@@ -1,0 +1,3 @@
+Kenney.nl Platformer Characters
+License: CC0 (Public Domain)
+Source: https://opengameart.org/content/platformer-characters

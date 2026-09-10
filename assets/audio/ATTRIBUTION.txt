@@ -1,0 +1,4 @@
+Audio assets in this folder (wall_bonk.wav, land_hup.wav, footstep.wav,
+charge_start.wav, jump_launch.wav, ambient_curious.wav)
+are original procedural sound effects created for the politropia project.
+Generated programmatically; no third-party samples were used.

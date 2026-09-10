@@ -1,0 +1,20 @@
+[gd_scene load_steps=4 format=3 uid="uid://blevel01politropia"]
+
+[ext_resource type="Script" path="res://scripts/levels/level_01.gd" id="1_level"]
+[ext_resource type="PackedScene" uid="uid://bplayer01politropia" path="res://scenes/player/player.tscn" id="2_player"]
+[ext_resource type="Script" path="res://scripts/camera/room_camera.gd" id="3_camera"]
+
+[node name="Level01" type="Node2D"]
+script = ExtResource("1_level")
+
+[node name="Backgrounds" type="Node2D" parent="."]
+
+[node name="Solids" type="Node2D" parent="."]
+
+[node name="Pickups" type="Node2D" parent="."]
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(360, 1240)
+
+[node name="RoomCamera" type="Camera2D" parent="."]
+script = ExtResource("3_camera")

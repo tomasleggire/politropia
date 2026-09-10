@@ -1,0 +1,42 @@
+Kenney Pixel Platformer (CC0)
+
+Assets extracted from "Kenney Pixel Platformer" by Kenney (www.kenney.nl).
+
+License: CC0 1.0 Universal (Public Domain)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+You may use these assets for any purpose, including commercial projects,
+without attribution required (attribution is appreciated).
+
+Source: https://opengameart.org/content/pixel-platformer
+Downloaded from: https://opengameart.org/sites/default/files/kenney_pixel-platformer.zip
+
+Files: background.png, background_hills.png, cloud.png, ground.png, wall.png
+
+
+Kenney Background Elements (CC0)
+
+Assets extracted from "Background elements" by Kenney (www.kenney.nl).
+
+License: CC0 1.0 Universal (Public Domain)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Source: https://opengameart.org/content/background-elements
+Downloaded from: https://opengameart.org/sites/default/files/kenney_backgroundElements.zip
+
+Files: forest_bg.png (from Samples/colored_forest.png)
+
+
+Kenney Foliage Pack (CC0)
+
+Assets extracted from "Foliage Pack (100x)" by Kenney (www.kenney.nl).
+
+License: CC0 1.0 Universal (Public Domain)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Source: https://opengameart.org/content/foliage-pack-100x
+Downloaded from: https://opengameart.org/sites/default/files/kenney_foliagePack.zip
+
+Files:
+  tree.png  — foliagePack_027.png (tall pine tree)
+  bush.png  — foliagePack_050.png (low shrub)

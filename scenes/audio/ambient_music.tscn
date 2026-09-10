@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://bambientmusicpolitropia"]
+
+[ext_resource type="Script" path="res://scripts/audio/ambient_music.gd" id="1_ambient"]
+[ext_resource type="AudioStream" path="res://assets/audio/ambient_curious.wav" id="2_stream"]
+
+[node name="AmbientMusic" type="Node"]
+script = ExtResource("1_ambient")
+ambient_stream = ExtResource("2_stream")
+volume_db = -14.0
