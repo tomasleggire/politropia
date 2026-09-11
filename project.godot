@@ -18,7 +18,6 @@ config/icon="res://icon.svg"
 [autoload]
 
 TouchControls="*res://scenes/ui/touch_controls.tscn"
-AmbientMusic="*res://scenes/audio/ambient_music.tscn"
 
 [display]
 

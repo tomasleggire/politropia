@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3 uid="uid://bplayer01politropia"]
+[gd_scene load_steps=20 format=3 uid="uid://bplayer01politropia"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://scripts/player/jump_charge_meter.gd" id="2_meter"]
@@ -15,6 +15,7 @@
 [ext_resource type="AudioStream" path="res://assets/audio/footstep.wav" id="13_foot"]
 [ext_resource type="AudioStream" path="res://assets/audio/charge_start.wav" id="14_charge"]
 [ext_resource type="AudioStream" path="res://assets/audio/jump_launch.wav" id="15_jump"]
+[ext_resource type="AudioStream" path="res://assets/audio/fall_hapish.wav" id="16_fall"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(34, 52)
@@ -106,6 +107,11 @@ bus = &"Master"
 [node name="SfxLand" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("12_land_sfx")
 volume_db = -1.0
+bus = &"Master"
+
+[node name="SfxFall" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("16_fall")
+volume_db = 0.0
 bus = &"Master"
 
 [node name="SfxFoot" type="AudioStreamPlayer" parent="."]

@@ -75,7 +75,8 @@ def make_wall_bonk() -> list[float]:
 
 
 def make_land_hup() -> list[float]:
-    duration = 0.22
+    """Soft landing (hop OK)."""
+    duration = 0.16
     n = int(SAMPLE_RATE * duration)
     rng = random.Random(77)
     samples: list[float] = []
@@ -83,29 +84,63 @@ def make_land_hup() -> list[float]:
     for i in range(n):
         t = i / SAMPLE_RATE
 
-        # Muffled low thump (~90 Hz with fast pitch drop)
-        thump_freq = lerp(95.0, 55.0, smoothstep(0.0, 0.06, t))
+        thump_freq = lerp(110.0, 70.0, smoothstep(0.0, 0.05, t))
         thump_phase = 2.0 * math.pi * thump_freq * t
         thump = math.sin(thump_phase)
-        thump += 0.25 * math.sin(thump_phase * 0.5)
-        thump_env = exp_decay(t, 16.0) * smoothstep(0.0, 0.004, t)
+        thump += 0.2 * math.sin(thump_phase * 0.5)
+        thump_env = exp_decay(t, 20.0) * smoothstep(0.0, 0.003, t)
 
-        # Tiny "hap" click: short higher blip around 6–18 ms
-        hap_t = t - 0.006
-        hap = 0.0
-        if 0.0 <= hap_t <= 0.035:
-            hap_freq = lerp(680.0, 420.0, hap_t / 0.035)
-            hap = math.sin(2.0 * math.pi * hap_freq * hap_t)
-            hap *= exp_decay(hap_t, 55.0) * smoothstep(0.0, 0.002, hap_t)
-
-        # Subtle soft noise for fabric/body feel
-        noise = (rng.random() * 2.0 - 1.0) * exp_decay(t, 30.0) * 0.08
-
-        sample = thump * thump_env * 0.55 + hap * 0.42 + noise
-        sample *= exp_decay(t, 8.0)  # gentle overall tail
-        samples.append(clamp(sample * 0.9))
+        noise = (rng.random() * 2.0 - 1.0) * exp_decay(t, 36.0) * 0.06
+        sample = thump * thump_env * 0.5 + noise
+        sample *= exp_decay(t, 10.0)
+        samples.append(clamp(sample * 0.75))
 
     return samples
+
+
+def make_fall_hapish() -> list[float]:
+    """Hard fall: body thud + clear 'hapish' (Jump King faceplant feel)."""
+    duration = 0.32
+    n = int(SAMPLE_RATE * duration)
+    rng = random.Random(101)
+    samples: list[float] = []
+
+    for i in range(n):
+        t = i / SAMPLE_RATE
+
+        # Heavy body slam
+        thump_freq = lerp(78.0, 38.0, smoothstep(0.0, 0.09, t))
+        thump_phase = 2.0 * math.pi * thump_freq * t
+        thump = math.sin(thump_phase)
+        thump += 0.4 * math.sin(thump_phase * 0.5)
+        thump += 0.18 * math.sin(thump_phase * 2.1)
+        thump_env = exp_decay(t, 11.0) * smoothstep(0.0, 0.004, t)
+
+        # Distinct "hapish" / air-out-of-lungs blip
+        hap_t = t - 0.012
+        hap = 0.0
+        if 0.0 <= hap_t <= 0.07:
+            hap_freq = lerp(560.0, 260.0, hap_t / 0.07)
+            hap = math.sin(2.0 * math.pi * hap_freq * hap_t)
+            hap += 0.35 * math.sin(2.0 * math.pi * hap_freq * 1.5 * hap_t)
+            hap *= exp_decay(hap_t, 28.0) * smoothstep(0.0, 0.003, hap_t)
+
+        # Cloth / impact noise burst
+        noise = (rng.random() * 2.0 - 1.0) * exp_decay(t, 18.0) * 0.22
+        noise *= smoothstep(0.0, 0.006, t)
+
+        # Soft second bounce of body
+        second_t = t - 0.09
+        second = 0.0
+        if second_t > 0.0:
+            second = math.sin(2.0 * math.pi * lerp(90.0, 50.0, second_t / 0.1) * second_t)
+            second *= exp_decay(second_t, 20.0) * 0.28
+
+        sample = thump * thump_env * 0.7 + hap * 0.55 + noise + second
+        sample *= exp_decay(t, 5.5)
+        samples.append(clamp(sample))
+
+    return normalize_peak(samples, target_peak=0.92)
 
 
 def normalize_peak(samples: list[float], target_peak: float = 0.85) -> list[float]:
@@ -284,14 +319,128 @@ def make_jump_launch() -> list[float]:
     return [clamp(s * scale) for s in samples]
 
 
+def make_ambient_room_a() -> list[float]:
+    """Sala 1: grave, seco, poco movimiento."""
+    duration = 6.0
+    n = int(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    voices = [
+        {"cycles": 330, "phase": 0.2, "amp": 0.28},   # 55 Hz
+        {"cycles": 396, "phase": 1.1, "amp": 0.18},
+        {"cycles": 495, "phase": 2.0, "amp": 0.12},
+    ]
+    for i in range(n):
+        lp = i / n
+        mix = 0.0
+        for v in voices:
+            mix += v["amp"] * math.sin(2.0 * math.pi * v["cycles"] * lp + v["phase"])
+        swell = 0.9 + 0.1 * math.sin(2.0 * math.pi * lp)
+        samples.append(clamp(mix * swell * 0.55))
+    # crossfade loop
+    cf = int(0.05 * n)
+    for i in range(cf):
+        t = smoothstep(0.0, 1.0, i / max(cf - 1, 1))
+        samples[i] = lerp(samples[n - cf + i], samples[i], t)
+        samples[n - cf + i] = samples[i]
+    return normalize_peak(samples, 0.16)
+
+
+def make_ambient_room_b() -> list[float]:
+    """Sala 2: más aire / eco frío."""
+    duration = 6.0
+    n = int(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    voices = [
+        {"cycles": 396, "phase": 0.4, "amp": 0.20},
+        {"cycles": 528, "phase": 1.5, "amp": 0.16},
+        {"cycles": 660, "phase": 2.2, "amp": 0.12},
+        {"cycles": 792, "phase": 0.8, "amp": 0.08},
+        {"cycles": 990, "phase": 2.8, "amp": 0.05},
+    ]
+    for i in range(n):
+        lp = i / n
+        mix = 0.0
+        for v in voices:
+            mix += v["amp"] * math.sin(2.0 * math.pi * v["cycles"] * lp + v["phase"])
+        air = 0.88 + 0.12 * math.sin(4.0 * math.pi * lp + 0.5)
+        samples.append(clamp(mix * air * 0.5))
+    cf = int(0.05 * n)
+    for i in range(cf):
+        t = smoothstep(0.0, 1.0, i / max(cf - 1, 1))
+        samples[i] = lerp(samples[n - cf + i], samples[i], t)
+        samples[n - cf + i] = samples[i]
+    return normalize_peak(samples, 0.15)
+
+
+def make_pickup_chime() -> list[float]:
+    duration = 0.35
+    n = int(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    for i in range(n):
+        t = i / SAMPLE_RATE
+        s = 0.0
+        for f, amp in ((660.0, 0.45), (880.0, 0.28), (1320.0, 0.16)):
+            s += amp * math.sin(2.0 * math.pi * f * t) * exp_decay(t, 7.0 + f / 400.0)
+        s *= smoothstep(0.0, 0.004, t)
+        samples.append(clamp(s))
+    return normalize_peak(samples, 0.85)
+
+
+def make_item_notice() -> list[float]:
+    duration = 0.22
+    n = int(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    for i in range(n):
+        t = i / SAMPLE_RATE
+        f = lerp(420.0, 640.0, smoothstep(0.0, 0.12, t))
+        s = math.sin(2.0 * math.pi * f * t) * exp_decay(t, 12.0)
+        s += 0.2 * math.sin(2.0 * math.pi * f * 1.5 * t) * exp_decay(t, 16.0)
+        samples.append(clamp(s * smoothstep(0.0, 0.003, t)))
+    return normalize_peak(samples, 0.55)
+
+
+def make_mark_whisper() -> list[float]:
+    duration = 0.28
+    n = int(SAMPLE_RATE * duration)
+    rng = random.Random(55)
+    samples: list[float] = []
+    for i in range(n):
+        t = i / SAMPLE_RATE
+        noise = (rng.random() * 2.0 - 1.0) * exp_decay(t, 10.0) * 0.35
+        tone = math.sin(2.0 * math.pi * lerp(180.0, 120.0, t / duration) * t)
+        tone *= exp_decay(t, 8.0) * 0.25
+        samples.append(clamp((noise + tone) * smoothstep(0.0, 0.02, t)))
+    return normalize_peak(samples, 0.4)
+
+
+def make_room_enter() -> list[float]:
+    duration = 0.4
+    n = int(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    for i in range(n):
+        t = i / SAMPLE_RATE
+        f = lerp(90.0, 55.0, smoothstep(0.0, 0.25, t))
+        s = math.sin(2.0 * math.pi * f * t) * exp_decay(t, 5.0) * 0.5
+        s += math.sin(2.0 * math.pi * f * 2.0 * t) * exp_decay(t, 7.0) * 0.15
+        samples.append(clamp(s * smoothstep(0.0, 0.01, t)))
+    return normalize_peak(samples, 0.5)
+
+
 def main() -> None:
     files = {
         "wall_bonk.wav": make_wall_bonk(),
         "land_hup.wav": make_land_hup(),
+        "fall_hapish.wav": make_fall_hapish(),
         "footstep.wav": make_footstep(),
         "charge_start.wav": make_charge_start(),
         "jump_launch.wav": make_jump_launch(),
         "ambient_curious.wav": make_ambient_curious(),
+        "ambient_room_a.wav": make_ambient_room_a(),
+        "ambient_room_b.wav": make_ambient_room_b(),
+        "pickup_chime.wav": make_pickup_chime(),
+        "item_notice.wav": make_item_notice(),
+        "mark_whisper.wav": make_mark_whisper(),
+        "room_enter.wav": make_room_enter(),
     }
 
     for name, samples in files.items():
@@ -300,16 +449,15 @@ def main() -> None:
         size = path.stat().st_size
         peak = max(abs(s) for s in samples)
         line = f"{path}  ({size:,} bytes)"
-        if name == "ambient_curious.wav":
+        if name.startswith("ambient"):
             line += f"  peak={peak:.4f}"
         print(line)
 
     attribution = OUTPUT_DIR / "ATTRIBUTION.txt"
     attribution.write_text(
-        "Audio assets in this folder (wall_bonk.wav, land_hup.wav, footstep.wav,\n"
-        "charge_start.wav, jump_launch.wav, ambient_curious.wav)\n"
-        "are original procedural sound effects created for the politropia project.\n"
-        "Generated programmatically; no third-party samples were used.\n",
+        "Audio assets in this folder are original procedural sound effects\n"
+        "created for the politropia project. Generated programmatically;\n"
+        "no third-party samples were used.\n",
         encoding="utf-8",
     )
     print(f"{attribution}  ({attribution.stat().st_size:,} bytes)")

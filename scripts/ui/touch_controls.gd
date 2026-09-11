@@ -1,76 +1,138 @@
 extends CanvasLayer
 
-## Controles táctiles.
-## - Mantener en cualquier parte de la pantalla = cargar salto
-## - ◀ y ▶ abajo, separados (space-between)
+## Controles:
+## - Mitad izquierda de la pantalla = izquierda
+## - Mitad derecha = derecha
+## - Círculo SALTO (misma posición): tap = saltito, hold = cargar
+## Mientras cargás, deslizá L/R sobre el salto para apuntar.
 
 @export var force_visible: bool = false
 
-@onready var _jump_area: Control = $Root/JumpArea
-@onready var _button_left: BaseButton = $Root/MoveBar/Left
-@onready var _button_right: BaseButton = $Root/MoveBar/Right
+const AIM_DEADZONE := 12.0
 
-var _jump_touch_index: int = -1
-var _jump_mouse_held: bool = false
+var _move_touch: int = -1
+var _move_side: int = 0
+var _jump_touch: int = -1
+var _jump_origin: Vector2 = Vector2.ZERO
+
+@onready var _root: Control = $Root
+@onready var _jump: BaseButton = $Root/JumpButton
 
 
 func _ready() -> void:
 	layer = 100
 	_apply_visibility()
-	_connect_button(_button_left, &"move_left")
-	_connect_button(_button_right, &"move_right")
-	_jump_area.gui_input.connect(_on_jump_area_gui_input)
+	_jump.button_down.connect(_on_jump_down)
+	_jump.button_up.connect(_on_jump_up)
+
+
+func _input(event: InputEvent) -> void:
+	if not visible:
+		return
+
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed:
+			_on_touch_pressed(touch)
+		else:
+			_on_touch_released(touch)
+	elif event is InputEventScreenDrag:
+		_on_touch_drag(event as InputEventScreenDrag)
+
+
+func _on_touch_pressed(touch: InputEventScreenTouch) -> void:
+	# El botón de salto se maneja por su signal; solo trackeamos aim.
+	if _jump.get_global_rect().has_point(touch.position):
+		if _jump_touch < 0:
+			_jump_touch = touch.index
+			_jump_origin = touch.position
+		return
+
+	if _move_touch >= 0:
+		return
+
+	_move_touch = touch.index
+	_move_side = _side_from_x(touch.position.x)
+	_press_dir(_move_side)
+	get_viewport().set_input_as_handled()
+
+
+func _on_touch_released(touch: InputEventScreenTouch) -> void:
+	if touch.index == _move_touch:
+		_end_move()
+		get_viewport().set_input_as_handled()
+	if touch.index == _jump_touch:
+		_jump_touch = -1
+		_clear_aim_from_jump()
+
+
+func _on_touch_drag(drag: InputEventScreenDrag) -> void:
+	if drag.index == _move_touch:
+		var side := _side_from_x(drag.position.x)
+		if side != _move_side:
+			_release_dirs()
+			_move_side = side
+			_press_dir(_move_side)
+		get_viewport().set_input_as_handled()
+		return
+
+	if drag.index == _jump_touch and Input.is_action_pressed(&"jump"):
+		var dx := drag.position.x - _jump_origin.x
+		_release_dirs()
+		if dx < -AIM_DEADZONE:
+			Input.action_press(&"move_left")
+		elif dx > AIM_DEADZONE:
+			Input.action_press(&"move_right")
+		get_viewport().set_input_as_handled()
+
+
+func _side_from_x(x: float) -> int:
+	return -1 if x < _root.size.x * 0.5 else 1
+
+
+func _press_dir(side: int) -> void:
+	if side < 0:
+		Input.action_press(&"move_left")
+	elif side > 0:
+		Input.action_press(&"move_right")
+
+
+func _end_move() -> void:
+	_move_touch = -1
+	_move_side = 0
+	if _jump_touch < 0:
+		_release_dirs()
+
+
+func _clear_aim_from_jump() -> void:
+	if _move_touch < 0:
+		_release_dirs()
+
+
+func _on_jump_down() -> void:
+	Input.action_press(&"jump")
+
+
+func _on_jump_up() -> void:
+	if Input.is_action_pressed(&"jump"):
+		Input.action_release(&"jump")
+	_jump_touch = -1
+	_clear_aim_from_jump()
+
+
+func _release_dirs() -> void:
+	if Input.is_action_pressed(&"move_left"):
+		Input.action_release(&"move_left")
+	if Input.is_action_pressed(&"move_right"):
+		Input.action_release(&"move_right")
 
 
 func _apply_visibility() -> void:
-	var should_show := (
+	visible = (
 		force_visible
 		or OS.has_feature("mobile")
 		or DisplayServer.is_touchscreen_available()
 	)
-	visible = should_show
-
-
-func _connect_button(button: BaseButton, action: StringName) -> void:
-	button.button_down.connect(_on_action_down.bind(action))
-	button.button_up.connect(_on_action_up.bind(action))
-
-
-func _on_action_down(action: StringName) -> void:
-	Input.action_press(action)
-
-
-func _on_action_up(action: StringName) -> void:
-	if Input.is_action_pressed(action):
-		Input.action_release(action)
-
-
-func _on_jump_area_gui_input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch:
-		var touch := event as InputEventScreenTouch
-		if touch.pressed and _jump_touch_index < 0:
-			_jump_touch_index = touch.index
-			Input.action_press(&"jump")
-			_jump_area.accept_event()
-		elif not touch.pressed and touch.index == _jump_touch_index:
-			_jump_touch_index = -1
-			if Input.is_action_pressed(&"jump"):
-				Input.action_release(&"jump")
-			_jump_area.accept_event()
-		return
-
-	# Útil para probar en editor con mouse.
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		var mouse := event as InputEventMouseButton
-		if mouse.pressed and not _jump_mouse_held:
-			_jump_mouse_held = true
-			Input.action_press(&"jump")
-			_jump_area.accept_event()
-		elif not mouse.pressed and _jump_mouse_held:
-			_jump_mouse_held = false
-			if Input.is_action_pressed(&"jump"):
-				Input.action_release(&"jump")
-			_jump_area.accept_event()
 
 
 func _notification(what: int) -> void:
@@ -79,8 +141,8 @@ func _notification(what: int) -> void:
 
 
 func _release_all() -> void:
-	_jump_touch_index = -1
-	_jump_mouse_held = false
+	_end_move()
+	_jump_touch = -1
 	for action in [&"move_left", &"move_right", &"jump"]:
 		if Input.is_action_pressed(action):
 			Input.action_release(action)

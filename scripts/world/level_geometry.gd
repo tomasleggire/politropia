@@ -3,6 +3,8 @@ extends RefCounted
 
 ## Utilidad para armar colisiones y visuales sólidos de forma prolija.
 
+const TILE_PX := 28.0
+
 
 static func add_solid(
 	parent: Node2D,
@@ -20,103 +22,135 @@ static func add_solid(
 	collision.shape = shape
 	body.add_child(collision)
 
-	var half := rect.size * 0.5
-	var visual := Polygon2D.new()
-	visual.polygon = PackedVector2Array([
-		Vector2(-half.x, -half.y),
-		Vector2(half.x, -half.y),
-		Vector2(half.x, half.y),
-		Vector2(-half.x, half.y),
-	])
-
 	if texture != null:
-		visual.texture = texture
-		visual.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		visual.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-		visual.uv = PackedVector2Array([
-			Vector2(0.0, 0.0),
-			Vector2(rect.size.x, 0.0),
-			Vector2(rect.size.x, rect.size.y),
-			Vector2(0.0, rect.size.y),
-		])
-		visual.color = Color(1, 1, 1, 1)
+		var sprite := Sprite2D.new()
+		sprite.texture = texture
+		sprite.centered = true
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+		var tex_w := float(texture.get_width())
+		var tex_h := float(texture.get_height())
+		sprite.region_enabled = true
+		sprite.region_rect = Rect2(
+			0.0,
+			0.0,
+			(rect.size.x / TILE_PX) * tex_w,
+			(rect.size.y / TILE_PX) * tex_h
+		)
+		sprite.scale = Vector2(TILE_PX / tex_w, TILE_PX / tex_h)
+		body.add_child(sprite)
 	else:
+		var half := rect.size * 0.5
+		var visual := Polygon2D.new()
 		visual.color = color
+		visual.polygon = PackedVector2Array([
+			Vector2(-half.x, -half.y),
+			Vector2(half.x, -half.y),
+			Vector2(half.x, half.y),
+			Vector2(-half.x, half.y),
+		])
+		body.add_child(visual)
 
-	body.add_child(visual)
 	parent.add_child(body)
 	return body
 
 
-static func add_forest_background(
+static func add_flat_background(
 	parent: Node2D,
 	room: Vector2i,
 	room_size: Vector2,
-	color: Color,
-	forest_tex: Texture2D,
-	tree_tex: Texture2D = null,
-	bush_tex: Texture2D = null
+	color: Color
 ) -> void:
 	var origin := Vector2(room) * room_size
-
-	var base := Polygon2D.new()
-	base.z_index = -30
-	base.color = color
-	base.polygon = PackedVector2Array([
+	var visual := Polygon2D.new()
+	visual.z_index = -20
+	visual.color = color
+	visual.polygon = PackedVector2Array([
 		origin,
 		origin + Vector2(room_size.x, 0.0),
 		origin + room_size,
 		origin + Vector2(0.0, room_size.y),
 	])
-	parent.add_child(base)
+	parent.add_child(visual)
 
-	var bg := Sprite2D.new()
-	bg.z_index = -25
-	bg.texture = forest_tex
-	bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	bg.centered = true
-	bg.position = origin + room_size * 0.5
-	bg.scale = room_size / Vector2(forest_tex.get_size())
-	bg.modulate = Color(0.55, 0.65, 0.55, 1.0)
-	parent.add_child(bg)
 
-	if tree_tex != null:
-		var tree_spots := [
-			Vector2(0.10, 0.78),
-			Vector2(0.26, 0.74),
-			Vector2(0.44, 0.80),
-			Vector2(0.62, 0.73),
-			Vector2(0.80, 0.77),
-			Vector2(0.18, 0.48),
-			Vector2(0.72, 0.46),
-			Vector2(0.50, 0.55),
-		]
-		for ratio in tree_spots:
-			var tree := Sprite2D.new()
-			tree.z_index = -20
-			tree.texture = tree_tex
-			tree.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			tree.centered = true
-			tree.offset = Vector2(0, -tree_tex.get_height() * 0.4)
-			tree.position = origin + Vector2(room_size.x * ratio.x, room_size.y * ratio.y)
-			var scale_factor: float = 1.3 + ratio.x * 0.2
-			tree.scale = Vector2(scale_factor, scale_factor)
-			tree.modulate = Color(0.7, 0.85, 0.7, 0.95)
-			parent.add_child(tree)
+static func add_atmosphere_background(
+	parent: Node2D,
+	room: Vector2i,
+	room_size: Vector2,
+	top_color: Color,
+	bottom_color: Color,
+	accent_color: Color
+) -> void:
+	var origin := Vector2(room) * room_size
+	var bands := 8
+	for i in bands:
+		var t0 := float(i) / float(bands)
+		var t1 := float(i + 1) / float(bands)
+		var y0 := origin.y + room_size.y * t0
+		var y1 := origin.y + room_size.y * t1
+		var c := top_color.lerp(bottom_color, (t0 + t1) * 0.5)
+		var band := Polygon2D.new()
+		band.z_index = -20
+		band.color = c
+		band.polygon = PackedVector2Array([
+			Vector2(origin.x, y0),
+			Vector2(origin.x + room_size.x, y0),
+			Vector2(origin.x + room_size.x, y1),
+			Vector2(origin.x, y1),
+		])
+		parent.add_child(band)
 
-	if bush_tex != null:
-		var bush_spots := [
-			Vector2(0.20, 0.92),
-			Vector2(0.48, 0.94),
-			Vector2(0.76, 0.91),
-		]
-		for ratio in bush_spots:
-			var bush := Sprite2D.new()
-			bush.z_index = -18
-			bush.texture = bush_tex
-			bush.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			bush.centered = true
-			bush.position = origin + Vector2(room_size.x * ratio.x, room_size.y * ratio.y)
-			bush.scale = Vector2(1.2, 1.2)
-			bush.modulate = Color(0.55, 0.7, 0.5, 0.85)
-			parent.add_child(bush)
+	# Siluetas lejanas (no colliders).
+	for i in 5:
+		var sil := Polygon2D.new()
+		sil.z_index = -18
+		sil.color = Color(accent_color.r, accent_color.g, accent_color.b, 0.18)
+		var w := 40.0 + float(i) * 18.0
+		var h := 120.0 + float((i * 37) % 90)
+		var x := origin.x + 80.0 + float(i) * 120.0
+		var y := origin.y + room_size.y - 80.0
+		sil.polygon = PackedVector2Array([
+			Vector2(x, y),
+			Vector2(x + w * 0.5, y - h),
+			Vector2(x + w, y),
+		])
+		parent.add_child(sil)
+
+
+static func add_dust_motes(
+	parent: Node2D,
+	room: Vector2i,
+	room_size: Vector2,
+	count: int,
+	color: Color
+) -> void:
+	var origin := Vector2(room) * room_size
+	var dust := Node2D.new()
+	dust.z_index = -10
+	dust.set_script(load("res://scripts/world/dust_motes.gd"))
+	dust.set("room_origin", origin)
+	dust.set("room_size", room_size)
+	dust.set("mote_count", count)
+	dust.set("mote_color", color)
+	parent.add_child(dust)
+
+
+static func add_broken_ledge(
+	parent: Node2D,
+	rect: Rect2,
+	color: Color,
+	texture: Texture2D = null
+) -> void:
+	# Plataforma “rota”: visual irregular + collider un poco más corto.
+	add_solid(parent, rect, color, texture)
+	var chip := Polygon2D.new()
+	chip.z_index = 1
+	chip.color = Color(color.r * 0.7, color.g * 0.7, color.b * 0.7, 1.0)
+	var tip := rect.position + Vector2(rect.size.x + 8.0, rect.size.y * 0.5)
+	chip.polygon = PackedVector2Array([
+		tip + Vector2(-18, -10),
+		tip + Vector2(10, 0),
+		tip + Vector2(-18, 10),
+	])
+	parent.add_child(chip)
