@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dlkkqvtpuvoq0"
-path="res://.godot/imported/forest_bg.png-0fc88b28fe363573f7a1a1e7fd1d758b.ctex"
+uid="uid://6ioaibes4w7d"
+path="res://.godot/imported/top_down_hero_sheet.png-45c05f234ef2707975365fea15cf4153.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/world/forest_bg.png"
-dest_files=["res://.godot/imported/forest_bg.png-0fc88b28fe363573f7a1a1e7fd1d758b.ctex"]
+source_file="res://assets/player/top_down_hero_sheet.png"
+dest_files=["res://.godot/imported/top_down_hero_sheet.png-45c05f234ef2707975365fea15cf4153.ctex"]
 
 [params]
 

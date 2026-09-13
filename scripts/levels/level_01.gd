@@ -1,170 +1,200 @@
 extends Node2D
 
-## Dos pantallas verticales pulidas: Umbral → Lo que se aclara.
+## Tres habitaciones top-down conectadas, enteramente dibujadas con colores planos.
 
 const ROOM_SIZE := Vector2(720, 1280)
-
-const PLAT_COLOR := Color(0.40, 0.52, 0.30, 1.0)
-const FLOOR_COLOR := Color(0.28, 0.34, 0.22, 1.0)
-const WALL_COLOR := Color(0.33, 0.28, 0.24, 1.0)
-
-const TEX_DIRT := preload("res://assets/world/tex_dirt.png")
-const TEX_STONE := preload("res://assets/world/tex_stone.png")
-const SFX_PICKUP := preload("res://assets/audio/pickup_chime.wav")
-const SFX_NOTICE := preload("res://assets/audio/item_notice.wav")
-const SFX_WHISPER := preload("res://assets/audio/mark_whisper.wav")
+const TOTAL_SPARKS := 3
 
 @onready var _player: Player = $Player
 @onready var _camera: RoomCamera = $RoomCamera
-@onready var _solids: Node2D = $Solids
 @onready var _backgrounds: Node2D = $Backgrounds
-@onready var _pickups: Node2D = $Pickups
 @onready var _decor: Node2D = $Decor
-@onready var _story: StoryLine = $StoryLine
-@onready var _ambience: RoomAmbience = $RoomAmbience
+@onready var _solids: Node2D = $Solids
+@onready var _pickups: Node2D = $Pickups
+@onready var _top_card: Panel = $Interface/Root/TopCard
+@onready var _room_title: Label = $Interface/Root/TopCard/RoomTitle
+@onready var _room_subtitle: Label = $Interface/Root/TopCard/RoomSubtitle
+@onready var _counter: Label = $Interface/Root/Counter/Text
+@onready var _hint: Panel = $Interface/Root/Hint
+@onready var _overlay: ColorRect = $Interface/Root/TransitionOverlay
 
-var _upper_seal: RoomMark
+var _collected := 0
+var _title_tween: Tween
+var _hint_tween: Tween
 
 
 func _ready() -> void:
-	_player.add_to_group("player")
-	_camera.target = _player
-	_camera.room_changed.connect(_on_room_changed)
+	_player.add_to_group(&"player")
 	_build_level()
-	_ambience.update_room(Vector2i(0, 0))
-
-
-func _plat(rect: Rect2) -> void:
-	LevelGeometry.add_solid(_solids, rect, PLAT_COLOR, TEX_DIRT)
-
-
-func _floor(rect: Rect2) -> void:
-	LevelGeometry.add_solid(_solids, rect, FLOOR_COLOR, null)
-
-
-func _wall(rect: Rect2) -> void:
-	LevelGeometry.add_solid(_solids, rect, WALL_COLOR, TEX_STONE)
+	_camera.room_changed.connect(_on_room_changed)
+	_camera.follow(_player)
+	_show_room_title(Vector2i.ZERO, true)
+	_update_counter()
+	_hint_tween = create_tween()
+	_hint_tween.tween_interval(4.8)
+	_hint_tween.tween_property(_hint, "modulate:a", 0.0, 0.65)
 
 
 func _build_level() -> void:
-	_build_start_room()
-	_build_upper_room()
+	_build_threshold_room()
+	_build_chamber_room()
+	_build_sanctuary_room()
 
 
-func _build_start_room() -> void:
-	# Sala 1 — El umbral (cálida, polvo, tutorial implícito).
-	LevelGeometry.add_atmosphere_background(
-		_backgrounds,
-		Vector2i(0, 0),
-		ROOM_SIZE,
-		Color(0.62, 0.48, 0.36, 1.0),
-		Color(0.42, 0.30, 0.24, 1.0),
-		Color(0.25, 0.18, 0.14, 1.0)
+func _build_threshold_room() -> void:
+	LevelGeometry.add_room(
+		_backgrounds, _solids, _decor, Vector2i(0, 0), ROOM_SIZE,
+		Color("283941"), Color("4c6067"), [&"right"]
 	)
-	LevelGeometry.add_dust_motes(
-		_decor, Vector2i(0, 0), ROOM_SIZE, 22, Color(1.0, 0.9, 0.7, 0.22)
+	LevelGeometry.add_solid_rect(_solids, Rect2(92, 250, 176, 78), Color("526d70"))
+	LevelGeometry.add_circle_obstacle(_solids, Vector2(520, 356), 62, Color("49676a"))
+	LevelGeometry.add_solid_rect(_solids, Rect2(225, 860, 270, 92), Color("425e62"))
+	LevelGeometry.add_circle_obstacle(_solids, Vector2(145, 1040), 46, Color("4f6a6d"))
+	_add_room_rug(Vector2(360, 625), Vector2(250, 300), Color(0.32, 0.56, 0.56, 0.11))
+	_add_spark(Vector2(360, 438), Color("66d9c8"))
+
+
+func _build_chamber_room() -> void:
+	var origin := Vector2(ROOM_SIZE.x, 0)
+	LevelGeometry.add_room(
+		_backgrounds, _solids, _decor, Vector2i(1, 0), ROOM_SIZE,
+		Color("393447"), Color("655b73"), [&"left", &"top"]
 	)
-
-	_floor(Rect2(0, 1240, 720, 40))
-	_wall(Rect2(0, 0, 56, 1280))
-	_wall(Rect2(664, 0, 56, 1280))
-
-	# Escalones bajos: tap hops.
-	_plat(Rect2(120, 1120, 150, 24))
-	_plat(Rect2(380, 1020, 140, 24))
-	_plat(Rect2(160, 900, 130, 24))
-
-	# Plataforma del ítem-gancho (visible de entrada).
-	_plat(Rect2(300, 780, 200, 24))
-	var hook := HookItem.new()
-	hook.position = Vector2(400, 730)
-	hook.pickup_stream = SFX_PICKUP
-	hook.notice_stream = SFX_NOTICE
-	hook.story_text = "queda algo arriba"
-	hook.setup(_story)
-	_pickups.add_child(hook)
-
-	# Ruta hacia arriba + ledge rota (invita bounce).
-	_plat(Rect2(100, 660, 120, 24))
-	LevelGeometry.add_broken_ledge(_solids, Rect2(420, 560, 130, 24), PLAT_COLOR, TEX_DIRT)
-	_plat(Rect2(180, 440, 140, 24))
-	_plat(Rect2(400, 300, 150, 24))
-	_plat(Rect2(220, 160, 160, 24))
-	_plat(Rect2(360, 40, 180, 24))
-
-	_add_mark(Vector2(90, 1080), &"m1", "…no…", false, Color(0.95, 0.82, 0.62, 0.8))
-	_add_mark(Vector2(620, 860), &"m2", "¿otra vez?", false, Color(0.95, 0.82, 0.62, 0.8))
-	_add_mark(Vector2(90, 480), &"m3", "", false, Color(0.95, 0.82, 0.62, 0.55))
+	LevelGeometry.add_solid_rect(_solids, Rect2(origin + Vector2(245, 430), Vector2(230, 220)), Color("625975"))
+	LevelGeometry.add_circle_obstacle(_solids, origin + Vector2(555, 315), 53, Color("74667f"))
+	LevelGeometry.add_circle_obstacle(_solids, origin + Vector2(140, 930), 58, Color("695f78"))
+	LevelGeometry.add_solid_rect(_solids, Rect2(origin + Vector2(405, 970), Vector2(178, 82)), Color("5a506b"))
+	_add_room_rug(origin + Vector2(360, 770), Vector2(330, 270), Color(0.69, 0.45, 0.72, 0.10))
+	_add_spark(origin + Vector2(560, 820), Color("c18ee0"))
 
 
-func _build_upper_room() -> void:
-	# Sala 2 — Lo que se aclara (más fría, saltos cargados + wall bounce).
-	LevelGeometry.add_atmosphere_background(
-		_backgrounds,
-		Vector2i(0, -1),
-		ROOM_SIZE,
-		Color(0.34, 0.36, 0.48, 1.0),
-		Color(0.22, 0.24, 0.34, 1.0),
-		Color(0.16, 0.14, 0.28, 1.0)
+func _build_sanctuary_room() -> void:
+	var origin := Vector2(ROOM_SIZE.x, -ROOM_SIZE.y)
+	LevelGeometry.add_room(
+		_backgrounds, _solids, _decor, Vector2i(1, -1), ROOM_SIZE,
+		Color("2f443d"), Color("557166"), [&"bottom"]
 	)
-	LevelGeometry.add_dust_motes(
-		_decor, Vector2i(0, -1), ROOM_SIZE, 16, Color(0.75, 0.8, 1.0, 0.18)
-	)
-
-	_wall(Rect2(0, -1280, 56, 1280))
-	_wall(Rect2(664, -1280, 56, 1280))
-	_wall(Rect2(0, -1280, 720, 56))
-
-	# Entrada desde abajo.
-	_plat(Rect2(56, -28, 160, 24))
-	_plat(Rect2(500, -28, 160, 24))
-
-	_plat(Rect2(240, -160, 130, 24))
-	_plat(Rect2(90, -320, 110, 24))
-	# Momento pared → plataforma (rebote útil).
-	_plat(Rect2(520, -460, 100, 24))
-	_plat(Rect2(200, -620, 140, 24))
-	_plat(Rect2(430, -780, 150, 24))
-	_plat(Rect2(160, -940, 160, 24))
-	_plat(Rect2(300, -1100, 220, 28))
-
-	# Franja de marcas alineadas (resolución).
-	_add_mark(Vector2(120, -1080), &"u1", "", true, Color(0.85, 0.9, 1.0, 0.9))
-	_add_mark(Vector2(200, -1080), &"u2", "", true, Color(0.85, 0.9, 1.0, 0.9))
-	_upper_seal = _add_mark(
-		Vector2(360, -1080),
-		&"u_seal",
-		"podés subir igual",
-		true,
-		Color(1.0, 0.92, 0.55, 0.95)
-	)
+	LevelGeometry.add_circle_obstacle(_solids, origin + Vector2(170, 350), 56, Color("557569"))
+	LevelGeometry.add_circle_obstacle(_solids, origin + Vector2(550, 350), 56, Color("557569"))
+	LevelGeometry.add_solid_rect(_solids, Rect2(origin + Vector2(135, 770), Vector2(145, 78)), Color("4c6b60"))
+	LevelGeometry.add_solid_rect(_solids, Rect2(origin + Vector2(440, 770), Vector2(145, 78)), Color("4c6b60"))
+	_add_room_rug(origin + Vector2(360, 590), Vector2(315, 390), Color(0.45, 0.73, 0.59, 0.105))
+	_add_spark(origin + Vector2(360, 510), Color("f1c75b"))
 
 
-func _add_mark(
-	pos: Vector2,
-	mark_id: StringName,
-	text: String,
-	resolved: bool,
-	color: Color
-) -> RoomMark:
-	var mark := RoomMark.new()
-	mark.position = pos
-	mark.mark_id = mark_id
-	mark.story_text = text
-	mark.resolved = resolved
-	mark.glyph_color = color
-	mark.whisper_stream = SFX_WHISPER
-	mark.setup(_story)
-	if mark_id == &"u_seal":
-		mark.revealed.connect(_on_seal_revealed)
-	_decor.add_child(mark)
-	return mark
+func _add_room_rug(center: Vector2, size: Vector2, color: Color) -> void:
+	var rug := Polygon2D.new()
+	rug.position = center
+	rug.z_index = -8
+	rug.color = color
+	var half := size * 0.5
+	rug.polygon = PackedVector2Array([
+		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
+		Vector2(half.x, half.y), Vector2(-half.x, half.y),
+	])
+	_decor.add_child(rug)
 
 
-func _on_seal_revealed(_id: StringName) -> void:
-	if _player.has_meta("has_fragment") and bool(_player.get_meta("has_fragment")):
-		_story.show_line("el fragmento encaja", &"fragment_fit")
+func _add_spark(position: Vector2, color: Color) -> void:
+	var spark := Area2D.new()
+	spark.position = position
+	spark.collision_layer = 0
+	spark.collision_mask = 1
+	spark.z_index = 4
+
+	var shape := CircleShape2D.new()
+	shape.radius = 32.0
+	var collision := CollisionShape2D.new()
+	collision.shape = shape
+	spark.add_child(collision)
+
+	var shadow := Polygon2D.new()
+	shadow.position = Vector2(0, 9)
+	shadow.polygon = LevelGeometry.circle_points(27, 20)
+	shadow.color = Color(0.01, 0.015, 0.02, 0.32)
+	shadow.z_index = -1
+	spark.add_child(shadow)
+
+	var diamond := Polygon2D.new()
+	diamond.polygon = PackedVector2Array([Vector2(0, -27), Vector2(22, 0), Vector2(0, 27), Vector2(-22, 0)])
+	diamond.color = color
+	spark.add_child(diamond)
+
+	var core := Polygon2D.new()
+	core.polygon = LevelGeometry.circle_points(10, 16)
+	core.color = color.lightened(0.36)
+	spark.add_child(core)
+
+	_pickups.add_child(spark)
+	spark.body_entered.connect(_on_spark_collected.bind(spark))
+	var float_tween := spark.create_tween().set_loops()
+	float_tween.set_trans(Tween.TRANS_SINE)
+	float_tween.tween_property(spark, "position:y", position.y - 7.0, 0.72)
+	float_tween.tween_property(spark, "position:y", position.y + 7.0, 0.72)
 
 
-func _on_room_changed(room: Vector2i) -> void:
-	_ambience.update_room(room)
+func _on_spark_collected(body: Node2D, spark: Area2D) -> void:
+	if body != _player or not is_instance_valid(spark) or not spark.monitoring:
+		return
+	spark.set_deferred("monitoring", false)
+	_collected += 1
+	_update_counter()
+	var collect_tween := create_tween().set_parallel(true)
+	collect_tween.set_trans(Tween.TRANS_BACK)
+	collect_tween.set_ease(Tween.EASE_IN)
+	collect_tween.tween_property(spark, "scale", Vector2(1.8, 1.8), 0.22)
+	collect_tween.tween_property(spark, "modulate:a", 0.0, 0.22)
+	collect_tween.chain().tween_callback(spark.queue_free)
+	_flash(Color(0.95, 0.82, 0.45, 1), 0.15)
+	if _collected == TOTAL_SPARKS:
+		_room_subtitle.text = "Prototipo completo"
+		_room_subtitle.visible = true
+		_room_title.text = "LOS TRES DESTELLOS"
+		_show_top_card()
+
+
+func _update_counter() -> void:
+	_counter.text = "◆  %d / %d" % [_collected, TOTAL_SPARKS]
+
+
+func _on_room_changed(room: Vector2i, _direction: Vector2i) -> void:
+	_show_room_title(room, false)
+	_flash(Color(0.70, 0.90, 0.87, 1), 0.11)
+
+
+func _show_room_title(room: Vector2i, instant: bool) -> void:
+	match room:
+		Vector2i(0, 0):
+			_room_title.text = "EL UMBRAL"
+			_room_subtitle.text = ""
+		Vector2i(1, 0):
+			_room_title.text = "LA CÁMARA"
+			_room_subtitle.text = "Encontrá el camino hacia arriba"
+		Vector2i(1, -1):
+			_room_title.text = "EL SANTUARIO"
+			_room_subtitle.text = "La última luz espera"
+		_:
+			_room_title.text = "POLITROPIA"
+			_room_subtitle.text = ""
+	_room_subtitle.visible = not _room_subtitle.text.is_empty()
+	if instant:
+		_top_card.modulate.a = 1.0
+		return
+	_show_top_card()
+
+
+func _show_top_card() -> void:
+	if is_instance_valid(_title_tween):
+		_title_tween.kill()
+	_top_card.modulate.a = 0.0
+	_title_tween = create_tween()
+	_title_tween.tween_property(_top_card, "modulate:a", 1.0, 0.18)
+	_title_tween.tween_interval(1.55)
+	_title_tween.tween_property(_top_card, "modulate:a", 0.18, 0.42)
+
+
+func _flash(color: Color, peak_alpha: float) -> void:
+	_overlay.color = color
+	_overlay.modulate.a = peak_alpha
+	var tween := create_tween()
+	tween.tween_property(_overlay, "modulate:a", 0.0, 0.32)

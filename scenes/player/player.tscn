@@ -1,131 +1,33 @@
-[gd_scene load_steps=20 format=3 uid="uid://bplayer01politropia"]
+[gd_scene load_steps=4 format=3 uid="uid://bplayer01politropia"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
-[ext_resource type="Script" path="res://scripts/player/jump_charge_meter.gd" id="2_meter"]
-[ext_resource type="Texture2D" path="res://assets/player/adventurer/idle.png" id="3_idle"]
-[ext_resource type="Texture2D" path="res://assets/player/adventurer/walk_1.png" id="4_walk1"]
-[ext_resource type="Texture2D" path="res://assets/player/adventurer/walk_2.png" id="5_walk2"]
-[ext_resource type="Texture2D" path="res://assets/player/adventurer/charge.png" id="6_charge"]
-[ext_resource type="Texture2D" path="res://assets/player/adventurer/jump.png" id="7_jump"]
-[ext_resource type="Texture2D" path="res://assets/player/adventurer/fall.png" id="8_fall"]
-[ext_resource type="Texture2D" path="res://assets/player/adventurer/stand.png" id="9_stand"]
-[ext_resource type="Texture2D" path="res://assets/player/adventurer/land.png" id="10_land"]
-[ext_resource type="AudioStream" path="res://assets/audio/wall_bonk.wav" id="11_wall"]
-[ext_resource type="AudioStream" path="res://assets/audio/land_hup.wav" id="12_land_sfx"]
-[ext_resource type="AudioStream" path="res://assets/audio/footstep.wav" id="13_foot"]
-[ext_resource type="AudioStream" path="res://assets/audio/charge_start.wav" id="14_charge"]
-[ext_resource type="AudioStream" path="res://assets/audio/jump_launch.wav" id="15_jump"]
-[ext_resource type="AudioStream" path="res://assets/audio/fall_hapish.wav" id="16_fall"]
+[ext_resource type="Texture2D" path="res://assets/player/top_down_hero_sheet.png" id="2_hero"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
-size = Vector2(34, 52)
-
-[sub_resource type="SpriteFrames" id="SpriteFrames_player"]
-animations = [{
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("6_charge")
-}],
-"loop": true,
-"name": &"charge",
-"speed": 5.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("8_fall")
-}],
-"loop": true,
-"name": &"fall",
-"speed": 5.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("3_idle")
-}, {
-"duration": 1.0,
-"texture": ExtResource("9_stand")
-}],
-"loop": true,
-"name": &"idle",
-"speed": 2.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("7_jump")
-}],
-"loop": true,
-"name": &"jump",
-"speed": 5.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("10_land")
-}],
-"loop": false,
-"name": &"land",
-"speed": 5.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": ExtResource("4_walk1")
-}, {
-"duration": 1.0,
-"texture": ExtResource("5_walk2")
-}],
-"loop": true,
-"name": &"walk",
-"speed": 8.0
-}]
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 24.0
 
 [node name="Player" type="CharacterBody2D"]
 collision_layer = 1
 collision_mask = 1
-floor_stop_on_slope = true
-safe_margin = 0.1
+safe_margin = 0.08
+motion_mode = 1
 script = ExtResource("1_player")
 
+[node name="Shadow" type="Polygon2D" parent="."]
+z_index = -1
+position = Vector2(0, 13.5)
+color = Color(0.015, 0.02, 0.025, 0.34)
+polygon = PackedVector2Array(-26, 0, -22.517, -5, -13, -8.66, 0, -9, 13, -8.66, 22.517, -5, 26, 0, 22.517, 5, 13, 8.66, 0, 9, -13, 8.66, -22.517, 5)
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(-3.4, -17.2)
+scale = Vector2(0.265, 0.265)
+texture_filter = 1
+texture = ExtResource("2_hero")
+hframes = 4
+vframes = 4
+frame = 1
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, -26)
-shape = SubResource("RectangleShape2D_body")
-
-[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
-position = Vector2(0, -30)
-scale = Vector2(0.55, 0.55)
-sprite_frames = SubResource("SpriteFrames_player")
-animation = &"idle"
-autoplay = "idle"
-
-[node name="JumpChargeMeter" type="Node2D" parent="."]
-position = Vector2(0, -72)
-script = ExtResource("2_meter")
-
-[node name="SfxWall" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("11_wall")
-volume_db = -2.0
-bus = &"Master"
-
-[node name="SfxLand" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("12_land_sfx")
-volume_db = -1.0
-bus = &"Master"
-
-[node name="SfxFall" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("16_fall")
-volume_db = 0.0
-bus = &"Master"
-
-[node name="SfxFoot" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("13_foot")
-volume_db = -6.0
-max_polyphony = 2
-bus = &"Master"
-
-[node name="SfxCharge" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("14_charge")
-volume_db = -3.0
-bus = &"Master"
-
-[node name="SfxJump" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("15_jump")
-volume_db = -2.0
-bus = &"Master"
+position = Vector2(0, 14)
+shape = SubResource("CircleShape2D_body")

@@ -1,18 +1,48 @@
-[gd_scene load_steps=3 format=3 uid="uid://btouchcontrolspolitropia"]
+[gd_scene load_steps=5 format=3 uid="uid://btouchcontrolspolitropia"]
 
 [ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="1_touch"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jump"]
-bg_color = Color(0.95, 0.78, 0.22, 0.34)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_base"]
+bg_color = Color(0.09, 0.12, 0.15, 0.28)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(1, 0.9, 0.45, 0.8)
-corner_radius_top_left = 48
-corner_radius_top_right = 48
-corner_radius_bottom_right = 48
-corner_radius_bottom_left = 48
+border_color = Color(0.82, 0.9, 0.91, 0.16)
+corner_radius_top_left = 102
+corner_radius_top_right = 102
+corner_radius_bottom_right = 102
+corner_radius_bottom_left = 102
+shadow_color = Color(0, 0, 0, 0.14)
+shadow_size = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_knob"]
+bg_color = Color(0.42, 0.82, 0.78, 0.58)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.82, 1, 0.96, 0.42)
+corner_radius_top_left = 42
+corner_radius_top_right = 42
+corner_radius_bottom_right = 42
+corner_radius_bottom_left = 42
+shadow_color = Color(0, 0, 0, 0.16)
+shadow_size = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_attack"]
+bg_color = Color(0.86, 0.42, 0.28, 0.34)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.78, 0.55, 0.42)
+corner_radius_top_left = 78
+corner_radius_top_right = 78
+corner_radius_bottom_right = 78
+corner_radius_bottom_left = 78
+shadow_color = Color(0, 0, 0, 0.18)
+shadow_size = 6
 
 [node name="TouchControls" type="CanvasLayer"]
 script = ExtResource("1_touch")
@@ -26,24 +56,50 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="JumpButton" type="Button" parent="Root"]
+[node name="MoveZone" type="Control" parent="Root"]
+layout_mode = 1
+anchors_preset = 9
+anchor_right = 0.58
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="PadBase" type="Panel" parent="Root"]
+modulate = Color(1, 1, 1, 0.55)
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = -296.0
+offset_right = 232.0
+offset_bottom = -92.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_base")
+
+[node name="PadKnob" type="Panel" parent="Root/PadBase"]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 60.0
+offset_right = 144.0
+offset_bottom = 144.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_knob")
+
+[node name="AttackButton" type="Panel" parent="Root"]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -124.0
-offset_top = -292.0
-offset_right = -28.0
-offset_bottom = -196.0
+offset_left = -176.0
+offset_top = -236.0
+offset_right = -32.0
+offset_bottom = -92.0
 grow_horizontal = 0
 grow_vertical = 0
-focus_mode = 0
-theme_override_colors/font_color = Color(1, 1, 1, 0.92)
-theme_override_font_sizes/font_size = 18
-theme_override_styles/normal = SubResource("StyleBoxFlat_jump")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_jump")
-theme_override_styles/hover = SubResource("StyleBoxFlat_jump")
-theme_override_styles/focus = SubResource("StyleBoxFlat_jump")
-text = "↑"
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_attack")

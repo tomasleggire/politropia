@@ -1,0 +1,10 @@
+---
+description: Tras cambios de juego, instalar el build iOS en el iPhone conectado
+alwaysApply: true
+---
+
+# Deploy al celular
+
+Cuando el usuario pida cambios de juego (gameplay, UI, arte, niveles, controles) y esos cambios ya estén aplicados, exportá e instalá el build debug en el iPhone. No esperes a que lo pida de nuevo.
+
+Usá `tools/ios/deploy.sh`. Team `NN2XF448XH`, bundle `com.tomasleggire.politropia`. Preferí el iPhone que figure como `connected` en `xcrun devicectl list devices`.

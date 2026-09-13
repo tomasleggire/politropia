@@ -1,29 +1,47 @@
 extends CanvasLayer
 
-## Controles:
-## - Mitad izquierda de la pantalla = izquierda
-## - Mitad derecha = derecha
-## - Círculo SALTO (misma posición): tap = saltito, hold = cargar
-## Mientras cargás, deslizá L/R sobre el salto para apuntar.
+## Stick fijo abajo a la izquierda. Solo se mueve tocando ese pad.
 
 @export var force_visible: bool = false
 
-const AIM_DEADZONE := 12.0
+const MAX_RADIUS := 70.0
+const DEADZONE := 0.08
+const PAD_SIZE := Vector2(204.0, 204.0)
+const KNOB_REST := Vector2(60.0, 60.0)
+const REST_ALPHA := 0.55
+const ACTIVE_ALPHA := 1.0
+const HOME_LEFT := 28.0
+const HOME_BOTTOM := 92.0
+const ATTACK_HAPTIC_MS := 32
+const ATTACK_HAPTIC_AMP := 0.5
 
-var _move_touch: int = -1
-var _move_side: int = 0
-var _jump_touch: int = -1
-var _jump_origin: Vector2 = Vector2.ZERO
+var movement_vector := Vector2.ZERO
+
+var _touch_id := -1
+var _attack_id := -1
+var _attack_tween: Tween
 
 @onready var _root: Control = $Root
-@onready var _jump: BaseButton = $Root/JumpButton
+@onready var _base: Control = $Root/PadBase
+@onready var _knob: Control = $Root/PadBase/PadKnob
+@onready var _attack: Control = $Root/AttackButton
 
 
 func _ready() -> void:
 	layer = 100
-	_apply_visibility()
-	_jump.button_down.connect(_on_jump_down)
-	_jump.button_up.connect(_on_jump_up)
+	visible = force_visible or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
+	_root.resized.connect(_on_root_resized)
+	_knob.position = KNOB_REST
+	call_deferred("_on_root_resized")
+
+
+func get_movement_vector() -> Vector2:
+	return movement_vector
+
+
+func _on_root_resized() -> void:
+	_attack.pivot_offset = _attack.size * 0.5
+	_place_pad_home()
 
 
 func _input(event: InputEvent) -> void:
@@ -33,116 +51,126 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var touch := event as InputEventScreenTouch
 		if touch.pressed:
-			_on_touch_pressed(touch)
+			_on_press(touch.index, touch.position)
 		else:
-			_on_touch_released(touch)
+			_on_release(touch.index)
 	elif event is InputEventScreenDrag:
-		_on_touch_drag(event as InputEventScreenDrag)
+		var drag := event as InputEventScreenDrag
+		if drag.index == _touch_id:
+			_update_stick(drag.position)
+			get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		var mouse := event as InputEventMouseButton
+		if mouse.pressed:
+			if _touch_id >= 0:
+				return
+			_on_press(0, mouse.position)
+		else:
+			_on_release(0)
+	elif event is InputEventMouseMotion and _touch_id == 0:
+		_update_stick((event as InputEventMouseMotion).position)
 
 
-func _on_touch_pressed(touch: InputEventScreenTouch) -> void:
-	# El botón de salto se maneja por su signal; solo trackeamos aim.
-	if _jump.get_global_rect().has_point(touch.position):
-		if _jump_touch < 0:
-			_jump_touch = touch.index
-			_jump_origin = touch.position
+func _on_press(index: int, screen_position: Vector2) -> void:
+	if _is_in_attack(screen_position):
+		_begin_attack(index)
+		get_viewport().set_input_as_handled()
 		return
-
-	if _move_touch >= 0:
+	if not _base.get_global_rect().grow(12.0).has_point(screen_position):
 		return
-
-	_move_touch = touch.index
-	_move_side = _side_from_x(touch.position.x)
-	_press_dir(_move_side)
+	if _touch_id >= 0 and index != _touch_id:
+		return
+	_touch_id = index
+	_base.modulate.a = ACTIVE_ALPHA
+	_update_stick(screen_position)
 	get_viewport().set_input_as_handled()
 
 
-func _on_touch_released(touch: InputEventScreenTouch) -> void:
-	if touch.index == _move_touch:
-		_end_move()
-		get_viewport().set_input_as_handled()
-	if touch.index == _jump_touch:
-		_jump_touch = -1
-		_clear_aim_from_jump()
-
-
-func _on_touch_drag(drag: InputEventScreenDrag) -> void:
-	if drag.index == _move_touch:
-		var side := _side_from_x(drag.position.x)
-		if side != _move_side:
-			_release_dirs()
-			_move_side = side
-			_press_dir(_move_side)
-		get_viewport().set_input_as_handled()
+func _on_release(index: int) -> void:
+	_end_attack(index)
+	if index != _touch_id:
 		return
-
-	if drag.index == _jump_touch and Input.is_action_pressed(&"jump"):
-		var dx := drag.position.x - _jump_origin.x
-		_release_dirs()
-		if dx < -AIM_DEADZONE:
-			Input.action_press(&"move_left")
-		elif dx > AIM_DEADZONE:
-			Input.action_press(&"move_right")
-		get_viewport().set_input_as_handled()
+	_end_move()
+	get_viewport().set_input_as_handled()
 
 
-func _side_from_x(x: float) -> int:
-	return -1 if x < _root.size.x * 0.5 else 1
-
-
-func _press_dir(side: int) -> void:
-	if side < 0:
-		Input.action_press(&"move_left")
-	elif side > 0:
-		Input.action_press(&"move_right")
+func _is_in_attack(screen_position: Vector2) -> bool:
+	return is_instance_valid(_attack) and _attack.get_global_rect().has_point(screen_position)
 
 
 func _end_move() -> void:
-	_move_touch = -1
-	_move_side = 0
-	if _jump_touch < 0:
-		_release_dirs()
+	_touch_id = -1
+	movement_vector = Vector2.ZERO
+	if is_instance_valid(_knob):
+		_knob.position = KNOB_REST
+	_base.modulate.a = REST_ALPHA
 
 
-func _clear_aim_from_jump() -> void:
-	if _move_touch < 0:
-		_release_dirs()
+func _begin_attack(index: int) -> void:
+	if _attack_id >= 0:
+		return
+	_attack_id = index
+	Input.vibrate_handheld(ATTACK_HAPTIC_MS, ATTACK_HAPTIC_AMP)
+	_pulse_attack()
 
 
-func _on_jump_down() -> void:
-	Input.action_press(&"jump")
+func _end_attack(index: int) -> void:
+	if index != _attack_id:
+		return
+	_attack_id = -1
+	_release_attack_visual()
 
 
-func _on_jump_up() -> void:
-	if Input.is_action_pressed(&"jump"):
-		Input.action_release(&"jump")
-	_jump_touch = -1
-	_clear_aim_from_jump()
+func _pulse_attack() -> void:
+	if not is_instance_valid(_attack):
+		return
+	if is_instance_valid(_attack_tween):
+		_attack_tween.kill()
+	_attack.scale = Vector2.ONE
+	_attack_tween = create_tween()
+	_attack_tween.set_trans(Tween.TRANS_QUAD)
+	_attack_tween.set_ease(Tween.EASE_OUT)
+	_attack_tween.tween_property(_attack, "scale", Vector2(0.93, 0.94), 0.04)
+	_attack_tween.tween_property(_attack, "scale", Vector2.ONE, 0.1)
 
 
-func _release_dirs() -> void:
-	if Input.is_action_pressed(&"move_left"):
-		Input.action_release(&"move_left")
-	if Input.is_action_pressed(&"move_right"):
-		Input.action_release(&"move_right")
+func _release_attack_visual() -> void:
+	if not is_instance_valid(_attack):
+		return
+	if is_instance_valid(_attack_tween):
+		_attack_tween.kill()
+	_attack.scale = Vector2.ONE
 
 
-func _apply_visibility() -> void:
-	visible = (
-		force_visible
-		or OS.has_feature("mobile")
-		or DisplayServer.is_touchscreen_available()
-	)
+func _place_pad_home() -> void:
+	_base.anchor_left = 0.0
+	_base.anchor_top = 0.0
+	_base.anchor_right = 0.0
+	_base.anchor_bottom = 0.0
+	_base.size = PAD_SIZE
+	_base.position = Vector2(HOME_LEFT, _root.size.y - HOME_BOTTOM - PAD_SIZE.y)
+	if _touch_id < 0:
+		_base.modulate.a = REST_ALPHA
+
+
+func _update_stick(screen_position: Vector2) -> void:
+	var center := _base.global_position + PAD_SIZE * 0.5
+	var offset := screen_position - center
+	var normalized := offset / MAX_RADIUS
+	if normalized.length() > 1.0:
+		normalized = normalized.normalized()
+	var strength := normalized.length()
+	if strength <= DEADZONE:
+		movement_vector = Vector2.ZERO
+	else:
+		var remapped := (strength - DEADZONE) / (1.0 - DEADZONE)
+		movement_vector = normalized.normalized() * remapped
+	_knob.position = KNOB_REST + movement_vector * MAX_RADIUS
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
-		_release_all()
-
-
-func _release_all() -> void:
-	_end_move()
-	_jump_touch = -1
-	for action in [&"move_left", &"move_right", &"jump"]:
-		if Input.is_action_pressed(action):
-			Input.action_release(action)
+		_attack_id = -1
+		if _touch_id >= 0:
+			_end_move()
+		_release_attack_visual()
