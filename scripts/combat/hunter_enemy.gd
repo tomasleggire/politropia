@@ -6,8 +6,13 @@ extends CharacterBody2D
 enum Kind { MELEE, RANGED }
 enum State { SLEEP, OBSERVE, HUNT, WINDUP, COMMIT, RECOVER, DEAD }
 
+signal defeated
+
 const WandBolt := preload("res://scripts/combat/wand_projectile.gd")
+const MeleeTexture := preload("res://assets/enemies/melee_hunter.png")
+const RangedTexture := preload("res://assets/enemies/ranged_hunter.png")
 const ROOM_SIZE := Vector2(720, 1280)
+const SPRITE_UNIT_SCALE := 0.25 ## Los sprites se dibujaron a 4px por unidad de mundo.
 
 var kind: Kind = Kind.MELEE
 var pathfinder
@@ -24,9 +29,7 @@ var _repath_in := 0.0
 var _path: PackedVector2Array = PackedVector2Array()
 var _path_i := 0
 var _flank := 1.0
-var _body: Polygon2D
-var _core: Polygon2D
-var _base_color := Color.WHITE
+var _sprite: Sprite2D
 var _hurt_flash := 0.0
 var _contact_cd := 0.0
 var _lunge_dir := Vector2.DOWN
@@ -44,13 +47,11 @@ func setup(p_kind: int, origin: Vector2, finder) -> void:
 		_max_speed = 308.0
 		_accel = 2550.0
 		_body_radius = 23.0
-		_base_color = Color("c45b48")
 	else:
 		_hp = 4
 		_max_speed = 248.0
 		_accel = 2050.0
 		_body_radius = 18.0
-		_base_color = Color("7a4ea8")
 	_build_visuals()
 
 
@@ -303,6 +304,7 @@ func _die() -> void:
 	_state = State.DEAD
 	collision_layer = 0
 	collision_mask = 0
+	defeated.emit()
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(self, "scale", Vector2(1.45, 0.35), 0.18)
@@ -318,38 +320,24 @@ func _build_visuals() -> void:
 	shadow.color = Color(0.01, 0.015, 0.02, 0.34)
 	add_child(shadow)
 
-	_body = Polygon2D.new()
-	if kind == Kind.MELEE:
-		_body.polygon = PackedVector2Array([
-			Vector2(0, -26), Vector2(20, 10), Vector2(10, 22),
-			Vector2(-10, 22), Vector2(-20, 10),
-		])
-	else:
-		_body.polygon = PackedVector2Array([
-			Vector2(-12, -20), Vector2(12, -20), Vector2(16, 6),
-			Vector2(0, 22), Vector2(-16, 6),
-		])
-	_body.color = _base_color
-	add_child(_body)
-
-	_core = Polygon2D.new()
-	_core.position = Vector2(0, -4)
-	_core.polygon = LevelGeometry.circle_points(7.0 if kind == Kind.MELEE else 6.0, 12)
-	_core.color = _base_color.lightened(0.28)
-	add_child(_core)
+	_sprite = Sprite2D.new()
+	_sprite.texture = MeleeTexture if kind == Kind.MELEE else RangedTexture
+	_sprite.scale = Vector2.ONE * SPRITE_UNIT_SCALE
+	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	add_child(_sprite)
 
 
 func _update_look() -> void:
-	if _body == null:
+	if _sprite == null:
 		return
 	if _hurt_flash > 0.0:
-		_body.color = Color(1, 0.92, 0.9, 1)
+		_sprite.modulate = Color(1.7, 1.5, 1.45, 1.0)
 		return
 	var pulse := 1.0
 	if _state == State.WINDUP:
-		pulse = 1.18
-	_body.color = _base_color.lightened(0.12 * pulse - 0.06)
+		pulse = 1.16
+	_sprite.modulate = Color(pulse, pulse, pulse, 1.0)
 	if velocity.length() > 28.0:
-		_body.rotation = velocity.angle() + PI * 0.5
+		_sprite.rotation = velocity.angle() + PI * 0.5
 	elif _state == State.WINDUP or _state == State.COMMIT:
-		_body.rotation = _lunge_dir.angle() + PI * 0.5
+		_sprite.rotation = _lunge_dir.angle() + PI * 0.5

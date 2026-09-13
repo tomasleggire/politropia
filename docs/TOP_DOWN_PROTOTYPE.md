@@ -17,14 +17,18 @@ desde arriba, pensado primero para mobile.
 El mundo, los obstáculos, las puertas, los pickups y la interfaz se construyen
 con geometría y colores planos en Godot. No hay texturas de escenario.
 
-El único asset visual de juego es:
+Assets visuales de personajes:
 
 - `assets/player/top_down_hero_sheet.png`: sprite-sheet original de 4 × 4,
   generado para este prototipo. Filas: abajo, izquierda, derecha, arriba.
-
-La ilustración se generó con la herramienta integrada de generación de imágenes
-de Codex usando un prompt de personaje original y fondo transparente. No está
-basada en personajes ni arte de otros juegos.
+  Generado con la herramienta integrada de generación de imágenes de Codex
+  usando un prompt de personaje original y fondo transparente. No está
+  basado en personajes ni arte de otros juegos.
+- `assets/enemies/melee_hunter.png` y `assets/enemies/ranged_hunter.png`:
+  sprites placeholder de los dos cazadores de la segunda sala, generados por
+  código (degradé + contorno + brillo sobre la silueta que antes se dibujaba
+  con `Polygon2D`), en la misma paleta que ya usaba cada tipo. Pensados para
+  reemplazarse por arte final más adelante.
 
 ## Exportar a iOS
 

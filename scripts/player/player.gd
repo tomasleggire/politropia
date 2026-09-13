@@ -3,6 +3,8 @@ extends CharacterBody2D
 
 ## Movimiento top-down responsivo: aceleración corta, freno firme y control analógico.
 
+signal died
+
 @export var max_speed := 325.0
 @export var acceleration := 2350.0
 @export var deceleration := 2950.0
@@ -94,6 +96,7 @@ func take_damage(amount: int, from_dir: Vector2) -> void:
 
 
 func _respawn() -> void:
+	died.emit()
 	_hp = MAX_HP
 	_i_frames = 1.15
 	_stun = 0.0

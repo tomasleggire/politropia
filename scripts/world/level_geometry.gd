@@ -38,6 +38,14 @@ static func add_room(
 		_add_door_trim(decor_parent, origin, room_size, side)
 
 
+static func add_door(parent: Node2D, rect: Rect2) -> RoomDoor:
+	var door := RoomDoor.new()
+	door.setup(rect.size)
+	door.position = rect.get_center()
+	parent.add_child(door)
+	return door
+
+
 static func add_solid_rect(parent: Node2D, rect: Rect2, color: Color, shadow := true) -> StaticBody2D:
 	var body := StaticBody2D.new()
 	body.position = rect.position + rect.size * 0.5
