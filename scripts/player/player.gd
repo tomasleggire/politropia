@@ -13,6 +13,8 @@ extends CharacterBody2D
 @onready var _sprite: Sprite2D = $Sprite2D
 @onready var _shadow: Polygon2D = $Shadow
 
+const WandBolt := preload("res://scripts/combat/wand_projectile.gd")
+
 # El sheet recorta cada fila a distinta altura; esto apoya los pies en el mismo punto.
 const SPRITE_POS_BY_FACING := [
 	Vector2(-3.4, -17.2),
@@ -21,6 +23,8 @@ const SPRITE_POS_BY_FACING := [
 	Vector2(0.8, -11.1),
 ]
 const SHADOW_POS := Vector2(0.0, 13.5)
+const ATTACK_SPAWN_DISTANCE := 42.0
+const MAX_HP := 3
 
 var _facing_row := 0
 var _walk_time := 0.0
@@ -28,27 +32,74 @@ var _transition_time := 0.0
 var _transition_direction := Vector2.ZERO
 var _last_input := Vector2.DOWN
 var _base_sprite_scale := Vector2(0.265, 0.265)
+var _has_wand := false
+var _hp := MAX_HP
+var _i_frames := 0.0
+var _stun := 0.0
+var _checkpoint := Vector2.ZERO
 
 
 func _ready() -> void:
+	add_to_group(&"player")
 	_sprite.frame_coords = Vector2i(1, _facing_row)
 	_sprite.position = SPRITE_POS_BY_FACING[_facing_row]
 	_shadow.position = SHADOW_POS
 
 
 func _physics_process(delta: float) -> void:
+	_i_frames = maxf(_i_frames - delta, 0.0)
+	_stun = maxf(_stun - delta, 0.0)
+	modulate.a = 0.42 if _i_frames > 0.0 and int(_i_frames * 18.0) % 2 == 0 else 1.0
+
 	var input_vector := _read_input()
 
 	if _transition_time > 0.0:
 		_transition_time = maxf(_transition_time - delta, 0.0)
 		input_vector = _transition_direction
 		velocity = _transition_direction * max_speed * 0.82
+	elif _stun > 0.0:
+		velocity = velocity.move_toward(Vector2.ZERO, deceleration * 0.55 * delta)
 	else:
 		_apply_movement(input_vector, delta)
 
 	move_and_slide()
 	_update_facing(input_vector)
 	_update_animation(delta, input_vector)
+	_update_attack(delta)
+
+
+func unlock_wand() -> void:
+	if _has_wand:
+		return
+	_has_wand = true
+	if is_instance_valid(TouchControls):
+		TouchControls.unlock_attack()
+
+
+func mark_checkpoint(world_position: Vector2) -> void:
+	_checkpoint = world_position
+
+
+func take_damage(amount: int, from_dir: Vector2) -> void:
+	if _i_frames > 0.0:
+		return
+	_hp -= amount
+	_i_frames = 0.78
+	_stun = 0.12
+	if from_dir != Vector2.ZERO:
+		velocity += from_dir.normalized() * 360.0
+	Input.vibrate_handheld(36, 0.55)
+	if _hp <= 0:
+		_respawn()
+
+
+func _respawn() -> void:
+	_hp = MAX_HP
+	_i_frames = 1.15
+	_stun = 0.0
+	velocity = Vector2.ZERO
+	if _checkpoint != Vector2.ZERO:
+		global_position = _checkpoint
 
 
 func begin_room_transition(direction: Vector2, duration: float) -> void:
@@ -107,3 +158,39 @@ func _update_animation(delta: float, input_vector: Vector2) -> void:
 	_sprite.position = SPRITE_POS_BY_FACING[_facing_row]
 	_shadow.position = SHADOW_POS
 	_shadow.scale = Vector2.ONE
+
+
+func facing_direction() -> Vector2:
+	match _facing_row:
+		1:
+			return Vector2.LEFT
+		2:
+			return Vector2.RIGHT
+		3:
+			return Vector2.UP
+		_:
+			return Vector2.DOWN
+
+
+func _update_attack(_delta: float) -> void:
+	if not _has_wand:
+		return
+	if _is_attack_just_pressed():
+		_fire_wand()
+
+
+func _is_attack_just_pressed() -> bool:
+	if is_instance_valid(TouchControls) and TouchControls.poll_attack_just_pressed():
+		return true
+	return Input.is_action_just_pressed(&"attack")
+
+
+func _fire_wand() -> void:
+	var direction := facing_direction()
+	var bolt := WandBolt.new()
+	var parent := get_parent().get_node_or_null("Projectiles")
+	if parent == null:
+		parent = get_parent()
+	parent.add_child(bolt)
+	bolt.global_position = global_position + Vector2(0, 6) + direction * ATTACK_SPAWN_DISTANCE
+	bolt.launch(direction)

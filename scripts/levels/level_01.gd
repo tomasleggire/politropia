@@ -2,25 +2,19 @@ extends Node2D
 
 ## Tres habitaciones top-down conectadas, enteramente dibujadas con colores planos.
 
+const HunterScript := preload("res://scripts/combat/hunter_enemy.gd")
+const PathfinderScript := preload("res://scripts/combat/room_pathfinder.gd")
 const ROOM_SIZE := Vector2(720, 1280)
-const TOTAL_SPARKS := 3
 
 @onready var _player: Player = $Player
 @onready var _camera: RoomCamera = $RoomCamera
 @onready var _backgrounds: Node2D = $Backgrounds
 @onready var _decor: Node2D = $Decor
 @onready var _solids: Node2D = $Solids
-@onready var _pickups: Node2D = $Pickups
-@onready var _top_card: Panel = $Interface/Root/TopCard
-@onready var _room_title: Label = $Interface/Root/TopCard/RoomTitle
-@onready var _room_subtitle: Label = $Interface/Root/TopCard/RoomSubtitle
-@onready var _counter: Label = $Interface/Root/Counter/Text
-@onready var _hint: Panel = $Interface/Root/Hint
+@onready var _hunters: Node2D = $Hunters
 @onready var _overlay: ColorRect = $Interface/Root/TransitionOverlay
 
-var _collected := 0
-var _title_tween: Tween
-var _hint_tween: Tween
+var _pathfinder
 
 
 func _ready() -> void:
@@ -28,11 +22,7 @@ func _ready() -> void:
 	_build_level()
 	_camera.room_changed.connect(_on_room_changed)
 	_camera.follow(_player)
-	_show_room_title(Vector2i.ZERO, true)
-	_update_counter()
-	_hint_tween = create_tween()
-	_hint_tween.tween_interval(4.8)
-	_hint_tween.tween_property(_hint, "modulate:a", 0.0, 0.65)
+	call_deferred("_setup_hunters")
 
 
 func _build_level() -> void:
@@ -51,7 +41,7 @@ func _build_threshold_room() -> void:
 	LevelGeometry.add_solid_rect(_solids, Rect2(225, 860, 270, 92), Color("425e62"))
 	LevelGeometry.add_circle_obstacle(_solids, Vector2(145, 1040), 46, Color("4f6a6d"))
 	_add_room_rug(Vector2(360, 625), Vector2(250, 300), Color(0.32, 0.56, 0.56, 0.11))
-	_add_spark(Vector2(360, 438), Color("66d9c8"))
+	_add_wand_pedestal(Vector2(360, 548))
 
 
 func _build_chamber_room() -> void:
@@ -65,7 +55,6 @@ func _build_chamber_room() -> void:
 	LevelGeometry.add_circle_obstacle(_solids, origin + Vector2(140, 930), 58, Color("695f78"))
 	LevelGeometry.add_solid_rect(_solids, Rect2(origin + Vector2(405, 970), Vector2(178, 82)), Color("5a506b"))
 	_add_room_rug(origin + Vector2(360, 770), Vector2(330, 270), Color(0.69, 0.45, 0.72, 0.10))
-	_add_spark(origin + Vector2(560, 820), Color("c18ee0"))
 
 
 func _build_sanctuary_room() -> void:
@@ -79,7 +68,28 @@ func _build_sanctuary_room() -> void:
 	LevelGeometry.add_solid_rect(_solids, Rect2(origin + Vector2(135, 770), Vector2(145, 78)), Color("4c6b60"))
 	LevelGeometry.add_solid_rect(_solids, Rect2(origin + Vector2(440, 770), Vector2(145, 78)), Color("4c6b60"))
 	_add_room_rug(origin + Vector2(360, 590), Vector2(315, 390), Color(0.45, 0.73, 0.59, 0.105))
-	_add_spark(origin + Vector2(360, 510), Color("f1c75b"))
+
+
+func _setup_hunters() -> void:
+	_pathfinder = PathfinderScript.new()
+	_pathfinder.build(get_world_2d(), Vector2(ROOM_SIZE.x, 0.0), ROOM_SIZE)
+	_spawn_hunter(HunterScript.Kind.MELEE, Vector2(ROOM_SIZE.x + 560.0, 248.0))
+	_spawn_hunter(HunterScript.Kind.RANGED, Vector2(ROOM_SIZE.x + 168.0, 1088.0))
+
+
+func _spawn_hunter(kind: int, world_position: Vector2) -> void:
+	var enemy := HunterScript.new()
+	enemy.setup(kind, Vector2(ROOM_SIZE.x, 0.0), _pathfinder)
+	_hunters.add_child(enemy)
+	enemy.global_position = world_position
+
+
+func _wake_hunters() -> void:
+	var delay := 0.16
+	for child in _hunters.get_children():
+		if child.has_method("wake_up"):
+			child.wake_up(delay)
+			delay += 0.28
 
 
 func _add_room_rug(center: Vector2, size: Vector2, color: Color) -> void:
@@ -95,102 +105,127 @@ func _add_room_rug(center: Vector2, size: Vector2, color: Color) -> void:
 	_decor.add_child(rug)
 
 
-func _add_spark(position: Vector2, color: Color) -> void:
-	var spark := Area2D.new()
-	spark.position = position
-	spark.collision_layer = 0
-	spark.collision_mask = 1
-	spark.z_index = 4
-
-	var shape := CircleShape2D.new()
-	shape.radius = 32.0
-	var collision := CollisionShape2D.new()
-	collision.shape = shape
-	spark.add_child(collision)
+func _add_wand_pedestal(position: Vector2) -> void:
+	var pedestal := Node2D.new()
+	pedestal.position = position
+	pedestal.z_index = 3
+	_decor.add_child(pedestal)
 
 	var shadow := Polygon2D.new()
-	shadow.position = Vector2(0, 9)
-	shadow.polygon = LevelGeometry.circle_points(27, 20)
-	shadow.color = Color(0.01, 0.015, 0.02, 0.32)
+	shadow.position = Vector2(0, 18)
+	shadow.polygon = LevelGeometry.circle_points(34, 20)
+	shadow.color = Color(0.01, 0.015, 0.02, 0.34)
 	shadow.z_index = -1
-	spark.add_child(shadow)
+	pedestal.add_child(shadow)
 
-	var diamond := Polygon2D.new()
-	diamond.polygon = PackedVector2Array([Vector2(0, -27), Vector2(22, 0), Vector2(0, 27), Vector2(-22, 0)])
-	diamond.color = color
-	spark.add_child(diamond)
+	var base := Polygon2D.new()
+	base.polygon = PackedVector2Array([
+		Vector2(-32, 6), Vector2(32, 6), Vector2(24, 22), Vector2(-24, 22),
+	])
+	base.color = Color("3a484b")
+	pedestal.add_child(base)
 
-	var core := Polygon2D.new()
-	core.polygon = LevelGeometry.circle_points(10, 16)
-	core.color = color.lightened(0.36)
-	spark.add_child(core)
+	var column := Polygon2D.new()
+	column.polygon = PackedVector2Array([
+		Vector2(-16, 8), Vector2(16, 8), Vector2(13, -10), Vector2(-13, -10),
+	])
+	column.color = Color("536366")
+	pedestal.add_child(column)
 
-	_pickups.add_child(spark)
-	spark.body_entered.connect(_on_spark_collected.bind(spark))
-	var float_tween := spark.create_tween().set_loops()
+	var cap := Polygon2D.new()
+	cap.position = Vector2(0, -14)
+	cap.polygon = PackedVector2Array([
+		Vector2(-22, 6), Vector2(22, 6), Vector2(18, -4), Vector2(-18, -4),
+	])
+	cap.color = Color("6a7577")
+	pedestal.add_child(cap)
+
+	var inlay := Polygon2D.new()
+	inlay.position = Vector2(0, -16)
+	inlay.polygon = LevelGeometry.circle_points(9, 14)
+	inlay.color = Color("7d8d82")
+	pedestal.add_child(inlay)
+
+	var wand := Area2D.new()
+	wand.position = Vector2(4, -46)
+	wand.collision_layer = 0
+	wand.collision_mask = 1
+	pedestal.add_child(wand)
+
+	var shape := CircleShape2D.new()
+	shape.radius = 40.0
+	var collision := CollisionShape2D.new()
+	collision.shape = shape
+	wand.add_child(collision)
+
+	var shaft := Polygon2D.new()
+	shaft.polygon = PackedVector2Array([
+		Vector2(-4, 22), Vector2(3, 24), Vector2(7, -18), Vector2(-1, -20),
+	])
+	shaft.color = Color("c4a15a")
+	wand.add_child(shaft)
+
+	var wrap := Polygon2D.new()
+	wrap.polygon = PackedVector2Array([
+		Vector2(-3, 2), Vector2(6, 4), Vector2(5, -2), Vector2(-4, -4),
+	])
+	wrap.color = Color("8d6a32")
+	wand.add_child(wrap)
+
+	var glow := Polygon2D.new()
+	glow.position = Vector2(4, -26)
+	glow.polygon = LevelGeometry.circle_points(16, 16)
+	glow.color = Color(0.55, 0.95, 0.88, 0.28)
+	wand.add_child(glow)
+
+	var gem := Polygon2D.new()
+	gem.position = Vector2(4, -26)
+	gem.polygon = LevelGeometry.circle_points(9, 16)
+	gem.color = Color("7ee8d8")
+	wand.add_child(gem)
+
+	var gem_core := Polygon2D.new()
+	gem_core.position = Vector2(2, -28)
+	gem_core.polygon = LevelGeometry.circle_points(4, 12)
+	gem_core.color = Color(0.96, 1.0, 0.98, 0.92)
+	wand.add_child(gem_core)
+
+	wand.body_entered.connect(_on_wand_collected.bind(wand))
+	var float_tween := wand.create_tween().set_loops()
 	float_tween.set_trans(Tween.TRANS_SINE)
-	float_tween.tween_property(spark, "position:y", position.y - 7.0, 0.72)
-	float_tween.tween_property(spark, "position:y", position.y + 7.0, 0.72)
+	float_tween.tween_property(wand, "position:y", -52.0, 0.78)
+	float_tween.tween_property(wand, "position:y", -40.0, 0.78)
 
 
-func _on_spark_collected(body: Node2D, spark: Area2D) -> void:
-	if body != _player or not is_instance_valid(spark) or not spark.monitoring:
+func _on_wand_collected(body: Node2D, wand: Area2D) -> void:
+	if body != _player or not is_instance_valid(wand) or not wand.monitoring:
 		return
-	spark.set_deferred("monitoring", false)
-	_collected += 1
-	_update_counter()
+	wand.set_deferred("monitoring", false)
+	_player.unlock_wand()
+	Input.vibrate_handheld(28, 0.42)
 	var collect_tween := create_tween().set_parallel(true)
 	collect_tween.set_trans(Tween.TRANS_BACK)
 	collect_tween.set_ease(Tween.EASE_IN)
-	collect_tween.tween_property(spark, "scale", Vector2(1.8, 1.8), 0.22)
-	collect_tween.tween_property(spark, "modulate:a", 0.0, 0.22)
-	collect_tween.chain().tween_callback(spark.queue_free)
-	_flash(Color(0.95, 0.82, 0.45, 1), 0.15)
-	if _collected == TOTAL_SPARKS:
-		_room_subtitle.text = "Prototipo completo"
-		_room_subtitle.visible = true
-		_room_title.text = "LOS TRES DESTELLOS"
-		_show_top_card()
-
-
-func _update_counter() -> void:
-	_counter.text = "◆  %d / %d" % [_collected, TOTAL_SPARKS]
+	collect_tween.tween_property(wand, "scale", Vector2(1.7, 1.7), 0.2)
+	collect_tween.tween_property(wand, "modulate:a", 0.0, 0.2)
+	collect_tween.chain().tween_callback(wand.queue_free)
+	_flash(Color(0.62, 0.95, 0.88, 1), 0.16)
 
 
 func _on_room_changed(room: Vector2i, _direction: Vector2i) -> void:
-	_show_room_title(room, false)
+	_clear_projectiles()
+	if room == Vector2i(1, 0):
+		_player.mark_checkpoint(Vector2(ROOM_SIZE.x + 78.0, ROOM_SIZE.y * 0.5))
+		_wake_hunters()
 	_flash(Color(0.70, 0.90, 0.87, 1), 0.11)
 
 
-func _show_room_title(room: Vector2i, instant: bool) -> void:
-	match room:
-		Vector2i(0, 0):
-			_room_title.text = "EL UMBRAL"
-			_room_subtitle.text = ""
-		Vector2i(1, 0):
-			_room_title.text = "LA CÁMARA"
-			_room_subtitle.text = "Encontrá el camino hacia arriba"
-		Vector2i(1, -1):
-			_room_title.text = "EL SANTUARIO"
-			_room_subtitle.text = "La última luz espera"
-		_:
-			_room_title.text = "POLITROPIA"
-			_room_subtitle.text = ""
-	_room_subtitle.visible = not _room_subtitle.text.is_empty()
-	if instant:
-		_top_card.modulate.a = 1.0
+func _clear_projectiles() -> void:
+	var projectiles := get_node_or_null("Projectiles")
+	if projectiles == null:
 		return
-	_show_top_card()
-
-
-func _show_top_card() -> void:
-	if is_instance_valid(_title_tween):
-		_title_tween.kill()
-	_top_card.modulate.a = 0.0
-	_title_tween = create_tween()
-	_title_tween.tween_property(_top_card, "modulate:a", 1.0, 0.18)
-	_title_tween.tween_interval(1.55)
-	_title_tween.tween_property(_top_card, "modulate:a", 0.18, 0.42)
+	for child in projectiles.get_children():
+		child.queue_free()
 
 
 func _flash(color: Color, peak_alpha: float) -> void:

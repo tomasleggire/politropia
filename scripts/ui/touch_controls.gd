@@ -19,6 +19,8 @@ var movement_vector := Vector2.ZERO
 
 var _touch_id := -1
 var _attack_id := -1
+var _attack_unlocked := false
+var _attack_just_pressed := false
 var _attack_tween: Tween
 
 @onready var _root: Control = $Root
@@ -30,6 +32,8 @@ var _attack_tween: Tween
 func _ready() -> void:
 	layer = 100
 	visible = force_visible or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
+	_attack.visible = false
+	_attack.modulate.a = 0.0
 	_root.resized.connect(_on_root_resized)
 	_knob.position = KNOB_REST
 	call_deferred("_on_root_resized")
@@ -37,6 +41,33 @@ func _ready() -> void:
 
 func get_movement_vector() -> Vector2:
 	return movement_vector
+
+
+func is_attack_held() -> bool:
+	return _attack_unlocked and _attack_id >= 0
+
+
+func poll_attack_just_pressed() -> bool:
+	if not _attack_just_pressed:
+		return false
+	_attack_just_pressed = false
+	return true
+
+
+func unlock_attack() -> void:
+	if _attack_unlocked:
+		return
+	_attack_unlocked = true
+	_attack.visible = true
+	_attack.pivot_offset = _attack.size * 0.5
+	_attack.modulate.a = 0.0
+	_attack.scale = Vector2(0.72, 0.72)
+	if is_instance_valid(_attack_tween):
+		_attack_tween.kill()
+	_attack_tween = create_tween()
+	_attack_tween.set_parallel(true)
+	_attack_tween.tween_property(_attack, "modulate:a", 1.0, 0.2)
+	_attack_tween.tween_property(_attack, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _on_root_resized() -> void:
@@ -95,7 +126,12 @@ func _on_release(index: int) -> void:
 
 
 func _is_in_attack(screen_position: Vector2) -> bool:
-	return is_instance_valid(_attack) and _attack.get_global_rect().has_point(screen_position)
+	return (
+		_attack_unlocked
+		and is_instance_valid(_attack)
+		and _attack.visible
+		and _attack.get_global_rect().has_point(screen_position)
+	)
 
 
 func _end_move() -> void:
@@ -110,6 +146,7 @@ func _begin_attack(index: int) -> void:
 	if _attack_id >= 0:
 		return
 	_attack_id = index
+	_attack_just_pressed = true
 	Input.vibrate_handheld(ATTACK_HAPTIC_MS, ATTACK_HAPTIC_AMP)
 	_pulse_attack()
 
@@ -171,6 +208,7 @@ func _update_stick(screen_position: Vector2) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		_attack_id = -1
+		_attack_just_pressed = false
 		if _touch_id >= 0:
 			_end_move()
 		_release_attack_visual()
