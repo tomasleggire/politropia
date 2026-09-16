@@ -1,25 +1,6 @@
-[gd_scene load_steps=4 format=3 uid="uid://btouchcontrolspolitropia"]
+[gd_scene load_steps=2 format=3 uid="uid://btouchcontrolspolitropia"]
 
 [ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="1_touch"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ring"]
-bg_color = Color(0.08, 0.1, 0.13, 0.16)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(1, 1, 1, 0.32)
-corner_radius_top_left = 64
-corner_radius_top_right = 64
-corner_radius_bottom_right = 64
-corner_radius_bottom_left = 64
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_knob"]
-bg_color = Color(0.976, 0.659, 0.145, 0.72)
-corner_radius_top_left = 32
-corner_radius_top_right = 32
-corner_radius_bottom_right = 32
-corner_radius_bottom_left = 32
 
 [node name="TouchControls" type="CanvasLayer"]
 script = ExtResource("1_touch")
@@ -48,19 +29,3 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.55)
 theme_override_font_sizes/font_size = 17
 text = "DESLIZÁ Y SOLTÁ · CADA GESTO SUMA IMPULSO"
 horizontal_alignment = 1
-
-[node name="OriginRing" type="Panel" parent="Root"]
-custom_minimum_size = Vector2(126, 126)
-layout_mode = 0
-offset_right = 126.0
-offset_bottom = 126.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_ring")
-
-[node name="Knob" type="Panel" parent="Root"]
-custom_minimum_size = Vector2(58, 58)
-layout_mode = 0
-offset_right = 58.0
-offset_bottom = 58.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_knob")

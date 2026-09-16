@@ -10,11 +10,9 @@ signal respawned
 @export var max_upward_speed := 720.0
 @export var horizontal_impulse := 330.0
 @export var upward_impulse := 610.0
-@export var downward_impulse := 460.0
-@export var air_vertical_factor := 0.72
 
 @export_category("Peso")
-@export var ground_drag := 500.0
+@export var ground_drag := 1600.0
 @export var air_drag := 85.0
 @export var gravity_rise := 1420.0
 @export var gravity_fall := 2050.0
@@ -75,6 +73,11 @@ func apply_swipe(swipe_pixels: Vector2, duration_seconds: float) -> void:
 	var length := swipe_pixels.length()
 	if length < 16.0:
 		return
+	# Un solo salto y sin redireccionar en el aire: una vez que saltás, el
+	# swipe no hace nada hasta que aterrizás. Más adelante habrá mejoras que
+	# permitan control aéreo; por ahora el salto compromete a la trayectoria.
+	if not (is_on_floor() or _coyote_left > 0.0):
+		return
 
 	var speed := length / maxf(duration_seconds, 0.04)
 	var speed_factor := remap(clampf(speed, 250.0, 2200.0), 250.0, 2200.0, 0.90, 1.12)
@@ -87,22 +90,15 @@ func apply_swipe(swipe_pixels: Vector2, duration_seconds: float) -> void:
 		_facing = 1 if impulse_x > 0.0 else -1
 
 	if swipe_pixels.y <= -30.0:
-		var vertical_factor := 1.0 if is_on_floor() or _coyote_left > 0.0 else air_vertical_factor
 		velocity.y = maxf(
-			velocity.y - upward_impulse * y_strength * speed_factor * vertical_factor,
+			velocity.y - upward_impulse * y_strength * speed_factor,
 			-max_upward_speed
 		)
 		_coyote_left = 0.0
 		_landing_left = 0.0
 		_sfx_jump.play()
-	elif swipe_pixels.y >= 30.0:
-		if is_on_floor() and _standing_on_one_way():
-			_begin_drop_through()
-		if not is_on_floor() or _drop_left > 0.0:
-			velocity.y = minf(
-				velocity.y + downward_impulse * y_strength * speed_factor,
-				max_fall_speed
-			)
+	elif swipe_pixels.y >= 30.0 and _standing_on_one_way():
+		_begin_drop_through()
 
 
 func _apply_keyboard_fallback(delta: float, grounded: bool) -> void:

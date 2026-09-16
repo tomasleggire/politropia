@@ -11,8 +11,6 @@ var _origin := Vector2.ZERO
 var _current := Vector2.ZERO
 var _started_msec := 0
 
-@onready var _origin_ring: Control = $Root/OriginRing
-@onready var _knob: Control = $Root/Knob
 @onready var _hint: Label = $Root/Hint
 
 
@@ -45,18 +43,12 @@ func _begin_gesture(index: int, position: Vector2) -> void:
 	_origin = position
 	_current = position
 	_started_msec = Time.get_ticks_msec()
-	_origin_ring.position = position - _origin_ring.size * 0.5
-	_knob.position = position - _knob.size * 0.5
-	_origin_ring.visible = true
-	_knob.visible = true
 	_hint.text = "ARRASTRÁ · SOLTÁ PARA IMPULSAR"
 
 
 func _update_gesture(position: Vector2) -> void:
 	_current = position
 	var swipe := position - _origin
-	var visual_offset := swipe.limit_length(145.0)
-	_knob.position = _origin + visual_offset - _knob.size * 0.5
 	var power := roundi(clampf(swipe.length() / full_power_distance, 0.0, 1.0) * 100.0)
 	_hint.text = "IMPULSO %d%%  %s" % [power, _arrow_for(swipe)]
 
@@ -93,13 +85,11 @@ func _arrow_for(vector: Vector2) -> String:
 
 
 func _hide_gesture() -> void:
-	_origin_ring.visible = false
-	_knob.visible = false
 	_hint.text = "DESLIZÁ Y SOLTÁ · CADA GESTO SUMA IMPULSO"
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		_touch_id = -1
-		if is_instance_valid(_origin_ring):
+		if is_instance_valid(_hint):
 			_hide_gesture()
