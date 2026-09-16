@@ -1,32 +1,33 @@
 class_name Player
 extends CharacterBody2D
 
-## Controlador lateral ágil y con peso. El input puede venir del teclado o de gestos.
+## Controlador lateral por impulsos. Cada swipe suma momentum al movimiento actual.
 
 signal respawned
 
-@export_category("Movimiento")
-@export var max_run_speed: float = 300.0
-@export var ground_acceleration: float = 1900.0
-@export var ground_deceleration: float = 2400.0
-@export var turn_acceleration: float = 3000.0
-@export var air_acceleration: float = 1050.0
-@export var air_deceleration: float = 360.0
+@export_category("Impulsos")
+@export var max_horizontal_speed := 540.0
+@export var max_upward_speed := 720.0
+@export var horizontal_impulse := 330.0
+@export var upward_impulse := 610.0
+@export var downward_impulse := 460.0
+@export var air_vertical_factor := 0.72
 
-@export_category("Salto")
-@export var jump_speed: float = 585.0
-@export var gravity_rise: float = 1500.0
-@export var gravity_fall: float = 2050.0
-@export var gravity_apex: float = 900.0
-@export var max_fall_speed: float = 980.0
-@export var coyote_time: float = 0.12
-@export var jump_buffer_time: float = 0.14
-@export var apex_threshold: float = 85.0
+@export_category("Peso")
+@export var ground_drag := 500.0
+@export var air_drag := 85.0
+@export var gravity_rise := 1420.0
+@export var gravity_fall := 2050.0
+@export var gravity_apex := 820.0
+@export var apex_threshold := 80.0
+@export var max_fall_speed := 1050.0
+@export var coyote_time := 0.12
+@export var drop_through_time := 0.20
 
-@export_category("Sensación")
-@export var landing_lock_time: float = 0.07
-@export var footstep_interval: float = 0.24
-@export var drop_through_time: float = 0.20
+@export_category("Teclado de prueba")
+@export var keyboard_speed := 300.0
+@export var keyboard_acceleration := 1800.0
+@export var keyboard_jump_speed := 560.0
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
@@ -35,9 +36,8 @@ signal respawned
 
 var _facing := 1
 var _coyote_left := 0.0
-var _jump_buffer_left := 0.0
-var _landing_left := 0.0
 var _drop_left := 0.0
+var _landing_left := 0.0
 var _footstep_left := 0.0
 var _was_on_floor := false
 var _spawn_position := Vector2.ZERO
@@ -50,71 +50,78 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_update_timers(delta)
-	_read_actions()
-
 	var grounded := is_on_floor()
-	if grounded:
-		_coyote_left = coyote_time
-	else:
-		_coyote_left = maxf(_coyote_left - delta, 0.0)
+	_coyote_left = coyote_time if grounded else maxf(_coyote_left - delta, 0.0)
 
-	var input_axis := Input.get_axis(&"move_left", &"move_right")
-	_apply_horizontal(input_axis, grounded, delta)
-	_try_jump()
+	_apply_keyboard_fallback(delta, grounded)
+	_apply_natural_drag(delta, grounded)
 	_apply_gravity(delta)
 
 	var fall_speed_before_move := velocity.y
 	move_and_slide()
-
-	if not _was_on_floor and is_on_floor() and fall_speed_before_move > 120.0:
-		_landing_left = landing_lock_time
+	if not _was_on_floor and is_on_floor() and fall_speed_before_move > 150.0:
+		_landing_left = 0.08
 		_sfx_land.play()
 	_was_on_floor = is_on_floor()
 
-	_update_facing(input_axis)
-	_update_footsteps(delta, input_axis)
+	_update_facing()
+	_update_footsteps(delta)
 	_update_animation()
 
 
-func _update_timers(delta: float) -> void:
-	_jump_buffer_left = maxf(_jump_buffer_left - delta, 0.0)
-	_landing_left = maxf(_landing_left - delta, 0.0)
-	if _drop_left > 0.0:
-		_drop_left -= delta
-		if _drop_left <= 0.0:
-			set_collision_mask_value(2, true)
+## swipe_pixels usa coordenadas de pantalla: derecha +X, abajo +Y.
+## duration_seconds agrega una influencia pequeña de velocidad sin reemplazar la distancia.
+func apply_swipe(swipe_pixels: Vector2, duration_seconds: float) -> void:
+	var length := swipe_pixels.length()
+	if length < 16.0:
+		return
+
+	var speed := length / maxf(duration_seconds, 0.04)
+	var speed_factor := remap(clampf(speed, 250.0, 2200.0), 250.0, 2200.0, 0.90, 1.12)
+	var x_strength := pow(clampf(absf(swipe_pixels.x) / 240.0, 0.0, 1.0), 0.82)
+	var y_strength := pow(clampf(absf(swipe_pixels.y) / 220.0, 0.0, 1.0), 0.82)
+
+	if absf(swipe_pixels.x) >= 10.0:
+		var impulse_x := signf(swipe_pixels.x) * horizontal_impulse * x_strength * speed_factor
+		velocity.x = clampf(velocity.x + impulse_x, -max_horizontal_speed, max_horizontal_speed)
+		_facing = 1 if impulse_x > 0.0 else -1
+
+	if swipe_pixels.y <= -30.0:
+		var vertical_factor := 1.0 if is_on_floor() or _coyote_left > 0.0 else air_vertical_factor
+		velocity.y = maxf(
+			velocity.y - upward_impulse * y_strength * speed_factor * vertical_factor,
+			-max_upward_speed
+		)
+		_coyote_left = 0.0
+		_landing_left = 0.0
+		_sfx_jump.play()
+	elif swipe_pixels.y >= 30.0:
+		if is_on_floor() and _standing_on_one_way():
+			_begin_drop_through()
+		if not is_on_floor() or _drop_left > 0.0:
+			velocity.y = minf(
+				velocity.y + downward_impulse * y_strength * speed_factor,
+				max_fall_speed
+			)
 
 
-func _read_actions() -> void:
-	if Input.is_action_just_pressed(&"jump"):
-		_jump_buffer_left = jump_buffer_time
+func _apply_keyboard_fallback(delta: float, grounded: bool) -> void:
+	var axis := Input.get_axis(&"move_left", &"move_right")
+	if not is_zero_approx(axis):
+		velocity.x = move_toward(velocity.x, axis * keyboard_speed, keyboard_acceleration * delta)
+	if Input.is_action_just_pressed(&"jump") and (grounded or _coyote_left > 0.0):
+		velocity.y = -keyboard_jump_speed
+		_coyote_left = 0.0
+		_sfx_jump.play()
 	if Input.is_action_just_pressed(&"drop_down"):
 		_begin_drop_through()
 
 
-func _apply_horizontal(input_axis: float, grounded: bool, delta: float) -> void:
-	var target := input_axis * max_run_speed
-	var acceleration: float
-	if grounded:
-		if is_zero_approx(input_axis):
-			acceleration = ground_deceleration
-		elif not is_zero_approx(velocity.x) and signf(input_axis) != signf(velocity.x):
-			acceleration = turn_acceleration
-		else:
-			acceleration = ground_acceleration
-	else:
-		acceleration = air_acceleration if not is_zero_approx(input_axis) else air_deceleration
-	velocity.x = move_toward(velocity.x, target, acceleration * delta)
-
-
-func _try_jump() -> void:
-	if _jump_buffer_left <= 0.0 or _coyote_left <= 0.0 or _drop_left > 0.0:
+func _apply_natural_drag(delta: float, grounded: bool) -> void:
+	if not is_zero_approx(Input.get_axis(&"move_left", &"move_right")):
 		return
-	velocity.y = -jump_speed
-	_jump_buffer_left = 0.0
-	_coyote_left = 0.0
-	_landing_left = 0.0
-	_sfx_jump.play()
+	var drag := ground_drag if grounded else air_drag
+	velocity.x = move_toward(velocity.x, 0.0, drag * delta)
 
 
 func _apply_gravity(delta: float) -> void:
@@ -128,13 +135,19 @@ func _apply_gravity(delta: float) -> void:
 	velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
 
 
+func _update_timers(delta: float) -> void:
+	_landing_left = maxf(_landing_left - delta, 0.0)
+	if _drop_left > 0.0:
+		_drop_left -= delta
+		if _drop_left <= 0.0:
+			set_collision_mask_value(2, true)
+
+
 func _begin_drop_through() -> void:
 	if not is_on_floor() or _drop_left > 0.0 or not _standing_on_one_way():
 		return
-	# Las plataformas atravesables viven en la capa 2; el piso sigue sólido.
 	set_collision_mask_value(2, false)
 	_drop_left = drop_through_time
-	velocity.y = 110.0
 	global_position.y += 5.0
 
 
@@ -161,21 +174,20 @@ func respawn() -> void:
 	respawned.emit()
 
 
-func _update_facing(input_axis: float) -> void:
-	if absf(input_axis) < 0.05:
-		return
-	_facing = 1 if input_axis > 0.0 else -1
+func _update_facing() -> void:
+	if absf(velocity.x) > 24.0:
+		_facing = 1 if velocity.x > 0.0 else -1
 	_sprite.flip_h = _facing < 0
 
 
-func _update_footsteps(delta: float, input_axis: float) -> void:
-	if not is_on_floor() or absf(input_axis) < 0.05 or absf(velocity.x) < 60.0:
+func _update_footsteps(delta: float) -> void:
+	if not is_on_floor() or absf(velocity.x) < 70.0:
 		_footstep_left = 0.0
 		return
 	_footstep_left -= delta
 	if _footstep_left <= 0.0:
 		_sfx_foot.play()
-		_footstep_left = footstep_interval
+		_footstep_left = clampf(0.30 - absf(velocity.x) / 2600.0, 0.12, 0.26)
 
 
 func _update_animation() -> void:
@@ -183,9 +195,9 @@ func _update_animation() -> void:
 		_play_animation(&"jump" if velocity.y < 40.0 else &"fall")
 	elif _landing_left > 0.0:
 		_play_animation(&"land")
-	elif absf(velocity.x) > 28.0:
+	elif absf(velocity.x) > 35.0:
 		_play_animation(&"walk")
-		_sprite.speed_scale = clampf(absf(velocity.x) / 185.0, 0.75, 1.65)
+		_sprite.speed_scale = clampf(absf(velocity.x) / 220.0, 0.7, 1.8)
 	else:
 		_play_animation(&"idle")
 		_sprite.speed_scale = 1.0

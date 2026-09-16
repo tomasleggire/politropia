@@ -67,7 +67,7 @@ func _build_boundaries() -> void:
 
 func _build_zone_run() -> void:
 	_solid(Rect2(0, FLOOR_Y, 1120, 100))
-	_add_title(Vector2(180, 180), "01 · IMPULSO", "Deslizá y sostené hacia la derecha\nSoltá para frenar · cambiá de lado para girar")
+	_add_title(Vector2(180, 180), "01 · IMPULSO", "Deslizá y soltá: corto = suave · largo = fuerte\nCada nuevo gesto se suma al movimiento actual")
 	# Pequeños cambios de altura para sentir aceleración y caída sin castigo.
 	_solid(Rect2(520, 570, 180, 50), SOLID_ALT)
 	_solid(Rect2(760, 530, 150, 90), SOLID_ALT)
@@ -76,7 +76,7 @@ func _build_zone_run() -> void:
 
 func _build_zone_jump() -> void:
 	_solid(Rect2(1250, FLOOR_Y, 1110, 100))
-	_add_title(Vector2(1380, 170), "02 · SALTO CON ENVÍO", "Mantené derecha y deslizá también hacia arriba\nEl salto conserva tu velocidad horizontal")
+	_add_title(Vector2(1380, 170), "02 · SALTO CON ENVÍO", "Hacé un swipe diagonal hacia arriba y adelante\nEncadená otro gesto en el aire para corregir")
 	_one_way(Rect2(1510, 520, 170, 20))
 	_one_way(Rect2(1780, 455, 180, 20))
 	_one_way(Rect2(2070, 390, 190, 20))
@@ -87,7 +87,7 @@ func _build_zone_jump() -> void:
 
 func _build_zone_drop() -> void:
 	_solid(Rect2(3100, FLOOR_Y, 1900, 100))
-	_add_title(Vector2(2660, 155), "03 · ATRAVESAR", "Subí a las plataformas amarillas\nArriba de ellas, deslizá hacia abajo")
+	_add_title(Vector2(2660, 155), "03 · ATRAVESAR", "Subí a las plataformas amarillas\nSobre ellas, hacé un swipe hacia abajo")
 	# Escalera que enseña plataformas atravesables.
 	_one_way(Rect2(2800, 520, 170, 20))
 	_one_way(Rect2(2990, 445, 170, 20))
@@ -102,7 +102,7 @@ func _build_zone_drop() -> void:
 
 
 func _build_zone_flow() -> void:
-	_add_title(Vector2(4300, 165), "04 · FLUJO", "Combiná carrera, salto y correcciones en el aire")
+	_add_title(Vector2(4300, 165), "04 · FLUJO", "Encadená impulsos: carrera, diagonal y corrección aérea")
 	_one_way(Rect2(4380, 520, 170, 20))
 	_one_way(Rect2(4620, 455, 170, 20))
 	# Hueco final ancho: requiere envión, pero admite coyote time y buffer.

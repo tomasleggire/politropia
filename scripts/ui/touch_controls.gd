@@ -1,17 +1,15 @@
 extends CanvasLayer
 
-## Un único gesto puede combinar dirección horizontal y salto/descenso vertical.
-## Arrastrar y sostener mueve; soltar frena conservando un poco de inercia.
+## Flick controls: al soltar, el vector del swipe se convierte en un impulso.
 
 @export var force_visible := false
-@export var horizontal_deadzone := 22.0
-@export var full_speed_distance := 105.0
-@export var vertical_trigger_distance := 58.0
+@export var minimum_swipe := 16.0
+@export var full_power_distance := 240.0
 
 var _touch_id := -1
 var _origin := Vector2.ZERO
-var _vertical_armed := true
-var _action_release_frames: Dictionary = {}
+var _current := Vector2.ZERO
+var _started_msec := 0
 
 @onready var _origin_ring: Control = $Root/OriginRing
 @onready var _knob: Control = $Root/Knob
@@ -33,7 +31,7 @@ func _input(event: InputEvent) -> void:
 			_begin_gesture(touch.index, touch.position)
 			get_viewport().set_input_as_handled()
 		elif not touch.pressed and touch.index == _touch_id:
-			_end_gesture()
+			_commit_gesture(touch.position)
 			get_viewport().set_input_as_handled()
 	elif event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
@@ -42,86 +40,66 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 
-func _physics_process(_delta: float) -> void:
-	for action: StringName in _action_release_frames.keys():
-		var frames: int = int(_action_release_frames[action]) - 1
-		if frames <= 0:
-			Input.action_release(action)
-			_action_release_frames.erase(action)
-		else:
-			_action_release_frames[action] = frames
-
-
 func _begin_gesture(index: int, position: Vector2) -> void:
 	_touch_id = index
 	_origin = position
-	_vertical_armed = true
+	_current = position
+	_started_msec = Time.get_ticks_msec()
 	_origin_ring.position = position - _origin_ring.size * 0.5
 	_knob.position = position - _knob.size * 0.5
 	_origin_ring.visible = true
 	_knob.visible = true
-	_hint.text = "DESLIZÁ · ↑ SALTÁ · ↓ BAJÁ"
+	_hint.text = "ARRASTRÁ · SOLTÁ PARA IMPULSAR"
 
 
 func _update_gesture(position: Vector2) -> void:
-	var offset := position - _origin
-	var horizontal := 0.0
-	if absf(offset.x) > horizontal_deadzone:
-		horizontal = signf(offset.x) * clampf(
-			(absf(offset.x) - horizontal_deadzone) / (full_speed_distance - horizontal_deadzone),
-			0.0,
-			1.0
-		)
-	_set_horizontal(horizontal)
-
-	if _vertical_armed and offset.y <= -vertical_trigger_distance:
-		_pulse_action(&"jump")
-		_vertical_armed = false
-		_hint.text = "SALTO + ENVÍO"
-	elif _vertical_armed and offset.y >= vertical_trigger_distance:
-		_pulse_action(&"drop_down")
-		_vertical_armed = false
-		_hint.text = "BAJAR PLATAFORMA"
-	elif not _vertical_armed and absf(offset.y) < vertical_trigger_distance * 0.35:
-		_vertical_armed = true
-
-	var visual_offset := offset.limit_length(full_speed_distance)
+	_current = position
+	var swipe := position - _origin
+	var visual_offset := swipe.limit_length(145.0)
 	_knob.position = _origin + visual_offset - _knob.size * 0.5
+	var power := roundi(clampf(swipe.length() / full_power_distance, 0.0, 1.0) * 100.0)
+	_hint.text = "IMPULSO %d%%  %s" % [power, _arrow_for(swipe)]
 
 
-func _end_gesture() -> void:
+func _commit_gesture(release_position: Vector2) -> void:
+	_current = release_position
+	var swipe := _current - _origin
+	var duration := float(Time.get_ticks_msec() - _started_msec) / 1000.0
+	if swipe.length() >= minimum_swipe:
+		get_tree().call_group(&"player", &"apply_swipe", swipe, duration)
 	_touch_id = -1
-	_release_horizontal()
 	_hide_gesture()
 
 
-func _set_horizontal(value: float) -> void:
-	_release_horizontal()
-	if value < 0.0:
-		Input.action_press(&"move_left", absf(value))
-	elif value > 0.0:
-		Input.action_press(&"move_right", value)
-
-
-func _release_horizontal() -> void:
-	Input.action_release(&"move_left")
-	Input.action_release(&"move_right")
-
-
-func _pulse_action(action: StringName) -> void:
-	Input.action_press(action)
-	_action_release_frames[action] = 2
+func _arrow_for(vector: Vector2) -> String:
+	if vector.length() < minimum_swipe:
+		return "·"
+	var angle := vector.angle()
+	if angle < -2.75 or angle >= 2.75:
+		return "←"
+	if angle < -1.96:
+		return "↖"
+	if angle < -1.18:
+		return "↑"
+	if angle < -0.39:
+		return "↗"
+	if angle < 0.39:
+		return "→"
+	if angle < 1.18:
+		return "↘"
+	if angle < 1.96:
+		return "↓"
+	return "↙"
 
 
 func _hide_gesture() -> void:
 	_origin_ring.visible = false
 	_knob.visible = false
-	_hint.text = "TOCÁ Y DESLIZÁ"
+	_hint.text = "DESLIZÁ Y SOLTÁ · CADA GESTO SUMA IMPULSO"
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
-		_end_gesture()
-		for action: StringName in _action_release_frames.keys():
-			Input.action_release(action)
-		_action_release_frames.clear()
+		_touch_id = -1
+		if is_instance_valid(_origin_ring):
+			_hide_gesture()

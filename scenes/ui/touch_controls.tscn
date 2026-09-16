@@ -46,7 +46,7 @@ grow_vertical = 0
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 0.55)
 theme_override_font_sizes/font_size = 17
-text = "TOCÁ Y DESLIZÁ"
+text = "DESLIZÁ Y SOLTÁ · CADA GESTO SUMA IMPULSO"
 horizontal_alignment = 1
 
 [node name="OriginRing" type="Panel" parent="Root"]
