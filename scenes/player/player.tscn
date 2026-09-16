@@ -1,7 +1,6 @@
-[gd_scene load_steps=20 format=3 uid="uid://bplayer01politropia"]
+[gd_scene load_steps=19 format=3 uid="uid://bplayer01politropia"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
-[ext_resource type="Script" path="res://scripts/player/jump_charge_meter.gd" id="2_meter"]
 [ext_resource type="Texture2D" path="res://assets/player/adventurer/idle.png" id="3_idle"]
 [ext_resource type="Texture2D" path="res://assets/player/adventurer/walk_1.png" id="4_walk1"]
 [ext_resource type="Texture2D" path="res://assets/player/adventurer/walk_2.png" id="5_walk2"]
@@ -79,7 +78,7 @@ animations = [{
 
 [node name="Player" type="CharacterBody2D"]
 collision_layer = 1
-collision_mask = 1
+collision_mask = 3
 floor_stop_on_slope = true
 safe_margin = 0.1
 script = ExtResource("1_player")
@@ -94,10 +93,6 @@ scale = Vector2(0.55, 0.55)
 sprite_frames = SubResource("SpriteFrames_player")
 animation = &"idle"
 autoplay = "idle"
-
-[node name="JumpChargeMeter" type="Node2D" parent="."]
-position = Vector2(0, -72)
-script = ExtResource("2_meter")
 
 [node name="SfxWall" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("11_wall")

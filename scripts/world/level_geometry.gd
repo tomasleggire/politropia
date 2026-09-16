@@ -14,6 +14,8 @@ static func add_solid(
 ) -> StaticBody2D:
 	var body := StaticBody2D.new()
 	body.position = rect.position + rect.size * 0.5
+	body.collision_layer = 1
+	body.collision_mask = 0
 
 	var shape := RectangleShape2D.new()
 	shape.size = rect.size
@@ -53,6 +55,53 @@ static func add_solid(
 
 	parent.add_child(body)
 	return body
+
+
+static func add_one_way_platform(
+	parent: Node2D,
+	rect: Rect2,
+	color: Color
+) -> StaticBody2D:
+	var body := StaticBody2D.new()
+	body.position = rect.position + rect.size * 0.5
+	body.collision_layer = 2
+	body.collision_mask = 0
+	body.set_meta("one_way", true)
+
+	var shape := RectangleShape2D.new()
+	shape.size = rect.size
+	var collision := CollisionShape2D.new()
+	collision.shape = shape
+	collision.one_way_collision = true
+	collision.one_way_collision_margin = 12.0
+	body.add_child(collision)
+
+	var half := rect.size * 0.5
+	var visual := Polygon2D.new()
+	visual.color = color
+	visual.polygon = PackedVector2Array([
+		Vector2(-half.x, -half.y),
+		Vector2(half.x, -half.y),
+		Vector2(half.x, half.y),
+		Vector2(-half.x, half.y),
+	])
+	body.add_child(visual)
+	parent.add_child(body)
+	return body
+
+
+static func add_color_rect(parent: Node2D, rect: Rect2, color: Color, z_index := -20) -> Polygon2D:
+	var visual := Polygon2D.new()
+	visual.z_index = z_index
+	visual.color = color
+	visual.polygon = PackedVector2Array([
+		rect.position,
+		rect.position + Vector2(rect.size.x, 0.0),
+		rect.end,
+		rect.position + Vector2(0.0, rect.size.y),
+	])
+	parent.add_child(visual)
+	return visual
 
 
 static func add_flat_background(
