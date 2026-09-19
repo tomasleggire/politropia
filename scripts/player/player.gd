@@ -1,376 +1,240 @@
 class_name Player
 extends CharacterBody2D
 
-## Jugador estilo Jump King (calco de potencia/ángulo + knockdown).
+## Controlador lateral por impulsos. Cada swipe suma momentum al movimiento actual.
 
-enum State {
-	GROUNDED,
-	CHARGING,
-	AIRBORNE,
-	LANDING,
-	FALLEN,
-}
+signal respawned
 
-## Constantes reales de Jump King (px/frame @ 60fps), escaladas a nuestro mundo.
-## Fuente: simulación del mod jump-king-parabole / valores del juego.
-const JK_GRAVITY_PER_FRAME := 0.2571429
-const JK_JUMP_VY_MAX := 8.742858
-const JK_JUMP_VX := 3.5
-const JK_MAX_FALL := 10.0
-const JK_CHARGE_SECONDS := 0.6
-## ~36 pasos a 60fps (speedrunners miden 35–38 frames de carga completa).
-const CHARGE_FRAMES := 36
-## Escala visual para habitaciones 720×1280 (preserva ángulos JK).
-const WORLD_SCALE := 2.25
+@export_category("Impulsos")
+@export var max_horizontal_speed := 540.0
+@export var max_upward_speed := 720.0
+@export var horizontal_impulse := 330.0
+@export var upward_impulse := 610.0
 
-@export var move_speed: float = 145.0
-## Solo para mostrar el medidor/SFX; un tap igual salta (mínimo 1 frame).
-@export var min_hold_to_arm: float = 0.10
+@export_category("Peso")
+@export var ground_drag := 1600.0
+@export var air_drag := 85.0
+@export var gravity_rise := 1420.0
+@export var gravity_fall := 2050.0
+@export var gravity_apex := 820.0
+@export var apex_threshold := 80.0
+@export var max_fall_speed := 1050.0
+@export var coyote_time := 0.12
+@export var drop_through_time := 0.20
 
-## Rebote: el primero conserva subida (mecánica de pared → plataforma).
-@export var bounce_retention: float = 0.72
-@export var bounce_up_boost: float = 1.05
+@export_category("Movimiento directo")
+@export var keyboard_speed := 300.0
+@export var keyboard_acceleration := 1800.0
+@export var keyboard_jump_speed := 560.0
+@export var touch_walk_speed := 190.0
+@export var touch_run_speed := 390.0
+@export var touch_jump_horizontal_speed := 335.0
 
-@export var soft_land_time: float = 0.18
-## Knockdown corto; solo en caídas fuertes (no en aterrizajes de salto OK).
-@export var fallen_time: float = 0.62
-@export var hard_fall_speed: float = 1560.0
-@export var hard_fall_air_time: float = 0.55
-@export var footstep_interval: float = 0.22
-
-@onready var _charge_meter: JumpChargeMeter = $JumpChargeMeter
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
-@onready var _sfx_wall: AudioStreamPlayer = $SfxWall
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
-@onready var _sfx_fall: AudioStreamPlayer = $SfxFall
 @onready var _sfx_foot: AudioStreamPlayer = $SfxFoot
-@onready var _sfx_charge: AudioStreamPlayer = $SfxCharge
 @onready var _sfx_jump: AudioStreamPlayer = $SfxJump
 
-var _state: State = State.GROUNDED
-var _charge_frames: int = 0
-var _charge_accum: float = 0.0
-var _aim_direction: int = 0
-var _facing: int = 1
-var _land_timer: float = 0.0
-var _fall_speed_on_land: float = 0.0
-var _foot_timer: float = 0.0
-var _charge_armed: bool = false
-var _wall_bounce_used: bool = false
-var _peak_fall_speed: float = 0.0
-var _falling_air_time: float = 0.0
-var _sprite_base_pos: Vector2 = Vector2.ZERO
-var _sprite_base_rot: float = 0.0
-
-var gravity: float:
-	get:
-		return JK_GRAVITY_PER_FRAME * 60.0 * 60.0 * WORLD_SCALE
-
-var jump_vy_max: float:
-	get:
-		return JK_JUMP_VY_MAX * 60.0 * WORLD_SCALE
-
-var jump_vx: float:
-	get:
-		return JK_JUMP_VX * 60.0 * WORLD_SCALE
-
-var max_fall_speed: float:
-	get:
-		# Un poco sobre el tope JK para permitir caídas largas → knockdown.
-		return JK_MAX_FALL * 60.0 * WORLD_SCALE * 1.4
+var _facing := 1
+var _coyote_left := 0.0
+var _drop_left := 0.0
+var _landing_left := 0.0
+var _footstep_left := 0.0
+var _was_on_floor := false
+var _spawn_position := Vector2.ZERO
+var _touch_move_axis := 0.0
 
 
 func _ready() -> void:
-	_sprite_base_pos = _sprite.position
-	_sprite_base_rot = _sprite.rotation
-	_charge_meter.visible = false
-	_charge_meter.configure_ticks(CHARGE_FRAMES)
+	_spawn_position = global_position
 	_play_animation(&"idle")
 
 
 func _physics_process(delta: float) -> void:
-	match _state:
-		State.GROUNDED:
-			_process_grounded(delta)
-		State.CHARGING:
-			_process_charging(delta)
-		State.AIRBORNE:
-			_process_airborne(delta)
-		State.LANDING:
-			_process_landing(delta)
-		State.FALLEN:
-			_process_fallen(delta)
+	_update_timers(delta)
+	var grounded := is_on_floor()
+	_coyote_left = coyote_time if grounded else maxf(_coyote_left - delta, 0.0)
+
+	_apply_keyboard_fallback(delta, grounded)
+	_apply_natural_drag(delta, grounded)
+	_apply_gravity(delta)
+
+	var fall_speed_before_move := velocity.y
+	move_and_slide()
+	if not _was_on_floor and is_on_floor() and fall_speed_before_move > 150.0:
+		_landing_left = 0.08
+		_sfx_land.play()
+	_was_on_floor = is_on_floor()
+
+	_update_facing()
+	_update_footsteps(delta)
 	_update_animation()
 
 
-func _process_grounded(delta: float) -> void:
-	_apply_gravity(delta)
-
-	var input_dir := _read_horizontal_input()
-	velocity.x = input_dir * move_speed
-	if input_dir != 0:
-		_set_facing(input_dir)
-		_update_footsteps(delta, true)
-	else:
-		_foot_timer = 0.0
-
-	if Input.is_action_just_pressed("jump"):
-		_begin_charge()
-		move_and_slide()
+## swipe_pixels usa coordenadas de pantalla: derecha +X, abajo +Y.
+## duration_seconds agrega una influencia pequeña de velocidad sin reemplazar la distancia.
+func apply_swipe(swipe_pixels: Vector2, duration_seconds: float) -> void:
+	var length := swipe_pixels.length()
+	if length < 16.0:
+		return
+	# Un solo salto y sin redireccionar en el aire: una vez que saltás, el
+	# swipe no hace nada hasta que aterrizás. Más adelante habrá mejoras que
+	# permitan control aéreo; por ahora el salto compromete a la trayectoria.
+	if not (is_on_floor() or _coyote_left > 0.0):
 		return
 
-	move_and_slide()
+	var speed := length / maxf(duration_seconds, 0.04)
+	var speed_factor := remap(clampf(speed, 250.0, 2200.0), 250.0, 2200.0, 0.90, 1.12)
+	var x_strength := pow(clampf(absf(swipe_pixels.x) / 240.0, 0.0, 1.0), 0.82)
+	var y_strength := pow(clampf(absf(swipe_pixels.y) / 220.0, 0.0, 1.0), 0.82)
 
-	if not is_on_floor():
-		_enter_airborne()
+	if absf(swipe_pixels.x) >= 10.0:
+		var impulse_x := signf(swipe_pixels.x) * horizontal_impulse * x_strength * speed_factor
+		velocity.x = clampf(velocity.x + impulse_x, -max_horizontal_speed, max_horizontal_speed)
+		_facing = 1 if impulse_x > 0.0 else -1
+
+	if swipe_pixels.y <= -30.0:
+		velocity.y = maxf(
+			velocity.y - upward_impulse * y_strength * speed_factor,
+			-max_upward_speed
+		)
+		_coyote_left = 0.0
+		_landing_left = 0.0
+		_sfx_jump.play()
+	elif swipe_pixels.y >= 30.0 and _standing_on_one_way():
+		_begin_drop_through()
 
 
-func _process_charging(delta: float) -> void:
-	velocity = Vector2.ZERO
-	_foot_timer = 0.0
+## Continuous analog intent from the on-screen pad.
+func set_touch_move(axis: float) -> void:
+	_touch_move_axis = clampf(axis, -1.0, 1.0)
 
-	# Avance de carga en “frames JK” (60 Hz), no en FPS del dispositivo.
-	_charge_accum += delta * 60.0
-	while _charge_accum >= 1.0 and _charge_frames < CHARGE_FRAMES:
-		_charge_accum -= 1.0
-		_charge_frames += 1
 
-	var charge_time := float(_charge_frames) / 60.0
-	if not _charge_armed and charge_time >= min_hold_to_arm:
-		_charge_armed = true
-		_charge_meter.visible = true
-		_sfx_charge.play()
-
-	var input_dir := _read_horizontal_input()
-	if input_dir != 0:
-		_aim_direction = input_dir
-		_set_facing(input_dir)
-
-	if _charge_armed:
-		_charge_meter.set_frame(_charge_frames)
-
-	if Input.is_action_just_released("jump"):
-		# Tap = salto mínimo (1 frame). Hold = carga. Nunca cancelar sin saltar.
-		_charge_frames = maxi(_charge_frames, 1)
-		_release_jump()
+## direction is absolute screen direction: -1 left, 0 vertical, +1 right.
+## A vertical jump keeps current horizontal speed, so a running character
+## still goes the way it was walking.
+func touch_jump(direction: int) -> void:
+	if not (is_on_floor() or _coyote_left > 0.0):
 		return
-
-	move_and_slide()
-
-	if not is_on_floor():
-		_cancel_charge()
-		_enter_airborne()
-
-
-func _process_airborne(delta: float) -> void:
-	_foot_timer = 0.0
-	_apply_gravity(delta)
-	var velocity_before_move := velocity
-	move_and_slide()
-	_resolve_bounces(velocity_before_move)
-
-	_peak_fall_speed = maxf(_peak_fall_speed, maxf(velocity.y, velocity_before_move.y))
-	if velocity_before_move.y > 80.0 or velocity.y > 80.0:
-		_falling_air_time += delta
-	else:
-		_falling_air_time = 0.0
-
-	if is_on_floor():
-		_fall_speed_on_land = maxf(_peak_fall_speed, maxf(velocity_before_move.y, velocity.y))
-		_land()
-
-
-func _process_landing(delta: float) -> void:
-	velocity = Vector2.ZERO
-	_land_timer -= delta
-	# Buffer de tap: si tapeás durante el soft-land, arranca carga al instante.
-	if Input.is_action_just_pressed("jump"):
-		_reset_sprite_pose()
-		_begin_charge()
-		move_and_slide()
-		return
-	move_and_slide()
-	if _land_timer <= 0.0:
-		_reset_sprite_pose()
-		_state = State.GROUNDED
-
-
-func _process_fallen(delta: float) -> void:
-	velocity = Vector2.ZERO
-	_land_timer -= delta
-	move_and_slide()
-	if _land_timer <= 0.0:
-		_reset_sprite_pose()
-		_state = State.GROUNDED
-
-
-func _begin_charge() -> void:
-	_state = State.CHARGING
-	_charge_frames = 0
-	_charge_accum = 0.0
-	_charge_armed = false
-	_aim_direction = _facing
-	velocity = Vector2.ZERO
-	_charge_meter.visible = false
-	_charge_meter.set_frame(0)
-
-
-func _cancel_charge() -> void:
-	_charge_frames = 0
-	_charge_accum = 0.0
-	_charge_armed = false
-	_charge_meter.visible = false
-	_charge_meter.set_frame(0)
-
-
-func _release_jump() -> void:
-	# Calco JK: vY = -max * intensity; vX = dirección * velocidad fija.
-	# intensity mínima = 1/36 (tap = saltito casi caminar).
-	var intensity := clampf(float(_charge_frames) / float(CHARGE_FRAMES), 0.0, 1.0)
-	intensity = maxf(intensity, 1.0 / float(CHARGE_FRAMES))
-
-	var jump_dir := _aim_direction if _aim_direction != 0 else _facing
-	velocity = Vector2(jump_dir * jump_vx, -jump_vy_max * intensity)
-
-	_cancel_charge()
+	velocity.y = -keyboard_jump_speed
+	if direction != 0:
+		velocity.x = float(direction) * touch_jump_horizontal_speed
+		_facing = direction
+		_sprite.flip_h = _facing < 0
+	_coyote_left = 0.0
+	_landing_left = 0.0
 	_sfx_jump.play()
-	_enter_airborne()
 
 
-func _enter_airborne() -> void:
-	_state = State.AIRBORNE
-	_wall_bounce_used = false
-	_peak_fall_speed = maxf(0.0, velocity.y)
-	_falling_air_time = 0.0
-	_reset_sprite_pose()
+func touch_drop() -> void:
+	_begin_drop_through()
 
 
-func _land() -> void:
-	velocity = Vector2.ZERO
-	_wall_bounce_used = false
-
-	var is_hard_fall := (
-		_fall_speed_on_land >= hard_fall_speed
-		and _falling_air_time >= hard_fall_air_time
-	)
-	_falling_air_time = 0.0
-	if is_hard_fall:
-		_enter_fallen()
-	else:
-		_sfx_land.play()
-		# Saltitos chicos: recuperación casi nula para poder tapeear.
-		if _fall_speed_on_land < 420.0:
-			_land_timer = 0.04
-		else:
-			_land_timer = soft_land_time
-		_state = State.LANDING
+func _apply_keyboard_fallback(delta: float, grounded: bool) -> void:
+	var keyboard_axis := Input.get_axis(&"move_left", &"move_right")
+	var axis := keyboard_axis
+	if absf(_touch_move_axis) > absf(keyboard_axis):
+		axis = _touch_move_axis
+	if not is_zero_approx(axis) and grounded:
+		var target_speed := keyboard_speed
+		if absf(_touch_move_axis) > absf(keyboard_axis):
+			var analog_strength := inverse_lerp(0.16, 1.0, absf(_touch_move_axis))
+			target_speed = lerpf(touch_walk_speed, touch_run_speed, analog_strength)
+		velocity.x = move_toward(velocity.x, signf(axis) * target_speed, keyboard_acceleration * delta)
+	if Input.is_action_just_pressed(&"jump") and (grounded or _coyote_left > 0.0):
+		velocity.y = -keyboard_jump_speed
+		_coyote_left = 0.0
+		_sfx_jump.play()
+	if Input.is_action_just_pressed(&"drop_down"):
+		_begin_drop_through()
 
 
-func _enter_fallen() -> void:
-	_sfx_fall.play()
-	_land_timer = fallen_time
-	_state = State.FALLEN
-	_apply_fallen_pose()
-
-
-func _apply_fallen_pose() -> void:
-	# Boca abajo en el piso (lectura clara de “fue una caída”).
-	_sprite.rotation = PI * 0.5 * float(_facing)
-	_sprite.position = _sprite_base_pos + Vector2(float(_facing) * 8.0, 10.0)
-
-
-func _reset_sprite_pose() -> void:
-	_sprite.rotation = _sprite_base_rot
-	_sprite.position = _sprite_base_pos
-
-
-func _resolve_bounces(velocity_before_move: Vector2) -> void:
-	# Un solo rebote por vuelo; el primero sirve para llegar a plataformas.
-	if _wall_bounce_used:
+func _apply_natural_drag(delta: float, grounded: bool) -> void:
+	if not is_zero_approx(Input.get_axis(&"move_left", &"move_right")) or not is_zero_approx(_touch_move_axis):
 		return
-
-	for i in get_slide_collision_count():
-		var collision := get_slide_collision(i)
-		var normal := collision.get_normal()
-
-		if normal.y < -0.7:
-			continue
-
-		if velocity_before_move.dot(normal) >= 0.0:
-			continue
-
-		var bounced := velocity_before_move.bounce(normal)
-		bounced.x *= bounce_retention
-
-		# Si venimos subiendo / con energía, el rebote empuja hacia arriba.
-		if velocity_before_move.y < 0.0:
-			bounced.y = minf(bounced.y, velocity_before_move.y) * bounce_up_boost
-			bounced.y = minf(bounced.y, -absf(velocity_before_move.x) * 0.35)
-		else:
-			# En caída: toque sutil y sigue bajando (sin segundo “super salto”).
-			bounced.y = absf(bounced.y) * 0.25
-
-		velocity = bounced
-		_wall_bounce_used = true
-		_sfx_wall.play()
-		break
-
-
-func _update_footsteps(delta: float, walking: bool) -> void:
-	if not walking or not is_on_floor():
-		return
-	_foot_timer -= delta
-	if _foot_timer <= 0.0:
-		_sfx_foot.play()
-		_foot_timer = footstep_interval
+	var drag := ground_drag if grounded else air_drag
+	velocity.x = move_toward(velocity.x, 0.0, drag * delta)
 
 
 func _apply_gravity(delta: float) -> void:
-	if not is_on_floor():
-		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
-
-
-func _read_horizontal_input() -> int:
-	var axis := Input.get_axis("move_left", "move_right")
-	if axis < 0.0:
-		return -1
-	if axis > 0.0:
-		return 1
-	return 0
-
-
-func _set_facing(direction: int) -> void:
-	if direction == 0:
+	if is_on_floor() and velocity.y >= 0.0:
 		return
-	_facing = direction
-	_sprite.flip_h = direction < 0
+	var gravity := gravity_rise
+	if absf(velocity.y) < apex_threshold:
+		gravity = gravity_apex
+	elif velocity.y > 0.0:
+		gravity = gravity_fall
+	velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
+
+
+func _update_timers(delta: float) -> void:
+	_landing_left = maxf(_landing_left - delta, 0.0)
+	if _drop_left > 0.0:
+		_drop_left -= delta
+		if _drop_left <= 0.0:
+			set_collision_mask_value(2, true)
+
+
+func _begin_drop_through() -> void:
+	if not is_on_floor() or _drop_left > 0.0 or not _standing_on_one_way():
+		return
+	set_collision_mask_value(2, false)
+	_drop_left = drop_through_time
+	global_position.y += 5.0
+
+
+func _standing_on_one_way() -> bool:
+	for index in get_slide_collision_count():
+		var collision := get_slide_collision(index)
+		if collision.get_normal().y > -0.7:
+			continue
+		var collider := collision.get_collider() as CollisionObject2D
+		if collider != null and collider.get_collision_layer_value(2):
+			return true
+	return false
+
+
+func set_checkpoint(checkpoint: Vector2) -> void:
+	_spawn_position = checkpoint
+
+
+func respawn() -> void:
+	set_collision_mask_value(2, true)
+	_drop_left = 0.0
+	velocity = Vector2.ZERO
+	global_position = _spawn_position
+	respawned.emit()
+
+
+func _update_facing() -> void:
+	if absf(velocity.x) > 24.0:
+		_facing = 1 if velocity.x > 0.0 else -1
+	_sprite.flip_h = _facing < 0
+
+
+func _update_footsteps(delta: float) -> void:
+	if not is_on_floor() or absf(velocity.x) < 70.0:
+		_footstep_left = 0.0
+		return
+	_footstep_left -= delta
+	if _footstep_left <= 0.0:
+		_sfx_foot.play()
+		_footstep_left = clampf(0.30 - absf(velocity.x) / 2600.0, 0.12, 0.26)
 
 
 func _update_animation() -> void:
-	match _state:
-		State.CHARGING:
-			if _charge_armed:
-				_play_animation(&"charge")
-			elif absf(velocity.x) > 5.0:
-				_play_animation(&"walk")
-			else:
-				_play_animation(&"idle")
-		State.AIRBORNE:
-			if velocity.y < 0.0:
-				_play_animation(&"jump")
-			else:
-				_play_animation(&"fall")
-		State.LANDING:
-			_play_animation(&"land")
-		State.FALLEN:
-			_play_animation(&"fall")
-		State.GROUNDED:
-			if absf(velocity.x) > 5.0:
-				_play_animation(&"walk")
-			else:
-				_play_animation(&"idle")
+	if not is_on_floor():
+		_play_animation(&"jump" if velocity.y < 40.0 else &"fall")
+	elif _landing_left > 0.0:
+		_play_animation(&"land")
+	elif absf(velocity.x) > 35.0:
+		_play_animation(&"walk")
+		_sprite.speed_scale = clampf(absf(velocity.x) / 220.0, 0.7, 1.8)
+	else:
+		_play_animation(&"idle")
+		_sprite.speed_scale = 1.0
 
 
-func _play_animation(anim_name: StringName) -> void:
-	if _sprite.animation != anim_name:
-		_sprite.play(anim_name)
+func _play_animation(animation_name: StringName) -> void:
+	if _sprite.animation != animation_name:
+		_sprite.play(animation_name)

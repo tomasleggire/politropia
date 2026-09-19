@@ -3,8 +3,12 @@
 [ext_resource type="Script" path="res://scripts/levels/level_01.gd" id="1_level"]
 [ext_resource type="PackedScene" uid="uid://bplayer01politropia" path="res://scenes/player/player.tscn" id="2_player"]
 [ext_resource type="Script" path="res://scripts/camera/room_camera.gd" id="3_camera"]
-[ext_resource type="Script" path="res://scripts/ui/story_line.gd" id="4_story"]
-[ext_resource type="Script" path="res://scripts/audio/room_ambience.gd" id="5_ambience"]
+
+[sub_resource type="Shader" id="Shader_gothic_grade"]
+code = "shader_type canvas_item;\n\nvoid fragment() {\n\tvec2 centered = UV - vec2(0.5);\n\tfloat edge = smoothstep(0.30, 0.76, length(centered * vec2(1.0, 1.35)));\n\tfloat top_falloff = smoothstep(0.64, 0.0, UV.y) * 0.12;\n\tfloat bottom_haze = smoothstep(0.70, 1.0, UV.y) * 0.10;\n\tfloat alpha = min(0.58, edge * 0.46 + top_falloff + bottom_haze);\n\tCOLOR = vec4(0.006, 0.010, 0.035, alpha);\n}\n"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gothic_grade"]
+shader = SubResource("Shader_gothic_grade")
 
 [node name="Level01" type="Node2D"]
 script = ExtResource("1_level")
@@ -15,16 +19,21 @@ script = ExtResource("1_level")
 
 [node name="Solids" type="Node2D" parent="."]
 
-[node name="Pickups" type="Node2D" parent="."]
-
 [node name="Player" parent="." instance=ExtResource("2_player")]
-position = Vector2(360, 1240)
+position = Vector2(180, 620)
 
 [node name="RoomCamera" type="Camera2D" parent="."]
+position = Vector2(640, 360)
 script = ExtResource("3_camera")
 
-[node name="StoryLine" type="CanvasLayer" parent="."]
-script = ExtResource("4_story")
+[node name="AtmosphereOverlay" type="CanvasLayer" parent="."]
+layer = 20
 
-[node name="RoomAmbience" type="Node" parent="."]
-script = ExtResource("5_ambience")
+[node name="Vignette" type="ColorRect" parent="AtmosphereOverlay"]
+material = SubResource("ShaderMaterial_gothic_grade")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2

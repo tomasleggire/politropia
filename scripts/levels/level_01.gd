@@ -1,170 +1,251 @@
 extends Node2D
 
-## Dos pantallas verticales pulidas: Umbral → Lo que se aclara.
+## Prototipo horizontal corto para aprender el control por gestos.
 
-const ROOM_SIZE := Vector2(720, 1280)
+const WORLD_SIZE := Vector2(6400.0, 720.0)
+const FLOOR_Y := 620.0
 
-const PLAT_COLOR := Color(0.40, 0.52, 0.30, 1.0)
-const FLOOR_COLOR := Color(0.28, 0.34, 0.22, 1.0)
-const WALL_COLOR := Color(0.33, 0.28, 0.24, 1.0)
+const BACKGROUND := preload("res://assets/art/gothic/library_background.png")
+const STONE := preload("res://assets/art/gothic/stone_tile.png")
+const CANDLE_SCRIPT := preload("res://scripts/world/gothic_candle.gd")
 
-const TEX_DIRT := preload("res://assets/world/tex_dirt.png")
-const TEX_STONE := preload("res://assets/world/tex_stone.png")
-const SFX_PICKUP := preload("res://assets/audio/pickup_chime.wav")
-const SFX_NOTICE := preload("res://assets/audio/item_notice.wav")
-const SFX_WHISPER := preload("res://assets/audio/mark_whisper.wav")
+const SOLID := Color("101a33")
+const SOLID_ALT := Color("182b4f")
+const ONE_WAY := Color("24558a")
+const TEXT := Color("c7d8ec")
+const TEXT_MUTED := Color("8198b6")
+const AMBER := Color("f0ae4c")
+
+const CHECKPOINTS := [
+	Vector2(180, FLOOR_Y),
+	Vector2(1380, FLOOR_Y),
+	Vector2(2680, FLOOR_Y),
+	Vector2(4220, FLOOR_Y),
+	Vector2(5350, FLOOR_Y),
+]
 
 @onready var _player: Player = $Player
 @onready var _camera: RoomCamera = $RoomCamera
-@onready var _solids: Node2D = $Solids
 @onready var _backgrounds: Node2D = $Backgrounds
-@onready var _pickups: Node2D = $Pickups
+@onready var _solids: Node2D = $Solids
 @onready var _decor: Node2D = $Decor
-@onready var _story: StoryLine = $StoryLine
-@onready var _ambience: RoomAmbience = $RoomAmbience
 
-var _upper_seal: RoomMark
+var _checkpoint_index := 0
 
 
 func _ready() -> void:
-	_player.add_to_group("player")
+	_player.add_to_group(&"player")
 	_camera.target = _player
-	_camera.room_changed.connect(_on_room_changed)
-	_build_level()
-	_ambience.update_room(Vector2i(0, 0))
+	_build_course()
+	_player.set_checkpoint(CHECKPOINTS[0])
+	_camera.snap_to_target()
 
 
-func _plat(rect: Rect2) -> void:
-	LevelGeometry.add_solid(_solids, rect, PLAT_COLOR, TEX_DIRT)
+func _physics_process(_delta: float) -> void:
+	_update_checkpoint()
+	if _player.global_position.y > 820.0:
+		_player.respawn()
+		_camera.snap_to_target()
 
 
-func _floor(rect: Rect2) -> void:
-	LevelGeometry.add_solid(_solids, rect, FLOOR_COLOR, null)
+func _build_course() -> void:
+	_build_backgrounds()
+	_build_boundaries()
+	_build_zone_run()
+	_build_zone_jump()
+	_build_zone_drop()
+	_build_zone_flow()
+	_build_ambient_decor()
 
 
-func _wall(rect: Rect2) -> void:
-	LevelGeometry.add_solid(_solids, rect, WALL_COLOR, TEX_STONE)
+func _build_backgrounds() -> void:
+	LevelGeometry.add_color_rect(_backgrounds, Rect2(0, 0, WORLD_SIZE.x, WORLD_SIZE.y), Color("02040b"), -40)
+	var room_tints := [
+		Color("8b9ab8"),
+		Color("788bab"),
+		Color("6f7fa1"),
+		Color("857b9e"),
+		Color("718ead"),
+	]
+	for room_index in 5:
+		var background := Sprite2D.new()
+		background.texture = BACKGROUND
+		background.centered = true
+		background.position = Vector2(float(room_index) * 1280.0 + 640.0, 360.0)
+		background.scale = Vector2(
+			1280.0 / float(BACKGROUND.get_width()),
+			720.0 / float(BACKGROUND.get_height())
+		)
+		background.flip_h = room_index % 2 == 1
+		background.modulate = room_tints[room_index]
+		background.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		background.z_index = -30
+		_backgrounds.add_child(background)
+
+		# Each stretch gets a slightly different color veil, which avoids the
+		# repeated architecture feeling stamped while keeping one art language.
+		var veil_color := Color(0.015, 0.025, 0.07, 0.12 + float(room_index % 3) * 0.035)
+		LevelGeometry.add_color_rect(
+			_backgrounds,
+			Rect2(float(room_index) * 1280.0, 0.0, 1280.0, 720.0),
+			veil_color,
+			-28
+		)
+		LevelGeometry.add_dust_motes(
+			_backgrounds,
+			Vector2i(room_index, 0),
+			Vector2(1280.0, 720.0),
+			18,
+			Color(0.38, 0.58, 0.82, 0.16)
+		)
+
+	# Deep mist anchors the collision layer and keeps the blue rims legible.
+	LevelGeometry.add_color_rect(_backgrounds, Rect2(0, 505, WORLD_SIZE.x, 215), Color(0.01, 0.02, 0.055, 0.52), -19)
+	LevelGeometry.add_color_rect(_backgrounds, Rect2(0, 585, WORLD_SIZE.x, 135), Color(0.005, 0.008, 0.02, 0.74), -18)
 
 
-func _build_level() -> void:
-	_build_start_room()
-	_build_upper_room()
+func _build_boundaries() -> void:
+	_solid(Rect2(-60, 0, 60, 720))
+	_solid(Rect2(WORLD_SIZE.x, 0, 60, 720))
 
 
-func _build_start_room() -> void:
-	# Sala 1 — El umbral (cálida, polvo, tutorial implícito).
-	LevelGeometry.add_atmosphere_background(
-		_backgrounds,
-		Vector2i(0, 0),
-		ROOM_SIZE,
-		Color(0.62, 0.48, 0.36, 1.0),
-		Color(0.42, 0.30, 0.24, 1.0),
-		Color(0.25, 0.18, 0.14, 1.0)
-	)
-	LevelGeometry.add_dust_motes(
-		_decor, Vector2i(0, 0), ROOM_SIZE, 22, Color(1.0, 0.9, 0.7, 0.22)
-	)
-
-	_floor(Rect2(0, 1240, 720, 40))
-	_wall(Rect2(0, 0, 56, 1280))
-	_wall(Rect2(664, 0, 56, 1280))
-
-	# Escalones bajos: tap hops.
-	_plat(Rect2(120, 1120, 150, 24))
-	_plat(Rect2(380, 1020, 140, 24))
-	_plat(Rect2(160, 900, 130, 24))
-
-	# Plataforma del ítem-gancho (visible de entrada).
-	_plat(Rect2(300, 780, 200, 24))
-	var hook := HookItem.new()
-	hook.position = Vector2(400, 730)
-	hook.pickup_stream = SFX_PICKUP
-	hook.notice_stream = SFX_NOTICE
-	hook.story_text = "queda algo arriba"
-	hook.setup(_story)
-	_pickups.add_child(hook)
-
-	# Ruta hacia arriba + ledge rota (invita bounce).
-	_plat(Rect2(100, 660, 120, 24))
-	LevelGeometry.add_broken_ledge(_solids, Rect2(420, 560, 130, 24), PLAT_COLOR, TEX_DIRT)
-	_plat(Rect2(180, 440, 140, 24))
-	_plat(Rect2(400, 300, 150, 24))
-	_plat(Rect2(220, 160, 160, 24))
-	_plat(Rect2(360, 40, 180, 24))
-
-	_add_mark(Vector2(90, 1080), &"m1", "…no…", false, Color(0.95, 0.82, 0.62, 0.8))
-	_add_mark(Vector2(620, 860), &"m2", "¿otra vez?", false, Color(0.95, 0.82, 0.62, 0.8))
-	_add_mark(Vector2(90, 480), &"m3", "", false, Color(0.95, 0.82, 0.62, 0.55))
+func _build_zone_run() -> void:
+	_solid(Rect2(0, FLOOR_Y, 1120, 100))
+	_add_title(Vector2(180, 180), "01 · MOVIMIENTO", "Mové el pad: cerca = caminar · al borde = correr\nDeslizá hacia arriba y soltá para saltar")
+	# Pequeños cambios de altura para sentir aceleración y caída sin castigo.
+	_solid(Rect2(520, 570, 180, 50), SOLID_ALT)
+	_solid(Rect2(760, 530, 150, 90), SOLID_ALT)
+	_one_way(Rect2(930, 470, 150, 20))
 
 
-func _build_upper_room() -> void:
-	# Sala 2 — Lo que se aclara (más fría, saltos cargados + wall bounce).
-	LevelGeometry.add_atmosphere_background(
-		_backgrounds,
-		Vector2i(0, -1),
-		ROOM_SIZE,
-		Color(0.34, 0.36, 0.48, 1.0),
-		Color(0.22, 0.24, 0.34, 1.0),
-		Color(0.16, 0.14, 0.28, 1.0)
-	)
-	LevelGeometry.add_dust_motes(
-		_decor, Vector2i(0, -1), ROOM_SIZE, 16, Color(0.75, 0.8, 1.0, 0.18)
-	)
-
-	_wall(Rect2(0, -1280, 56, 1280))
-	_wall(Rect2(664, -1280, 56, 1280))
-	_wall(Rect2(0, -1280, 720, 56))
-
-	# Entrada desde abajo.
-	_plat(Rect2(56, -28, 160, 24))
-	_plat(Rect2(500, -28, 160, 24))
-
-	_plat(Rect2(240, -160, 130, 24))
-	_plat(Rect2(90, -320, 110, 24))
-	# Momento pared → plataforma (rebote útil).
-	_plat(Rect2(520, -460, 100, 24))
-	_plat(Rect2(200, -620, 140, 24))
-	_plat(Rect2(430, -780, 150, 24))
-	_plat(Rect2(160, -940, 160, 24))
-	_plat(Rect2(300, -1100, 220, 28))
-
-	# Franja de marcas alineadas (resolución).
-	_add_mark(Vector2(120, -1080), &"u1", "", true, Color(0.85, 0.9, 1.0, 0.9))
-	_add_mark(Vector2(200, -1080), &"u2", "", true, Color(0.85, 0.9, 1.0, 0.9))
-	_upper_seal = _add_mark(
-		Vector2(360, -1080),
-		&"u_seal",
-		"podés subir igual",
-		true,
-		Color(1.0, 0.92, 0.55, 0.95)
-	)
+func _build_zone_jump() -> void:
+	_solid(Rect2(1250, FLOOR_Y, 1110, 100))
+	_add_title(Vector2(1380, 170), "02 · TRES SALTOS", "Desde el pad: ↖ atrás · ↑ vertical · ↗ adelante\nElegí la dirección y soltá para despegar")
+	_one_way(Rect2(1510, 520, 170, 20))
+	_one_way(Rect2(1780, 455, 180, 20))
+	_one_way(Rect2(2070, 390, 190, 20))
+	# Segundo hueco, un poco más ancho: premia llegar corriendo.
+	_solid(Rect2(2540, FLOOR_Y, 560, 100))
+	_one_way(Rect2(2320, 500, 150, 20))
 
 
-func _add_mark(
-	pos: Vector2,
-	mark_id: StringName,
-	text: String,
-	resolved: bool,
-	color: Color
-) -> RoomMark:
-	var mark := RoomMark.new()
-	mark.position = pos
-	mark.mark_id = mark_id
-	mark.story_text = text
-	mark.resolved = resolved
-	mark.glyph_color = color
-	mark.whisper_stream = SFX_WHISPER
-	mark.setup(_story)
-	if mark_id == &"u_seal":
-		mark.revealed.connect(_on_seal_revealed)
-	_decor.add_child(mark)
-	return mark
+func _build_zone_drop() -> void:
+	_solid(Rect2(3100, FLOOR_Y, 1900, 100))
+	_add_title(Vector2(2660, 155), "03 · ATRAVESAR", "Subí a las plataformas marcadas\nSobre ellas, bajá el pad y soltá")
+	# Escalera que enseña plataformas atravesables.
+	_one_way(Rect2(2800, 520, 170, 20))
+	_one_way(Rect2(2990, 445, 170, 20))
+	_solid(Rect2(3100, 420, 70, 200))
+	_one_way(Rect2(3160, 375, 300, 22))
+	_one_way(Rect2(3460, 375, 300, 22))
+	_one_way(Rect2(3760, 375, 300, 22))
+	# Esta pared cierra el camino alto: hay que bajar antes y cruzar el túnel.
+	_solid(Rect2(4060, 0, 90, 505))
+	_add_marker(Vector2(3810, 330), "↓")
+	_add_marker(Vector2(4200, 575), "BIEN")
 
 
-func _on_seal_revealed(_id: StringName) -> void:
-	if _player.has_meta("has_fragment") and bool(_player.get_meta("has_fragment")):
-		_story.show_line("el fragmento encaja", &"fragment_fit")
+func _build_zone_flow() -> void:
+	_add_title(Vector2(4300, 165), "04 · FLUJO", "Encadená impulsos: carrera, diagonal y corrección aérea")
+	_one_way(Rect2(4380, 520, 170, 20))
+	_one_way(Rect2(4620, 455, 170, 20))
+	# Hueco final ancho: requiere envión, pero admite coyote time y buffer.
+	_solid(Rect2(5250, FLOOR_Y, 1150, 100))
+	_one_way(Rect2(4870, 390, 150, 20))
+	_one_way(Rect2(5150, 490, 150, 20))
+	_one_way(Rect2(5480, 520, 160, 20))
+	_one_way(Rect2(5720, 445, 170, 20))
+	_one_way(Rect2(5960, 365, 190, 20))
+	_add_title(Vector2(5710, 170), "PRUEBA COMPLETA", "El recorrido termina acá por ahora")
+	_add_marker(Vector2(6220, 330), "◆")
 
 
-func _on_room_changed(room: Vector2i) -> void:
-	_ambience.update_room(room)
+func _solid(rect: Rect2, color := SOLID) -> void:
+	LevelGeometry.add_solid(_solids, rect, color, STONE)
+
+
+func _one_way(rect: Rect2) -> void:
+	LevelGeometry.add_one_way_platform(_solids, rect, ONE_WAY, STONE)
+
+
+func _add_title(position: Vector2, title: String, subtitle: String) -> void:
+	var panel := Polygon2D.new()
+	panel.z_index = 2
+	panel.color = Color(0.015, 0.025, 0.065, 0.82)
+	panel.polygon = PackedVector2Array([
+		position + Vector2(-18, -14),
+		position + Vector2(590, -14),
+		position + Vector2(590, 102),
+		position + Vector2(-18, 102),
+	])
+	_decor.add_child(panel)
+
+	var accent := Polygon2D.new()
+	accent.z_index = 3
+	accent.color = Color("4f91c8")
+	accent.polygon = PackedVector2Array([
+		position + Vector2(-18, -14),
+		position + Vector2(-13, -14),
+		position + Vector2(-13, 102),
+		position + Vector2(-18, 102),
+	])
+	_decor.add_child(accent)
+
+	var title_label := Label.new()
+	title_label.z_index = 4
+	title_label.position = position
+	title_label.text = title
+	title_label.add_theme_font_size_override("font_size", 22)
+	title_label.add_theme_color_override("font_color", TEXT)
+	title_label.add_theme_color_override("font_outline_color", Color("050712"))
+	title_label.add_theme_constant_override("outline_size", 5)
+	_decor.add_child(title_label)
+
+	var subtitle_label := Label.new()
+	subtitle_label.z_index = 4
+	subtitle_label.position = position + Vector2(0, 48)
+	subtitle_label.text = subtitle
+	subtitle_label.add_theme_font_size_override("font_size", 15)
+	subtitle_label.add_theme_color_override("font_color", TEXT_MUTED)
+	subtitle_label.add_theme_color_override("font_outline_color", Color("050712"))
+	subtitle_label.add_theme_constant_override("outline_size", 4)
+	_decor.add_child(subtitle_label)
+
+
+func _add_marker(position: Vector2, text: String) -> void:
+	var label := Label.new()
+	label.position = position
+	label.text = text
+	label.add_theme_font_size_override("font_size", 28)
+	label.add_theme_color_override("font_color", AMBER)
+	label.add_theme_color_override("font_outline_color", Color("050712"))
+	label.add_theme_constant_override("outline_size", 5)
+	_decor.add_child(label)
+
+
+func _build_ambient_decor() -> void:
+	var candles := [
+		Vector2(315, 620), Vector2(690, 570), Vector2(1010, 470),
+		Vector2(1450, 620), Vector2(1595, 520), Vector2(1860, 455),
+		Vector2(2170, 390), Vector2(2920, 520), Vector2(3290, 375),
+		Vector2(3585, 375), Vector2(3920, 375), Vector2(4380, 520),
+		Vector2(4705, 455), Vector2(5220, 490), Vector2(5550, 520),
+		Vector2(6030, 365), Vector2(6260, 620),
+	]
+	for index in candles.size():
+		var candle := Node2D.new()
+		candle.position = candles[index]
+		candle.z_index = 6
+		candle.set_script(CANDLE_SCRIPT)
+		candle.set("phase_offset", float(index) * 0.73)
+		candle.set("height", 15.0 + float(index % 3) * 4.0)
+		_decor.add_child(candle)
+
+
+func _update_checkpoint() -> void:
+	var next_index := _checkpoint_index + 1
+	if next_index >= CHECKPOINTS.size():
+		return
+	if _player.global_position.x >= CHECKPOINTS[next_index].x:
+		_checkpoint_index = next_index
+		_player.set_checkpoint(CHECKPOINTS[_checkpoint_index])

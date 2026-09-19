@@ -1,52 +1,44 @@
 class_name RoomCamera
 extends Camera2D
 
-## Cámara de pantallas fijas con snap suave corto.
-
-signal room_changed(room: Vector2i)
+## Cámara lateral continua: anticipa la carrera sin perder estabilidad vertical.
 
 @export var target: Node2D
-@export var room_size: Vector2 = Vector2(720, 1280)
-@export var snap_seconds: float = 0.18
+@export var world_size := Vector2(6400.0, 720.0)
+@export var follow_speed := 7.5
+@export var look_ahead_distance := 150.0
+@export var look_ahead_speed := 4.0
 
-var _current_room: Vector2i = Vector2i(999, 999)
-var _from: Vector2 = Vector2.ZERO
-var _to: Vector2 = Vector2.ZERO
-var _snap_t: float = 1.0
+var _look_ahead := 0.0
 
 
 func _ready() -> void:
 	make_current()
-	_snap_to_target_room(true)
+	position = _desired_position()
 
 
-func _physics_process(delta: float) -> void:
-	_snap_to_target_room(false)
-	if _snap_t < 1.0:
-		_snap_t = minf(_snap_t + delta / maxf(snap_seconds, 0.01), 1.0)
-		var t := _snap_t * _snap_t * (3.0 - 2.0 * _snap_t)
-		global_position = _from.lerp(_to, t)
-
-
-func _snap_to_target_room(instant: bool) -> void:
+func _process(delta: float) -> void:
 	if target == null:
 		return
+	var target_velocity := 0.0
+	if target is CharacterBody2D:
+		target_velocity = (target as CharacterBody2D).velocity.x
+	var desired_look := signf(target_velocity) * look_ahead_distance if absf(target_velocity) > 45.0 else 0.0
+	_look_ahead = lerpf(_look_ahead, desired_look, 1.0 - exp(-look_ahead_speed * delta))
+	global_position = global_position.lerp(_desired_position(), 1.0 - exp(-follow_speed * delta))
 
-	var room := Vector2i(
-		floori(target.global_position.x / room_size.x),
-		floori(target.global_position.y / room_size.y)
+
+func snap_to_target() -> void:
+	_look_ahead = 0.0
+	global_position = _desired_position()
+
+
+func _desired_position() -> Vector2:
+	if target == null:
+		return Vector2(640.0, 360.0)
+	var half_view := get_viewport_rect().size * 0.5
+	var desired_x := target.global_position.x + _look_ahead
+	return Vector2(
+		clampf(desired_x, half_view.x, world_size.x - half_view.x),
+		clampf(target.global_position.y - 65.0, half_view.y, world_size.y - half_view.y)
 	)
-	var desired := Vector2(room) * room_size + room_size * 0.5
-	if room != _current_room:
-		_current_room = room
-		room_changed.emit(room)
-		if instant:
-			global_position = desired
-			_to = desired
-			_snap_t = 1.0
-		else:
-			_from = global_position
-			_to = desired
-			_snap_t = 0.0
-	elif _snap_t >= 1.0:
-		global_position = desired
