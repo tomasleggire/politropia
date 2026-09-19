@@ -22,10 +22,13 @@ signal respawned
 @export var coyote_time := 0.12
 @export var drop_through_time := 0.20
 
-@export_category("Teclado de prueba")
+@export_category("Movimiento directo")
 @export var keyboard_speed := 300.0
 @export var keyboard_acceleration := 1800.0
 @export var keyboard_jump_speed := 560.0
+@export var touch_walk_speed := 190.0
+@export var touch_run_speed := 390.0
+@export var touch_jump_horizontal_speed := 335.0
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
@@ -39,6 +42,7 @@ var _landing_left := 0.0
 var _footstep_left := 0.0
 var _was_on_floor := false
 var _spawn_position := Vector2.ZERO
+var _touch_move_axis := 0.0
 
 
 func _ready() -> void:
@@ -101,10 +105,42 @@ func apply_swipe(swipe_pixels: Vector2, duration_seconds: float) -> void:
 		_begin_drop_through()
 
 
+## Continuous analog intent from the on-screen pad.
+func set_touch_move(axis: float) -> void:
+	_touch_move_axis = clampf(axis, -1.0, 1.0)
+
+
+## direction is absolute screen direction: -1 left, 0 vertical, +1 right.
+## A vertical jump keeps current horizontal speed, so a running character
+## still goes the way it was walking.
+func touch_jump(direction: int) -> void:
+	if not (is_on_floor() or _coyote_left > 0.0):
+		return
+	velocity.y = -keyboard_jump_speed
+	if direction != 0:
+		velocity.x = float(direction) * touch_jump_horizontal_speed
+		_facing = direction
+		_sprite.flip_h = _facing < 0
+	_coyote_left = 0.0
+	_landing_left = 0.0
+	_sfx_jump.play()
+
+
+func touch_drop() -> void:
+	_begin_drop_through()
+
+
 func _apply_keyboard_fallback(delta: float, grounded: bool) -> void:
-	var axis := Input.get_axis(&"move_left", &"move_right")
-	if not is_zero_approx(axis):
-		velocity.x = move_toward(velocity.x, axis * keyboard_speed, keyboard_acceleration * delta)
+	var keyboard_axis := Input.get_axis(&"move_left", &"move_right")
+	var axis := keyboard_axis
+	if absf(_touch_move_axis) > absf(keyboard_axis):
+		axis = _touch_move_axis
+	if not is_zero_approx(axis) and grounded:
+		var target_speed := keyboard_speed
+		if absf(_touch_move_axis) > absf(keyboard_axis):
+			var analog_strength := inverse_lerp(0.16, 1.0, absf(_touch_move_axis))
+			target_speed = lerpf(touch_walk_speed, touch_run_speed, analog_strength)
+		velocity.x = move_toward(velocity.x, signf(axis) * target_speed, keyboard_acceleration * delta)
 	if Input.is_action_just_pressed(&"jump") and (grounded or _coyote_left > 0.0):
 		velocity.y = -keyboard_jump_speed
 		_coyote_left = 0.0
@@ -114,7 +150,7 @@ func _apply_keyboard_fallback(delta: float, grounded: bool) -> void:
 
 
 func _apply_natural_drag(delta: float, grounded: bool) -> void:
-	if not is_zero_approx(Input.get_axis(&"move_left", &"move_right")):
+	if not is_zero_approx(Input.get_axis(&"move_left", &"move_right")) or not is_zero_approx(_touch_move_axis):
 		return
 	var drag := ground_drag if grounded else air_drag
 	velocity.x = move_toward(velocity.x, 0.0, drag * delta)

@@ -3,7 +3,12 @@ extends RefCounted
 
 ## Utilidad para armar colisiones y visuales sólidos de forma prolija.
 
-const TILE_PX := 28.0
+const TILE_PX := 64.0
+const STONE_TINT := Color("b7c9df")
+const STONE_SHADOW := Color("02040b")
+const EDGE_BLUE := Color("4f91c8")
+const EDGE_BLUE_HOT := Color("78b8df")
+const RUNE_AMBER := Color("d8792e")
 
 
 static func add_solid(
@@ -25,22 +30,7 @@ static func add_solid(
 	body.add_child(collision)
 
 	if texture != null:
-		var sprite := Sprite2D.new()
-		sprite.texture = texture
-		sprite.centered = true
-		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-		var tex_w := float(texture.get_width())
-		var tex_h := float(texture.get_height())
-		sprite.region_enabled = true
-		sprite.region_rect = Rect2(
-			0.0,
-			0.0,
-			(rect.size.x / TILE_PX) * tex_w,
-			(rect.size.y / TILE_PX) * tex_h
-		)
-		sprite.scale = Vector2(TILE_PX / tex_w, TILE_PX / tex_h)
-		body.add_child(sprite)
+		_add_stone_visual(body, rect.size, texture, color, false)
 	else:
 		var half := rect.size * 0.5
 		var visual := Polygon2D.new()
@@ -60,7 +50,8 @@ static func add_solid(
 static func add_one_way_platform(
 	parent: Node2D,
 	rect: Rect2,
-	color: Color
+	color: Color,
+	texture: Texture2D = null
 ) -> StaticBody2D:
 	var body := StaticBody2D.new()
 	body.position = rect.position + rect.size * 0.5
@@ -76,18 +67,105 @@ static func add_one_way_platform(
 	collision.one_way_collision_margin = 12.0
 	body.add_child(collision)
 
-	var half := rect.size * 0.5
-	var visual := Polygon2D.new()
-	visual.color = color
-	visual.polygon = PackedVector2Array([
+	if texture != null:
+		_add_stone_visual(body, rect.size, texture, color, true)
+	else:
+		var half := rect.size * 0.5
+		var visual := Polygon2D.new()
+		visual.color = color
+		visual.polygon = PackedVector2Array([
+			Vector2(-half.x, -half.y),
+			Vector2(half.x, -half.y),
+			Vector2(half.x, half.y),
+			Vector2(-half.x, half.y),
+		])
+		body.add_child(visual)
+	parent.add_child(body)
+	return body
+
+
+static func _add_stone_visual(
+	body: StaticBody2D,
+	size: Vector2,
+	texture: Texture2D,
+	tint: Color,
+	is_one_way: bool
+) -> void:
+	var half := size * 0.5
+	var tex_w := float(texture.get_width())
+	var tex_h := float(texture.get_height())
+
+	var sprite := Sprite2D.new()
+	sprite.texture = texture
+	sprite.centered = true
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	sprite.region_enabled = true
+	sprite.region_rect = Rect2(
+		0.0,
+		0.0,
+		(size.x / TILE_PX) * tex_w,
+		(size.y / TILE_PX) * tex_h
+	)
+	sprite.scale = Vector2(TILE_PX / tex_w, TILE_PX / tex_h)
+	sprite.modulate = STONE_TINT.lerp(tint, 0.28)
+	body.add_child(sprite)
+
+	# The cool cap is the gameplay read: it keeps every walkable edge visible
+	# without flattening the masonry into a bright rectangle.
+	var cap := Polygon2D.new()
+	cap.z_index = 2
+	cap.color = EDGE_BLUE_HOT if is_one_way else EDGE_BLUE
+	cap.polygon = PackedVector2Array([
 		Vector2(-half.x, -half.y),
 		Vector2(half.x, -half.y),
+		Vector2(half.x, -half.y + (3.0 if is_one_way else 4.0)),
+		Vector2(-half.x, -half.y + (3.0 if is_one_way else 4.0)),
+	])
+	body.add_child(cap)
+
+	var bevel := Polygon2D.new()
+	bevel.z_index = 1
+	bevel.color = Color(0.08, 0.18, 0.31, 0.72)
+	bevel.polygon = PackedVector2Array([
+		Vector2(-half.x, -half.y + 4.0),
+		Vector2(half.x, -half.y + 4.0),
+		Vector2(half.x, -half.y + 10.0),
+		Vector2(-half.x, -half.y + 10.0),
+	])
+	body.add_child(bevel)
+
+	var lower_shadow := Polygon2D.new()
+	lower_shadow.z_index = 1
+	lower_shadow.color = Color(STONE_SHADOW, 0.58)
+	lower_shadow.polygon = PackedVector2Array([
+		Vector2(-half.x, half.y - minf(12.0, size.y * 0.3)),
+		Vector2(half.x, half.y - minf(12.0, size.y * 0.3)),
 		Vector2(half.x, half.y),
 		Vector2(-half.x, half.y),
 	])
-	body.add_child(visual)
-	parent.add_child(body)
-	return body
+	body.add_child(lower_shadow)
+
+	if is_one_way:
+		_add_platform_runes(body, size)
+
+
+static func _add_platform_runes(body: StaticBody2D, size: Vector2) -> void:
+	var count := maxi(1, floori(size.x / 58.0))
+	var spacing := size.x / float(count + 1)
+	for i in count:
+		var center_x := -size.x * 0.5 + spacing * float(i + 1)
+		var rune := Line2D.new()
+		rune.z_index = 3
+		rune.width = 1.5
+		rune.default_color = Color(RUNE_AMBER, 0.72)
+		rune.antialiased = false
+		rune.points = PackedVector2Array([
+			Vector2(center_x - 5.0, -size.y * 0.5 + 8.0),
+			Vector2(center_x, -size.y * 0.5 + 4.0),
+			Vector2(center_x + 5.0, -size.y * 0.5 + 8.0),
+		])
+		body.add_child(rune)
 
 
 static func add_color_rect(parent: Node2D, rect: Rect2, color: Color, z_index := -20) -> Polygon2D:

@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://btouchcontrolspolitropia"]
+[gd_scene load_steps=3 format=3 uid="uid://btouchcontrolspolitropia"]
 
 [ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="1_touch"]
+[ext_resource type="Script" path="res://scripts/ui/virtual_pad_visual.gd" id="2_pad"]
 
 [node name="TouchControls" type="CanvasLayer"]
 script = ExtResource("1_touch")
@@ -14,18 +15,36 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="MovePad" type="Control" parent="Root"]
+custom_minimum_size = Vector2(190, 190)
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 64.0
+offset_top = -206.0
+offset_right = 254.0
+offset_bottom = -16.0
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("2_pad")
+
 [node name="Hint" type="Label" parent="Root"]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -54.0
-offset_bottom = -18.0
+offset_top = -48.0
+offset_bottom = -16.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.55)
-theme_override_font_sizes/font_size = 17
-text = "DESLIZÁ Y SOLTÁ · CADA GESTO SUMA IMPULSO"
+theme_override_colors/font_color = Color(0.59, 0.72, 0.86, 0.72)
+theme_override_colors/font_outline_color = Color(0.019, 0.027, 0.066, 0.95)
+theme_override_constants/outline_size = 5
+theme_override_font_sizes/font_size = 14
+text = "PAD: CAMINAR · SWIPE: SALTAR"
 horizontal_alignment = 1
