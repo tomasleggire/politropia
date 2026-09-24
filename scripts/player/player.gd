@@ -2,7 +2,7 @@ class_name Player
 extends CharacterBody2D
 
 ## Blasphemous-style finite state machine: weighty ground run, a precise
-## jump arc, crouch, a ground-only dash/slide, wall cling + climb jump,
+## jump arc, crouch, a ground-only dash/slide, wall cling + climb kick,
 ## ledge grab, a 3-hit ground combo, up/air/crouch attacks and a down plunge.
 
 signal respawned
@@ -58,8 +58,22 @@ const PHASE_RECOVERY := 2
 @export_group("Wall")
 @export var wall_ray_length := 20.0
 @export var wall_cling_apex_threshold := 60.0
-@export var wall_climb_hop_speed := 620.0
-@export var wall_climb_hop_outward_speed := 140.0
+## A collider only counts as a clingable wall when its shape is at least this
+## tall and is not wider than it is tall — filters out horizontal platforms.
+@export var min_wall_height := 80.0
+@export var wall_slide_speed := 70.0
+## How fast the slide speed above is approached, so clinging eases in instead
+## of snapping to a fixed downward speed.
+@export var wall_slide_acceleration := 600.0
+@export var wall_slide_max_speed := 140.0
+@export var wall_kick_outward_speed := 220.0
+@export var wall_kick_vertical_speed := 560.0
+## Horizontal input is ignored for this long right after a kick, so the
+## outward push reads as a real impulse instead of a vertical hop.
+@export var wall_kick_input_lock_time := 0.12
+## Air-control target speed used to drift back toward the wall after a kick,
+## once the input lock above ends, unless the player holds away from it.
+@export var wall_kick_drift_speed := 160.0
 @export var wall_jump_horizontal_speed := 300.0
 @export var wall_jump_vertical_speed := 560.0
 @export var wall_jump_lock_time := 0.15
@@ -110,6 +124,7 @@ const PHASE_RECOVERY := 2
 @onready var _collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var _wall_check_head: RayCast2D = $WallCheckHead
 @onready var _wall_check_chest: RayCast2D = $WallCheckChest
+@onready var _wall_check_feet: RayCast2D = $WallCheckFeet
 @onready var _ledge_check_above: RayCast2D = $LedgeCheckAbove
 @onready var _headroom_check: RayCast2D = $HeadroomCheck
 @onready var _attack_hitbox: AttackHitbox = $AttackHitbox
@@ -137,6 +152,9 @@ var _dash_cooldown_left := 0.0
 var _wall_direction := 0
 var _wall_recling_lock := 0.0
 var _wall_jump_lock_left := 0.0
+var _wall_kick_lock_left := 0.0
+var _wall_kick_pending := false
+var _wall_kick_wall_direction := 0
 
 var _ledge_snap_from := Vector2.ZERO
 var _ledge_snap_to := Vector2.ZERO
@@ -158,6 +176,7 @@ func _ready() -> void:
 
 	_wall_check_head.collision_mask = 1
 	_wall_check_chest.collision_mask = 1
+	_wall_check_feet.collision_mask = 1
 	_ledge_check_above.collision_mask = 1
 	_headroom_check.collision_mask = 1
 
@@ -221,6 +240,7 @@ func _update_shared_timers(delta: float) -> void:
 	_landing_left = maxf(_landing_left - delta, 0.0)
 	_wall_recling_lock = maxf(_wall_recling_lock - delta, 0.0)
 	_wall_jump_lock_left = maxf(_wall_jump_lock_left - delta, 0.0)
+	_wall_kick_lock_left = maxf(_wall_kick_lock_left - delta, 0.0)
 	_dash_cooldown_left = maxf(_dash_cooldown_left - delta, 0.0)
 
 	if _drop_left > 0.0:
@@ -260,9 +280,11 @@ func _update_facing() -> void:
 func _update_facing_rays() -> void:
 	_wall_check_head.target_position.x = wall_ray_length * _facing
 	_wall_check_chest.target_position.x = wall_ray_length * _facing
+	_wall_check_feet.target_position.x = wall_ray_length * _facing
 	_ledge_check_above.target_position.x = wall_ray_length * _facing
 	_wall_check_head.force_raycast_update()
 	_wall_check_chest.force_raycast_update()
+	_wall_check_feet.force_raycast_update()
 	_ledge_check_above.force_raycast_update()
 
 
@@ -625,10 +647,8 @@ func _hitbox_config_for(attack_name: StringName) -> Dictionary:
 ## -- Airborne: jump / fall ----------------------------------------------------
 
 func _update_airborne(delta: float) -> void:
-	var axis := _horizontal_input()
-	var target_speed := axis * run_max_speed
-	var accel := air_acceleration if not is_zero_approx(axis) else air_deceleration
-	velocity.x = move_toward(velocity.x, target_speed, accel * delta)
+	if _wall_kick_lock_left <= 0.0:
+		_apply_air_horizontal_control(delta)
 
 	if Input.is_action_just_released(&"jump") and velocity.y < 0.0:
 		velocity.y *= jump_release_multiplier
@@ -644,6 +664,20 @@ func _update_airborne(delta: float) -> void:
 			return
 
 	_state = State.JUMP if velocity.y < 0.0 else State.FALL
+
+
+## Normal air control, except right after a wall kick: with no horizontal
+## input held, it drifts back toward the kicked wall instead of holding
+## still, so a wall kick reads as a climb rather than a jump away.
+func _apply_air_horizontal_control(delta: float) -> void:
+	var input_axis := _horizontal_input()
+	if not is_zero_approx(input_axis):
+		velocity.x = move_toward(velocity.x, input_axis * run_max_speed, air_acceleration * delta)
+		return
+	if _wall_kick_pending:
+		velocity.x = move_toward(velocity.x, float(_wall_kick_wall_direction) * wall_kick_drift_speed, air_acceleration * delta)
+		return
+	velocity.x = move_toward(velocity.x, 0.0, air_deceleration * delta)
 
 
 func _apply_gravity(delta: float) -> void:
@@ -697,24 +731,57 @@ func _update_dash(delta: float) -> void:
 
 ## -- Wall cling / climb --------------------------------------------------------
 
+## True when `ray` hits a collider whose shape is tall and narrow enough to
+## be a real wall (not the side of a horizontal platform): at least
+## `min_wall_height` tall, and not wider than it is tall.
+func _is_wall_ray(ray: RayCast2D) -> bool:
+	if not ray.is_colliding():
+		return false
+	var size := _collider_shape_size(ray.get_collider())
+	if size == Vector2.ZERO:
+		return false
+	return size.y >= min_wall_height and size.y >= size.x
+
+
+func _collider_shape_size(collider: Object) -> Vector2:
+	if collider == null or not (collider is Node):
+		return Vector2.ZERO
+	for child in (collider as Node).get_children():
+		if child is CollisionShape2D:
+			var shape := (child as CollisionShape2D).shape
+			if shape is RectangleShape2D:
+				return (shape as RectangleShape2D).size
+	return Vector2.ZERO
+
+
+func _is_against_climbable_wall() -> bool:
+	if not (_is_wall_ray(_wall_check_head) and _is_wall_ray(_wall_check_chest) and _is_wall_ray(_wall_check_feet)):
+		return false
+	# All three rays must hit the same solid, not three different neighbors
+	# that each only partially cover the player's height.
+	var collider := _wall_check_chest.get_collider()
+	return _wall_check_head.get_collider() == collider and _wall_check_feet.get_collider() == collider
+
+
 func _try_start_wall_cling() -> bool:
 	if _wall_recling_lock > 0.0:
 		return false
 	if velocity.y < -wall_cling_apex_threshold:
 		return false
-	if not (_wall_check_head.is_colliding() and _wall_check_chest.is_colliding()):
+	if not _is_against_climbable_wall():
 		return false
 	_wall_direction = _facing
 	_enter_state(State.WALL_CLING)
 	return true
 
 
-func _update_wall_cling(_delta: float) -> void:
+func _update_wall_cling(delta: float) -> void:
 	if is_on_floor():
 		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
 		return
 
-	velocity = Vector2.ZERO
+	velocity.x = 0.0
+	velocity.y = minf(move_toward(velocity.y, wall_slide_speed, wall_slide_acceleration * delta), wall_slide_max_speed)
 	_facing = _wall_direction
 	_sprite.flip_h = _facing < 0
 
@@ -733,16 +800,21 @@ func _update_wall_cling(_delta: float) -> void:
 			_wall_jump_lock_left = wall_jump_lock_time
 			_wall_recling_lock = wall_recling_lockout
 		else:
-			# Tiny outward push that air control pulls back in, so repeated
-			# jumps climb higher along the same wall. No re-cling lockout
-			# here: climbing depends on re-triggering the cling quickly.
-			velocity.x = -float(_wall_direction) * wall_climb_hop_outward_speed
-			velocity.y = -wall_climb_hop_speed
+			# Wall kick: push outward and up, briefly lock input, then drift
+			# back toward this same wall (see _apply_air_horizontal_control)
+			# so it re-clings higher and slides again — a climb by kicking.
+			# No re-cling lockout here: climbing depends on re-triggering the
+			# cling quickly.
+			velocity.x = -float(_wall_direction) * wall_kick_outward_speed
+			velocity.y = -wall_kick_vertical_speed
+			_wall_kick_lock_left = wall_kick_input_lock_time
+			_wall_kick_pending = true
+			_wall_kick_wall_direction = _wall_direction
 		_sfx_jump.play()
 		_enter_state(State.JUMP)
 		return
 
-	if not (_wall_check_head.is_colliding() and _wall_check_chest.is_colliding()):
+	if not _is_against_climbable_wall():
 		_enter_state(State.FALL)
 
 
@@ -753,7 +825,7 @@ func _try_start_ledge_hang() -> bool:
 		return false
 	if velocity.y < 0.0:
 		return false
-	if not _wall_check_chest.is_colliding() or _ledge_check_above.is_colliding():
+	if not _is_wall_ray(_wall_check_chest) or _ledge_check_above.is_colliding():
 		return false
 	_snap_to_ledge()
 	_enter_state(State.LEDGE_HANG)
@@ -810,6 +882,11 @@ func _enter_state(new_state: State) -> void:
 
 	if new_state == State.LEDGE_CLIMB:
 		_ledge_climb_time = 0.0
+
+	# The post-kick drift-back only applies while airborne; any other state
+	# (re-clung, landed, attacked, dashed…) clears it.
+	if new_state != State.JUMP and new_state != State.FALL:
+		_wall_kick_pending = false
 
 
 func _set_collider_height(height: float) -> void:

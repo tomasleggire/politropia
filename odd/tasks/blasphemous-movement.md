@@ -14,7 +14,7 @@ Current player (`scripts/player/player.gd`) is an impulse-swipe prototype with n
 
 ## Constraints / Assumptions
 - No crouch/attack/dash/wall/ledge frames exist in `wanderer_sheet.png`: use placeholder visuals (reused frames, squash, debug hitbox flash) until art arrives.
-- Wall cling: level has no "climbable" wall markers, so any solid wall face is clingable for now (Blasphemous restricts to marked walls; revisit).
+- Wall cling: level has no "climbable" wall markers. Since `LevelGeometry` builds every solid as a plain `RectangleShape2D` (walls and horizontal platforms alike), a collider qualifies as a clingable wall by shape only: at least `min_wall_height` tall and not wider than it is tall (T4).
 - Numbers are approximations of Blasphemous feel, tuned by user feedback.
 
 ## TDD
@@ -28,6 +28,7 @@ Current player (`scripts/player/player.gd`) is an impulse-swipe prototype with n
 - [x] T1 Input + touch UI: input actions in project.godot, Blasphemous-mobile touch layout (pad + Jump/Attack/Dash), remove hint texts and level titles/markers. Route: delegated writer (2+ non-trivial files). Commit: f8c5dec.
 - [x] T2 Player movement state machine: idle/run/crouch/jump (variable height)/fall/air control/drop-through (down+jump)/dash-slide/wall cling+climb jump/ledge grab. Route: delegated writer. Commit: 1001000.
 - [x] T3 Attacks: ground 3-hit combo, up attack, air attack, down plunge attack in air, hitbox Area2D + placeholder visuals. Route: delegated writer. Commit: 55c0f24.
+- [x] T4 Wall cling fixes from playtest (vertical-only, slow slide, wall kick). Route: delegated writer.
 
 ## Acceptance criteria
 - No tutorial/counter texts on screen.
@@ -48,5 +49,11 @@ Current player (`scripts/player/player.gd`) is an impulse-swipe prototype with n
   - Verification: `--quit-after 300 2>&1 | rg -i "error|warning"`: no output (clean). `rg` leftover-reference check: no output (clean). `gga run --no-cache` (GGA_PROVIDER=claude): STATUS: PASSED; applied its 1 actionable note (stale header comment); left 2 accepted non-blocking notes (dispatcher function length, redundant raycast collision_mask re-assignment already set in the scene).
   - Manual iPhone playtest via tools/ios/deploy.sh: not run (no device attached in this session).
 
+- Review (T1–T3 range 993735b..62f6275): assessed medium (executable_change, 1694 lines, slice_budget_reached); user declined native review for this candidate. Parent spot check: headless `--quit-after 300` clean.
+
+- T4 done. Route: delegated writer. iPhone playtest found the player wall-clinging on the sides of horizontal jumpable platforms (e.g. `Rect2(520, 570, 180, 50)`, `Rect2(760, 530, 150, 90)` in `level_01.gd` — short/wide `add_solid` blocks). Root cause: `WallCheckHead`/`WallCheckChest` only checked collision, never the collider's shape, so any solid whose vertical extent happened to span both ray heights (~29–50px above feet) qualified, including low platform edges; ledge grab had the same gap (only checked `WallCheckChest`). Files: scripts/player/player.gd (new `_is_wall_ray`/`_collider_shape_size`/`_is_against_climbable_wall` helpers — a ray only counts as hitting a wall when the collider's `RectangleShape2D` is at least `min_wall_height` tall and not wider than tall; wall cling now also requires a new feet-level `WallCheckFeet` ray so head+chest+feet all hit the same collider; ledge grab's chest check now goes through the same shape qualification; `_update_wall_cling` slides down smoothly toward `wall_slide_speed` via `wall_slide_acceleration`, capped by `wall_slide_max_speed`, instead of freezing velocity every frame; the same-direction jump-while-clinging branch now kicks outward (`wall_kick_outward_speed`/`wall_kick_vertical_speed`), locks horizontal input for `wall_kick_input_lock_time` via a new `_wall_kick_lock_left` timer, then `_apply_air_horizontal_control` auto-drifts back toward `_wall_kick_wall_direction` at `wall_kick_drift_speed` unless the player holds away — replacing the old climb-hop constants `wall_climb_hop_speed`/`wall_climb_hop_outward_speed`; `_wall_kick_pending` clears on any non-airborne state so the drift only lasts through the jump/fall arc; re-cling after a kick keeps no lockout, same as before, while releasing via down still sets `wall_recling_lockout`), scenes/player/player.tscn (added `WallCheckFeet` RayCast2D at y=-8, mask=solids). New exports (Wall group, grouped/typed to match style): `min_wall_height=80.0`, `wall_slide_speed=70.0`, `wall_slide_acceleration=600.0`, `wall_slide_max_speed=140.0`, `wall_kick_outward_speed=220.0`, `wall_kick_vertical_speed=560.0`, `wall_kick_input_lock_time=0.12`, `wall_kick_drift_speed=160.0`.
+  - Verification: `--quit-after 300 2>&1 | rg -i "error|warning"`: no output (clean).
+  - Manual iPhone playtest via tools/ios/deploy.sh: not run (no device attached in this session) — follow-up needed to confirm the fix feels right on-device.
+
 ## Next step
-None — T1–T3 complete. Suggested follow-ups for a later pass: real art/animations for crouch/dash/wall/ledge/attacks (current visuals are placeholder squash + a translucent hitbox rectangle), an enemy/hurtbox layer to actually receive `attack_hit`, and manual iPhone playtest via tools/ios/deploy.sh.
+Manual iPhone playtest of T4's wall cling/slide/kick changes. Other suggested follow-ups: real art/animations for crouch/dash/wall/ledge/attacks (current visuals are placeholder squash + a translucent hitbox rectangle), an enemy/hurtbox layer to actually receive `attack_hit`.
