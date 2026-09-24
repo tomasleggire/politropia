@@ -1,13 +1,17 @@
-[gd_scene load_steps=16 format=3 uid="uid://bplayer01politropia"]
+[gd_scene load_steps=18 format=3 uid="uid://bplayer01politropia"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 [ext_resource type="Texture2D" path="res://assets/player/gothic/wanderer_sheet.png" id="2_hero"]
 [ext_resource type="AudioStream" path="res://assets/audio/land_hup.wav" id="3_land"]
 [ext_resource type="AudioStream" path="res://assets/audio/footstep.wav" id="4_foot"]
 [ext_resource type="AudioStream" path="res://assets/audio/jump_launch.wav" id="5_jump"]
+[ext_resource type="Script" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(38, 58)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_attack"]
+size = Vector2(10, 10)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_side_0"]
 atlas = ExtResource("2_hero")
@@ -126,6 +130,15 @@ collision_mask = 1
 position = Vector2(0, -29)
 target_position = Vector2(0, -29)
 collision_mask = 1
+
+[node name="AttackHitbox" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 8
+script = ExtResource("6_hitbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackHitbox"]
+shape = SubResource("RectangleShape2D_attack")
+disabled = true
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 position = Vector2(0, -48)

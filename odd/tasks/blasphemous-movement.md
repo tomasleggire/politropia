@@ -27,7 +27,7 @@ Current player (`scripts/player/player.gd`) is an impulse-swipe prototype with n
 ## Tasks
 - [x] T1 Input + touch UI: input actions in project.godot, Blasphemous-mobile touch layout (pad + Jump/Attack/Dash), remove hint texts and level titles/markers. Route: delegated writer (2+ non-trivial files). Commit: f8c5dec.
 - [x] T2 Player movement state machine: idle/run/crouch/jump (variable height)/fall/air control/drop-through (down+jump)/dash-slide/wall cling+climb jump/ledge grab. Route: delegated writer. Commit: 1001000.
-- [ ] T3 Attacks: ground 3-hit combo, up attack, air attack, down plunge attack in air, hitbox Area2D + placeholder visuals. Route: delegated writer.
+- [x] T3 Attacks: ground 3-hit combo, up attack, air attack, down plunge attack in air, hitbox Area2D + placeholder visuals. Route: delegated writer. Commit: (pending, see Progress).
 
 ## Acceptance criteria
 - No tutorial/counter texts on screen.
@@ -44,5 +44,9 @@ Current player (`scripts/player/player.gd`) is an impulse-swipe prototype with n
   - Verification: `--quit-after 300 2>&1 | rg -i "error|warning"`: no output (clean). `rg` leftover-reference check: no output (clean, all old touch/prototype API gone). `gga run --no-cache` (GGA_PROVIDER=claude): STATUS: PASSED; applied its 2 actionable notes (duplicate `add_to_group`, stray self-referencing doc comment).
   - Manual iPhone playtest via tools/ios/deploy.sh: not run (no device attached in this session).
 
+- T3 done. Route: delegated writer. Files: scripts/player/player.gd (new states ATTACK/AIR_ATTACK/UP_ATTACK/CROUCH_ATTACK/PLUNGE/PLUNGE_LAND, `attack`/`Attack Hitboxes`/`Plunge` export groups, `request_attack(direction)` public API for touch, unified `_queue_attack` dispatcher shared by keyboard `attack` action and touch, 3-hit ground combo with buffered next-hit + dash/jump cancel in recovery, crouch/up/air attacks, down+attack air plunge with hang→fast-fall→shockwave landing), scripts/player/attack_hitbox.gd (new, `AttackHitbox` Area2D: `configure/activate/deactivate`, `attack_hit(target, attack_name)` signal on body/area entered, translucent placeholder slash via `_draw()`), scenes/player/player.tscn (added `AttackHitbox` Area2D + `CollisionShape2D`, layer=player_attack(4) mask=enemies(8)).
+  - Verification: `--quit-after 300 2>&1 | rg -i "error|warning"`: no output (clean). `rg` leftover-reference check: no output (clean). `gga run --no-cache` (GGA_PROVIDER=claude): STATUS: PASSED; applied its 1 actionable note (stale header comment); left 2 accepted non-blocking notes (dispatcher function length, redundant raycast collision_mask re-assignment already set in the scene).
+  - Manual iPhone playtest via tools/ios/deploy.sh: not run (no device attached in this session).
+
 ## Next step
-T3: attacks + hitbox.
+None — T1–T3 complete. Suggested follow-ups for a later pass: real art/animations for crouch/dash/wall/ledge/attacks (current visuals are placeholder squash + a translucent hitbox rectangle), an enemy/hurtbox layer to actually receive `attack_hit`, and manual iPhone playtest via tools/ios/deploy.sh.
