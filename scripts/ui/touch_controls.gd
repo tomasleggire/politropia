@@ -2,8 +2,13 @@ extends CanvasLayer
 
 ## Blasphemous-style mobile layout: a floating left-thumb joystick that drives
 ## the same move_* input actions as the keyboard, plus three right-side
-## buttons (jump, dash, attack). The attack button reads a short swipe to
-## pick a directional attack, matching the keyboard's up/down + attack combo.
+## buttons (jump, dash, attack). The attack fires the instant the finger
+## touches down (neutral, or directional if the pad already holds up/down);
+## a short swipe right after that can still upgrade the same attack to
+## up/plunge instead of firing a second one. Jump and dash also call the
+## player directly on touch-down (in addition to Input.action_press) so a
+## very quick tap can never be missed by is_action_just_pressed's same-frame
+## edge (see Player.request_jump/request_dash).
 
 @export var force_visible := false
 
@@ -17,7 +22,10 @@ extends CanvasLayer
 
 @export_group("Attack gesture")
 @export var attack_swipe_distance := 28.0
-@export var attack_neutral_delay := 0.15
+## After touch-down, a qualifying vertical swipe within this window upgrades
+## the attack that already fired to up/plunge (the player only honors the
+## upgrade while its own startup phase is still active, ~attack_startup_time).
+@export var attack_upgrade_window := 0.10
 
 var _pad_touch_id := -1
 var _pad_center := Vector2.ZERO
@@ -29,7 +37,7 @@ var _dash_touch_id := -1
 var _attack_touch_id := -1
 var _attack_start := Vector2.ZERO
 var _attack_timer := 0.0
-var _attack_resolved := false
+var _attack_upgraded := false
 
 var _held_actions := {
 	&"move_left": false,
@@ -51,11 +59,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if _attack_touch_id < 0 or _attack_resolved:
+	if _attack_touch_id < 0 or _attack_upgraded:
 		return
 	_attack_timer += delta
-	if _attack_timer >= attack_neutral_delay:
-		_resolve_attack(0)
 
 
 func _input(event: InputEvent) -> void:
@@ -182,6 +188,7 @@ func _set_action_held(action: StringName, held: bool) -> void:
 func _begin_jump(index: int) -> void:
 	_jump_touch_id = index
 	Input.action_press(&"jump")
+	get_tree().call_group(&"player", &"request_jump")
 	_jump_button.call(&"set_button_state", true)
 
 
@@ -195,6 +202,7 @@ func _end_jump() -> void:
 func _begin_dash(index: int) -> void:
 	_dash_touch_id = index
 	Input.action_press(&"dash")
+	get_tree().call_group(&"player", &"request_dash")
 	_dash_button.call(&"set_button_state", true)
 
 
@@ -205,36 +213,42 @@ func _end_dash() -> void:
 		_dash_button.call(&"set_button_state", false)
 
 
-## -- Attack button (swipe-to-direct) ---------------------------------------
+## -- Attack button (fire immediately, swipe to upgrade) ---------------------
 
 func _begin_attack(index: int, position: Vector2) -> void:
 	_attack_touch_id = index
 	_attack_start = position
 	_attack_timer = 0.0
-	_attack_resolved = false
+	_attack_upgraded = false
 	_attack_button.call(&"set_button_state", true)
+	get_tree().call_group(&"player", &"request_attack", _pad_vertical_direction())
+
+
+## The attack already fires as neutral above; if the pad is held up/down at
+## touch-down, fire that directional attack immediately instead (zero added
+## latency either way).
+func _pad_vertical_direction() -> int:
+	if _held_actions.get(&"move_up", false):
+		return -1
+	if _held_actions.get(&"move_down", false):
+		return 1
+	return 0
 
 
 func _update_attack_drag(position: Vector2) -> void:
-	if _attack_resolved:
+	if _attack_upgraded or _attack_timer > attack_upgrade_window:
 		return
 	var delta := position - _attack_start
 	if absf(delta.y) < attack_swipe_distance or absf(delta.y) <= absf(delta.x):
 		return
-	_resolve_attack(-1 if delta.y < 0.0 else 1)
+	_attack_upgraded = true
+	get_tree().call_group(&"player", &"request_attack_upgrade", -1 if delta.y < 0.0 else 1)
 
 
 func _end_attack() -> void:
 	_attack_touch_id = -1
 	if is_instance_valid(_attack_button):
 		_attack_button.call(&"set_button_state", false)
-	if not _attack_resolved:
-		_resolve_attack(0)
-
-
-func _resolve_attack(direction: int) -> void:
-	_attack_resolved = true
-	get_tree().call_group(&"player", &"request_attack", direction)
 
 
 func _notification(what: int) -> void:
