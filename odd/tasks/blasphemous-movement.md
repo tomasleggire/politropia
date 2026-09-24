@@ -29,9 +29,9 @@ Current player (`scripts/player/player.gd`) is an impulse-swipe prototype with n
 - [x] T2 Player movement state machine: idle/run/crouch/jump (variable height)/fall/air control/drop-through (down+jump)/dash-slide/wall cling+climb jump/ledge grab. Route: delegated writer. Commit: 1001000.
 - [x] T3 Attacks: ground 3-hit combo, up attack, air attack, down plunge attack in air, hitbox Area2D + placeholder visuals. Route: delegated writer. Commit: 55c0f24.
 - [x] T4 Wall cling fixes from playtest (vertical-only, slow slide, wall kick). Route: delegated writer. Commit: a000702.
-- [x] T5 Input latency + combinability audit from iPhone playtest (touch attack fires on touch-down instead of after a swipe/release delay; attack input buffer; centralized combinable dash; jump/dash direct-call guard against same-frame taps). Route: delegated writer.
-- [x] T6 Air dash: one per airborne period, horizontal-only with no gravity, standing collider. Route: delegated writer.
-- [x] T7 Wall tweaks: faster wall kick (~+26.6% height), cling only while holding toward the wall. Route: delegated writer.
+- [x] T5 Input latency + combinability audit from iPhone playtest (touch attack fires on touch-down instead of after a swipe/release delay; attack input buffer; centralized combinable dash; jump/dash direct-call guard against same-frame taps). Route: delegated writer. Commit: bb577f2.
+- [x] T6 Air dash: one per airborne period, horizontal-only with no gravity, standing collider. Route: delegated writer. Commit: bb577f2.
+- [x] T7 Wall tweaks: faster wall kick (~+26.6% height), cling only while holding toward the wall. Route: delegated writer. Commit: bb577f2.
 
 ## Acceptance criteria
 - No tutorial/counter texts on screen.
