@@ -1,179 +1,1045 @@
 class_name Player
 extends CharacterBody2D
 
-## Controlador lateral por impulsos. Cada swipe suma momentum al movimiento actual.
+## Blasphemous-style finite state machine: weighty ground run, a precise
+## jump arc, crouch, a dash/slide usable on the ground or in the air (one
+## air dash per airborne period), wall cling + climb kick, ledge grab,
+## a 3-hit ground combo, up/air/crouch attacks and a down plunge.
 
 signal respawned
 
-@export_category("Impulsos")
-@export var max_horizontal_speed := 540.0
-@export var max_upward_speed := 720.0
-@export var horizontal_impulse := 330.0
-@export var upward_impulse := 610.0
+enum State {
+	IDLE, RUN, CROUCH, JUMP, FALL, DASH,
+	WALL_CLING, LEDGE_HANG, LEDGE_CLIMB,
+	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK, PLUNGE, PLUNGE_LAND,
+}
 
-@export_category("Peso")
-@export var ground_drag := 1600.0
-@export var air_drag := 85.0
-@export var gravity_rise := 1420.0
-@export var gravity_fall := 2050.0
-@export var gravity_apex := 820.0
-@export var apex_threshold := 80.0
-@export var max_fall_speed := 1050.0
-@export var coyote_time := 0.12
+const PHASE_STARTUP := 0
+const PHASE_ACTIVE := 1
+const PHASE_RECOVERY := 2
+
+@export_group("Run")
+@export var run_max_speed := 250.0
+@export var run_acceleration := 4000.0
+@export var run_deceleration := 5000.0
+
+@export_group("Jump")
+## Apex height and time-to-apex derive rise gravity and launch velocity.
+@export var jump_height := 130.0
+@export var jump_time_to_apex := 0.36
+## Releasing jump while rising multiplies the current upward speed by this.
+@export var jump_release_multiplier := 0.45
+@export var fall_gravity_multiplier := 1.2
+@export var max_fall_speed := 900.0
+@export var coyote_time := 0.08
+@export var jump_buffer_time := 0.10
+
+@export_group("Air Control")
+@export var air_acceleration := 2600.0
+@export var air_deceleration := 2600.0
+
+@export_group("Landing")
+@export var landing_squash_time := 0.08
+@export var landing_impact_speed := 150.0
+
+@export_group("Crouch")
+@export var crouch_collider_scale := 0.5
+@export var crouch_headroom_margin := 4.0
+
+@export_group("Drop Through")
 @export var drop_through_time := 0.20
 
-@export_category("Movimiento directo")
-@export var keyboard_speed := 300.0
-@export var keyboard_acceleration := 1800.0
-@export var keyboard_jump_speed := 560.0
-@export var touch_walk_speed := 190.0
-@export var touch_run_speed := 390.0
-@export var touch_jump_horizontal_speed := 335.0
+@export_group("Dash")
+@export var dash_duration := 0.45
+@export var dash_speed := 480.0
+## Fraction of dash_duration spent at full dash_speed before easing to run speed.
+@export var dash_full_speed_ratio := 0.70
+@export var dash_cooldown := 0.35
+## Air dash: horizontal only, gravity suspended for its duration, standing
+## collider kept (unlike the ground dash's low slide collider). One per
+## airborne period — resets on landing, wall cling or ledge hang.
+@export var air_dash_duration := 0.30
+
+@export_group("Wall")
+@export var wall_ray_length := 20.0
+@export var wall_cling_apex_threshold := 60.0
+## A collider only counts as a clingable wall when its shape is at least this
+## tall and is not wider than it is tall — filters out horizontal platforms.
+@export var min_wall_height := 80.0
+@export var wall_slide_speed := 70.0
+## How fast the slide speed above is approached, so clinging eases in instead
+## of snapping to a fixed downward speed.
+@export var wall_slide_acceleration := 600.0
+@export var wall_slide_max_speed := 140.0
+@export var wall_kick_outward_speed := 220.0
+## Raised from 560 -> 630 for a modestly faster climb: ~+26.6% peak height
+## per kick (v^2/(2*rise_gravity), rise_gravity derived from Jump/jump_height
+## and jump_time_to_apex — unchanged), within the requested 25-35% range.
+@export var wall_kick_vertical_speed := 630.0
+## Horizontal input is ignored for this long right after a kick, so the
+## outward push reads as a real impulse instead of a vertical hop.
+@export var wall_kick_input_lock_time := 0.12
+## Air-control target speed used to drift back toward the wall after a kick,
+## once the input lock above ends, unless the player holds away from it.
+@export var wall_kick_drift_speed := 160.0
+@export var wall_jump_horizontal_speed := 300.0
+@export var wall_jump_vertical_speed := 560.0
+@export var wall_jump_lock_time := 0.15
+@export var wall_recling_lockout := 0.2
+
+@export_group("Ledge")
+@export var ledge_climb_duration := 0.25
+@export var ledge_climb_forward_offset := 40.0
+
+@export_group("Attack")
+@export var attack_startup_time := 0.06
+@export var attack_active_time := 0.10
+## Total time (from attack start) before combo hit 1/2 close and buffer expires.
+@export var attack_window_hit1 := 0.30
+@export var attack_window_hit2 := 0.30
+## Total time for the finisher (hit 3) and for crouch/up-attack windows.
+@export var attack_window_hit3 := 0.45
+@export var attack_forward_step_speed := 60.0
+## Air attack total cycle (startup + active + recovery); re-attack allowed once recovery starts.
+@export var air_attack_recovery := 0.35
+## How long a press that can't start an attack right away (dash, wall cling,
+## crouch/up/plunge attack, plunge land) stays queued so it fires the instant
+## a new attack becomes possible, instead of being silently dropped.
+@export var attack_buffer_time := 0.12
+
+@export_group("Plunge")
+@export var plunge_hang_time := 0.12
+@export var plunge_fall_speed := 1300.0
+@export var plunge_land_active_time := 0.12
+@export var plunge_land_recovery_time := 0.25
+
+@export_group("Attack Hitboxes")
+@export var hitbox_ground_size := Vector2(52.0, 30.0)
+@export var hitbox_ground_offset := Vector2(34.0, -35.0)
+@export var hitbox_finisher_size := Vector2(64.0, 34.0)
+@export var hitbox_finisher_offset := Vector2(40.0, -34.0)
+@export var hitbox_crouch_size := Vector2(50.0, 18.0)
+@export var hitbox_crouch_offset := Vector2(32.0, -13.0)
+@export var hitbox_up_size := Vector2(26.0, 54.0)
+@export var hitbox_up_offset := Vector2(0.0, -82.0)
+@export var hitbox_air_size := Vector2(50.0, 26.0)
+@export var hitbox_air_offset := Vector2(34.0, -40.0)
+@export var hitbox_plunge_size := Vector2(28.0, 18.0)
+@export var hitbox_plunge_offset := Vector2(0.0, 12.0)
+@export var hitbox_plunge_land_size := Vector2(150.0, 20.0)
+@export var hitbox_plunge_land_offset := Vector2(0.0, 6.0)
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
 @onready var _sfx_foot: AudioStreamPlayer = $SfxFoot
 @onready var _sfx_jump: AudioStreamPlayer = $SfxJump
+@onready var _collision_shape: CollisionShape2D = $CollisionShape2D
+@onready var _wall_check_head: RayCast2D = $WallCheckHead
+@onready var _wall_check_chest: RayCast2D = $WallCheckChest
+@onready var _wall_check_feet: RayCast2D = $WallCheckFeet
+@onready var _ledge_check_above: RayCast2D = $LedgeCheckAbove
+@onready var _headroom_check: RayCast2D = $HeadroomCheck
+@onready var _attack_hitbox: AttackHitbox = $AttackHitbox
 
+var _state := State.IDLE
+var _state_time := 0.0
 var _facing := 1
+var _spawn_position := Vector2.ZERO
+
+var _rise_gravity := 0.0
+var _fall_gravity := 0.0
+var _jump_velocity := 0.0
+var _standing_shape_height := 58.0
+
 var _coyote_left := 0.0
-var _drop_left := 0.0
+var _jump_buffer_left := 0.0
 var _landing_left := 0.0
 var _footstep_left := 0.0
 var _was_on_floor := false
-var _spawn_position := Vector2.ZERO
-var _touch_move_axis := 0.0
+var _drop_left := 0.0
+
+var _dash_direction := 1
+var _dash_cooldown_left := 0.0
+var _dash_is_air := false
+var _air_dash_used := false
+
+var _wall_direction := 0
+var _wall_recling_lock := 0.0
+var _wall_jump_lock_left := 0.0
+var _wall_kick_lock_left := 0.0
+var _wall_kick_pending := false
+var _wall_kick_wall_direction := 0
+
+var _ledge_snap_from := Vector2.ZERO
+var _ledge_snap_to := Vector2.ZERO
+var _ledge_climb_time := 0.0
+
+var _attack_phase := PHASE_STARTUP
+var _attack_combo_index := 0
+var _attack_buffered := false
+var _air_attack_buffered := false
+var _attack_buffer_left := 0.0
+var _attack_buffer_direction := 0
 
 
 func _ready() -> void:
+	add_to_group(&"player")
 	_spawn_position = global_position
-	_play_animation(&"idle")
+	_recompute_jump_physics()
+
+	var shape := _collision_shape.shape as RectangleShape2D
+	_standing_shape_height = shape.size.y
+	_collision_shape.shape = shape.duplicate()
+
+	_wall_check_head.collision_mask = 1
+	_wall_check_chest.collision_mask = 1
+	_wall_check_feet.collision_mask = 1
+	_ledge_check_above.collision_mask = 1
+	_headroom_check.collision_mask = 1
+
+	_enter_state(State.IDLE)
+
+
+func _recompute_jump_physics() -> void:
+	_rise_gravity = (2.0 * jump_height) / (jump_time_to_apex * jump_time_to_apex)
+	_jump_velocity = -_rise_gravity * jump_time_to_apex
+	_fall_gravity = _rise_gravity * fall_gravity_multiplier
 
 
 func _physics_process(delta: float) -> void:
-	_update_timers(delta)
-	var grounded := is_on_floor()
-	_coyote_left = coyote_time if grounded else maxf(_coyote_left - delta, 0.0)
+	_state_time += delta
+	_update_shared_timers(delta)
+	_update_facing()
+	_update_facing_rays()
 
-	_apply_keyboard_fallback(delta, grounded)
-	_apply_natural_drag(delta, grounded)
-	_apply_gravity(delta)
+	if Input.is_action_just_pressed(&"attack"):
+		_queue_attack(_held_vertical_direction())
+	if _attack_buffer_left > 0.0 and _can_start_attack():
+		var buffered_direction := _attack_buffer_direction
+		_attack_buffer_left = 0.0
+		_queue_attack(buffered_direction)
+
+	if Input.is_action_just_pressed(&"dash"):
+		_try_start_dash()
 
 	var fall_speed_before_move := velocity.y
-	move_and_slide()
-	if not _was_on_floor and is_on_floor() and fall_speed_before_move > 150.0:
-		_landing_left = 0.08
-		_sfx_land.play()
-	_was_on_floor = is_on_floor()
 
-	_update_facing()
+	match _state:
+		State.IDLE, State.RUN:
+			_update_ground_move(delta)
+		State.CROUCH:
+			_update_crouch(delta)
+		State.JUMP, State.FALL:
+			_update_airborne(delta)
+		State.DASH:
+			_update_dash(delta)
+		State.WALL_CLING:
+			_update_wall_cling(delta)
+		State.LEDGE_HANG:
+			_update_ledge_hang(delta)
+		State.LEDGE_CLIMB:
+			_update_ledge_climb(delta)
+			_update_animation()
+			return
+		State.ATTACK:
+			_update_attack(delta)
+		State.CROUCH_ATTACK:
+			_update_crouch_attack(delta)
+		State.UP_ATTACK:
+			_update_up_attack(delta)
+		State.AIR_ATTACK:
+			_update_air_attack(delta)
+		State.PLUNGE:
+			_update_plunge(delta)
+		State.PLUNGE_LAND:
+			_update_plunge_land(delta)
+
+	move_and_slide()
+	_after_move(fall_speed_before_move)
 	_update_footsteps(delta)
 	_update_animation()
 
 
-## swipe_pixels usa coordenadas de pantalla: derecha +X, abajo +Y.
-## duration_seconds agrega una influencia pequeña de velocidad sin reemplazar la distancia.
-func apply_swipe(swipe_pixels: Vector2, duration_seconds: float) -> void:
-	var length := swipe_pixels.length()
-	if length < 16.0:
-		return
-	# Un solo salto y sin redireccionar en el aire: una vez que saltás, el
-	# swipe no hace nada hasta que aterrizás. Más adelante habrá mejoras que
-	# permitan control aéreo; por ahora el salto compromete a la trayectoria.
-	if not (is_on_floor() or _coyote_left > 0.0):
-		return
-
-	var speed := length / maxf(duration_seconds, 0.04)
-	var speed_factor := remap(clampf(speed, 250.0, 2200.0), 250.0, 2200.0, 0.90, 1.12)
-	var x_strength := pow(clampf(absf(swipe_pixels.x) / 240.0, 0.0, 1.0), 0.82)
-	var y_strength := pow(clampf(absf(swipe_pixels.y) / 220.0, 0.0, 1.0), 0.82)
-
-	if absf(swipe_pixels.x) >= 10.0:
-		var impulse_x := signf(swipe_pixels.x) * horizontal_impulse * x_strength * speed_factor
-		velocity.x = clampf(velocity.x + impulse_x, -max_horizontal_speed, max_horizontal_speed)
-		_facing = 1 if impulse_x > 0.0 else -1
-
-	if swipe_pixels.y <= -30.0:
-		velocity.y = maxf(
-			velocity.y - upward_impulse * y_strength * speed_factor,
-			-max_upward_speed
-		)
-		_coyote_left = 0.0
-		_landing_left = 0.0
-		_sfx_jump.play()
-	elif swipe_pixels.y >= 30.0 and _standing_on_one_way():
-		_begin_drop_through()
-
-
-## Continuous analog intent from the on-screen pad.
-func set_touch_move(axis: float) -> void:
-	_touch_move_axis = clampf(axis, -1.0, 1.0)
-
-
-## direction is absolute screen direction: -1 left, 0 vertical, +1 right.
-## A vertical jump keeps current horizontal speed, so a running character
-## still goes the way it was walking.
-func touch_jump(direction: int) -> void:
-	if not (is_on_floor() or _coyote_left > 0.0):
-		return
-	velocity.y = -keyboard_jump_speed
-	if direction != 0:
-		velocity.x = float(direction) * touch_jump_horizontal_speed
-		_facing = direction
-		_sprite.flip_h = _facing < 0
-	_coyote_left = 0.0
-	_landing_left = 0.0
-	_sfx_jump.play()
-
-
-func touch_drop() -> void:
-	_begin_drop_through()
-
-
-func _apply_keyboard_fallback(delta: float, grounded: bool) -> void:
-	var keyboard_axis := Input.get_axis(&"move_left", &"move_right")
-	var axis := keyboard_axis
-	if absf(_touch_move_axis) > absf(keyboard_axis):
-		axis = _touch_move_axis
-	if not is_zero_approx(axis) and grounded:
-		var target_speed := keyboard_speed
-		if absf(_touch_move_axis) > absf(keyboard_axis):
-			var analog_strength := inverse_lerp(0.16, 1.0, absf(_touch_move_axis))
-			target_speed = lerpf(touch_walk_speed, touch_run_speed, analog_strength)
-		velocity.x = move_toward(velocity.x, signf(axis) * target_speed, keyboard_acceleration * delta)
-	if Input.is_action_just_pressed(&"jump") and (grounded or _coyote_left > 0.0):
-		velocity.y = -keyboard_jump_speed
-		_coyote_left = 0.0
-		_sfx_jump.play()
-	if Input.is_action_just_pressed(&"drop_down"):
-		_begin_drop_through()
-
-
-func _apply_natural_drag(delta: float, grounded: bool) -> void:
-	if not is_zero_approx(Input.get_axis(&"move_left", &"move_right")) or not is_zero_approx(_touch_move_axis):
-		return
-	var drag := ground_drag if grounded else air_drag
-	velocity.x = move_toward(velocity.x, 0.0, drag * delta)
-
-
-func _apply_gravity(delta: float) -> void:
-	if is_on_floor() and velocity.y >= 0.0:
-		return
-	var gravity := gravity_rise
-	if absf(velocity.y) < apex_threshold:
-		gravity = gravity_apex
-	elif velocity.y > 0.0:
-		gravity = gravity_fall
-	velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
-
-
-func _update_timers(delta: float) -> void:
+func _update_shared_timers(delta: float) -> void:
 	_landing_left = maxf(_landing_left - delta, 0.0)
+	_wall_recling_lock = maxf(_wall_recling_lock - delta, 0.0)
+	_wall_jump_lock_left = maxf(_wall_jump_lock_left - delta, 0.0)
+	_wall_kick_lock_left = maxf(_wall_kick_lock_left - delta, 0.0)
+	_dash_cooldown_left = maxf(_dash_cooldown_left - delta, 0.0)
+	_attack_buffer_left = maxf(_attack_buffer_left - delta, 0.0)
+
 	if _drop_left > 0.0:
 		_drop_left -= delta
 		if _drop_left <= 0.0:
 			set_collision_mask_value(2, true)
 
+	if Input.is_action_just_pressed(&"jump"):
+		_jump_buffer_left = jump_buffer_time
+	else:
+		_jump_buffer_left = maxf(_jump_buffer_left - delta, 0.0)
+
+	var grounded_state := _state != State.WALL_CLING and _state != State.LEDGE_HANG and _state != State.LEDGE_CLIMB
+	if is_on_floor() and grounded_state:
+		_coyote_left = coyote_time
+	else:
+		_coyote_left = maxf(_coyote_left - delta, 0.0)
+
+
+## -- Facing ---------------------------------------------------------------
+
+func _horizontal_input() -> float:
+	if _wall_jump_lock_left > 0.0:
+		return 0.0
+	return Input.get_axis(&"move_left", &"move_right")
+
+
+func _update_facing() -> void:
+	if _state == State.DASH or _state == State.WALL_CLING or _state == State.LEDGE_HANG or _state == State.LEDGE_CLIMB:
+		return
+	var axis := _horizontal_input()
+	if not is_zero_approx(axis):
+		_facing = 1 if axis > 0.0 else -1
+	_sprite.flip_h = _facing < 0
+
+
+func _update_facing_rays() -> void:
+	_wall_check_head.target_position.x = wall_ray_length * _facing
+	_wall_check_chest.target_position.x = wall_ray_length * _facing
+	_wall_check_feet.target_position.x = wall_ray_length * _facing
+	_ledge_check_above.target_position.x = wall_ray_length * _facing
+	_wall_check_head.force_raycast_update()
+	_wall_check_chest.force_raycast_update()
+	_wall_check_feet.force_raycast_update()
+	_ledge_check_above.force_raycast_update()
+
+
+## -- Ground: idle / run -----------------------------------------------------
+
+func _update_ground_move(delta: float) -> void:
+	if not is_on_floor():
+		_enter_state(State.FALL)
+		_update_airborne(delta)
+		return
+
+	var axis := _horizontal_input()
+	var target_speed := axis * run_max_speed
+	var accel := run_acceleration if not is_zero_approx(axis) else run_deceleration
+	velocity.x = move_toward(velocity.x, target_speed, accel * delta)
+	velocity.y = 0.0
+
+	if Input.is_action_pressed(&"move_down"):
+		_enter_state(State.CROUCH)
+		return
+
+	if _try_launch_jump():
+		return
+
+	_state = State.RUN if absf(velocity.x) > 5.0 else State.IDLE
+
+
+## -- Crouch ------------------------------------------------------------------
+
+func _update_crouch(delta: float) -> void:
+	if not is_on_floor():
+		_enter_state(State.FALL)
+		_update_airborne(delta)
+		return
+
+	velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
+	velocity.y = 0.0
+
+	if _jump_buffer_left > 0.0:
+		# On a one-way platform: fall through. On solid ground: stay crouched,
+		# down + jump is not a jump.
+		if _standing_on_one_way():
+			_begin_drop_through()
+		_jump_buffer_left = 0.0
+
+	if not Input.is_action_pressed(&"move_down") and _has_standing_headroom():
+		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+
+
+func _has_standing_headroom() -> bool:
+	var crouch_height := _standing_shape_height * crouch_collider_scale
+	var needed := (_standing_shape_height - crouch_height) + crouch_headroom_margin
+	_headroom_check.position = Vector2(0.0, -crouch_height)
+	_headroom_check.target_position = Vector2(0.0, -needed)
+	_headroom_check.force_raycast_update()
+	return not _headroom_check.is_colliding()
+
+
+## -- Combat: attack dispatch -----------------------------------------------------
+
+## direction: -1 up, 0 neutral, 1 down. Used by both the keyboard attack
+## action and the touch UI's request_attack override.
+func _held_vertical_direction() -> int:
+	if Input.is_action_pressed(&"move_up"):
+		return -1
+	if Input.is_action_pressed(&"move_down"):
+		return 1
+	return 0
+
+
+## Touch UI entry point: get_tree().call_group(&"player", &"request_attack", dir).
+## A neutral (0) touch attack falls back to whatever move_up/move_down the
+## on-screen joystick is currently holding, same as the keyboard path.
+## Called immediately on touch-down by the touch UI (zero added latency).
+func request_attack(direction: int) -> void:
+	var resolved := direction
+	if resolved == 0:
+		resolved = _held_vertical_direction()
+	_queue_attack(resolved)
+
+
+## Touch UI: upgrades the attack that just started — while it is still in
+## its startup phase, before any hitbox is active — to up/plunge instead of
+## firing a second attack. Used when the finger swipes after touching down
+## on the attack button (see touch_controls.gd's attack_upgrade_window).
+func request_attack_upgrade(direction: int) -> void:
+	if direction == 0:
+		return
+	var upgrading_from_neutral := (
+		(_state == State.ATTACK and _attack_combo_index == 0 and _attack_phase == PHASE_STARTUP)
+		or (_state == State.AIR_ATTACK and _attack_phase == PHASE_STARTUP)
+	)
+	if direction == -1 and upgrading_from_neutral:
+		_start_up_attack()
+	elif direction == 1 and _state == State.AIR_ATTACK and _attack_phase == PHASE_STARTUP:
+		_start_plunge()
+
+
+## Touch UI entry point for the jump button, called directly instead of only
+## relying on Input.action_press + is_action_just_pressed: a very quick tap
+## can press and release an action within the same frame, which the engine's
+## just-pressed edge can miss. This guarantees the jump buffer is never
+## dropped by a fast tap. Input.action_press/release still runs alongside
+## (see touch_controls.gd) so the held-release variable jump height keeps
+## working.
+func request_jump() -> void:
+	_jump_buffer_left = jump_buffer_time
+
+
+## Touch UI entry point for the dash button; same same-frame-miss guard as
+## request_jump above, calling the same start path the keyboard/gamepad
+## dash uses (ground or air, respects cooldown/state/one-air-dash).
+func request_dash() -> void:
+	_try_start_dash()
+
+
+func _can_start_attack() -> bool:
+	match _state:
+		State.IDLE, State.RUN, State.CROUCH, State.JUMP, State.FALL:
+			return true
+		_:
+			return false
+
+
+func _queue_attack(direction: int) -> void:
+	match _state:
+		State.ATTACK:
+			if _attack_combo_index < 2:
+				_attack_buffered = true
+			return
+		State.AIR_ATTACK:
+			if _attack_phase == PHASE_RECOVERY:
+				_state_time = 0.0
+				_attack_phase = PHASE_STARTUP
+			else:
+				_air_attack_buffered = true
+			return
+		State.CROUCH_ATTACK, State.UP_ATTACK, State.PLUNGE, State.PLUNGE_LAND, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB:
+			_attack_buffer_left = attack_buffer_time
+			_attack_buffer_direction = direction
+			return
+		_:
+			pass
+
+	if not is_on_floor():
+		if direction == 1:
+			_start_plunge()
+		elif direction == -1:
+			_start_up_attack()
+		else:
+			_start_air_attack()
+		return
+
+	if _state == State.CROUCH:
+		_start_crouch_attack()
+		return
+
+	if direction == -1:
+		_start_up_attack()
+		return
+
+	_start_ground_attack()
+
+
+func _end_generic_attack() -> void:
+	if is_on_floor():
+		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+	else:
+		_enter_state(State.JUMP if velocity.y < 0.0 else State.FALL)
+
+
+## -- Combat: ground combo -----------------------------------------------------
+
+func _start_ground_attack() -> void:
+	_attack_combo_index = 0
+	_attack_buffered = false
+	_enter_state(State.ATTACK)
+	_attack_phase = PHASE_STARTUP
+
+
+func _update_attack(delta: float) -> void:
+	velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
+	if is_on_floor():
+		velocity.y = 0.0
+	else:
+		_apply_gravity(delta)
+
+	var window := _attack_window_for(_attack_combo_index)
+	var t := _state_time
+
+	if t < attack_startup_time:
+		_attack_phase = PHASE_STARTUP
+	elif t < attack_startup_time + attack_active_time:
+		if _attack_phase != PHASE_ACTIVE:
+			_attack_phase = PHASE_ACTIVE
+			_activate_attack_hitbox(_ground_attack_name(_attack_combo_index))
+		velocity.x = float(_facing) * attack_forward_step_speed
+	else:
+		if _attack_phase != PHASE_RECOVERY:
+			_attack_phase = PHASE_RECOVERY
+			_deactivate_attack_hitbox()
+		if _try_launch_jump():
+			return
+
+	if t >= window:
+		if _attack_buffered and _attack_combo_index < 2:
+			_attack_combo_index += 1
+			_attack_buffered = false
+			_state_time = 0.0
+			_attack_phase = PHASE_STARTUP
+		else:
+			_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+
+
+func _attack_window_for(index: int) -> float:
+	match index:
+		0:
+			return attack_window_hit1
+		1:
+			return attack_window_hit2
+		_:
+			return attack_window_hit3
+
+
+func _ground_attack_name(index: int) -> StringName:
+	match index:
+		0:
+			return &"attack_ground_1"
+		1:
+			return &"attack_ground_2"
+		_:
+			return &"attack_ground_3"
+
+
+## -- Combat: crouch attack -----------------------------------------------------
+
+func _start_crouch_attack() -> void:
+	_enter_state(State.CROUCH_ATTACK)
+	_attack_phase = PHASE_STARTUP
+
+
+func _update_crouch_attack(delta: float) -> void:
+	velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
+	velocity.y = 0.0
+
+	if _state_time < attack_startup_time:
+		pass
+	elif _state_time < attack_startup_time + attack_active_time:
+		if _attack_phase != PHASE_ACTIVE:
+			_attack_phase = PHASE_ACTIVE
+			_activate_attack_hitbox(&"attack_crouch")
+	else:
+		if _attack_phase != PHASE_RECOVERY:
+			_attack_phase = PHASE_RECOVERY
+			_deactivate_attack_hitbox()
+		if _state_time >= attack_window_hit3:
+			if Input.is_action_pressed(&"move_down") or not _has_standing_headroom():
+				_enter_state(State.CROUCH)
+			else:
+				_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+
+
+## -- Combat: up attack (ground or air) -----------------------------------------
+
+func _start_up_attack() -> void:
+	_enter_state(State.UP_ATTACK)
+	_attack_phase = PHASE_STARTUP
+
+
+func _update_up_attack(delta: float) -> void:
+	if is_on_floor():
+		velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
+		velocity.y = 0.0
+	else:
+		var axis := _horizontal_input()
+		velocity.x = move_toward(velocity.x, axis * run_max_speed, air_acceleration * delta)
+		_apply_gravity(delta)
+
+	if _state_time < attack_startup_time:
+		pass
+	elif _state_time < attack_startup_time + attack_active_time:
+		if _attack_phase != PHASE_ACTIVE:
+			_attack_phase = PHASE_ACTIVE
+			_activate_attack_hitbox(&"attack_up")
+	else:
+		if _attack_phase != PHASE_RECOVERY:
+			_attack_phase = PHASE_RECOVERY
+			_deactivate_attack_hitbox()
+		if _state_time >= attack_window_hit3:
+			_end_generic_attack()
+
+
+## -- Combat: air attack ---------------------------------------------------------
+
+func _start_air_attack() -> void:
+	_air_attack_buffered = false
+	_enter_state(State.AIR_ATTACK)
+	_attack_phase = PHASE_STARTUP
+
+
+func _update_air_attack(delta: float) -> void:
+	var axis := _horizontal_input()
+	velocity.x = move_toward(velocity.x, axis * run_max_speed, air_acceleration * delta)
+	_apply_gravity(delta)
+
+	if is_on_floor():
+		_deactivate_attack_hitbox()
+		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+		return
+
+	if _state_time < attack_startup_time:
+		_attack_phase = PHASE_STARTUP
+	elif _state_time < attack_startup_time + attack_active_time:
+		if _attack_phase != PHASE_ACTIVE:
+			_attack_phase = PHASE_ACTIVE
+			_activate_attack_hitbox(&"attack_air")
+	else:
+		if _attack_phase != PHASE_RECOVERY:
+			_attack_phase = PHASE_RECOVERY
+			_deactivate_attack_hitbox()
+		if _air_attack_buffered:
+			_air_attack_buffered = false
+			_state_time = 0.0
+			_attack_phase = PHASE_STARTUP
+			return
+
+	if _state_time >= air_attack_recovery:
+		_state = State.JUMP if velocity.y < 0.0 else State.FALL
+
+
+## -- Combat: down plunge ---------------------------------------------------------
+
+func _start_plunge() -> void:
+	_enter_state(State.PLUNGE)
+	_attack_phase = PHASE_STARTUP
+
+
+func _update_plunge(_delta: float) -> void:
+	if is_on_floor():
+		_deactivate_attack_hitbox()
+		_enter_state(State.PLUNGE_LAND)
+		return
+
+	velocity.x = 0.0
+	if _state_time < plunge_hang_time:
+		velocity.y = 0.0
+		return
+
+	if _attack_phase != PHASE_ACTIVE:
+		_attack_phase = PHASE_ACTIVE
+		_activate_attack_hitbox(&"attack_plunge")
+	velocity.y = plunge_fall_speed
+
+
+func _update_plunge_land(_delta: float) -> void:
+	velocity = Vector2.ZERO
+
+	if _state_time < plunge_land_active_time:
+		if _attack_phase != PHASE_ACTIVE:
+			_attack_phase = PHASE_ACTIVE
+			_activate_attack_hitbox(&"attack_plunge_land")
+	else:
+		if _attack_phase != PHASE_RECOVERY:
+			_attack_phase = PHASE_RECOVERY
+			_deactivate_attack_hitbox()
+		if _state_time >= plunge_land_active_time + plunge_land_recovery_time:
+			_enter_state(State.IDLE)
+
+
+## -- Combat: hitbox helpers -------------------------------------------------------
+
+func _activate_attack_hitbox(attack_name: StringName) -> void:
+	var config := _hitbox_config_for(attack_name)
+	var offset: Vector2 = config.offset
+	_attack_hitbox.configure(config.size, Vector2(offset.x * float(_facing), offset.y))
+	_attack_hitbox.activate(attack_name)
+
+
+func _deactivate_attack_hitbox() -> void:
+	_attack_hitbox.deactivate()
+
+
+func _hitbox_config_for(attack_name: StringName) -> Dictionary:
+	match attack_name:
+		&"attack_ground_1", &"attack_ground_2":
+			return {size = hitbox_ground_size, offset = hitbox_ground_offset}
+		&"attack_ground_3":
+			return {size = hitbox_finisher_size, offset = hitbox_finisher_offset}
+		&"attack_crouch":
+			return {size = hitbox_crouch_size, offset = hitbox_crouch_offset}
+		&"attack_up":
+			return {size = hitbox_up_size, offset = hitbox_up_offset}
+		&"attack_air":
+			return {size = hitbox_air_size, offset = hitbox_air_offset}
+		&"attack_plunge":
+			return {size = hitbox_plunge_size, offset = hitbox_plunge_offset}
+		&"attack_plunge_land":
+			return {size = hitbox_plunge_land_size, offset = hitbox_plunge_land_offset}
+		_:
+			return {size = hitbox_ground_size, offset = hitbox_ground_offset}
+
+
+## -- Airborne: jump / fall ----------------------------------------------------
+
+func _update_airborne(delta: float) -> void:
+	if _wall_kick_lock_left <= 0.0:
+		_apply_air_horizontal_control(delta)
+
+	if Input.is_action_just_released(&"jump") and velocity.y < 0.0:
+		velocity.y *= jump_release_multiplier
+
+	_apply_gravity(delta)
+
+	if not is_on_floor():
+		if velocity.y >= 0.0 and _try_start_ledge_hang():
+			return
+		if _try_start_wall_cling():
+			return
+		if _try_launch_jump():
+			return
+
+	_state = State.JUMP if velocity.y < 0.0 else State.FALL
+
+
+## Normal air control, except right after a wall kick: with no horizontal
+## input held, it drifts back toward the kicked wall instead of holding
+## still, so a wall kick reads as a climb rather than a jump away.
+func _apply_air_horizontal_control(delta: float) -> void:
+	var input_axis := _horizontal_input()
+	if not is_zero_approx(input_axis):
+		velocity.x = move_toward(velocity.x, input_axis * run_max_speed, air_acceleration * delta)
+		return
+	if _wall_kick_pending:
+		velocity.x = move_toward(velocity.x, float(_wall_kick_wall_direction) * wall_kick_drift_speed, air_acceleration * delta)
+		return
+	velocity.x = move_toward(velocity.x, 0.0, air_deceleration * delta)
+
+
+func _apply_gravity(delta: float) -> void:
+	var gravity := _fall_gravity if velocity.y > 0.0 else _rise_gravity
+	velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
+
+
+func _try_launch_jump() -> bool:
+	if _jump_buffer_left <= 0.0 or not (is_on_floor() or _coyote_left > 0.0):
+		return false
+	velocity.y = _jump_velocity
+	_jump_buffer_left = 0.0
+	_coyote_left = 0.0
+	_sfx_jump.play()
+	_enter_state(State.JUMP)
+	return true
+
+
+## -- Dash / slide -------------------------------------------------------------
+
+## Centralized dash trigger (keyboard/gamepad "dash" just-pressed and the
+## touch dash button both route here — see request_dash). Ground or air,
+## one air dash per airborne period.
+func _try_start_dash() -> bool:
+	if _dash_cooldown_left > 0.0 or _state == State.DASH:
+		return false
+	if not _can_dash_from_state():
+		return false
+	if not is_on_floor() and _air_dash_used:
+		return false
+	_start_dash()
+	return true
+
+
+func _can_dash_from_state() -> bool:
+	match _state:
+		State.IDLE, State.RUN, State.CROUCH, State.JUMP, State.FALL:
+			return true
+		State.ATTACK, State.AIR_ATTACK:
+			return _attack_phase == PHASE_RECOVERY
+		_:
+			return false
+
+
+func _start_dash() -> void:
+	_dash_direction = _facing
+	_dash_is_air = not is_on_floor()
+	if _dash_is_air:
+		_air_dash_used = true
+	_enter_state(State.DASH)
+	velocity.x = float(_dash_direction) * dash_speed
+	velocity.y = 0.0
+
+
+func _update_dash(delta: float) -> void:
+	if _dash_is_air:
+		_update_air_dash(delta)
+		return
+
+	if not is_on_floor():
+		_enter_state(State.FALL)
+		_update_airborne(delta)
+		return
+
+	var t := clampf(_state_time / dash_duration, 0.0, 1.0)
+	var target_speed := dash_speed
+	if t >= dash_full_speed_ratio:
+		var ease_t := (t - dash_full_speed_ratio) / maxf(1.0 - dash_full_speed_ratio, 0.0001)
+		target_speed = lerpf(dash_speed, run_max_speed, ease_t)
+	velocity.x = float(_dash_direction) * target_speed
+	velocity.y = 0.0
+
+	if Input.is_action_just_pressed(&"jump") and _try_launch_jump():
+		return
+
+	if _state_time >= dash_duration:
+		if _has_standing_headroom():
+			_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+		else:
+			_enter_state(State.CROUCH)
+
+
+## Air dash: horizontal only, no gravity for its duration, standing collider
+## kept (see _enter_state's low-collider check, which only lowers for a
+## ground dash).
+func _update_air_dash(delta: float) -> void:
+	if is_on_floor():
+		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+		return
+
+	velocity.x = float(_dash_direction) * dash_speed
+	velocity.y = 0.0
+
+	if Input.is_action_just_pressed(&"jump") and _try_launch_jump():
+		return
+
+	if _state_time >= air_dash_duration:
+		_enter_state(State.JUMP if velocity.y < 0.0 else State.FALL)
+
+
+## -- Wall cling / climb --------------------------------------------------------
+
+## True when `ray` hits a collider whose shape is tall and narrow enough to
+## be a real wall (not the side of a horizontal platform): at least
+## `min_wall_height` tall, and not wider than it is tall.
+func _is_wall_ray(ray: RayCast2D) -> bool:
+	if not ray.is_colliding():
+		return false
+	var size := _collider_shape_size(ray.get_collider())
+	if size == Vector2.ZERO:
+		return false
+	return size.y >= min_wall_height and size.y >= size.x
+
+
+func _collider_shape_size(collider: Object) -> Vector2:
+	if collider == null or not (collider is Node):
+		return Vector2.ZERO
+	for child in (collider as Node).get_children():
+		if child is CollisionShape2D:
+			var shape := (child as CollisionShape2D).shape
+			if shape is RectangleShape2D:
+				return (shape as RectangleShape2D).size
+	return Vector2.ZERO
+
+
+func _is_against_climbable_wall() -> bool:
+	if not (_is_wall_ray(_wall_check_head) and _is_wall_ray(_wall_check_chest) and _is_wall_ray(_wall_check_feet)):
+		return false
+	# All three rays must hit the same solid, not three different neighbors
+	# that each only partially cover the player's height.
+	var collider := _wall_check_chest.get_collider()
+	return _wall_check_head.get_collider() == collider and _wall_check_feet.get_collider() == collider
+
+
+## True while the move pad is held toward `direction` (the wall side), which
+## is required to grab or keep a wall cling. The brief post-wall-kick input
+## lock doesn't count as "releasing" — the drift back toward the wall during
+## that window can still re-cling once contact is made.
+func _is_holding_toward_wall(direction: int) -> bool:
+	if _wall_kick_lock_left > 0.0:
+		return true
+	var axis := Input.get_axis(&"move_left", &"move_right")
+	return not is_zero_approx(axis) and signf(axis) == float(direction)
+
+
+func _try_start_wall_cling() -> bool:
+	if _wall_recling_lock > 0.0:
+		return false
+	if velocity.y < -wall_cling_apex_threshold:
+		return false
+	if not _is_against_climbable_wall():
+		return false
+	if not _is_holding_toward_wall(_facing):
+		return false
+	_wall_direction = _facing
+	_air_dash_used = false
+	_enter_state(State.WALL_CLING)
+	return true
+
+
+func _update_wall_cling(delta: float) -> void:
+	if is_on_floor():
+		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+		return
+
+	velocity.x = 0.0
+	velocity.y = minf(move_toward(velocity.y, wall_slide_speed, wall_slide_acceleration * delta), wall_slide_max_speed)
+	_facing = _wall_direction
+	_sprite.flip_h = _facing < 0
+
+	if Input.is_action_pressed(&"move_down"):
+		_wall_recling_lock = wall_recling_lockout
+		_enter_state(State.FALL)
+		return
+
+	if Input.is_action_just_pressed(&"jump"):
+		var axis := Input.get_axis(&"move_left", &"move_right")
+		var jumping_away := not is_zero_approx(axis) and signf(axis) != float(_wall_direction)
+		if jumping_away:
+			velocity.x = -float(_wall_direction) * wall_jump_horizontal_speed
+			velocity.y = -wall_jump_vertical_speed
+			_facing = -_wall_direction
+			_wall_jump_lock_left = wall_jump_lock_time
+			_wall_recling_lock = wall_recling_lockout
+		else:
+			# Wall kick: push outward and up, briefly lock input, then drift
+			# back toward this same wall (see _apply_air_horizontal_control)
+			# so it re-clings higher and slides again — a climb by kicking.
+			# No re-cling lockout here: climbing depends on re-triggering the
+			# cling quickly.
+			velocity.x = -float(_wall_direction) * wall_kick_outward_speed
+			velocity.y = -wall_kick_vertical_speed
+			_wall_kick_lock_left = wall_kick_input_lock_time
+			_wall_kick_pending = true
+			_wall_kick_wall_direction = _wall_direction
+		_sfx_jump.play()
+		_enter_state(State.JUMP)
+		return
+
+	if not _is_against_climbable_wall():
+		_enter_state(State.FALL)
+		return
+
+	# Holding away from the wall (or letting the pad go neutral) lets go and
+	# falls, with no fixed lockout: _try_start_wall_cling checks the same
+	# holding-toward condition every frame, so pushing toward the wall again
+	# re-grabs immediately.
+	if not _is_holding_toward_wall(_wall_direction):
+		_enter_state(State.FALL)
+
+
+## -- Ledge grab -----------------------------------------------------------------
+
+func _try_start_ledge_hang() -> bool:
+	if _wall_recling_lock > 0.0:
+		return false
+	if velocity.y < 0.0:
+		return false
+	if not _is_wall_ray(_wall_check_chest) or _ledge_check_above.is_colliding():
+		return false
+	_air_dash_used = false
+	_snap_to_ledge()
+	_enter_state(State.LEDGE_HANG)
+	return true
+
+
+func _snap_to_ledge() -> void:
+	if _wall_check_chest.is_colliding():
+		var hit_x: float = _wall_check_chest.get_collision_point().x
+		var half_width := (_collision_shape.shape as RectangleShape2D).size.x * 0.5
+		global_position.x = hit_x - float(_facing) * (half_width + 2.0)
+	velocity = Vector2.ZERO
+
+
+func _update_ledge_hang(_delta: float) -> void:
+	velocity = Vector2.ZERO
+
+	if Input.is_action_just_pressed(&"move_up") or Input.is_action_just_pressed(&"jump"):
+		_ledge_snap_from = global_position
+		_ledge_snap_to = global_position + Vector2(float(_facing) * ledge_climb_forward_offset, -_standing_shape_height)
+		_enter_state(State.LEDGE_CLIMB)
+		return
+
+	if Input.is_action_pressed(&"move_down"):
+		_wall_recling_lock = wall_recling_lockout
+		_enter_state(State.FALL)
+
+
+func _update_ledge_climb(delta: float) -> void:
+	_ledge_climb_time += delta
+	var t := clampf(_ledge_climb_time / ledge_climb_duration, 0.0, 1.0)
+	global_position = _ledge_snap_from.lerp(_ledge_snap_to, ease(t, 0.3))
+	velocity = Vector2.ZERO
+	if t >= 1.0:
+		_enter_state(State.RUN if not is_zero_approx(_horizontal_input()) else State.IDLE)
+
+
+## -- State transitions -------------------------------------------------------
+
+func _enter_state(new_state: State) -> void:
+	var previous := _state
+	_state = new_state
+	_state_time = 0.0
+
+	if previous == State.DASH and new_state != State.DASH:
+		_dash_cooldown_left = dash_cooldown
+
+	# A dash only keeps the low slide collider on the ground; an air dash
+	# keeps the standing collider. _dash_is_air still reflects the dash that
+	# is ending when new_state leaves State.DASH (it's only reassigned by
+	# the next _start_dash call).
+	var was_low := previous == State.CROUCH or previous == State.CROUCH_ATTACK or (previous == State.DASH and not _dash_is_air)
+	var is_low := new_state == State.CROUCH or new_state == State.CROUCH_ATTACK or (new_state == State.DASH and not _dash_is_air)
+	if is_low and not was_low:
+		_set_collider_height(_standing_shape_height * crouch_collider_scale)
+	elif was_low and not is_low:
+		_set_collider_height(_standing_shape_height)
+
+	if new_state == State.LEDGE_CLIMB:
+		_ledge_climb_time = 0.0
+
+	# The post-kick drift-back only applies while airborne; any other state
+	# (re-clung, landed, attacked, dashed…) clears it.
+	if new_state != State.JUMP and new_state != State.FALL:
+		_wall_kick_pending = false
+
+
+func _set_collider_height(height: float) -> void:
+	var shape := _collision_shape.shape as RectangleShape2D
+	shape.size.y = height
+	_collision_shape.position.y = -height * 0.5
+
+
+## -- Drop-through / one-way platforms -----------------------------------------
 
 func _begin_drop_through() -> void:
 	if not is_on_floor() or _drop_left > 0.0 or not _standing_on_one_way():
@@ -194,6 +1060,8 @@ func _standing_on_one_way() -> bool:
 	return false
 
 
+## -- Checkpoints / respawn -----------------------------------------------------
+
 func set_checkpoint(checkpoint: Vector2) -> void:
 	_spawn_position = checkpoint
 
@@ -203,17 +1071,28 @@ func respawn() -> void:
 	_drop_left = 0.0
 	velocity = Vector2.ZERO
 	global_position = _spawn_position
+	_set_collider_height(_standing_shape_height)
+	_deactivate_attack_hitbox()
+	_air_dash_used = false
+	_enter_state(State.IDLE)
 	respawned.emit()
 
 
-func _update_facing() -> void:
-	if absf(velocity.x) > 24.0:
-		_facing = 1 if velocity.x > 0.0 else -1
-	_sprite.flip_h = _facing < 0
+## -- Post-move / feedback -------------------------------------------------------
+
+func _after_move(fall_speed_before_move: float) -> void:
+	if not _was_on_floor and is_on_floor() and fall_speed_before_move > landing_impact_speed:
+		_landing_left = landing_squash_time
+		_sfx_land.play()
+	if not _was_on_floor and is_on_floor():
+		_air_dash_used = false
+	if is_on_floor() and (_state == State.JUMP or _state == State.FALL):
+		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+	_was_on_floor = is_on_floor()
 
 
 func _update_footsteps(delta: float) -> void:
-	if not is_on_floor() or absf(velocity.x) < 70.0:
+	if _state != State.RUN or not is_on_floor() or absf(velocity.x) < 70.0:
 		_footstep_left = 0.0
 		return
 	_footstep_left -= delta
@@ -223,16 +1102,50 @@ func _update_footsteps(delta: float) -> void:
 
 
 func _update_animation() -> void:
-	if not is_on_floor():
-		_play_animation(&"jump" if velocity.y < 40.0 else &"fall")
-	elif _landing_left > 0.0:
-		_play_animation(&"land")
-	elif absf(velocity.x) > 35.0:
-		_play_animation(&"walk")
-		_sprite.speed_scale = clampf(absf(velocity.x) / 220.0, 0.7, 1.8)
-	else:
-		_play_animation(&"idle")
-		_sprite.speed_scale = 1.0
+	match _state:
+		State.CROUCH:
+			_play_animation(&"idle")
+			_sprite.scale = Vector2(0.44, 0.28)
+		State.DASH:
+			_play_animation(&"walk")
+			_sprite.scale = Vector2(0.46, 0.28)
+			_sprite.speed_scale = 1.6
+		State.JUMP:
+			_play_animation(&"jump")
+			_sprite.scale = Vector2(0.4, 0.4)
+		State.FALL:
+			_play_animation(&"fall")
+			_sprite.scale = Vector2(0.4, 0.4)
+		State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB:
+			_play_animation(&"fall")
+			_sprite.scale = Vector2(0.4, 0.4)
+		State.ATTACK, State.CROUCH_ATTACK:
+			_play_animation(&"land")
+			_sprite.scale = Vector2(0.46, 0.36) if _attack_phase == PHASE_ACTIVE else Vector2(0.4, 0.4)
+		State.UP_ATTACK:
+			_play_animation(&"jump")
+			_sprite.scale = Vector2(0.34, 0.46) if _attack_phase == PHASE_ACTIVE else Vector2(0.4, 0.4)
+		State.AIR_ATTACK:
+			_play_animation(&"fall")
+			_sprite.scale = Vector2(0.46, 0.36) if _attack_phase == PHASE_ACTIVE else Vector2(0.4, 0.4)
+		State.PLUNGE:
+			_play_animation(&"fall")
+			_sprite.scale = Vector2(0.34, 0.46)
+		State.PLUNGE_LAND:
+			_play_animation(&"land")
+			_sprite.scale = Vector2(0.5, 0.3)
+		_:
+			if _landing_left > 0.0:
+				_play_animation(&"land")
+				_sprite.scale = Vector2(0.44, 0.34)
+			elif absf(velocity.x) > 35.0:
+				_play_animation(&"walk")
+				_sprite.scale = Vector2(0.4, 0.4)
+				_sprite.speed_scale = clampf(absf(velocity.x) / 220.0, 0.7, 1.8)
+			else:
+				_play_animation(&"idle")
+				_sprite.scale = Vector2(0.4, 0.4)
+				_sprite.speed_scale = 1.0
 
 
 func _play_animation(animation_name: StringName) -> void:
