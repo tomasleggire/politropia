@@ -26,7 +26,7 @@ Current player (`scripts/player/player.gd`) is an impulse-swipe prototype with n
 
 ## Tasks
 - [x] T1 Input + touch UI: input actions in project.godot, Blasphemous-mobile touch layout (pad + Jump/Attack/Dash), remove hint texts and level titles/markers. Route: delegated writer (2+ non-trivial files). Commit: f8c5dec.
-- [ ] T2 Player movement state machine: idle/run/crouch/jump (variable height)/fall/air control/drop-through (down+jump)/dash-slide/wall cling+climb jump/ledge grab. Route: delegated writer.
+- [x] T2 Player movement state machine: idle/run/crouch/jump (variable height)/fall/air control/drop-through (down+jump)/dash-slide/wall cling+climb jump/ledge grab. Route: delegated writer. Commit: (pending, see Progress).
 - [ ] T3 Attacks: ground 3-hit combo, up attack, air attack, down plunge attack in air, hitbox Area2D + placeholder visuals. Route: delegated writer.
 
 ## Acceptance criteria
@@ -39,5 +39,10 @@ Current player (`scripts/player/player.gd`) is an impulse-swipe prototype with n
   - Verification: `--import`: completed, no errors. `--quit-after 300 2>&1 | rg -i "error|warning"`: no output (clean). `rg -n "drop_down|set_touch_move|touch_jump|touch_drop|apply_swipe|_add_title|_add_marker|Hint" scripts scenes project.godot`: still matches `set_touch_move`/`touch_jump`/`touch_drop`/`apply_swipe` in scripts/player/player.gd (expected — full player rewrite is T2).
   - Deviation: this repo's `gga` pre-commit hook reported "No provider configured" even though `.gga`/global config both set `PROVIDER="claude"` (tool bug — an env override proves the value works, the file just isn't read) and it required a missing `AGENTS.md`. `--no-verify` was attempted and blocked by the harness itself. Fixed by adding a minimal `AGENTS.md` (untracked, not part of this feature) and passing `GGA_PROVIDER=claude` for the commit; the real AI review then ran and returned `STATUS: PASSED` (2 trivial nits fixed: unused `index` param, pad ring radius vs. knob travel).
 
+- T2 done. Route: delegated writer. Files: scripts/player/player.gd (full rewrite: `State` enum IDLE/RUN/CROUCH/JUMP/FALL/DASH/WALL_CLING/LEDGE_HANG/LEDGE_CLIMB, grouped `@export` tunables, jump physics derived from height+time-to-apex, coyote+buffer, variable jump height, feet-anchored crouch collider resize with headroom raycast, down+jump drop-through vs. blocked-on-solid, dash/slide with cooldown and jump-cancel, wall cling+climb-hop+wall-jump-away, ledge grab+climb tween), scenes/player/player.tscn (added WallCheckHead/WallCheckChest/LedgeCheckAbove/HeadroomCheck RayCast2D nodes, mask=solids only), scripts/levels/level_01.gd (dropped the now-redundant `add_to_group` call + stale docstring).
+  - Two self-review bugs fixed before commit: (1) wall-jump climb-hop was applying the wall re-cling lockout, which would have broken "repeated jumps climb higher on the same wall"; (2) releasing a ledge via down would re-grab the same ledge the very next frame (chest ray still hit, above-head ray still missed) — added a short release lockout shared with the wall re-cling lock.
+  - Verification: `--quit-after 300 2>&1 | rg -i "error|warning"`: no output (clean). `rg` leftover-reference check: no output (clean, all old touch/prototype API gone). `gga run --no-cache` (GGA_PROVIDER=claude): STATUS: PASSED; applied its 2 actionable notes (duplicate `add_to_group`, stray self-referencing doc comment).
+  - Manual iPhone playtest via tools/ios/deploy.sh: not run (no device attached in this session).
+
 ## Next step
-T2: player movement state machine.
+T3: attacks + hitbox.

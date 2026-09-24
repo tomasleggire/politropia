@@ -1,6 +1,6 @@
 extends Node2D
 
-## Prototipo horizontal corto para aprender el control por gestos.
+## Prototipo horizontal corto para probar el moveset definitivo.
 
 const WORLD_SIZE := Vector2(6400.0, 720.0)
 const FLOOR_Y := 620.0
@@ -31,7 +31,7 @@ var _checkpoint_index := 0
 
 
 func _ready() -> void:
-	_player.add_to_group(&"player")
+	# Player already adds itself to the "player" group in its own _ready().
 	_camera.target = _player
 	_build_course()
 	_player.set_checkpoint(CHECKPOINTS[0])

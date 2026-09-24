@@ -107,6 +107,26 @@ script = ExtResource("1_player")
 position = Vector2(0, -29)
 shape = SubResource("RectangleShape2D_body")
 
+[node name="WallCheckHead" type="RayCast2D" parent="."]
+position = Vector2(0, -50)
+target_position = Vector2(20, 0)
+collision_mask = 1
+
+[node name="WallCheckChest" type="RayCast2D" parent="."]
+position = Vector2(0, -29)
+target_position = Vector2(20, 0)
+collision_mask = 1
+
+[node name="LedgeCheckAbove" type="RayCast2D" parent="."]
+position = Vector2(0, -60)
+target_position = Vector2(20, 0)
+collision_mask = 1
+
+[node name="HeadroomCheck" type="RayCast2D" parent="."]
+position = Vector2(0, -29)
+target_position = Vector2(0, -29)
+collision_mask = 1
+
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 position = Vector2(0, -48)
 scale = Vector2(0.4, 0.4)
