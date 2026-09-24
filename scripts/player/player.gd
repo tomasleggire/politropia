@@ -145,7 +145,7 @@ func _apply_keyboard_fallback(delta: float, grounded: bool) -> void:
 		velocity.y = -keyboard_jump_speed
 		_coyote_left = 0.0
 		_sfx_jump.play()
-	if Input.is_action_just_pressed(&"drop_down"):
+	if Input.is_action_just_pressed(&"move_down"):
 		_begin_drop_through()
 
 

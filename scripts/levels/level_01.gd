@@ -12,9 +12,6 @@ const CANDLE_SCRIPT := preload("res://scripts/world/gothic_candle.gd")
 const SOLID := Color("101a33")
 const SOLID_ALT := Color("182b4f")
 const ONE_WAY := Color("24558a")
-const TEXT := Color("c7d8ec")
-const TEXT_MUTED := Color("8198b6")
-const AMBER := Color("f0ae4c")
 
 const CHECKPOINTS := [
 	Vector2(180, FLOOR_Y),
@@ -111,7 +108,6 @@ func _build_boundaries() -> void:
 
 func _build_zone_run() -> void:
 	_solid(Rect2(0, FLOOR_Y, 1120, 100))
-	_add_title(Vector2(180, 180), "01 · MOVIMIENTO", "Mové el pad: cerca = caminar · al borde = correr\nDeslizá hacia arriba y soltá para saltar")
 	# Pequeños cambios de altura para sentir aceleración y caída sin castigo.
 	_solid(Rect2(520, 570, 180, 50), SOLID_ALT)
 	_solid(Rect2(760, 530, 150, 90), SOLID_ALT)
@@ -120,7 +116,6 @@ func _build_zone_run() -> void:
 
 func _build_zone_jump() -> void:
 	_solid(Rect2(1250, FLOOR_Y, 1110, 100))
-	_add_title(Vector2(1380, 170), "02 · TRES SALTOS", "Desde el pad: ↖ atrás · ↑ vertical · ↗ adelante\nElegí la dirección y soltá para despegar")
 	_one_way(Rect2(1510, 520, 170, 20))
 	_one_way(Rect2(1780, 455, 180, 20))
 	_one_way(Rect2(2070, 390, 190, 20))
@@ -131,7 +126,6 @@ func _build_zone_jump() -> void:
 
 func _build_zone_drop() -> void:
 	_solid(Rect2(3100, FLOOR_Y, 1900, 100))
-	_add_title(Vector2(2660, 155), "03 · ATRAVESAR", "Subí a las plataformas marcadas\nSobre ellas, bajá el pad y soltá")
 	# Escalera que enseña plataformas atravesables.
 	_one_way(Rect2(2800, 520, 170, 20))
 	_one_way(Rect2(2990, 445, 170, 20))
@@ -141,12 +135,9 @@ func _build_zone_drop() -> void:
 	_one_way(Rect2(3760, 375, 300, 22))
 	# Esta pared cierra el camino alto: hay que bajar antes y cruzar el túnel.
 	_solid(Rect2(4060, 0, 90, 505))
-	_add_marker(Vector2(3810, 330), "↓")
-	_add_marker(Vector2(4200, 575), "BIEN")
 
 
 func _build_zone_flow() -> void:
-	_add_title(Vector2(4300, 165), "04 · FLUJO", "Encadená impulsos: carrera, diagonal y corrección aérea")
 	_one_way(Rect2(4380, 520, 170, 20))
 	_one_way(Rect2(4620, 455, 170, 20))
 	# Hueco final ancho: requiere envión, pero admite coyote time y buffer.
@@ -156,8 +147,6 @@ func _build_zone_flow() -> void:
 	_one_way(Rect2(5480, 520, 160, 20))
 	_one_way(Rect2(5720, 445, 170, 20))
 	_one_way(Rect2(5960, 365, 190, 20))
-	_add_title(Vector2(5710, 170), "PRUEBA COMPLETA", "El recorrido termina acá por ahora")
-	_add_marker(Vector2(6220, 330), "◆")
 
 
 func _solid(rect: Rect2, color := SOLID) -> void:
@@ -166,61 +155,6 @@ func _solid(rect: Rect2, color := SOLID) -> void:
 
 func _one_way(rect: Rect2) -> void:
 	LevelGeometry.add_one_way_platform(_solids, rect, ONE_WAY, STONE)
-
-
-func _add_title(position: Vector2, title: String, subtitle: String) -> void:
-	var panel := Polygon2D.new()
-	panel.z_index = 2
-	panel.color = Color(0.015, 0.025, 0.065, 0.82)
-	panel.polygon = PackedVector2Array([
-		position + Vector2(-18, -14),
-		position + Vector2(590, -14),
-		position + Vector2(590, 102),
-		position + Vector2(-18, 102),
-	])
-	_decor.add_child(panel)
-
-	var accent := Polygon2D.new()
-	accent.z_index = 3
-	accent.color = Color("4f91c8")
-	accent.polygon = PackedVector2Array([
-		position + Vector2(-18, -14),
-		position + Vector2(-13, -14),
-		position + Vector2(-13, 102),
-		position + Vector2(-18, 102),
-	])
-	_decor.add_child(accent)
-
-	var title_label := Label.new()
-	title_label.z_index = 4
-	title_label.position = position
-	title_label.text = title
-	title_label.add_theme_font_size_override("font_size", 22)
-	title_label.add_theme_color_override("font_color", TEXT)
-	title_label.add_theme_color_override("font_outline_color", Color("050712"))
-	title_label.add_theme_constant_override("outline_size", 5)
-	_decor.add_child(title_label)
-
-	var subtitle_label := Label.new()
-	subtitle_label.z_index = 4
-	subtitle_label.position = position + Vector2(0, 48)
-	subtitle_label.text = subtitle
-	subtitle_label.add_theme_font_size_override("font_size", 15)
-	subtitle_label.add_theme_color_override("font_color", TEXT_MUTED)
-	subtitle_label.add_theme_color_override("font_outline_color", Color("050712"))
-	subtitle_label.add_theme_constant_override("outline_size", 4)
-	_decor.add_child(subtitle_label)
-
-
-func _add_marker(position: Vector2, text: String) -> void:
-	var label := Label.new()
-	label.position = position
-	label.text = text
-	label.add_theme_font_size_override("font_size", 28)
-	label.add_theme_color_override("font_color", AMBER)
-	label.add_theme_color_override("font_outline_color", Color("050712"))
-	label.add_theme_constant_override("outline_size", 5)
-	_decor.add_child(label)
 
 
 func _build_ambient_decor() -> void:
