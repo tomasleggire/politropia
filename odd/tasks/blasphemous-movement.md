@@ -27,7 +27,7 @@ Current player (`scripts/player/player.gd`) is an impulse-swipe prototype with n
 ## Tasks
 - [x] T1 Input + touch UI: input actions in project.godot, Blasphemous-mobile touch layout (pad + Jump/Attack/Dash), remove hint texts and level titles/markers. Route: delegated writer (2+ non-trivial files). Commit: f8c5dec.
 - [x] T2 Player movement state machine: idle/run/crouch/jump (variable height)/fall/air control/drop-through (down+jump)/dash-slide/wall cling+climb jump/ledge grab. Route: delegated writer. Commit: 1001000.
-- [x] T3 Attacks: ground 3-hit combo, up attack, air attack, down plunge attack in air, hitbox Area2D + placeholder visuals. Route: delegated writer. Commit: (pending, see Progress).
+- [x] T3 Attacks: ground 3-hit combo, up attack, air attack, down plunge attack in air, hitbox Area2D + placeholder visuals. Route: delegated writer. Commit: 55c0f24.
 
 ## Acceptance criteria
 - No tutorial/counter texts on screen.
