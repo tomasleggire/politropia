@@ -19,7 +19,7 @@ Luz's moveset is already implemented, but the current player art only covers a s
 
 ## Visual Constraints
 - Preserve Luz's reference identity in faithful anime pixel art: blonde hair, dark-blue urban clothing, backpack, recognizable proportions and palette.
-- The wooden practice sword is her weapon in every applicable pose; it must never be represented or posed as a baseball bat.
+- The wooden ruler is her weapon in every applicable pose; preserve its flat rectangular ruler silhouette and measurement markings so it is never read as a baseball bat or sword.
 - Draw the source sheet facing right and use horizontal flip (`flip_h`) for left-facing playback rather than duplicating left-facing art.
 - Author frames around the feet origin so Godot's grounded position remains stable; preserve the existing player/collider alignment during import and integration.
 - Use a consistent, documented frame grid and keep source/exported assets separable from animation mapping so more frames and states remain easy to add.
@@ -67,14 +67,14 @@ Luz's moveset is already implemented, but the current player art only covers a s
 - Each implementation task closes as a reviewable work-unit commit with its relevant checks and assets/code together. Record exact commit hashes and authored-line count below.
 
 ## Tasks
-- [ ] T0 Generate extensible Luz animation assets (catalog above; right-facing frames, feet-origin, reference fidelity, wooden sword; consistent frame grid and source/export organization). Route: delegated direct asset-generation work; trigger: multiple animation families and non-trivial frame production need cohesive visual consistency and broad state coverage. Checks: inspect every exported clip against the visual constraints and verify source/export dimensions and frame-grid consistency. Commit: pending.
+- [ ] T0 Generate extensible Luz animation assets (catalog above; right-facing frames, feet-origin, reference fidelity, wooden ruler; consistent frame grid and source/export organization). Route: delegated direct asset-generation work; trigger: multiple animation families and non-trivial frame production need cohesive visual consistency and broad state coverage. Checks: inspect every exported clip against the visual constraints and verify source/export dimensions and frame-grid consistency. Commit: pending.
 - [ ] T1 Integrate animations and state mapping in Godot, including left-facing `flip_h`, stable feet anchoring, safe clip/speed-scale changes, and drop-through crouch→fall reuse. Keep hitboxes, timings, and gameplay transitions unchanged; do not add a double-jump clip. Route: delegated direct writer; trigger: integration requires coordinated scene/resource and player-animation mapping changes, with asset inspection as preparation. Checks: exact headless command above; compare hitbox/timing/state code before and after; exercise all catalogued transitions. Commit: pending.
 - [ ] T2 Verify headless/runtime/iPhone behavior; correct only animation/import/integration defects without changing gameplay. Route: delegated verifier after T0–T1; trigger: runtime and iPhone checks require independent environment/device execution and visual inspection. Checks: exact headless command above; run the Godot scene and inspect idle/run/jump/fall/land, crouch/drop-through, ground/air dash, wall cling/jump, ledge hang/climb, all listed attacks and plunge-land; deploy with `tools/ios/deploy.sh` and repeat representative movement/combat transitions on iPhone, confirming frame readability, facing, feet-origin stability, and unchanged hitbox/timing behavior. Record unavailable device checks as pending, never passed. Commit: pending.
 
 ## Acceptance Criteria
 - Every existing catalogued movement/combat state has the intended readable animation, including distinct ground combo hits 1–3.
 - Drop-through visibly transitions from crouch into falling without creating a separate state/clip requirement; double jump remains absent.
-- Luz's hair, dark-blue outfit, backpack, and wooden sword consistently match the reference direction; no bat-like weapon pose appears.
+- Luz's hair, dark-blue outfit, backpack, and wooden ruler consistently match the reference direction; no bat-like or sword-like weapon pose appears.
 - Source art faces right; left-facing playback uses horizontal flipping; feet remain anchored through all tested transitions.
 - Headless load succeeds with no script/scene parse errors, Godot runtime transitions play the expected clips, and iPhone checks are completed and recorded.
 - Existing movement, hitbox geometry/activation, attack timing, combo behavior, and state transitions are unchanged.
