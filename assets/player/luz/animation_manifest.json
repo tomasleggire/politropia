@@ -1,0 +1,60 @@
+{
+  "columns": 4,
+  "rows": 4,
+  "cell_width": 313,
+  "cell_height": 313,
+  "index_origin": 0,
+  "ordering": "row-major",
+  "sheets": {
+    "luz_locomotion_sheet.png": {
+      "width": 1252,
+      "height": 1252,
+      "clips": {
+        "idle_breathing": [0, 1, 2, 3],
+        "run": [4, 5, 6, 7],
+        "jump_ascent": [8, 9],
+        "fall": [10, 11],
+        "crouch": [12, 13],
+        "land": [14, 15]
+      }
+    },
+    "luz_mobility_sheet.png": {
+      "width": 1252,
+      "height": 1252,
+      "clips": {
+        "ground_dash": [0, 1, 2, 3],
+        "air_dash": [4, 5, 6, 7],
+        "wall_cling": [8, 9],
+        "wall_jump": [10, 11],
+        "ledge_hang": [12, 13],
+        "ledge_climb": [14, 15]
+      }
+    },
+    "luz_ground_combat_sheet.png": {
+      "width": 1252,
+      "height": 1252,
+      "clips": {
+        "ground_attack_1": [0, 1, 2, 3],
+        "ground_attack_2": [4, 5, 6, 7],
+        "ground_attack_3": [8, 9, 10, 11],
+        "crouch_attack": [12, 13, 14, 15]
+      }
+    },
+    "luz_air_combat_sheet.png": {
+      "width": 1252,
+      "height": 1252,
+      "clips": {
+        "up_attack": [0, 1, 2, 3],
+        "air_horizontal_attack": [4, 5, 6, 7],
+        "plunge": [8, 9, 10, 11],
+        "plunge_land": [12, 13, 14, 15]
+      }
+    }
+  },
+  "validation": {
+    "usable_for_integration": true,
+    "normalization": "Each 1254x1254 output was center-cropped by one pixel per edge to 1252x1252, giving exact 313x313 cells while preserving the 4x4 layout.",
+    "alpha_cleanup": "Removed only exact pure-red RGB (255,0,0) pixels with alpha 1-2; removed counts: air combat 9525, ground combat 13442, locomotion 10602, mobility 10500. Warm opaque pixels were preserved.",
+    "reason": "All four sheets were visually inspected after cleanup: no remaining exact pure-red alpha 1-2 pixels, true alpha remains, the 4x4 layout is 313x313 per cell, and character identity, outfit, backpack, and flat marked wooden ruler are consistent. The air-combat edit corrected the duplicated plunge pose and anomalous splash."
+  }
+}
