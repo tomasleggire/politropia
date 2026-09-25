@@ -83,7 +83,7 @@ Luz's moveset is already implemented, but the current player art only covers a s
 ## Progress
 - Branch `feat/luz-character-animation` created from `main@532bc8e`.
 - T0–T2 pending.
-- Document work-unit commit: pending.
+- Document work-unit commit: `d592ffe` (`docs: plan Luz character animation assets`).
 
 ## Next Step
 Start T0 asset production from the approved reference and the state catalog. Before integration, inspect the actual atlas/import settings and confirm the source's frame grid; then preserve those measured dimensions and the existing feet anchor.
