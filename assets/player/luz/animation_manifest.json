@@ -16,6 +16,11 @@
         "fall": [10, 11],
         "crouch": [12, 13],
         "land": [14, 15]
+      },
+      "safe_cuts": {"vertical": [319, 614, 919], "horizontal": [339, 656, 966]},
+      "foot_offsets": [-26, -26, -26, -26, -25, -30, -21, -24, -21, -27, -6, -27, 5, 7, 7, 8],
+      "frame_overrides": {
+        "13": {"x0": 319, "y0": 1039, "x1": 614, "y1": 1252}
       }
     },
     "luz_mobility_sheet.png": {
@@ -28,6 +33,12 @@
         "wall_jump": [10, 11],
         "ledge_hang": [12, 13],
         "ledge_climb": [14, 15]
+      },
+      "safe_cuts": {"vertical": [293, 612, 964], "horizontal": [310, 618, 920]},
+      "foot_offsets": [7, 7, 7, 7, 29, 44, 26, 10, 25, 24, 19, 56, 13, 56, 14, 92],
+      "frame_overrides": {
+        "2": {"x0": 612, "y0": 0, "x1": 938, "y1": 310},
+        "3": {"x0": 938, "y0": 0, "x1": 1252, "y1": 310}
       }
     },
     "luz_ground_combat_sheet.png": {
@@ -38,7 +49,9 @@
         "ground_attack_2": [4, 5, 6, 7],
         "ground_attack_3": [8, 9, 10, 11],
         "crouch_attack": [12, 13, 14, 15]
-      }
+      },
+      "safe_cuts": {"vertical": [282, 606, 951], "horizontal": [325, 639, 953]},
+      "foot_offsets": [-2, -2, -2, -1, -3, -4, -4, -4, -2, -2, -2, -2, 26, 26, 26, 25]
     },
     "luz_air_combat_sheet.png": {
       "width": 1252,
@@ -48,13 +61,20 @@
         "air_horizontal_attack": [4, 5, 6, 7],
         "plunge": [8, 9, 10, 11],
         "plunge_land": [12, 13, 14, 15]
-      }
+      },
+      "safe_cuts": {"vertical": [307, 642, 956], "horizontal": [321, 620, 917]},
+      "foot_offsets": [0, 1, 1, 3, 14, 14, 13, 13, 30, 31, 27, 22, 17, 17, 17, 17]
     }
   },
+  "frame_canvas": [512, 512],
+  "frame_padding": 100,
+  "frame_anchor": {"x": 156.5, "y": 313},
   "validation": {
     "usable_for_integration": true,
     "normalization": "Each 1254x1254 output was center-cropped by one pixel per edge to 1252x1252, giving exact 313x313 cells while preserving the 4x4 layout.",
     "alpha_cleanup": "Removed only exact pure-red RGB (255,0,0) pixels with alpha 1-2; removed counts: air combat 9525, ground combat 13442, locomotion 10602, mobility 10500. Warm opaque pixels were preserved.",
-    "reason": "All four sheets were visually inspected after cleanup: no remaining exact pure-red alpha 1-2 pixels, true alpha remains, the 4x4 layout is 313x313 per cell, and character identity, outfit, backpack, and flat marked wooden ruler are consistent. The air-combat edit corrected the duplicated plunge pose and anomalous splash."
+    "reason": "All four sheets were visually inspected after cleanup: no remaining exact pure-red alpha 1-2 pixels, true alpha remains, the 4x4 layout is 313x313 per cell, and character identity, outfit, backpack, and flat marked wooden ruler are consistent. The air-combat edit corrected the duplicated plunge pose and anomalous splash.",
+    "foot_offsets": "Per-frame, per-sheet vertical pixel corrections applied on top of the safe_cuts grid margin so every frame's measured opaque bottom (feet/shoe) lands on the same canvas row (413, derived from AnimatedSprite2D.offset.y=-157 on a 512-tall virtual canvas), preventing feet jitter across non-uniformly cut cells. Computed by cropping each frame with safe_cuts, measuring its opaque alpha bounding box, and solving offset = 413 - measured_bottom_row. See scripts/player/luz_animation_catalog.gd:_frame_margin.",
+    "frame_overrides": "luz_mobility_sheet.png frames 2/3 (ground_dash) needed an explicit rectangle instead of the safe_cuts grid: the generated art's frame-3 ruler tip genuinely starts at x=939, 25px inside frame 2's grid cell, so the shared vertical safe_cut at x=964 bled a disconnected ruler-tip fragment into frame 2. The override reassigns that 25px strip to frame 3 (its rightful owner) and trims frame 2 at x=938. luz_locomotion_sheet.png frame 13 (crouch, second frame) had a small (~27x13px) disconnected shoe-tip fragment bled down from the jump_ascent/fall row above through the shared horizontal safe_cut at y=966; its override trims the top 73px (to y0=1039), which is well clear of the crouch pose itself (its body starts at y=1039 in this cell)."
   }
 }

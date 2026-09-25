@@ -2,8 +2,9 @@ class_name AttackHitbox
 extends Area2D
 
 ## Player attack hitbox. The player script positions/sizes it and toggles it
-## on for the active frames of exactly one attack at a time, and draws a
-## translucent placeholder slash while active (no combat art yet).
+## on for the active frames of exactly one attack at a time. In debug builds
+## it draws a faint outline of the active hitbox for gameplay debugging; it
+## is invisible in release builds now that Luz has real combat art.
 
 signal attack_hit(target: Node2D, attack_name: StringName)
 
@@ -53,10 +54,10 @@ func _on_area_entered(area: Area2D) -> void:
 
 
 func _draw() -> void:
-	if _shape.disabled:
+	if _shape.disabled or not OS.is_debug_build():
 		return
 	var shape := _shape.shape as RectangleShape2D
 	var half := shape.size * 0.5
 	var rect := Rect2(_shape.position - half, shape.size)
-	draw_rect(rect, Color(0.85, 0.72, 0.35, 0.35), true)
-	draw_rect(rect, Color(0.96, 0.82, 0.45, 0.85), false, 2.0)
+	draw_rect(rect, Color(0.85, 0.72, 0.35, 0.12), true)
+	draw_rect(rect, Color(0.96, 0.82, 0.45, 0.35), false, 1.0)
