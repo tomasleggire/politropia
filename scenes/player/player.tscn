@@ -59,7 +59,7 @@ disabled = true
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 scale = Vector2(0.175, 0.175)
-texture_filter = 1
+texture_filter = 4
 
 [node name="SfxLand" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("3_land")

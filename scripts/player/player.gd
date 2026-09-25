@@ -1095,6 +1095,7 @@ func respawn() -> void:
 	_drop_left = 0.0
 	velocity = Vector2.ZERO
 	global_position = _spawn_position
+	reset_physics_interpolation()
 	_set_collider_height(_standing_shape_height)
 	_deactivate_attack_hitbox()
 	_air_dash_used = false
