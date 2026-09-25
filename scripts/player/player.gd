@@ -140,6 +140,20 @@ const PHASE_RECOVERY := 2
 @onready var _ledge_check_above: RayCast2D = $LedgeCheckAbove
 @onready var _headroom_check: RayCast2D = $HeadroomCheck
 @onready var _attack_hitbox: AttackHitbox = $AttackHitbox
+@onready var _animation_sprite_frames: SpriteFrames = LuzAnimationCatalog.build_sprite_frames({
+	"ground_dash": dash_duration,
+	"air_dash": air_dash_duration,
+	"wall_jump": wall_kick_input_lock_time,
+	"ledge_climb": ledge_climb_duration,
+	"land": landing_squash_time,
+	"attack_1": attack_window_hit1,
+	"attack_2": attack_window_hit2,
+	"attack_3": attack_window_hit3,
+	"crouch_attack": attack_window_hit3,
+	"up_attack": attack_window_hit3,
+	"air_attack": air_attack_recovery,
+	"plunge_land": plunge_land_active_time + plunge_land_recovery_time,
+})
 
 var _state := State.IDLE
 var _state_time := 0.0
@@ -184,6 +198,16 @@ var _attack_buffer_direction := 0
 
 func _ready() -> void:
 	add_to_group(&"player")
+	_sprite.sprite_frames = _animation_sprite_frames
+	# Every Luz frame is placed on a shared 512x512 virtual canvas anchored to
+	# its nominal grid cell (see LuzAnimationCatalog); this offset puts that
+	# canvas' row 413 (padding 100 + cell_height 313, from the manifest) at
+	# local y=0, so the feet-anchored origin lines up with every frame's
+	# corrected opaque bottom regardless of pose.
+	_sprite.offset = Vector2(0.0, -157.0)
+	# Measured from the idle standing frames' opaque pixel height (~331px)
+	# so Luz renders at roughly the CollisionShape2D's 58px standing height.
+	_sprite.scale = Vector2(0.175, 0.175)
 	_spawn_position = global_position
 	_recompute_jump_physics()
 
@@ -1071,6 +1095,7 @@ func respawn() -> void:
 	_drop_left = 0.0
 	velocity = Vector2.ZERO
 	global_position = _spawn_position
+	reset_physics_interpolation()
 	_set_collider_height(_standing_shape_height)
 	_deactivate_attack_hitbox()
 	_air_dash_used = false
@@ -1102,52 +1127,53 @@ func _update_footsteps(delta: float) -> void:
 
 
 func _update_animation() -> void:
+	_sprite.flip_h = _facing < 0
 	match _state:
 		State.CROUCH:
-			_play_animation(&"idle")
-			_sprite.scale = Vector2(0.44, 0.28)
+			_play_animation(&"crouch")
 		State.DASH:
-			_play_animation(&"walk")
-			_sprite.scale = Vector2(0.46, 0.28)
-			_sprite.speed_scale = 1.6
+			_play_animation(&"air_dash" if _dash_is_air else &"ground_dash")
 		State.JUMP:
-			_play_animation(&"jump")
-			_sprite.scale = Vector2(0.4, 0.4)
+			# Both wall-exit branches (jumping away and the climb-by-kicking
+			# wall kick) enter State.JUMP; either lockout means this jump
+			# originated from a wall push-off, so both show the wall_jump
+			# pose for their brief lock window before falling back to the
+			# ordinary jump ascent clip.
+			var pushed_off_wall := _wall_jump_lock_left > 0.0 or _wall_kick_lock_left > 0.0
+			_play_animation(&"wall_jump" if pushed_off_wall else &"jump")
 		State.FALL:
 			_play_animation(&"fall")
-			_sprite.scale = Vector2(0.4, 0.4)
-		State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB:
-			_play_animation(&"fall")
-			_sprite.scale = Vector2(0.4, 0.4)
-		State.ATTACK, State.CROUCH_ATTACK:
-			_play_animation(&"land")
-			_sprite.scale = Vector2(0.46, 0.36) if _attack_phase == PHASE_ACTIVE else Vector2(0.4, 0.4)
+		State.WALL_CLING:
+			_play_animation(&"wall_cling")
+		State.LEDGE_HANG:
+			_play_animation(&"ledge_hang")
+		State.LEDGE_CLIMB:
+			_play_animation(&"ledge_climb")
+		State.ATTACK:
+			var attack_animation: StringName = [&"attack_1", &"attack_2", &"attack_3"][clampi(_attack_combo_index, 0, 2)]
+			_play_animation(attack_animation)
+		State.CROUCH_ATTACK:
+			_play_animation(&"crouch_attack")
 		State.UP_ATTACK:
-			_play_animation(&"jump")
-			_sprite.scale = Vector2(0.34, 0.46) if _attack_phase == PHASE_ACTIVE else Vector2(0.4, 0.4)
+			_play_animation(&"up_attack")
 		State.AIR_ATTACK:
-			_play_animation(&"fall")
-			_sprite.scale = Vector2(0.46, 0.36) if _attack_phase == PHASE_ACTIVE else Vector2(0.4, 0.4)
+			_play_animation(&"air_attack")
 		State.PLUNGE:
-			_play_animation(&"fall")
-			_sprite.scale = Vector2(0.34, 0.46)
+			_play_animation(&"plunge")
 		State.PLUNGE_LAND:
-			_play_animation(&"land")
-			_sprite.scale = Vector2(0.5, 0.3)
+			_play_animation(&"plunge_land")
 		_:
 			if _landing_left > 0.0:
 				_play_animation(&"land")
-				_sprite.scale = Vector2(0.44, 0.34)
 			elif absf(velocity.x) > 35.0:
-				_play_animation(&"walk")
-				_sprite.scale = Vector2(0.4, 0.4)
-				_sprite.speed_scale = clampf(absf(velocity.x) / 220.0, 0.7, 1.8)
+				_play_animation(&"walk", clampf(absf(velocity.x) / 220.0, 0.7, 1.8))
 			else:
 				_play_animation(&"idle")
-				_sprite.scale = Vector2(0.4, 0.4)
-				_sprite.speed_scale = 1.0
 
 
-func _play_animation(animation_name: StringName) -> void:
+## Clip-local speed: always reassigns speed_scale, even if the animation
+## itself did not change, so a prior action's speed can never leak forward.
+func _play_animation(animation_name: StringName, speed_scale := 1.0) -> void:
 	if _sprite.animation != animation_name:
 		_sprite.play(animation_name)
+	_sprite.speed_scale = speed_scale

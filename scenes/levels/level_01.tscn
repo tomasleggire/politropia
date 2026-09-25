@@ -24,6 +24,7 @@ position = Vector2(180, 620)
 
 [node name="RoomCamera" type="Camera2D" parent="."]
 position = Vector2(640, 360)
+process_callback = 0
 script = ExtResource("3_camera")
 
 [node name="AtmosphereOverlay" type="CanvasLayer" parent="."]
