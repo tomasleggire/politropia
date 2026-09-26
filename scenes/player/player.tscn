@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://bplayer01politropia"]
+[gd_scene load_steps=10 format=3 uid="uid://bplayer01politropia"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 [ext_resource type="AudioStream" path="res://assets/audio/land_hup.wav" id="3_land"]

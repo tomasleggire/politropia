@@ -27,9 +27,10 @@ frame-by-frame.
 Also emits, per erased frame, the ruler's *grip end* (the extreme point of
 its principal axis closest to the body centroid) and its *tip end* (the far
 extreme) in native sprite pixels, written to
-assets/player/luz/luz_attack_swings.json under each kind's "frame_anchors" so
-ruler_weapon.gd can anchor the procedural weapon to the hand in every frame
-without hand-authored per-frame data.
+assets/player/luz/luz_ruler_anchors.json (and, after conversion to world
+units, folded into luz_attack_swings.json's "measured_frame_grips_native_px"
+per kind) -- informational calibration data, not literally interpolated at
+runtime; see ruler_weapon.gd's module comment for why.
 
 Usage: tools/erase_luz_ruler.py [--dry-run] [--sheet NAME ...]
 Writes cleaned sheets back to assets/player/luz/*.png (in place) and preview

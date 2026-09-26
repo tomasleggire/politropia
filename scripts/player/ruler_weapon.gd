@@ -30,15 +30,11 @@ const WOOD_HIGHLIGHT := Color(0.90, 0.76, 0.53)
 const WOOD_OUTLINE := Color(0.32, 0.21, 0.11)
 const TICK_COLOR := Color(0.40, 0.27, 0.15)
 
-## Fraction of the ellipse radius the grip end sits at, vs. the tip at
-## radius 1.0 -- keeps the ruler's body-side end close to the swing pivot
-## (roughly the hand/shoulder) while the tip rides the full swing arc.
 var _swings: Dictionary
 var _sprite: Sprite2D
 
 var _active := false
 var _elapsed := 0.0
-var _kind: StringName
 var _config: Dictionary
 var _startup_time := 0.0
 var _active_time := 0.0
@@ -66,7 +62,6 @@ func start_swing(
 ) -> void:
 	if not _swings.has(String(kind)):
 		return
-	_kind = kind
 	_config = _swings[String(kind)]
 	_startup_time = maxf(startup_time, 0.001)
 	_active_time = maxf(active_time, 0.001)
@@ -122,6 +117,9 @@ func _update_ellipse_arc(phase_t: Dictionary) -> void:
 	var ry: float = (float(size[1]) * 0.5) * flare
 	var tilt := deg_to_rad(float(_config["tilt_deg"]))
 	var pivot := Vector2(_config["hitbox_offset"][0], _config["hitbox_offset"][1])
+	# Fraction of the ellipse radius the grip end sits at, vs. the tip at
+	# radius 1.0 -- keeps the ruler's body-side end close to the swing pivot
+	# (roughly the hand/shoulder) while the tip rides the full swing arc.
 	var base_fraction: float = _config.get("base_radius_fraction", 0.22)
 
 	var theta_deg := _interpolate(
