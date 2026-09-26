@@ -95,7 +95,6 @@ func _process(delta: float) -> void:
 	if _elapsed >= TOTAL_DURATION:
 		stop_slash()
 		return
-	@warning_ignore("integer_division")
 	var frame_index := clampi(int(_elapsed / _frame_duration), 0, _active_frames.size() - 1)
 	_advance_frame(frame_index)
 

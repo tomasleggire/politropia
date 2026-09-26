@@ -144,7 +144,7 @@ const PHASE_RECOVERY := 2
 @onready var _ledge_check_above: RayCast2D = $LedgeCheckAbove
 @onready var _headroom_check: RayCast2D = $HeadroomCheck
 @onready var _attack_hitbox: AttackHitbox = $AttackHitbox
-@onready var _slash_vfx: Node2D = $SlashVfx
+@onready var _slash_vfx: PlayerSlashVfx = $SlashVfx
 @onready var _animation_sprite_frames: SpriteFrames = LuzAnimationCatalog.build_sprite_frames({
 	"ground_dash": dash_duration,
 	"air_dash": air_dash_duration,
@@ -205,11 +205,10 @@ var _attack_buffer_direction := 0
 func _ready() -> void:
 	add_to_group(&"player")
 	_sprite.sprite_frames = _animation_sprite_frames
-	# Every Luz frame is placed on a shared 512x512 virtual canvas anchored to
-	# its nominal grid cell (see LuzAnimationCatalog); this offset puts that
-	# canvas' row 413 (padding 100 + cell_height 313, from the manifest) at
-	# local y=0, so the feet-anchored origin lines up with every frame's
-	# corrected opaque bottom regardless of pose.
+	# Every Luz frame is a uniform 512x512 grid cell (see LuzAnimationCatalog
+	# and tools/process_luz_sheet.py) already repacked so its opaque bottom
+	# lands on canvas row 413; this offset puts that row at local y=0, so the
+	# feet-anchored origin lines up with every frame regardless of pose.
 	_sprite.offset = Vector2(0.0, -157.0)
 	# Measured from the idle standing frames' opaque pixel height (~331px)
 	# so Luz renders at roughly the CollisionShape2D's 58px standing height.
@@ -747,7 +746,7 @@ func _activate_directional_attack(
 	attack_name: StringName, facing: int, variant: int, slash_kind: StringName
 ) -> void:
 	var config := _activate_attack_hitbox(attack_name, facing)
-	_slash_vfx.call("play_slash", slash_kind, variant, facing, config.size, config.offset)
+	_slash_vfx.play_slash(slash_kind, variant, facing, config.size, config.offset)
 
 
 func _deactivate_attack_hitbox() -> void:
@@ -1072,7 +1071,7 @@ func _enter_state(new_state: State) -> void:
 	_state = new_state
 	_state_time = 0.0
 	if not _is_directional_attack_state():
-		_slash_vfx.call("stop_slash")
+		_slash_vfx.stop_slash()
 
 	if previous == State.DASH and new_state != State.DASH:
 		_dash_cooldown_left = dash_cooldown
