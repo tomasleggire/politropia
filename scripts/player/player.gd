@@ -115,10 +115,16 @@ const PHASE_RECOVERY := 2
 @export var plunge_land_recovery_time := 0.25
 
 @export_group("Attack Hitboxes")
-## Reach enlarged ~40% (see odd/tasks/luz-blasphemous-animation.md T3) to
-## match the longer ruler + crescent smear reach; offsets lowered and centered (T3b/T3b-fix).
-@export var hitbox_ground_size := Vector2(76.0, 32.0)
-@export var hitbox_ground_offset := Vector2(46.0, -26.0)
+## ground_1 re-derived in T4 from the measured ruler tip of the new
+## ground_attack_1 art's contact frame (assets/player/luz/luz_ruler_track.json,
+## written by tools/process_luz_combat_hits.py): far edge = tip.x + a small
+## tolerance, near edge = the grip position, vertical center = the ruler's
+## height at contact. Old (T3b-fix, tuned for the abandoned procedural ruler
+## weapon, reach far past the actual hand-drawn ruler): size (76,32) offset
+## (46,-26). New: size (24,32) offset (35,-28) -- also used by ground_2 until
+## its own new art replaces the shared reach in T4's second pass.
+@export var hitbox_ground_size := Vector2(24.0, 32.0)
+@export var hitbox_ground_offset := Vector2(35.0, -28.0)
 @export var hitbox_finisher_size := Vector2(90.0, 38.0)
 @export var hitbox_finisher_offset := Vector2(53.0, -25.0)
 @export var hitbox_crouch_size := Vector2(72.0, 20.0)

@@ -31,6 +31,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PLAYER_GD = REPO_ROOT / "scripts" / "player" / "player.gd"
 OUTPUT_DIR = REPO_ROOT / "assets" / "player" / "luz" / "vfx"
 PREVIEW_DIR = REPO_ROOT / "tools" / "art_sources" / "luz" / "preview"
+TRACK_PATH = REPO_ROOT / "assets" / "player" / "luz" / "luz_ruler_track.json"
 
 PX = 3
 CELL_WIDTH = 720
@@ -179,16 +180,86 @@ def render_thrust_frame(
     return img.resize((CELL_WIDTH, CELL_HEIGHT), Image.NEAREST)
 
 
-def build_variant_geometry(name: str, config: dict, size: tuple[float, float], offset: tuple[float, float]) -> dict:
+def load_ruler_track() -> dict:
+    if not TRACK_PATH.exists():
+        return {}
+    return json.loads(TRACK_PATH.read_text())
+
+
+def track_driven_arc(clip_track: dict, cx: float, cy: float) -> tuple[float, float, float, tuple[float, float]]:
+    """Derives (a_from, a_to, radius, pivot_world) for an arc variant from the
+    measured per-frame ruler tip/grip path
+    (assets/player/luz/luz_ruler_track.json) instead of hand-picked constants.
+
+    Pivot: the hand-authored variants center their ellipse on the *hitbox*
+    center, sized from the hitbox's own half-extents -- that made sense when
+    the hitbox was deliberately enlarged past the (placeholder) art's real
+    reach. T4's hitbox_ground is now tightly re-derived to hug the actual
+    drawn ruler (grip to tip + a small tolerance, see player.gd), so it sits
+    very close to the tip itself; centering the ellipse there any more makes
+    it a barely-visible sliver (measured: radius ~34px vs the ~280px a bold
+    Blasphemous-style crescent needs). Pivoting at the character's own local
+    origin (feet) instead put the whole arc up past her shoulder, off to one
+    side -- also wrong (the tip's angle *around the feet* isn't where the
+    swing actually happens). The grip position (the hand, i.e. roughly the
+    swing's actual mechanical pivot) is stable and centrally located across
+    the whole windup/contact/follow-through path, so its per-frame average
+    is used as the ellipse's pivot; the radius is then fit so the boundary
+    passes exactly through the contact frame's measured tip (as required).
+    """
+    frames = clip_track["frames"]
+    contact_index = clip_track["contact_frame"]
+    # Exclude the ready-stance bookend frames (0 and the last), which loop
+    # the combo back to its own start and are not part of the swing arc.
+    swing_indices = list(range(1, len(frames) - 1))
+
+    pivot_x = sum(frames[i]["grip"]["x"] for i in swing_indices) / len(swing_indices)
+    pivot_y = sum(frames[i]["grip"]["y"] for i in swing_indices) / len(swing_indices)
+
+    def to_px(world: dict) -> tuple[float, float]:
+        return cx + (world["x"] - pivot_x) * DESIGN_SCALE, cy + (world["y"] - pivot_y) * DESIGN_SCALE
+
+    def angle_for(frame_index: int) -> float:
+        px, py = to_px(frames[frame_index]["tip"])
+        return math.degrees(math.atan2(py - cy, px - cx)) % 360.0
+
+    raw_angles = [angle_for(i) for i in swing_indices]
+    unwrapped = [raw_angles[0]]
+    for ang in raw_angles[1:]:
+        prev = unwrapped[-1]
+        delta = ((ang - prev) + 180.0) % 360.0 - 180.0
+        unwrapped.append(prev + delta)
+    a_from, a_to = unwrapped[0], unwrapped[-1]
+    if a_to < a_from:
+        a_from, a_to = a_to, a_from
+
+    contact_px, contact_py = to_px(frames[contact_index]["tip"])
+    radius = math.hypot(contact_px - cx, contact_py - cy)
+    return a_from, a_to, radius, (pivot_x, pivot_y)
+
+
+def build_variant_geometry(
+    name: str, config: dict, size: tuple[float, float], offset: tuple[float, float], track: dict
+) -> dict:
     design_w = size[0] * DESIGN_SCALE
     design_h = size[1] * DESIGN_SCALE
-    flare = config.get("flare", 1.30)
     cx = CELL_WIDTH / 2.0
     cy = CELL_HEIGHT / 2.0
-    rx = (design_w / 2.0) * flare
-    ry = (design_h / 2.0) * flare
-    anchor_x = cx - offset[0] * DESIGN_SCALE
-    anchor_y = cy - offset[1] * DESIGN_SCALE
+
+    track_clip = config.get("track_clip")
+    if track_clip and track.get("clips", {}).get(track_clip):
+        a_from, a_to, radius, pivot = track_driven_arc(track["clips"][track_clip], cx, cy)
+        config["a_from"], config["a_to"] = a_from, a_to
+        rx = ry = radius
+        anchor_x = cx - pivot[0] * DESIGN_SCALE
+        anchor_y = cy - pivot[1] * DESIGN_SCALE
+        print(f"  {name}: track-driven a_from={a_from:.1f} a_to={a_to:.1f} radius={radius:.1f} pivot={pivot}")
+    else:
+        flare = config.get("flare", 1.30)
+        rx = (design_w / 2.0) * flare
+        ry = (design_h / 2.0) * flare
+        anchor_x = cx - offset[0] * DESIGN_SCALE
+        anchor_y = cy - offset[1] * DESIGN_SCALE
 
     # Assert no cell clipping
     if config["type"] == "arc":
@@ -212,13 +283,19 @@ def main() -> int:
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
 
     hitbox_configs = parse_player_hitboxes()
+    ruler_track = load_ruler_track()
 
     variant_specs = {
         "ground_1": {
             "row": 0, "type": "arc",
+            # a_from/a_to/flare are overwritten from the measured ruler tip
+            # path (assets/player/luz/luz_ruler_track.json) in
+            # build_variant_geometry when track_clip data is available; these
+            # are only the fallback if the track is ever missing.
             "a_from": 220.0, "a_to": 380.0,
             "flare": 1.30, "peak": 0.55,
-            "description": "forward diagonal cut, behind-high to front-low",
+            "track_clip": "ground_attack_1",
+            "description": "forward diagonal cut, behind-high to front-low (measured from ground_attack_1 art)",
         },
         "ground_2": {
             "row": 1, "type": "arc",
@@ -259,7 +336,7 @@ def main() -> int:
 
     for name, spec in variant_specs.items():
         size, offset = hitbox_configs[name]
-        geometry = build_variant_geometry(name, spec, size, offset)
+        geometry = build_variant_geometry(name, spec, size, offset, ruler_track)
         row = spec["row"]
         print(f"{name}: row={row} rx={geometry['rx']:.1f} ry={geometry['ry']:.1f} anchor={geometry['anchor']}")
 

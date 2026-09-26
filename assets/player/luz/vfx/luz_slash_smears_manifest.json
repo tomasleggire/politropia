@@ -7,32 +7,32 @@
     "ground_1": {
       "row": 0,
       "reference_hitbox_size": [
-        76.0,
+        24.0,
         32.0
       ],
       "reference_hitbox_offset": [
-        46.0,
-        -26.0
+        35.0,
+        -28.0
       ],
       "anchor": [
-        97.14285714285711,
-        468.57142857142856
+        307.6857142857143,
+        499.4761904761905
       ],
-      "description": "forward diagonal cut, behind-high to front-low"
+      "description": "forward diagonal cut, behind-high to front-low (measured from ground_attack_1 art)"
     },
     "ground_2": {
       "row": 1,
       "reference_hitbox_size": [
-        76.0,
+        24.0,
         32.0
       ],
       "reference_hitbox_offset": [
-        46.0,
-        -26.0
+        35.0,
+        -28.0
       ],
       "anchor": [
-        97.14285714285711,
-        468.57142857142856
+        160.0,
+        480.0
       ],
       "description": "forward reverse backhand hook sweeping down-and-forward"
     },

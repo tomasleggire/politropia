@@ -1,0 +1,582 @@
+#!/usr/bin/env python3
+"""Ingest new Codex-generated ground-combo hit art (fixed 4x2 grid, 8 frames
+per raw sheet) and repack the ground combat sheet around it.
+
+Unlike ``process_luz_sheet.py`` (which segments a *nominal* grid seeded from
+legacy hand-picked cut lines because those source sheets bleed across cell
+boundaries), the new raw art already guarantees every frame's opaque pixels
+stay >= 12px inside its own fixed 384x512 cell (see the Codex prompts under
+``tools/art_sources/luz/prompts/``). So per-cell processing here only needs:
+  1. per-cell 8-connected alpha-component labeling, to find and drop stray
+     specks (small components far from the character's own silhouette);
+  2. a uniform rescale so the new art's body height matches the existing
+     (already-committed) sheets' character height at the same 0.175 display
+     scale (see NEW_ART_SCALE_FACTOR below for the measurement);
+  3. feet-baseline + horizontal placement into the shared 512x512 output
+     cell convention (frame_anchor (256, 413), same as every other clip).
+
+Also measures the wooden ruler's tip/grip/axis per output frame (by its
+light-brown/tan hue) and writes assets/player/luz/luz_ruler_track.json --
+the single source of truth for hitbox placement (this tool only prints
+suggested hitbox values; player.gd's @export values are edited by hand,
+keeping gameplay authority there) and for the crescent smear generator
+(tools/generate_luz_slash_smears.py reads this track for ground_1/2/3).
+
+Data-driven: add a new clip to RAW_CLIPS (raw file + target cell range) to
+process further hits with this same tool -- no code changes needed.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+import sys
+from pathlib import Path
+
+from PIL import Image, ImageChops, ImageDraw, ImageFont
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+RAW_DIR = REPO_ROOT / "tools" / "art_sources" / "luz" / "raw"
+OUTPUT_DIR = REPO_ROOT / "assets" / "player" / "luz"
+PREVIEW_DIR = REPO_ROOT / "tools" / "art_sources" / "luz" / "preview"
+MANIFEST_PATH = OUTPUT_DIR / "animation_manifest.json"
+TRACK_PATH = OUTPUT_DIR / "luz_ruler_track.json"
+GROUND_SHEET_NAME = "luz_ground_combat_sheet.png"
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import process_luz_sheet as legacy  # noqa: E402  (reuses the old sheet's segmentation config)
+
+ALPHA_THRESHOLD = 8
+# A component smaller than this AND farther than this from the character's
+# own silhouette bbox is a stray speck (compression/generation artifact),
+# not part of the art -- dropped (alpha zeroed). Kept otherwise (a component
+# could legitimately be disjoint from the main body blob, e.g. a ruler tip
+# separated from the hand by a few transparent pixels).
+SPECK_SIZE_THRESHOLD = 25  # px (component pixel count)
+SPECK_DISTANCE_THRESHOLD = 15  # px (component bbox to body bbox, rect distance)
+
+OUT_CELL_SIZE = 512
+CANVAS_PADDING = 100
+FEET_ROW = 413
+FRAME_ANCHOR = (256, 413)
+DISPLAY_SCALE = 0.175
+DESIGN_SCALE = 1.0 / DISPLAY_SCALE
+
+# Measured (see odd/tasks/luz-blasphemous-animation.md T4 progress entry):
+# new raw art's "ready stance" bbox height (251px, cell 0 of
+# ground_attack_1_raw.png) vs the OLD (currently-committed, pre-T4) raw
+# ground_attack_1 art's own ready-stance bbox height (292px, cell 0 of
+# tools/art_sources/luz/source/luz_ground_combat_sheet.png under its legacy
+# seed cuts) -- ratio 292/251 = 1.163. Cross-checked against the contact
+# frame (old finisher-less hit1 cell 3, 285px silhouette vs new cell 3's
+# horizontally-extended pose) which is noisier (arm extension dominates
+# bbox height there) but agrees within ~1% (1.175). Both new-art generation
+# runs (hit1 v2, hit2, hit3) share the identical "standing height ~240px,
+# feet baseline 40px above cell bottom" prompt spec, so one scale factor is
+# applied uniformly to all three.
+NEW_ART_SCALE_FACTOR = 1.17
+RESAMPLE = Image.LANCZOS
+
+RAW_GRID = {"columns": 4, "rows": 2, "cell_width": 384, "cell_height": 512}
+RAW_FEET_LOCAL_Y = 472  # measured identically across all 3 new raw sheets
+
+# Ruler wood-tone detection (sampled directly from the contact frame of
+# ground_attack_1_raw.png): fill ~ (220-241, 150-180, 94-120), outline/tick
+# marks ~ (90-150, 55-95, 30-65). Both are warm brown with R > G > B.
+def _is_ruler_pixel(r: int, g: int, b: int) -> bool:
+    if not (r > g > b):
+        return False
+    if not (10 <= (r - g) <= 95 and 8 <= (g - b) <= 85):
+        return False
+    fill = 195 <= r <= 250 and 125 <= g <= 195 and 75 <= b <= 145
+    outline = 70 <= r <= 165 and 45 <= g <= 105 and 20 <= b <= 75
+    return fill or outline
+
+
+RAW_CLIPS = {
+    "ground_attack_1": {
+        "raw_file": "ground_attack_1_raw.png",
+        "contact_frame": 3,
+        "target_cell_start": 0,
+    },
+    # T4 second pass: hit 2 and hit 3 raw art are approved but processed in a
+    # separate commit after hit 1 is verified end-to-end. Uncomment to run:
+    # "ground_attack_2": {
+    #     "raw_file": "ground_attack_2_raw.png",
+    #     "contact_frame": 1,
+    #     "target_cell_start": 8,
+    # },
+    # "ground_attack_3": {
+    #     "raw_file": "ground_attack_3_raw.png",
+    #     "contact_frame": 3,
+    #     "target_cell_start": 12,
+    # },
+}
+
+# clip_name -> new cell start, for clips not (yet) reprocessed from new raw
+# art in this run: their cells are recomputed fresh each run from the
+# pristine legacy source sheet (never from a previously-migrated assets
+# file), using process_luz_sheet's own segmentation.
+LEGACY_CLIP_CELLS = {
+    "ground_attack_2": (4, 8),   # (old_cell_start, new_cell_start)
+    "ground_attack_3": (8, 12),
+    "crouch_attack": (12, 16),
+}
+
+FRAME_COUNT_PER_CLIP = 8
+TOTAL_GROUND_CELLS = 20  # 8 (hit1) + 4 (hit2) + 4 (hit3) + 4 (crouch)
+GROUND_GRID = {"columns": 4, "rows": 5, "cell_width": 512, "cell_height": 512}
+
+
+class SegmentationError(RuntimeError):
+    pass
+
+
+def label_components(alpha: bytes, w: int, h: int):
+    labels = [0] * (w * h)
+    sizes: dict[int, int] = {}
+    bboxes: dict[int, tuple[int, int, int, int]] = {}
+    next_label = 0
+    for start in range(w * h):
+        if alpha[start] <= ALPHA_THRESHOLD or labels[start] != 0:
+            continue
+        next_label += 1
+        lbl = next_label
+        labels[start] = lbl
+        stack = [start]
+        size = 0
+        minx = miny = 10**9
+        maxx = maxy = -1
+        while stack:
+            idx = stack.pop()
+            size += 1
+            y, x = divmod(idx, w)
+            if x < minx:
+                minx = x
+            if x > maxx:
+                maxx = x
+            if y < miny:
+                miny = y
+            if y > maxy:
+                maxy = y
+            x0 = x - 1 if x > 0 else 0
+            x1 = x + 1 if x < w - 1 else w - 1
+            y0 = y - 1 if y > 0 else 0
+            y1 = y + 1 if y < h - 1 else h - 1
+            for ny in range(y0, y1 + 1):
+                base = ny * w
+                for nx in range(x0, x1 + 1):
+                    nidx = base + nx
+                    if nidx == idx:
+                        continue
+                    if alpha[nidx] > ALPHA_THRESHOLD and labels[nidx] == 0:
+                        labels[nidx] = lbl
+                        stack.append(nidx)
+        sizes[lbl] = size
+        bboxes[lbl] = (minx, miny, maxx, maxy)
+    return labels, sizes, bboxes
+
+
+def _rect_distance(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    dx = max(bx0 - ax1, ax0 - bx1, 0)
+    dy = max(by0 - ay1, ay0 - by1, 0)
+    return math.hypot(dx, dy)
+
+
+def speck_filter(cell_img: Image.Image) -> tuple[Image.Image, int]:
+    """Drops small-and-far components. Returns (filtered_image, dropped_count)."""
+    w, h = cell_img.size
+    alpha = cell_img.split()[-1].tobytes()
+    labels, sizes, bboxes = label_components(alpha, w, h)
+    if not sizes:
+        raise SegmentationError("cell has no opaque pixels at all")
+    body_label = max(sizes, key=lambda l: sizes[l])
+    body_bbox = bboxes[body_label]
+
+    dropped_labels = set()
+    for lbl, size in sizes.items():
+        if lbl == body_label:
+            continue
+        if size < SPECK_SIZE_THRESHOLD and _rect_distance(bboxes[lbl], body_bbox) > SPECK_DISTANCE_THRESHOLD:
+            dropped_labels.add(lbl)
+
+    if not dropped_labels:
+        return cell_img.copy(), 0
+
+    out = cell_img.copy()
+    r, g, b, a = out.split()
+    a_bytes = bytearray(a.tobytes())
+    for i, lbl in enumerate(labels):
+        if lbl in dropped_labels:
+            a_bytes[i] = 0
+    a2 = Image.frombytes("L", (w, h), bytes(a_bytes))
+    out = Image.merge("RGBA", (r, g, b, a2))
+    return out, len(dropped_labels)
+
+
+def premultiply(im: Image.Image) -> Image.Image:
+    r, g, b, a = im.split()
+    return Image.merge("RGBA", (ImageChops.multiply(r, a), ImageChops.multiply(g, a), ImageChops.multiply(b, a), a))
+
+
+def unpremultiply(im: Image.Image) -> Image.Image:
+    data = im.getdata()
+    out = []
+    for r, g, b, a in data:
+        if a == 0:
+            out.append((0, 0, 0, 0))
+        else:
+            out.append((min(255, r * 255 // a), min(255, g * 255 // a), min(255, b * 255 // a), a))
+    result = Image.new("RGBA", im.size)
+    result.putdata(out)
+    return result
+
+
+def process_raw_frame(raw_sheet: Image.Image, cell_index: int, report: list[str]) -> Image.Image:
+    """Returns a fresh 512x512 output cell for one frame of new raw art."""
+    col = cell_index % RAW_GRID["columns"]
+    row = cell_index // RAW_GRID["columns"]
+    cw, ch = RAW_GRID["cell_width"], RAW_GRID["cell_height"]
+    cell_img = raw_sheet.crop((col * cw, row * ch, (col + 1) * cw, (row + 1) * ch))
+
+    filtered, dropped = speck_filter(cell_img)
+    if dropped:
+        report.append(f"    frame {cell_index}: dropped {dropped} stray speck component(s)")
+
+    bbox = filtered.getbbox()
+    if bbox is None:
+        raise SegmentationError(f"frame {cell_index}: empty after speck filter")
+    region = filtered.crop(bbox)
+    region_w, region_h = region.size
+
+    scaled_w = max(1, round(region_w * NEW_ART_SCALE_FACTOR))
+    scaled_h = max(1, round(region_h * NEW_ART_SCALE_FACTOR))
+    scaled = unpremultiply(premultiply(region).resize((scaled_w, scaled_h), RESAMPLE))
+
+    leading_x = CANVAS_PADDING + round(bbox[0] * NEW_ART_SCALE_FACTOR)
+    leading_y = FEET_ROW - (scaled_h - 1)
+
+    if leading_x < 0 or leading_y < 0 or leading_x + scaled_w > OUT_CELL_SIZE or leading_y + scaled_h > OUT_CELL_SIZE:
+        raise SegmentationError(
+            f"frame {cell_index}: scaled placement out of bounds "
+            f"(leading=({leading_x},{leading_y}), size=({scaled_w}x{scaled_h}))"
+        )
+
+    out = Image.new("RGBA", (OUT_CELL_SIZE, OUT_CELL_SIZE), (0, 0, 0, 0))
+    out.paste(scaled, (leading_x, leading_y), scaled)
+    return out
+
+
+RULER_MIN_COMPONENT_SIZE = 300  # px; drop small color-matched noise
+RULER_MIN_ELONGATION = 15.0  # major/minor eigenvalue ratio; the ruler is a
+# long thin bar (elongation 30-100+ measured), while hair/skin regions that
+# happen to fall in the same warm-tan color range are blobby (elongation
+# 2-6) -- this is what actually isolates the ruler, not color alone.
+
+
+def _pca_eigvals(pts: list[tuple[int, int]]) -> tuple[float, float, float, float]:
+    n = len(pts)
+    mx = sum(p[0] for p in pts) / n
+    my = sum(p[1] for p in pts) / n
+    sxx = sum((p[0] - mx) ** 2 for p in pts) / n
+    syy = sum((p[1] - my) ** 2 for p in pts) / n
+    sxy = sum((p[0] - mx) * (p[1] - my) for p in pts) / n
+    trace = sxx + syy
+    det = sxx * syy - sxy * sxy
+    disc = max(trace * trace / 4.0 - det, 0.0)
+    lam1 = trace / 2.0 + math.sqrt(disc)
+    lam2 = trace / 2.0 - math.sqrt(disc)
+    return mx, my, lam1, lam2
+
+
+def _connected_components(mask: bytearray, w: int, h: int) -> list[list[tuple[int, int]]]:
+    labels = [0] * (w * h)
+    comps: list[list[tuple[int, int]]] = []
+    for start in range(w * h):
+        if mask[start] == 0 or labels[start] != 0:
+            continue
+        lbl = len(comps) + 1
+        labels[start] = lbl
+        stack = [start]
+        pts: list[tuple[int, int]] = []
+        while stack:
+            idx = stack.pop()
+            y, x = divmod(idx, w)
+            pts.append((x, y))
+            x0 = x - 1 if x > 0 else 0
+            x1 = x + 1 if x < w - 1 else w - 1
+            y0 = y - 1 if y > 0 else 0
+            y1 = y + 1 if y < h - 1 else h - 1
+            for ny in range(y0, y1 + 1):
+                base = ny * w
+                for nx in range(x0, x1 + 1):
+                    nidx = base + nx
+                    if nidx == idx:
+                        continue
+                    if mask[nidx] and labels[nidx] == 0:
+                        labels[nidx] = lbl
+                        stack.append(nidx)
+        comps.append(pts)
+    return comps
+
+
+def measure_ruler(frame_img: Image.Image) -> dict:
+    """Ruler tip/grip/axis for one already-placed 512x512 output frame.
+
+    Color alone (light-brown/tan) also matches blonde hair and skin tones,
+    so candidate color pixels are further split into 8-connected components
+    and only components that are both large enough and highly elongated
+    (major/minor eigenvalue ratio) are kept as "the ruler" -- hair/skin
+    blobs are round/compact (elongation ~2-6), the ruler is a long thin bar
+    (elongation 30-100+ measured across all 8 frames of ground_attack_1).
+    """
+    rgba = frame_img.convert("RGBA")
+    w, h = rgba.size
+    px = rgba.load()
+
+    color_mask = bytearray(w * h)
+    body_sx = body_sy = body_n = 0
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a <= ALPHA_THRESHOLD:
+                continue
+            body_sx += x
+            body_sy += y
+            body_n += 1
+            if _is_ruler_pixel(r, g, b):
+                color_mask[y * w + x] = 1
+
+    if body_n == 0:
+        raise SegmentationError("measure_ruler: empty frame")
+
+    body_cx = body_sx / body_n
+    body_cy = body_sy / body_n
+
+    components = _connected_components(color_mask, w, h)
+    ruler_pts: list[tuple[int, int]] = []
+    for comp in components:
+        if len(comp) < RULER_MIN_COMPONENT_SIZE:
+            continue
+        _, _, lam1, lam2 = _pca_eigvals(comp)
+        elongation = lam1 / max(lam2, 1e-6)
+        if elongation >= RULER_MIN_ELONGATION:
+            ruler_pts.extend(comp)
+
+    if len(ruler_pts) < 8:
+        raise SegmentationError(
+            f"measure_ruler: no elongated ruler-colored component found "
+            f"(largest candidates: {sorted((len(c) for c in components), reverse=True)[:3]})"
+        )
+
+    n = len(ruler_pts)
+    mx = sum(p[0] for p in ruler_pts) / n
+    my = sum(p[1] for p in ruler_pts) / n
+    sxx = sum((p[0] - mx) ** 2 for p in ruler_pts) / n
+    syy = sum((p[1] - my) ** 2 for p in ruler_pts) / n
+    sxy = sum((p[0] - mx) * (p[1] - my) for p in ruler_pts) / n
+
+    # Principal eigenvector of [[sxx, sxy], [sxy, syy]] (2x2 closed form).
+    trace = sxx + syy
+    det = sxx * syy - sxy * sxy
+    disc = max(trace * trace / 4.0 - det, 0.0)
+    lam1 = trace / 2.0 + math.sqrt(disc)
+    if abs(sxy) > 1e-9:
+        vx, vy = lam1 - syy, sxy
+    elif sxx >= syy:
+        vx, vy = 1.0, 0.0
+    else:
+        vx, vy = 0.0, 1.0
+    norm = math.hypot(vx, vy) or 1.0
+    vx, vy = vx / norm, vy / norm
+
+    projections = [((p[0] - mx) * vx + (p[1] - my) * vy, p) for p in ruler_pts]
+    proj_min = min(projections, key=lambda t: t[0])
+    proj_max = max(projections, key=lambda t: t[0])
+    end_a, end_b = proj_min[1], proj_max[1]
+
+    def dist_to_body(p: tuple[int, int]) -> float:
+        return math.hypot(p[0] - body_cx, p[1] - body_cy)
+
+    if dist_to_body(end_a) >= dist_to_body(end_b):
+        tip, grip = end_a, end_b
+    else:
+        tip, grip = end_b, end_a
+
+    axis_deg = math.degrees(math.atan2(tip[1] - grip[1], tip[0] - grip[0]))
+
+    def to_world(p: tuple[int, int]) -> dict:
+        return {
+            "x": round((p[0] - FRAME_ANCHOR[0]) * DISPLAY_SCALE, 2),
+            "y": round((p[1] - FRAME_ANCHOR[1]) * DISPLAY_SCALE, 2),
+        }
+
+    return {
+        "tip_px": {"x": tip[0], "y": tip[1]},
+        "grip_px": {"x": grip[0], "y": grip[1]},
+        "tip": to_world(tip),
+        "grip": to_world(grip),
+        "axis_angle_deg": round(axis_deg, 2),
+        "ruler_pixel_count": n,
+    }
+
+
+def _load_font():
+    try:
+        return ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 20)
+    except OSError:
+        return ImageFont.load_default()
+
+
+def render_contact_sheet(out_sheet: Image.Image, dest: Path) -> None:
+    contact = out_sheet.convert("RGBA").copy()
+    draw = ImageDraw.Draw(contact)
+    font = _load_font()
+    cols, rows = GROUND_GRID["columns"], GROUND_GRID["rows"]
+    for cell in range(cols * rows):
+        col = cell % cols
+        row = cell // cols
+        x0, y0 = col * OUT_CELL_SIZE, row * OUT_CELL_SIZE
+        x1, y1 = x0 + OUT_CELL_SIZE - 1, y0 + OUT_CELL_SIZE - 1
+        draw.rectangle([x0, y0, x1, y1], outline=(255, 0, 255, 255), width=2)
+        draw.line([(x0, y0 + FEET_ROW), (x1, y0 + FEET_ROW)], fill=(0, 200, 255, 180), width=1)
+        draw.text((x0 + 6, y0 + 6), str(cell), fill=(255, 255, 0, 255), font=font)
+    contact.save(dest)
+
+
+def render_onion_skin(out_sheet: Image.Image, indices: list[int], clip_name: str, dest_dir: Path) -> None:
+    cols = GROUND_GRID["columns"]
+    canvas = Image.new("RGBA", (OUT_CELL_SIZE, OUT_CELL_SIZE), (30, 30, 34, 255))
+    n = len(indices)
+    for i, cell in enumerate(indices):
+        col = cell % cols
+        row = cell // cols
+        cell_img = out_sheet.crop((col * OUT_CELL_SIZE, row * OUT_CELL_SIZE, (col + 1) * OUT_CELL_SIZE, (row + 1) * OUT_CELL_SIZE))
+        alpha_scale = 1.0 if i == n - 1 else 0.35
+        r, g, b, a = cell_img.split()
+        a = a.point(lambda v, s=alpha_scale: int(v * s))
+        canvas.alpha_composite(Image.merge("RGBA", (r, g, b, a)))
+    draw = ImageDraw.Draw(canvas)
+    draw.line([(0, FEET_ROW), (OUT_CELL_SIZE, FEET_ROW)], fill=(255, 0, 255, 200), width=1)
+    draw.text((6, 6), clip_name, fill=(255, 255, 0, 255), font=_load_font())
+    canvas.save(dest_dir / f"{GROUND_SHEET_NAME.replace('.png', '')}__{clip_name}.png")
+
+
+def build_legacy_ground_sheet() -> Image.Image:
+    """Re-derives the pristine legacy 4x4 ground combat sheet straight from
+    tools/art_sources/luz/source/ (never from the possibly-already-migrated
+    assets file), for clips not yet reprocessed from new raw art."""
+    config = legacy.SHEETS[GROUND_SHEET_NAME]
+    result = legacy.process_sheet(GROUND_SHEET_NAME, config, verbose=False)
+    return result["out_sheet"]
+
+
+def main() -> int:
+    report: list[str] = []
+    PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    (PREVIEW_DIR / ".gitignore").write_text("*\n")
+
+    manifest = json.loads(MANIFEST_PATH.read_text())
+    ground_sheet_manifest = manifest["sheets"][GROUND_SHEET_NAME]
+
+    out_sheet = Image.new("RGBA", (GROUND_GRID["columns"] * OUT_CELL_SIZE, GROUND_GRID["rows"] * OUT_CELL_SIZE), (0, 0, 0, 0))
+
+    clips: dict[str, list[int]] = {}
+    contact_frames: dict[str, int] = {}
+    track: dict[str, dict] = {}
+
+    processed_clip_names = set()
+    for clip_name, cfg in RAW_CLIPS.items():
+        raw_path = RAW_DIR / cfg["raw_file"]
+        if not raw_path.exists():
+            report.append(f"  {clip_name}: raw file {cfg['raw_file']} not found, skipping (stays on old art)")
+            continue
+        processed_clip_names.add(clip_name)
+        print(f"Processing {clip_name} from {cfg['raw_file']}...")
+        raw_sheet = Image.open(raw_path).convert("RGBA")
+        assert raw_sheet.size == (
+            RAW_GRID["columns"] * RAW_GRID["cell_width"],
+            RAW_GRID["rows"] * RAW_GRID["cell_height"],
+        ), f"{clip_name}: unexpected raw sheet size {raw_sheet.size}"
+
+        target_start = cfg["target_cell_start"]
+        new_indices = list(range(target_start, target_start + FRAME_COUNT_PER_CLIP))
+        clips[clip_name] = new_indices
+        contact_frames[clip_name] = cfg["contact_frame"]
+
+        frame_records = []
+        for local_i in range(FRAME_COUNT_PER_CLIP):
+            frame_img = process_raw_frame(raw_sheet, local_i, report)
+            dest_cell = new_indices[local_i]
+            col = dest_cell % GROUND_GRID["columns"]
+            row = dest_cell // GROUND_GRID["columns"]
+            out_sheet.paste(frame_img, (col * OUT_CELL_SIZE, row * OUT_CELL_SIZE), frame_img)
+            ruler = measure_ruler(frame_img)
+            frame_records.append({"frame": local_i, **ruler})
+            print(f"  frame {local_i} -> cell {dest_cell}: tip={ruler['tip']} grip={ruler['grip']} axis={ruler['axis_angle_deg']}deg")
+
+        track[clip_name] = {
+            "contact_frame": cfg["contact_frame"],
+            "frames": frame_records,
+        }
+        render_onion_skin(out_sheet, new_indices, clip_name, PREVIEW_DIR)
+
+    # Clips not (yet) reprocessed from new raw art: recompute fresh from the
+    # pristine legacy source sheet and copy into their new cell positions.
+    needed_legacy = {name: cells for name, cells in LEGACY_CLIP_CELLS.items() if name not in processed_clip_names}
+    if needed_legacy:
+        print("Recomputing unchanged clip(s) from pristine legacy source:", list(needed_legacy))
+        legacy_sheet = build_legacy_ground_sheet()
+        for clip_name, (old_start, new_start) in needed_legacy.items():
+            # crouch_attack and any not-yet-processed hit are still 4-frame clips.
+            new_indices = list(range(new_start, new_start + 4))
+            clips[clip_name] = new_indices
+            old_indices = list(range(old_start, old_start + 4))
+            legacy_manifest_contact = ground_sheet_manifest.get("contact_frames", {}).get(clip_name, -1)
+            if legacy_manifest_contact >= 0:
+                contact_frames[clip_name] = legacy_manifest_contact
+            for local_i, old_cell in enumerate(old_indices):
+                old_col = old_cell % 4
+                old_row = old_cell // 4
+                cell_img = legacy_sheet.crop((old_col * OUT_CELL_SIZE, old_row * OUT_CELL_SIZE, (old_col + 1) * OUT_CELL_SIZE, (old_row + 1) * OUT_CELL_SIZE))
+                dest_cell = new_indices[local_i]
+                col = dest_cell % GROUND_GRID["columns"]
+                row = dest_cell // GROUND_GRID["columns"]
+                out_sheet.paste(cell_img, (col * OUT_CELL_SIZE, row * OUT_CELL_SIZE), cell_img)
+            render_onion_skin(out_sheet, new_indices, clip_name, PREVIEW_DIR)
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = OUTPUT_DIR / GROUND_SHEET_NAME
+    out_sheet.save(out_path)
+    print(f"Wrote {out_path} ({out_sheet.size[0]}x{out_sheet.size[1]})")
+
+    contact_dest = PREVIEW_DIR / f"{GROUND_SHEET_NAME.replace('.png', '')}__contact_sheet.png"
+    render_contact_sheet(out_sheet, contact_dest)
+
+    # Update manifest (ground combat sheet section only).
+    ground_sheet_manifest["grid"] = GROUND_GRID
+    ground_sheet_manifest["clips"] = clips
+    ground_sheet_manifest["contact_frames"] = contact_frames
+    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n")
+    print(f"Updated {MANIFEST_PATH}")
+
+    # Update / merge the ruler track (only touches processed clips' entries).
+    existing_track = {}
+    if TRACK_PATH.exists():
+        existing_track = json.loads(TRACK_PATH.read_text())
+    existing_track.setdefault("display_scale", DISPLAY_SCALE)
+    existing_track.setdefault("frame_anchor", {"x": FRAME_ANCHOR[0], "y": FRAME_ANCHOR[1]})
+    existing_track.setdefault("clips", {})
+    existing_track["clips"].update(track)
+    TRACK_PATH.write_text(json.dumps(existing_track, indent=2) + "\n")
+    print(f"Updated {TRACK_PATH}")
+
+    print("\n".join(report))
+    print("\nDone.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

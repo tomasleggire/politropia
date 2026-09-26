@@ -1,0 +1,182 @@
+{
+  "display_scale": 0.175,
+  "frame_anchor": {
+    "x": 256,
+    "y": 413
+  },
+  "clips": {
+    "ground_attack_1": {
+      "contact_frame": 3,
+      "frames": [
+        {
+          "frame": 0,
+          "tip_px": {
+            "x": 336,
+            "y": 385
+          },
+          "grip_px": {
+            "x": 257,
+            "y": 323
+          },
+          "tip": {
+            "x": 14.0,
+            "y": -4.9
+          },
+          "grip": {
+            "x": 0.17,
+            "y": -15.75
+          },
+          "axis_angle_deg": 38.13,
+          "ruler_pixel_count": 1495
+        },
+        {
+          "frame": 1,
+          "tip_px": {
+            "x": 122,
+            "y": 58
+          },
+          "grip_px": {
+            "x": 220,
+            "y": 116
+          },
+          "tip": {
+            "x": -23.45,
+            "y": -62.12
+          },
+          "grip": {
+            "x": -6.3,
+            "y": -51.97
+          },
+          "axis_angle_deg": -149.38,
+          "ruler_pixel_count": 1719
+        },
+        {
+          "frame": 2,
+          "tip_px": {
+            "x": 403,
+            "y": 49
+          },
+          "grip_px": {
+            "x": 341,
+            "y": 120
+          },
+          "tip": {
+            "x": 25.72,
+            "y": -63.7
+          },
+          "grip": {
+            "x": 14.87,
+            "y": -51.27
+          },
+          "axis_angle_deg": -48.87,
+          "ruler_pixel_count": 1400
+        },
+        {
+          "frame": 3,
+          "tip_px": {
+            "x": 490,
+            "y": 259
+          },
+          "grip_px": {
+            "x": 389,
+            "y": 247
+          },
+          "tip": {
+            "x": 40.95,
+            "y": -26.95
+          },
+          "grip": {
+            "x": 23.27,
+            "y": -29.05
+          },
+          "axis_angle_deg": 6.78,
+          "ruler_pixel_count": 1468
+        },
+        {
+          "frame": 4,
+          "tip_px": {
+            "x": 465,
+            "y": 337
+          },
+          "grip_px": {
+            "x": 369,
+            "y": 282
+          },
+          "tip": {
+            "x": 36.57,
+            "y": -13.3
+          },
+          "grip": {
+            "x": 19.77,
+            "y": -22.92
+          },
+          "axis_angle_deg": 29.81,
+          "ruler_pixel_count": 1654
+        },
+        {
+          "frame": 5,
+          "tip_px": {
+            "x": 421,
+            "y": 383
+          },
+          "grip_px": {
+            "x": 319,
+            "y": 322
+          },
+          "tip": {
+            "x": 28.87,
+            "y": -5.25
+          },
+          "grip": {
+            "x": 11.02,
+            "y": -15.92
+          },
+          "axis_angle_deg": 30.88,
+          "ruler_pixel_count": 1727
+        },
+        {
+          "frame": 6,
+          "tip_px": {
+            "x": 142,
+            "y": 383
+          },
+          "grip_px": {
+            "x": 212,
+            "y": 314
+          },
+          "tip": {
+            "x": -19.95,
+            "y": -5.25
+          },
+          "grip": {
+            "x": -7.7,
+            "y": -17.32
+          },
+          "axis_angle_deg": 135.41,
+          "ruler_pixel_count": 1484
+        },
+        {
+          "frame": 7,
+          "tip_px": {
+            "x": 338,
+            "y": 387
+          },
+          "grip_px": {
+            "x": 258,
+            "y": 327
+          },
+          "tip": {
+            "x": 14.35,
+            "y": -4.55
+          },
+          "grip": {
+            "x": 0.35,
+            "y": -15.05
+          },
+          "axis_angle_deg": 36.87,
+          "ruler_pixel_count": 1485
+        }
+      ]
+    }
+  }
+}
