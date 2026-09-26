@@ -258,13 +258,6 @@ def track_driven_arc(clip_track: dict) -> tuple[float, float, float, tuple[float
     if a_to < a_from:
         a_from, a_to = a_to, a_from
 
-    # A per-step shortest-path unwrap can still accumulate a total span past
-    # a full circle when one recovery frame swings back sharply (measured on
-    # ground_3: 370.8deg, which visibly rendered as a near-complete ring
-    # instead of a crescent -- render_crescent_frame's modular angle math
-    # assumes span <= 360). Cap it, keeping a_to (the later, more visually
-    # prominent follow-through direction) fixed and pulling a_from in --
-    # this only trims how far back into the windup the crescent reaches.
     if a_to - a_from > MAX_SPAN_DEG:
         a_from = a_to - MAX_SPAN_DEG
 
@@ -274,7 +267,9 @@ def track_driven_arc(clip_track: dict) -> tuple[float, float, float, tuple[float
     return a_from, a_to, radius_world, (pivot_x, pivot_y)
 
 
-def forward_extent(pivot: tuple[float, float], radius: float, a_from: float, a_to: float, steps: int = 2000):
+def forward_extent(
+    pivot: tuple[float, float], radius: float, a_from: float, a_to: float, steps: int = 2000
+) -> tuple[float, float, float] | None:
     """Samples the (circular, radius=outer smear radius) arc from a_from to
     a_to and returns (far_x, y_min, y_max) restricted to the forward,
     at-or-above-feet region (x >= BODY_FRONT_X, y <= FEET_LINE_Y) -- "the
