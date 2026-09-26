@@ -44,6 +44,13 @@ DESIGN_SCALE = 1.0 / 0.175
 # this far past the measured ruler-tip distance.
 OUTER_RADIUS_FLARE = 1.15
 
+# A per-step shortest-path angle unwrap (track_driven_arc) can accumulate a
+# total swept span past a full circle when one recovery frame swings back
+# sharply (measured on ground_3: 370.8deg, rendering as a near-complete ring
+# instead of a crescent). Caps the span, pulling a_from in and keeping a_to
+# (the later, more visually prominent follow-through direction) fixed.
+MAX_SPAN_DEG = 280.0
+
 # "You hit what you see": ground_1/2/3's hitboxes are derived from the
 # rendered smear crescent (this outer radius, swept across a_from..a_to
 # around the swing's own pivot), not from the ruler bar alone. Only the part
@@ -212,18 +219,17 @@ def track_driven_arc(clip_track: dict) -> tuple[float, float, float, tuple[float
     makes no difference); build_variant_geometry converts radius to native
     smear pixels for rendering.
 
-    Pivot: the hand-authored variants center their ellipse on the *hitbox*
-    center, sized from the hitbox's own half-extents -- that made sense when
-    the hitbox was deliberately enlarged past the (placeholder) art's real
-    reach. T4's hitbox_ground is now tightly re-derived to hug the actual
-    drawn ruler (grip to tip + a small tolerance, see player.gd), so it sits
-    very close to the tip itself; centering the ellipse there any more makes
-    it a barely-visible sliver (measured: radius ~34px vs the ~280px a bold
-    Blasphemous-style crescent needs). Pivoting at the character's own local
-    origin (feet) instead put the whole arc up past her shoulder, off to one
-    side -- also wrong (the tip's angle *around the feet* isn't where the
-    swing actually happens). The grip position (the hand, i.e. roughly the
-    swing's actual mechanical pivot) is stable and centrally located across
+    Pivot: the hand-authored variants (crouch/up/air) center their ellipse on
+    the *hitbox* center, sized from the hitbox's own half-extents -- but
+    ground_1/2/3's hitbox is itself derived from this same arc (see
+    forward_extent/derive_hitbox below), so centering the ellipse there would
+    be circular and, measured, collapses to a barely-visible sliver (radius
+    ~34px vs the ~280px a bold Blasphemous-style crescent needs). Pivoting at
+    the character's own local origin (feet) instead put the whole arc up
+    past her shoulder, off to one side -- also wrong (the tip's angle around
+    the feet isn't where the swing actually happens). The grip position
+    (the hand, i.e. roughly the swing's actual mechanical pivot) is stable
+    and centrally located across
     the whole windup/contact/follow-through path, so its per-frame average
     is used as the ellipse's pivot; the radius is fit to the contact frame's
     measured tip distance, then flared out by OUTER_RADIUS_FLARE so the
@@ -259,7 +265,6 @@ def track_driven_arc(clip_track: dict) -> tuple[float, float, float, tuple[float
     # assumes span <= 360). Cap it, keeping a_to (the later, more visually
     # prominent follow-through direction) fixed and pulling a_from in --
     # this only trims how far back into the windup the crescent reaches.
-    MAX_SPAN_DEG = 280.0
     if a_to - a_from > MAX_SPAN_DEG:
         a_from = a_to - MAX_SPAN_DEG
 
@@ -418,8 +423,9 @@ def main() -> int:
     variant_specs = {
         "ground_1": {
             "row": 0, "type": "arc",
-            # a_from/a_to/flare are overwritten from the measured ruler tip
-            # path (assets/player/luz/luz_ruler_track.json) in
+            # a_from/a_to (and the radius, replacing "flare" entirely) are
+            # overwritten from the measured ruler tip path
+            # (assets/player/luz/luz_ruler_track.json) in
             # build_variant_geometry when track_clip data is available; these
             # are only the fallback if the track is ever missing.
             "a_from": 220.0, "a_to": 380.0,
