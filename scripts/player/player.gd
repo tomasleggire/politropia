@@ -92,16 +92,19 @@ const PHASE_RECOVERY := 2
 @export var ledge_climb_forward_offset := 40.0
 
 @export_group("Attack")
-@export var attack_startup_time := 0.06
-@export var attack_active_time := 0.10
+## Startup/active/window times raised slightly (T3b, odd/tasks/luz-blasphemous-animation.md)
+## for a more fluid, slightly longer combo now that the procedural ruler
+## weapon needs room to wind up and follow through.
+@export var attack_startup_time := 0.08
+@export var attack_active_time := 0.12
 ## Total time (from attack start) before combo hit 1/2 close and buffer expires.
-@export var attack_window_hit1 := 0.30
-@export var attack_window_hit2 := 0.30
+@export var attack_window_hit1 := 0.36
+@export var attack_window_hit2 := 0.36
 ## Total time for the finisher (hit 3) and for crouch/up-attack windows.
-@export var attack_window_hit3 := 0.45
+@export var attack_window_hit3 := 0.50
 @export var attack_forward_step_speed := 60.0
 ## Air attack total cycle (startup + active + recovery); re-attack allowed once recovery starts.
-@export var air_attack_recovery := 0.35
+@export var air_attack_recovery := 0.40
 ## How long a press that can't start an attack right away (dash, wall cling,
 ## crouch/up/plunge attack, plunge land) stays queued so it fires the instant
 ## a new attack becomes possible, instead of being silently dropped.
@@ -118,16 +121,21 @@ const PHASE_RECOVERY := 2
 ## match the longer ruler + crescent smear reach; hitbox_up_* is sized so its
 ## extent above the head equals hitbox_ground_*'s extent beyond the body's
 ## front edge (both 65px), not by the same +40% ratio.
+## Sizes are unchanged from T3 (user-approved as "PERFECT"); only the
+## Y offsets moved lower (T3b) so the smear/ruler read centered on the body
+## instead of riding high near the chest/shoulder. See
+## assets/player/luz/luz_attack_swings.json for the shared swing geometry
+## these offsets double as ellipse pivots for.
 @export var hitbox_ground_size := Vector2(76.0, 32.0)
-@export var hitbox_ground_offset := Vector2(46.0, -35.0)
+@export var hitbox_ground_offset := Vector2(46.0, -26.0)
 @export var hitbox_finisher_size := Vector2(90.0, 38.0)
-@export var hitbox_finisher_offset := Vector2(53.0, -34.0)
+@export var hitbox_finisher_offset := Vector2(53.0, -25.0)
 @export var hitbox_crouch_size := Vector2(72.0, 20.0)
-@export var hitbox_crouch_offset := Vector2(43.0, -13.0)
+@export var hitbox_crouch_offset := Vector2(43.0, -10.0)
 @export var hitbox_up_size := Vector2(26.0, 68.0)
 @export var hitbox_up_offset := Vector2(0.0, -89.0)
 @export var hitbox_air_size := Vector2(74.0, 30.0)
-@export var hitbox_air_offset := Vector2(45.0, -40.0)
+@export var hitbox_air_offset := Vector2(45.0, -33.0)
 @export var hitbox_plunge_size := Vector2(28.0, 18.0)
 @export var hitbox_plunge_offset := Vector2(0.0, 12.0)
 @export var hitbox_plunge_land_size := Vector2(150.0, 20.0)
@@ -145,6 +153,7 @@ const PHASE_RECOVERY := 2
 @onready var _headroom_check: RayCast2D = $HeadroomCheck
 @onready var _attack_hitbox: AttackHitbox = $AttackHitbox
 @onready var _slash_vfx: PlayerSlashVfx = $SlashVfx
+@onready var _ruler_weapon: RulerWeapon = $RulerWeapon
 @onready var _animation_sprite_frames: SpriteFrames = LuzAnimationCatalog.build_sprite_frames({
 	"ground_dash": dash_duration,
 	"air_dash": air_dash_duration,
@@ -549,7 +558,7 @@ func _update_attack(delta: float) -> void:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
 			_activate_directional_attack(
-				_ground_attack_name(_attack_combo_index), _attack_facing, _attack_combo_index, &"ground"
+				_ground_attack_name(_attack_combo_index), _attack_facing, _attack_combo_index, &"ground", window
 			)
 		if not is_on_floor():
 			velocity.x = float(_attack_facing) * attack_forward_step_speed
@@ -610,7 +619,7 @@ func _update_crouch_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_crouch", _attack_facing, 0, &"crouch")
+			_activate_directional_attack(&"attack_crouch", _attack_facing, 0, &"crouch", attack_window_hit3)
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -644,7 +653,7 @@ func _update_up_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_up", _attack_facing, 0, &"up")
+			_activate_directional_attack(&"attack_up", _attack_facing, 0, &"up", attack_window_hit3)
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -677,7 +686,7 @@ func _update_air_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
+			_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air", air_attack_recovery)
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -742,11 +751,29 @@ func _activate_attack_hitbox(attack_name: StringName, facing: int = 0) -> Dictio
 	return config
 
 
+const SWING_KIND_BY_SLASH_KIND_AND_VARIANT := {
+	&"ground": ["ground_1", "ground_2", "ground_3"],
+	&"crouch": ["crouch"],
+	&"up": ["up"],
+	&"air": ["air"],
+}
+
+
 func _activate_directional_attack(
-	attack_name: StringName, facing: int, variant: int, slash_kind: StringName
+	attack_name: StringName, facing: int, variant: int, slash_kind: StringName, window_end: float
 ) -> void:
 	var config := _activate_attack_hitbox(attack_name, facing)
 	_slash_vfx.play_slash(slash_kind, variant, facing, config.size, config.offset)
+	var swing_kind := _swing_kind_for(slash_kind, variant)
+	if not swing_kind.is_empty():
+		_ruler_weapon.start_swing(swing_kind, facing, attack_startup_time, attack_active_time, window_end)
+
+
+func _swing_kind_for(slash_kind: StringName, variant: int) -> StringName:
+	var names: Array = SWING_KIND_BY_SLASH_KIND_AND_VARIANT.get(slash_kind, [])
+	if names.is_empty():
+		return &""
+	return names[clampi(variant, 0, names.size() - 1)]
 
 
 func _deactivate_attack_hitbox() -> void:
@@ -1072,6 +1099,7 @@ func _enter_state(new_state: State) -> void:
 	_state_time = 0.0
 	if not _is_directional_attack_state():
 		_slash_vfx.stop_slash()
+		_ruler_weapon.stop_swing()
 
 	if previous == State.DASH and new_state != State.DASH:
 		_dash_cooldown_left = dash_cooldown
