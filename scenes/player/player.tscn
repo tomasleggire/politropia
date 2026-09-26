@@ -1,100 +1,16 @@
-[gd_scene load_steps=16 format=3 uid="uid://bplayer01politropia"]
+[gd_scene load_steps=8 format=3 uid="uid://bplayer01politropia"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
-[ext_resource type="Texture2D" path="res://assets/player/gothic/wanderer_sheet.png" id="2_hero"]
 [ext_resource type="AudioStream" path="res://assets/audio/land_hup.wav" id="3_land"]
 [ext_resource type="AudioStream" path="res://assets/audio/footstep.wav" id="4_foot"]
 [ext_resource type="AudioStream" path="res://assets/audio/jump_launch.wav" id="5_jump"]
+[ext_resource type="Script" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(38, 58)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_side_0"]
-atlas = ExtResource("2_hero")
-region = Rect2(0, 0, 192, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_side_1"]
-atlas = ExtResource("2_hero")
-region = Rect2(192, 0, 192, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_side_2"]
-atlas = ExtResource("2_hero")
-region = Rect2(384, 0, 192, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_side_3"]
-atlas = ExtResource("2_hero")
-region = Rect2(576, 0, 192, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_side_4"]
-atlas = ExtResource("2_hero")
-region = Rect2(0, 256, 192, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_jump"]
-atlas = ExtResource("2_hero")
-region = Rect2(192, 256, 192, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_fall"]
-atlas = ExtResource("2_hero")
-region = Rect2(384, 256, 192, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_land"]
-atlas = ExtResource("2_hero")
-region = Rect2(576, 256, 192, 256)
-
-[sub_resource type="SpriteFrames" id="SpriteFrames_player"]
-animations = [{
-"frames": [{
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_fall")
-}],
-"loop": true,
-"name": &"fall",
-"speed": 5.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_side_0")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_side_1")
-}],
-"loop": true,
-"name": &"idle",
-"speed": 2.4
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_jump")
-}],
-"loop": true,
-"name": &"jump",
-"speed": 5.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_land")
-}],
-"loop": false,
-"name": &"land",
-"speed": 8.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_side_2")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_side_3")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_side_4")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_side_3")
-}],
-"loop": true,
-"name": &"walk",
-"speed": 8.0
-}]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_attack"]
+size = Vector2(10, 10)
 
 [node name="Player" type="CharacterBody2D"]
 collision_layer = 1
@@ -107,13 +23,43 @@ script = ExtResource("1_player")
 position = Vector2(0, -29)
 shape = SubResource("RectangleShape2D_body")
 
+[node name="WallCheckHead" type="RayCast2D" parent="."]
+position = Vector2(0, -50)
+target_position = Vector2(20, 0)
+collision_mask = 1
+
+[node name="WallCheckChest" type="RayCast2D" parent="."]
+position = Vector2(0, -29)
+target_position = Vector2(20, 0)
+collision_mask = 1
+
+[node name="WallCheckFeet" type="RayCast2D" parent="."]
+position = Vector2(0, -8)
+target_position = Vector2(20, 0)
+collision_mask = 1
+
+[node name="LedgeCheckAbove" type="RayCast2D" parent="."]
+position = Vector2(0, -60)
+target_position = Vector2(20, 0)
+collision_mask = 1
+
+[node name="HeadroomCheck" type="RayCast2D" parent="."]
+position = Vector2(0, -29)
+target_position = Vector2(0, -29)
+collision_mask = 1
+
+[node name="AttackHitbox" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 8
+script = ExtResource("6_hitbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackHitbox"]
+shape = SubResource("RectangleShape2D_attack")
+disabled = true
+
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
-position = Vector2(0, -48)
-scale = Vector2(0.4, 0.4)
-texture_filter = 1
-sprite_frames = SubResource("SpriteFrames_player")
-animation = &"idle"
-autoplay = "idle"
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
 
 [node name="SfxLand" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("3_land")

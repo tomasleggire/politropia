@@ -5,3 +5,8 @@
 
 __pycache__/
 *.pyc
+
+# Local AI tooling
+AGENTS.md
+.gga
+.atl/
