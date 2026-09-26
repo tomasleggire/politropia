@@ -114,19 +114,19 @@ const PHASE_RECOVERY := 2
 @export var plunge_land_recovery_time := 0.25
 
 @export_group("Attack Hitboxes")
-## ground_1/ground_2 share this rect, derived from both hits' measured ruler
-## tip/grip across their contact and following frame
-## (assets/player/luz/luz_ruler_track.json, written by
-## tools/process_luz_combat_hits.py): far/near edges bracket the contact-frame
-## tip/grip x (+ a small tolerance on the far edge), and the vertical span
-## covers both hits' tip height from contact through the next frame (hit_2's
-## backhand keeps rising well above hit_1's own contact height).
-@export var hitbox_ground_size := Vector2(24.0, 38.0)
-@export var hitbox_ground_offset := Vector2(35.0, -31.4)
-## Same derivation as hitbox_ground, from ground_attack_3's own measured
-## ruler (its contact and following frame keep rising higher than hit_1/2).
-@export var hitbox_finisher_size := Vector2(25.0, 33.0)
-@export var hitbox_finisher_offset := Vector2(37.8, -46.5)
+## "You hit what you see": ground_1/ground_2/ground_3 are derived from the
+## visible smear crescent (tools/generate_luz_slash_smears.py, single source
+## of truth via assets/player/luz/luz_ruler_track.json), not the ruler bar
+## alone -- the crescent's outer radius already extends past the tip
+## (OUTER_RADIUS_FLARE), and the box covers only the part of that crescent
+## in front of the body and at/above the feet (BODY_FRONT_X/FEET_LINE_Y).
+## Running that script FAILS if these values drift from its derivation.
+## ground_1/ground_2 share this rect (union of both hits' forward extent).
+@export var hitbox_ground_size := Vector2(27.08, 66.95)
+@export var hitbox_ground_offset := Vector2(32.54, -33.5)
+## ground_3's own forward extent (its crescent is wider/reaches higher).
+@export var hitbox_finisher_size := Vector2(29.4, 65.5)
+@export var hitbox_finisher_offset := Vector2(33.7, -33.51)
 @export var hitbox_crouch_size := Vector2(72.0, 20.0)
 @export var hitbox_crouch_offset := Vector2(43.0, -10.0)
 @export var hitbox_up_size := Vector2(26.0, 68.0)

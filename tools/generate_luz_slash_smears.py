@@ -39,6 +39,23 @@ CELL_HEIGHT = 640
 FRAME_COUNT = 5
 DESIGN_SCALE = 1.0 / 0.175
 
+# Blasphemous-style slash arcs read wider than the weapon itself: the smear's
+# outer radius (and therefore the hitbox derived from it, see below) extends
+# this far past the measured ruler-tip distance.
+OUTER_RADIUS_FLARE = 1.15
+
+# "You hit what you see": ground_1/2/3's hitboxes are derived from the
+# rendered smear crescent (this outer radius, swept across a_from..a_to
+# around the swing's own pivot), not from the ruler bar alone. Only the part
+# of that crescent actually in front of the body and at/above the feet
+# counts -- the rest wraps behind her or into the ground and is never the
+# forward "you hit what you see" region a melee swing should represent.
+# BODY_FRONT_X is the standing CollisionShape2D's own half-width
+# (scenes/player/player.tscn, RectangleShape2D_body size=(38,58), half=19).
+BODY_FRONT_X = 19.0
+FEET_LINE_Y = 0.0
+HITBOX_TOLERANCE = 0.05  # world units; player.gd values must match within this
+
 PALETTE = [
     (240, 252, 244),
     (205, 240, 226),
@@ -186,10 +203,14 @@ def load_ruler_track() -> dict:
     return json.loads(TRACK_PATH.read_text())
 
 
-def track_driven_arc(clip_track: dict, cx: float, cy: float) -> tuple[float, float, float, tuple[float, float]]:
-    """Derives (a_from, a_to, radius, pivot_world) for an arc variant from the
-    measured per-frame ruler tip/grip path
+def track_driven_arc(clip_track: dict) -> tuple[float, float, float, tuple[float, float]]:
+    """Derives (a_from, a_to, radius_world, pivot_world) for an arc variant
+    from the measured per-frame ruler tip/grip path
     (assets/player/luz/luz_ruler_track.json) instead of hand-picked constants.
+    Everything here is in WORLD/hitbox units (angle is scale-invariant, so
+    computing it directly in world units instead of via a pixel round-trip
+    makes no difference); build_variant_geometry converts radius to native
+    smear pixels for rendering.
 
     Pivot: the hand-authored variants center their ellipse on the *hitbox*
     center, sized from the hitbox's own half-extents -- that made sense when
@@ -204,8 +225,9 @@ def track_driven_arc(clip_track: dict, cx: float, cy: float) -> tuple[float, flo
     swing actually happens). The grip position (the hand, i.e. roughly the
     swing's actual mechanical pivot) is stable and centrally located across
     the whole windup/contact/follow-through path, so its per-frame average
-    is used as the ellipse's pivot; the radius is then fit so the boundary
-    passes exactly through the contact frame's measured tip (as required).
+    is used as the ellipse's pivot; the radius is fit to the contact frame's
+    measured tip distance, then flared out by OUTER_RADIUS_FLARE so the
+    crescent's outer edge reads past the weapon, Blasphemous-style.
     """
     frames = clip_track["frames"]
     contact_index = clip_track["contact_frame"]
@@ -216,12 +238,9 @@ def track_driven_arc(clip_track: dict, cx: float, cy: float) -> tuple[float, flo
     pivot_x = sum(frames[i]["grip"]["x"] for i in swing_indices) / len(swing_indices)
     pivot_y = sum(frames[i]["grip"]["y"] for i in swing_indices) / len(swing_indices)
 
-    def to_px(world: dict) -> tuple[float, float]:
-        return cx + (world["x"] - pivot_x) * DESIGN_SCALE, cy + (world["y"] - pivot_y) * DESIGN_SCALE
-
     def angle_for(frame_index: int) -> float:
-        px, py = to_px(frames[frame_index]["tip"])
-        return math.degrees(math.atan2(py - cy, px - cx)) % 360.0
+        tip = frames[frame_index]["tip"]
+        return math.degrees(math.atan2(tip["y"] - pivot_y, tip["x"] - pivot_x)) % 360.0
 
     raw_angles = [angle_for(i) for i in swing_indices]
     unwrapped = [raw_angles[0]]
@@ -244,9 +263,44 @@ def track_driven_arc(clip_track: dict, cx: float, cy: float) -> tuple[float, flo
     if a_to - a_from > MAX_SPAN_DEG:
         a_from = a_to - MAX_SPAN_DEG
 
-    contact_px, contact_py = to_px(frames[contact_index]["tip"])
-    radius = math.hypot(contact_px - cx, contact_py - cy)
-    return a_from, a_to, radius, (pivot_x, pivot_y)
+    contact_tip = frames[contact_index]["tip"]
+    radius_world = math.hypot(contact_tip["x"] - pivot_x, contact_tip["y"] - pivot_y)
+    radius_world *= OUTER_RADIUS_FLARE
+    return a_from, a_to, radius_world, (pivot_x, pivot_y)
+
+
+def forward_extent(pivot: tuple[float, float], radius: float, a_from: float, a_to: float, steps: int = 2000):
+    """Samples the (circular, radius=outer smear radius) arc from a_from to
+    a_to and returns (far_x, y_min, y_max) restricted to the forward,
+    at-or-above-feet region (x >= BODY_FRONT_X, y <= FEET_LINE_Y) -- "the
+    part in front of the body" a melee hitbox should cover, per the "you hit
+    what you see" rule. Returns None if no sampled point qualifies."""
+    xs, ys = [], []
+    for i in range(steps):
+        theta = math.radians(a_from + (a_to - a_from) * i / (steps - 1))
+        x = pivot[0] + radius * math.cos(theta)
+        y = pivot[1] + radius * math.sin(theta)
+        if x >= BODY_FRONT_X and y <= FEET_LINE_Y:
+            xs.append(x)
+            ys.append(y)
+    if not xs:
+        return None
+    return max(xs), min(ys), max(ys)
+
+
+def derive_hitbox(extent: tuple[float, float, float]) -> tuple[tuple[float, float], tuple[float, float]]:
+    """(far_x, y_min, y_max) -> (size, offset), near edge fixed at BODY_FRONT_X."""
+    far_x, y_min, y_max = extent
+    size = (far_x - BODY_FRONT_X, y_max - y_min)
+    offset = ((far_x + BODY_FRONT_X) / 2.0, (y_max + y_min) / 2.0)
+    return size, offset
+
+
+def combine_extents(extents: list[tuple[float, float, float]]) -> tuple[float, float, float]:
+    """Union of several (far_x, y_min, y_max) forward extents -- for a
+    hitbox shared by more than one attack (ground_1/ground_2), it must cover
+    each attack's own visible crescent, not just one of them."""
+    return max(e[0] for e in extents), min(e[1] for e in extents), max(e[2] for e in extents)
 
 
 def build_variant_geometry(
@@ -259,12 +313,12 @@ def build_variant_geometry(
 
     track_clip = config.get("track_clip")
     if track_clip and track.get("clips", {}).get(track_clip):
-        a_from, a_to, radius, pivot = track_driven_arc(track["clips"][track_clip], cx, cy)
+        a_from, a_to, radius_world, pivot = track_driven_arc(track["clips"][track_clip])
         config["a_from"], config["a_to"] = a_from, a_to
-        rx = ry = radius
+        rx = ry = radius_world * DESIGN_SCALE
         anchor_x = cx - pivot[0] * DESIGN_SCALE
         anchor_y = cy - pivot[1] * DESIGN_SCALE
-        print(f"  {name}: track-driven a_from={a_from:.1f} a_to={a_to:.1f} radius={radius:.1f} pivot={pivot}")
+        print(f"  {name}: track-driven a_from={a_from:.1f} a_to={a_to:.1f} radius_world={radius_world:.2f} pivot={pivot}")
     else:
         flare = config.get("flare", 1.30)
         rx = (design_w / 2.0) * flare
@@ -289,12 +343,77 @@ def build_variant_geometry(
     }
 
 
+def validate_hitboxes(ruler_track: dict, hitbox_configs: dict) -> None:
+    """Fails the build if scripts/player/player.gd's hitbox_ground_*/
+    hitbox_finisher_* have drifted from the geometry derived here (from the
+    measured ruler track + the same outer smear radius the crescent is
+    rendered with) -- this script/the track JSON are the single source of
+    truth for WHAT the values should be; player.gd is where gameplay reads
+    them from, and the two must never silently disagree."""
+    if not ruler_track.get("clips"):
+        print("  (no ruler track data; skipping hitbox validation)")
+        return
+
+    groups = [
+        ("hitbox_ground", ["ground_attack_1", "ground_attack_2"], hitbox_configs["ground_1"]),
+        ("hitbox_finisher", ["ground_attack_3"], hitbox_configs["ground_3"]),
+    ]
+    failures: list[str] = []
+    for label, clips, (actual_size, actual_offset) in groups:
+        extents = []
+        for clip in clips:
+            clip_track = ruler_track["clips"].get(clip)
+            if not clip_track:
+                print(f"  (no track data for {clip} yet; skipping {label} validation)")
+                extents = None
+                break
+            a_from, a_to, radius_world, pivot = track_driven_arc(clip_track)
+            ext = forward_extent(pivot, radius_world, a_from, a_to)
+            if ext is None:
+                raise RuntimeError(
+                    f"{label}: {clip}'s forward-region smear extent is empty "
+                    "(no sampled point had x >= BODY_FRONT_X and y <= FEET_LINE_Y)"
+                )
+            extents.append(ext)
+        if not extents:
+            continue
+
+        combined = combine_extents(extents)
+        derived_size, derived_offset = derive_hitbox(combined)
+        print(
+            f"  {label}: derived size=({derived_size[0]:.2f},{derived_size[1]:.2f}) "
+            f"offset=({derived_offset[0]:.2f},{derived_offset[1]:.2f}) far_edge={combined[0]:.2f}  |  "
+            f"player.gd size={actual_size} offset={actual_offset}"
+        )
+        checks = (
+            (actual_size[0], derived_size[0], f"{label}_size.x"),
+            (actual_size[1], derived_size[1], f"{label}_size.y"),
+            (actual_offset[0], derived_offset[0], f"{label}_offset.x"),
+            (actual_offset[1], derived_offset[1], f"{label}_offset.y"),
+        )
+        for got, want, axis in checks:
+            if abs(got - want) > HITBOX_TOLERANCE:
+                failures.append(f"{axis}: player.gd has {got}, smear-derived is {want:.2f}")
+
+    if failures:
+        raise SystemExit(
+            "scripts/player/player.gd's hitbox @export values have drifted from the "
+            "smear-derived geometry (single source of truth: luz_ruler_track.json + "
+            "this script's OUTER_RADIUS_FLARE/BODY_FRONT_X):\n  "
+            + "\n  ".join(failures)
+            + "\nUpdate the @export values in player.gd to match the derived numbers printed above, then rerun."
+        )
+
+
 def main() -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
 
     hitbox_configs = parse_player_hitboxes()
     ruler_track = load_ruler_track()
+
+    print("Validating player.gd hitboxes against smear-derived geometry:")
+    validate_hitboxes(ruler_track, hitbox_configs)
 
     variant_specs = {
         "ground_1": {
