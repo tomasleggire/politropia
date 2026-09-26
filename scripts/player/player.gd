@@ -92,7 +92,6 @@ const PHASE_RECOVERY := 2
 @export var ledge_climb_forward_offset := 40.0
 
 @export_group("Attack")
-## Slightly longer, more fluid attack timing (T3b).
 @export var attack_startup_time := 0.08
 @export var attack_active_time := 0.12
 ## Total time (from attack start) before combo hit 1/2 close and buffer expires.
@@ -115,18 +114,19 @@ const PHASE_RECOVERY := 2
 @export var plunge_land_recovery_time := 0.25
 
 @export_group("Attack Hitboxes")
-## ground_1 re-derived in T4 from the measured ruler tip of the new
-## ground_attack_1 art's contact frame (assets/player/luz/luz_ruler_track.json,
-## written by tools/process_luz_combat_hits.py): far edge = tip.x + a small
-## tolerance, near edge = the grip position, vertical center = the ruler's
-## height at contact. Old (T3b-fix, tuned for the abandoned procedural ruler
-## weapon, reach far past the actual hand-drawn ruler): size (76,32) offset
-## (46,-26). New: size (24,32) offset (35,-28) -- also used by ground_2 until
-## its own new art replaces the shared reach in T4's second pass.
-@export var hitbox_ground_size := Vector2(24.0, 32.0)
-@export var hitbox_ground_offset := Vector2(35.0, -28.0)
-@export var hitbox_finisher_size := Vector2(90.0, 38.0)
-@export var hitbox_finisher_offset := Vector2(53.0, -25.0)
+## ground_1/ground_2 share this rect, derived from both hits' measured ruler
+## tip/grip across their contact and following frame
+## (assets/player/luz/luz_ruler_track.json, written by
+## tools/process_luz_combat_hits.py): far/near edges bracket the contact-frame
+## tip/grip x (+ a small tolerance on the far edge), and the vertical span
+## covers both hits' tip height from contact through the next frame (hit_2's
+## backhand keeps rising well above hit_1's own contact height).
+@export var hitbox_ground_size := Vector2(24.0, 38.0)
+@export var hitbox_ground_offset := Vector2(35.0, -31.4)
+## Same derivation as hitbox_ground, from ground_attack_3's own measured
+## ruler (its contact and following frame keep rising higher than hit_1/2).
+@export var hitbox_finisher_size := Vector2(25.0, 33.0)
+@export var hitbox_finisher_offset := Vector2(37.8, -46.5)
 @export var hitbox_crouch_size := Vector2(72.0, 20.0)
 @export var hitbox_crouch_offset := Vector2(43.0, -10.0)
 @export var hitbox_up_size := Vector2(26.0, 68.0)

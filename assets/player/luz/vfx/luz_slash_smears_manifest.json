@@ -8,11 +8,11 @@
       "row": 0,
       "reference_hitbox_size": [
         24.0,
-        32.0
+        38.0
       ],
       "reference_hitbox_offset": [
         35.0,
-        -28.0
+        -31.4
       ],
       "anchor": [
         307.6857142857143,
@@ -24,33 +24,33 @@
       "row": 1,
       "reference_hitbox_size": [
         24.0,
-        32.0
+        38.0
       ],
       "reference_hitbox_offset": [
         35.0,
-        -28.0
+        -31.4
       ],
       "anchor": [
-        160.0,
-        480.0
+        275.0095238095238,
+        491.48571428571427
       ],
-      "description": "forward reverse backhand hook sweeping down-and-forward"
+      "description": "backhand hook sweeping low-to-horizontal-to-up (measured from ground_attack_2 art)"
     },
     "ground_3": {
       "row": 2,
       "reference_hitbox_size": [
-        90.0,
-        38.0
+        25.0,
+        33.0
       ],
       "reference_hitbox_offset": [
-        53.0,
-        -25.0
+        37.8,
+        -46.5
       ],
       "anchor": [
-        57.14285714285711,
-        462.8571428571429
+        271.66666666666663,
+        511.48571428571427
       ],
-      "description": "finisher, widest and thickest horizontal forward sweep"
+      "description": "finisher, low windup lunging to a rising follow-through (measured from ground_attack_3 art)"
     },
     "crouch": {
       "row": 3,

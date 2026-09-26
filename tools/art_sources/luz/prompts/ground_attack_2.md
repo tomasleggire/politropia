@@ -35,6 +35,13 @@ RULER SIZE (critical): the ruler is LONG — about 130 px long in every frame (a
 240 px standing height) and about 14 px wide. Measure it: it must be the same length in every frame where it
 is fully visible. Do not shrink it when it points sideways.
 
+STRICT OUTPUT RULES (the previous attempt failed these):
+- The background must be 100% transparent: alpha = 0 on every pixel outside the character. NO glow, NO haze,
+  NO vignette, NO colored backdrop, NO soft shadow.
+- Standing height exactly 240 px, same pixel scale as the attached HIT 1 sheet. Feet baseline at y = 472 px
+  inside EVERY cell of BOTH rows (i.e. y = 472 in the top row and y = 984 in the bottom row of the canvas).
+- Every pixel at least 12 px inside its own 384x512 cell.
+
 NO slash smear, NO trail effects, NO sparks, NO text, NO frame numbers, NO grid lines — only the character.
 
 Layout (critical, it will be cut by a program):

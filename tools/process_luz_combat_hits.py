@@ -97,35 +97,34 @@ RAW_CLIPS = {
     "ground_attack_1": {
         "raw_file": "ground_attack_1_raw.png",
         "contact_frame": 3,
-        "target_cell_start": 0,
     },
-    # T4 second pass: hit 2 and hit 3 raw art are approved but processed in a
-    # separate commit after hit 1 is verified end-to-end. Uncomment to run:
-    # "ground_attack_2": {
-    #     "raw_file": "ground_attack_2_raw.png",
-    #     "contact_frame": 1,
-    #     "target_cell_start": 8,
-    # },
-    # "ground_attack_3": {
-    #     "raw_file": "ground_attack_3_raw.png",
-    #     "contact_frame": 3,
-    #     "target_cell_start": 12,
-    # },
+    "ground_attack_2": {
+        "raw_file": "ground_attack_2_raw.png",
+        "contact_frame": 3,  # every new raw sheet's contact frame is index 3 (the 4th)
+    },
+    "ground_attack_3": {
+        "raw_file": "ground_attack_3_raw.png",
+        "contact_frame": 3,
+    },
 }
 
-# clip_name -> new cell start, for clips not (yet) reprocessed from new raw
-# art in this run: their cells are recomputed fresh each run from the
-# pristine legacy source sheet (never from a previously-migrated assets
-# file), using process_luz_sheet's own segmentation.
-LEGACY_CLIP_CELLS = {
-    "ground_attack_2": (4, 8),   # (old_cell_start, new_cell_start)
-    "ground_attack_3": (8, 12),
-    "crouch_attack": (12, 16),
-}
+NEW_FRAME_COUNT = 8  # every new raw sheet is an 8-frame 4x2 grid
+LEGACY_FRAME_COUNT = 4  # every not-yet-replaced clip is still a 4-frame cell
 
-FRAME_COUNT_PER_CLIP = 8
-TOTAL_GROUND_CELLS = 20  # 8 (hit1) + 4 (hit2) + 4 (hit3) + 4 (crouch)
-GROUND_GRID = {"columns": 4, "rows": 5, "cell_width": 512, "cell_height": 512}
+# Ground combat sheet clip order (fixed -- this is the row-major cell layout
+# convention) and each clip's OLD cell start in the pristine 4x4 legacy
+# sheet, used only when that clip still needs its cells recomputed fresh
+# from tools/art_sources/luz/source/ (never copied from a possibly-already-
+# migrated assets file). Cell counts/positions in the OUTPUT sheet are
+# computed below from RAW_CLIPS, not hardcoded, so a clip's cell range grows
+# automatically the moment its raw art is added to RAW_CLIPS -- no manual
+# renumbering of the clips that come after it.
+CLIP_ORDER = ["ground_attack_1", "ground_attack_2", "ground_attack_3", "crouch_attack"]
+LEGACY_OLD_CELL_START = {
+    "ground_attack_2": 4,
+    "ground_attack_3": 8,
+    "crouch_attack": 12,
+}
 
 
 class SegmentationError(RuntimeError):
@@ -257,6 +256,31 @@ def process_raw_frame(raw_sheet: Image.Image, cell_index: int, report: list[str]
 
     leading_x = CANVAS_PADDING + round(bbox[0] * NEW_ART_SCALE_FACTOR)
     leading_y = FEET_ROW - (scaled_h - 1)
+
+    # The finisher's widest contact frame can be wider than CANVAS_PADDING +
+    # scaled_w leaves room for (by design -- it must reach farther than hits
+    # 1/2). Clamp to the cell's right edge rather than failing: this only
+    # reduces that frame's own left padding, it does not touch feet-baseline
+    # alignment or any other frame's placement.
+    if leading_x + scaled_w > OUT_CELL_SIZE:
+        report.append(
+            f"    frame {cell_index}: reach clamps left padding from {leading_x} "
+            f"to {OUT_CELL_SIZE - scaled_w} to fit the 512px cell"
+        )
+        leading_x = OUT_CELL_SIZE - scaled_w
+
+    if leading_y < 0:
+        # A tall pose (e.g. the finisher's raised follow-through) is taller
+        # than the feet-baseline convention leaves headroom for. Trim the
+        # excess off the TOP instead of shifting the whole frame down: the
+        # feet-on-row-413 baseline is the invariant every clip and the
+        # catalog's frame_anchor rely on, so it must stay exact; losing a
+        # few px of hair/ruler tip above the canvas is the lesser cost.
+        crop_top = -leading_y
+        report.append(f"    frame {cell_index}: trims {crop_top}px off the top to keep the feet baseline exact")
+        scaled = scaled.crop((0, crop_top, scaled_w, scaled_h))
+        scaled_h -= crop_top
+        leading_y = 0
 
     if leading_x < 0 or leading_y < 0 or leading_x + scaled_w > OUT_CELL_SIZE or leading_y + scaled_h > OUT_CELL_SIZE:
         raise SegmentationError(
@@ -430,11 +454,11 @@ def _load_font():
         return ImageFont.load_default()
 
 
-def render_contact_sheet(out_sheet: Image.Image, dest: Path) -> None:
+def render_contact_sheet(out_sheet: Image.Image, dest: Path, ground_grid: dict) -> None:
     contact = out_sheet.convert("RGBA").copy()
     draw = ImageDraw.Draw(contact)
     font = _load_font()
-    cols, rows = GROUND_GRID["columns"], GROUND_GRID["rows"]
+    cols, rows = ground_grid["columns"], ground_grid["rows"]
     for cell in range(cols * rows):
         col = cell % cols
         row = cell // cols
@@ -446,8 +470,8 @@ def render_contact_sheet(out_sheet: Image.Image, dest: Path) -> None:
     contact.save(dest)
 
 
-def render_onion_skin(out_sheet: Image.Image, indices: list[int], clip_name: str, dest_dir: Path) -> None:
-    cols = GROUND_GRID["columns"]
+def render_onion_skin(out_sheet: Image.Image, indices: list[int], clip_name: str, dest_dir: Path, ground_grid: dict) -> None:
+    cols = ground_grid["columns"]
     canvas = Image.new("RGBA", (OUT_CELL_SIZE, OUT_CELL_SIZE), (30, 30, 34, 255))
     n = len(indices)
     for i, cell in enumerate(indices):
@@ -473,6 +497,30 @@ def build_legacy_ground_sheet() -> Image.Image:
     return result["out_sheet"]
 
 
+def _resolve_layout() -> tuple[dict[str, int], dict[str, int], dict]:
+    """Cell layout for CLIP_ORDER, computed from RAW_CLIPS (not hardcoded):
+    a clip gets NEW_FRAME_COUNT(8) cells if it has an existing raw file
+    configured in RAW_CLIPS, else LEGACY_FRAME_COUNT(4). Returns
+    (cell_start_by_clip, frame_count_by_clip, ground_grid)."""
+    frame_counts: dict[str, int] = {}
+    for clip_name in CLIP_ORDER:
+        cfg = RAW_CLIPS.get(clip_name)
+        has_raw = cfg is not None and (RAW_DIR / cfg["raw_file"]).exists()
+        frame_counts[clip_name] = NEW_FRAME_COUNT if has_raw else LEGACY_FRAME_COUNT
+
+    cell_starts: dict[str, int] = {}
+    cursor = 0
+    for clip_name in CLIP_ORDER:
+        cell_starts[clip_name] = cursor
+        cursor += frame_counts[clip_name]
+
+    total_cells = cursor
+    columns = 4
+    rows = -(-total_cells // columns)  # ceil division
+    grid = {"columns": columns, "rows": rows, "cell_width": OUT_CELL_SIZE, "cell_height": OUT_CELL_SIZE}
+    return cell_starts, frame_counts, grid
+
+
 def main() -> int:
     report: list[str] = []
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
@@ -481,71 +529,62 @@ def main() -> int:
     manifest = json.loads(MANIFEST_PATH.read_text())
     ground_sheet_manifest = manifest["sheets"][GROUND_SHEET_NAME]
 
-    out_sheet = Image.new("RGBA", (GROUND_GRID["columns"] * OUT_CELL_SIZE, GROUND_GRID["rows"] * OUT_CELL_SIZE), (0, 0, 0, 0))
+    cell_starts, frame_counts, ground_grid = _resolve_layout()
+    print(f"Ground combat sheet layout: {ground_grid}; cell starts: {cell_starts}")
+    out_sheet = Image.new("RGBA", (ground_grid["columns"] * OUT_CELL_SIZE, ground_grid["rows"] * OUT_CELL_SIZE), (0, 0, 0, 0))
 
     clips: dict[str, list[int]] = {}
     contact_frames: dict[str, int] = {}
     track: dict[str, dict] = {}
+    legacy_sheet = None
 
-    processed_clip_names = set()
-    for clip_name, cfg in RAW_CLIPS.items():
-        raw_path = RAW_DIR / cfg["raw_file"]
-        if not raw_path.exists():
-            report.append(f"  {clip_name}: raw file {cfg['raw_file']} not found, skipping (stays on old art)")
-            continue
-        processed_clip_names.add(clip_name)
-        print(f"Processing {clip_name} from {cfg['raw_file']}...")
-        raw_sheet = Image.open(raw_path).convert("RGBA")
-        assert raw_sheet.size == (
-            RAW_GRID["columns"] * RAW_GRID["cell_width"],
-            RAW_GRID["rows"] * RAW_GRID["cell_height"],
-        ), f"{clip_name}: unexpected raw sheet size {raw_sheet.size}"
-
-        target_start = cfg["target_cell_start"]
-        new_indices = list(range(target_start, target_start + FRAME_COUNT_PER_CLIP))
+    for clip_name in CLIP_ORDER:
+        frame_count = frame_counts[clip_name]
+        new_indices = list(range(cell_starts[clip_name], cell_starts[clip_name] + frame_count))
         clips[clip_name] = new_indices
-        contact_frames[clip_name] = cfg["contact_frame"]
 
-        frame_records = []
-        for local_i in range(FRAME_COUNT_PER_CLIP):
-            frame_img = process_raw_frame(raw_sheet, local_i, report)
-            dest_cell = new_indices[local_i]
-            col = dest_cell % GROUND_GRID["columns"]
-            row = dest_cell // GROUND_GRID["columns"]
-            out_sheet.paste(frame_img, (col * OUT_CELL_SIZE, row * OUT_CELL_SIZE), frame_img)
-            ruler = measure_ruler(frame_img)
-            frame_records.append({"frame": local_i, **ruler})
-            print(f"  frame {local_i} -> cell {dest_cell}: tip={ruler['tip']} grip={ruler['grip']} axis={ruler['axis_angle_deg']}deg")
+        if frame_count == NEW_FRAME_COUNT:
+            cfg = RAW_CLIPS[clip_name]
+            print(f"Processing {clip_name} from {cfg['raw_file']}...")
+            raw_sheet = Image.open(RAW_DIR / cfg["raw_file"]).convert("RGBA")
+            assert raw_sheet.size == (
+                RAW_GRID["columns"] * RAW_GRID["cell_width"],
+                RAW_GRID["rows"] * RAW_GRID["cell_height"],
+            ), f"{clip_name}: unexpected raw sheet size {raw_sheet.size}"
+            contact_frames[clip_name] = cfg["contact_frame"]
 
-        track[clip_name] = {
-            "contact_frame": cfg["contact_frame"],
-            "frames": frame_records,
-        }
-        render_onion_skin(out_sheet, new_indices, clip_name, PREVIEW_DIR)
+            frame_records = []
+            for local_i in range(frame_count):
+                frame_img = process_raw_frame(raw_sheet, local_i, report)
+                dest_cell = new_indices[local_i]
+                col = dest_cell % ground_grid["columns"]
+                row = dest_cell // ground_grid["columns"]
+                out_sheet.paste(frame_img, (col * OUT_CELL_SIZE, row * OUT_CELL_SIZE), frame_img)
+                ruler = measure_ruler(frame_img)
+                frame_records.append({"frame": local_i, **ruler})
+                print(f"  frame {local_i} -> cell {dest_cell}: tip={ruler['tip']} grip={ruler['grip']} axis={ruler['axis_angle_deg']}deg")
 
-    # Clips not (yet) reprocessed from new raw art: recompute fresh from the
-    # pristine legacy source sheet and copy into their new cell positions.
-    needed_legacy = {name: cells for name, cells in LEGACY_CLIP_CELLS.items() if name not in processed_clip_names}
-    if needed_legacy:
-        print("Recomputing unchanged clip(s) from pristine legacy source:", list(needed_legacy))
-        legacy_sheet = build_legacy_ground_sheet()
-        for clip_name, (old_start, new_start) in needed_legacy.items():
-            # crouch_attack and any not-yet-processed hit are still 4-frame clips.
-            new_indices = list(range(new_start, new_start + 4))
-            clips[clip_name] = new_indices
-            old_indices = list(range(old_start, old_start + 4))
+            track[clip_name] = {"contact_frame": cfg["contact_frame"], "frames": frame_records}
+        else:
+            # Not (yet) reprocessed from new raw art: recompute fresh from the
+            # pristine legacy source sheet (never from a possibly-already-
+            # migrated assets file) and copy into the new cell positions.
+            if legacy_sheet is None:
+                print("Recomputing unchanged clip(s) from pristine legacy source...")
+                legacy_sheet = build_legacy_ground_sheet()
+            old_start = LEGACY_OLD_CELL_START[clip_name]
             legacy_manifest_contact = ground_sheet_manifest.get("contact_frames", {}).get(clip_name, -1)
             if legacy_manifest_contact >= 0:
                 contact_frames[clip_name] = legacy_manifest_contact
-            for local_i, old_cell in enumerate(old_indices):
-                old_col = old_cell % 4
-                old_row = old_cell // 4
+            for local_i in range(frame_count):
+                old_cell = old_start + local_i
+                old_col, old_row = old_cell % 4, old_cell // 4
                 cell_img = legacy_sheet.crop((old_col * OUT_CELL_SIZE, old_row * OUT_CELL_SIZE, (old_col + 1) * OUT_CELL_SIZE, (old_row + 1) * OUT_CELL_SIZE))
                 dest_cell = new_indices[local_i]
-                col = dest_cell % GROUND_GRID["columns"]
-                row = dest_cell // GROUND_GRID["columns"]
+                col, row = dest_cell % ground_grid["columns"], dest_cell // ground_grid["columns"]
                 out_sheet.paste(cell_img, (col * OUT_CELL_SIZE, row * OUT_CELL_SIZE), cell_img)
-            render_onion_skin(out_sheet, new_indices, clip_name, PREVIEW_DIR)
+
+        render_onion_skin(out_sheet, new_indices, clip_name, PREVIEW_DIR, ground_grid)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUTPUT_DIR / GROUND_SHEET_NAME
@@ -553,10 +592,10 @@ def main() -> int:
     print(f"Wrote {out_path} ({out_sheet.size[0]}x{out_sheet.size[1]})")
 
     contact_dest = PREVIEW_DIR / f"{GROUND_SHEET_NAME.replace('.png', '')}__contact_sheet.png"
-    render_contact_sheet(out_sheet, contact_dest)
+    render_contact_sheet(out_sheet, contact_dest, ground_grid)
 
     # Update manifest (ground combat sheet section only).
-    ground_sheet_manifest["grid"] = GROUND_GRID
+    ground_sheet_manifest["grid"] = ground_grid
     ground_sheet_manifest["clips"] = clips
     ground_sheet_manifest["contact_frames"] = contact_frames
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n")

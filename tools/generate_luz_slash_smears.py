@@ -233,6 +233,17 @@ def track_driven_arc(clip_track: dict, cx: float, cy: float) -> tuple[float, flo
     if a_to < a_from:
         a_from, a_to = a_to, a_from
 
+    # A per-step shortest-path unwrap can still accumulate a total span past
+    # a full circle when one recovery frame swings back sharply (measured on
+    # ground_3: 370.8deg, which visibly rendered as a near-complete ring
+    # instead of a crescent -- render_crescent_frame's modular angle math
+    # assumes span <= 360). Cap it, keeping a_to (the later, more visually
+    # prominent follow-through direction) fixed and pulling a_from in --
+    # this only trims how far back into the windup the crescent reaches.
+    MAX_SPAN_DEG = 280.0
+    if a_to - a_from > MAX_SPAN_DEG:
+        a_from = a_to - MAX_SPAN_DEG
+
     contact_px, contact_py = to_px(frames[contact_index]["tip"])
     radius = math.hypot(contact_px - cx, contact_py - cy)
     return a_from, a_to, radius, (pivot_x, pivot_y)
@@ -299,16 +310,19 @@ def main() -> int:
         },
         "ground_2": {
             "row": 1, "type": "arc",
-            # Sweeps forward in facing direction (250° over top to 400° front-down)
+            # a_from/a_to/radius overwritten from measured tip path (fallback only).
             "a_from": 250.0, "a_to": 400.0,
             "flare": 1.30, "peak": 0.55,
-            "description": "forward reverse backhand hook sweeping down-and-forward",
+            "track_clip": "ground_attack_2",
+            "description": "backhand hook sweeping low-to-horizontal-to-up (measured from ground_attack_2 art)",
         },
         "ground_3": {
             "row": 2, "type": "arc",
+            # a_from/a_to/radius overwritten from measured tip path (fallback only).
             "a_from": 190.0, "a_to": 380.0,
             "flare": 1.35, "peak": 0.62,
-            "description": "finisher, widest and thickest horizontal forward sweep",
+            "track_clip": "ground_attack_3",
+            "description": "finisher, low windup lunging to a rising follow-through (measured from ground_attack_3 art)",
         },
         "crouch": {
             "row": 3, "type": "arc",
