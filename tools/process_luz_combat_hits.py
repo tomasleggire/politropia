@@ -300,7 +300,9 @@ RULER_MIN_ELONGATION = 15.0  # major/minor eigenvalue ratio; the ruler is a
 # 2-6) -- this is what actually isolates the ruler, not color alone.
 
 
-def _pca_eigvals(pts: list[tuple[int, int]]) -> tuple[float, float, float, float]:
+def _pca(pts: list[tuple[int, int]]) -> tuple[float, float, float, float, float, float]:
+    """2x2 PCA closed form. Returns (mx, my, lam1, lam2, vx, vy): centroid,
+    major/minor eigenvalues, and the (unit) principal eigenvector."""
     n = len(pts)
     mx = sum(p[0] for p in pts) / n
     my = sum(p[1] for p in pts) / n
@@ -312,7 +314,14 @@ def _pca_eigvals(pts: list[tuple[int, int]]) -> tuple[float, float, float, float
     disc = max(trace * trace / 4.0 - det, 0.0)
     lam1 = trace / 2.0 + math.sqrt(disc)
     lam2 = trace / 2.0 - math.sqrt(disc)
-    return mx, my, lam1, lam2
+    if abs(sxy) > 1e-9:
+        vx, vy = lam1 - syy, sxy
+    elif sxx >= syy:
+        vx, vy = 1.0, 0.0
+    else:
+        vx, vy = 0.0, 1.0
+    norm = math.hypot(vx, vy) or 1.0
+    return mx, my, lam1, lam2, vx / norm, vy / norm
 
 
 def _connected_components(mask: bytearray, w: int, h: int) -> list[list[tuple[int, int]]]:
@@ -384,7 +393,7 @@ def measure_ruler(frame_img: Image.Image) -> dict:
     for comp in components:
         if len(comp) < RULER_MIN_COMPONENT_SIZE:
             continue
-        _, _, lam1, lam2 = _pca_eigvals(comp)
+        _, _, lam1, lam2, _, _ = _pca(comp)
         elongation = lam1 / max(lam2, 1e-6)
         if elongation >= RULER_MIN_ELONGATION:
             ruler_pts.extend(comp)
@@ -396,25 +405,7 @@ def measure_ruler(frame_img: Image.Image) -> dict:
         )
 
     n = len(ruler_pts)
-    mx = sum(p[0] for p in ruler_pts) / n
-    my = sum(p[1] for p in ruler_pts) / n
-    sxx = sum((p[0] - mx) ** 2 for p in ruler_pts) / n
-    syy = sum((p[1] - my) ** 2 for p in ruler_pts) / n
-    sxy = sum((p[0] - mx) * (p[1] - my) for p in ruler_pts) / n
-
-    # Principal eigenvector of [[sxx, sxy], [sxy, syy]] (2x2 closed form).
-    trace = sxx + syy
-    det = sxx * syy - sxy * sxy
-    disc = max(trace * trace / 4.0 - det, 0.0)
-    lam1 = trace / 2.0 + math.sqrt(disc)
-    if abs(sxy) > 1e-9:
-        vx, vy = lam1 - syy, sxy
-    elif sxx >= syy:
-        vx, vy = 1.0, 0.0
-    else:
-        vx, vy = 0.0, 1.0
-    norm = math.hypot(vx, vy) or 1.0
-    vx, vy = vx / norm, vy / norm
+    mx, my, _, _, vx, vy = _pca(ruler_pts)
 
     projections = [((p[0] - mx) * vx + (p[1] - my) * vy, p) for p in ruler_pts]
     proj_min = min(projections, key=lambda t: t[0])

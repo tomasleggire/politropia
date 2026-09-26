@@ -125,7 +125,7 @@ Bring Luz's animation set to near-final quality using Blasphemous (The Penitent 
   - **Composites** (scratchpad, not committed): `final_composite_ground_2.png`, `final_composite_ground_3.png`, `final_composite_ground_1_v3.png` (contact frame + hitbox rect + smear + measured tip marker, per hit), `size_comparison_strip_all_hits.png` (idle + all 24 new frames, feet baseline aligned, consistent size throughout -- visually verified in two halves). Tool-written onion skins: `tools/art_sources/luz/preview/luz_ground_combat_sheet__ground_attack_2.png`/`_3.png`, and the full 28-cell `luz_ground_combat_sheet__contact_sheet.png` (all frames correctly placed, no bleed/missing content, including both clamped edge-case frames).
   - **Checks**: `--import` (sheet grew again) then `--quit-after 300` clean x2. Scratch smoke test confirmed all 3 ground attacks (8 frames, contact at `attack_startup_time`) -- see above.
   - Also fixed manifest `validation.contact_frames` text again (it had described hit 2/3 as "still the original 4-frame placeholder", true only between the two commits).
-  - Commit: (recorded after commit, see hash below).
+  - Commit: `feat: integrar arte nuevo de los golpes 2 y 3 del combo de Luz` (`2229fde`). `gga` review passed, no blocking notes (2 non-blocking: minor PCA helper duplication in `measure_ruler`, and this doc's own commit-hash placeholder -- now filled in).
 
 ## Next Step
 T4 done. T5: crouch, up, and air attack art + smear sync + reach parity (up == lateral) -- crouch_attack is still the original 4-frame placeholder pending its own raw art generation.
