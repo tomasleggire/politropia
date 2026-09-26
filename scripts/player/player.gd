@@ -140,6 +140,7 @@ const PHASE_RECOVERY := 2
 @onready var _ledge_check_above: RayCast2D = $LedgeCheckAbove
 @onready var _headroom_check: RayCast2D = $HeadroomCheck
 @onready var _attack_hitbox: AttackHitbox = $AttackHitbox
+@onready var _slash_vfx: Node2D = $SlashVfx
 @onready var _animation_sprite_frames: SpriteFrames = LuzAnimationCatalog.build_sprite_frames({
 	"ground_dash": dash_duration,
 	"air_dash": air_dash_duration,
@@ -544,7 +545,9 @@ func _update_attack(delta: float) -> void:
 	elif t < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(_ground_attack_name(_attack_combo_index), _attack_facing)
+			_activate_directional_attack(
+				_ground_attack_name(_attack_combo_index), _attack_facing, _attack_combo_index, &"ground"
+			)
 		if not is_on_floor():
 			velocity.x = float(_attack_facing) * attack_forward_step_speed
 	else:
@@ -604,7 +607,7 @@ func _update_crouch_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_crouch", _attack_facing)
+			_activate_directional_attack(&"attack_crouch", _attack_facing, 0, &"crouch")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -638,7 +641,7 @@ func _update_up_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_up", _attack_facing)
+			_activate_directional_attack(&"attack_up", _attack_facing, 0, &"up")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -671,7 +674,7 @@ func _update_air_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_air", _attack_facing)
+			_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -733,6 +736,13 @@ func _activate_attack_hitbox(attack_name: StringName, facing: int = 0) -> void:
 	var attack_direction := _facing if facing == 0 else facing
 	_attack_hitbox.configure(config.size, Vector2(offset.x * float(attack_direction), offset.y))
 	_attack_hitbox.activate(attack_name)
+
+
+func _activate_directional_attack(
+	attack_name: StringName, facing: int, variant: int, slash_kind: StringName
+) -> void:
+	_activate_attack_hitbox(attack_name, facing)
+	_slash_vfx.call("play_slash", slash_kind, variant, facing)
 
 
 func _deactivate_attack_hitbox() -> void:
@@ -1056,6 +1066,8 @@ func _enter_state(new_state: State) -> void:
 	var previous := _state
 	_state = new_state
 	_state_time = 0.0
+	if not _is_directional_attack_state():
+		_slash_vfx.call("stop_slash")
 
 	if previous == State.DASH and new_state != State.DASH:
 		_dash_cooldown_left = dash_cooldown
