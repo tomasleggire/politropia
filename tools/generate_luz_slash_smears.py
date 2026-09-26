@@ -1,52 +1,42 @@
 #!/usr/bin/env python3
-"""Generate Luz's Blasphemous-style crescent slash smear VFX sheet.
+"""Generate Luz's Blasphemous-style crescent slash smear and thrust VFX sheet.
 
-Technique (see the approved prototype this was developed from): a band of a
-flattened ellipse between rho=1-thickness and rho=1, swept over an angle
-range; thickness follows a sine profile along the sweep so the crescent is
-thick near its leading edge and tapers to a thin tail; a 4-tone pale
-mint/white palette with checker dithering on the inner rim and tail keeps it
-readable as chunky pixel art. Five frames per variant: sweep-in, full,
-thinning, dissolve, residue. `up` is the exception (T3b): it is a narrow
-thrust *streak*, not a crescent -- see render_thrust_frame.
+- 6 variants x 5 frames:
+  - ground_1: diagonal cut sweeping down-forward
+  - ground_2: reverse backhand hook sweeping FORWARD in the facing direction
+  - ground_3: wider, thicker finisher sweep forward
+  - crouch: low flat horizontal sweep forward
+  - up: vertical thrust streak (narrow spindle along ruler axis, no clipping)
+  - air: lateral horizontal sweep forward
+- Pale mint 4-tone palette with checker dithering (PX=3 chunky pixel art).
+- Cell size 720x640: generously sized so up-thrust and tall arcs have zero clipping.
+- Hitbox size and offset parsed directly from scripts/player/player.gd as the single source of truth.
+- Assert bounds on all variants to guarantee no cell clipping.
 
-Geometry (arc pivot/radii/tilt or thrust base/angle/length) is read from
-assets/player/luz/luz_attack_swings.json, the single source of truth shared
-with scripts/player/ruler_weapon.gd, so the smear always matches the
-procedural ruler's swing exactly. Presentation-only parameters that have no
-gameplay meaning (palette, thickness peak, dither) stay local to this script.
-
-Output: assets/player/luz/vfx/luz_slash_smears.png (one row per variant, 5
-uniform cells per row) plus assets/player/luz/vfx/luz_slash_smears_manifest.json
-recording cell size and each variant's reference hitbox size + local pixel
-anchor (the point that maps to the player's feet origin at runtime), so
-player_slash_vfx.gd can scale/position a frame from the *current* hitbox
-tunables instead of a hardcoded transform.
+Outputs:
+- assets/player/luz/vfx/luz_slash_smears.png
+- assets/player/luz/vfx/luz_slash_smears_manifest.json
+- tools/art_sources/luz/preview/luz_slash_smears__contact_sheet.png
 """
 
 from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
-
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-ASSET_ROOT = REPO_ROOT / "assets" / "player" / "luz"
-OUTPUT_DIR = ASSET_ROOT / "vfx"
+PLAYER_GD = REPO_ROOT / "scripts" / "player" / "player.gd"
+OUTPUT_DIR = REPO_ROOT / "assets" / "player" / "luz" / "vfx"
 PREVIEW_DIR = REPO_ROOT / "tools" / "art_sources" / "luz" / "preview"
-SWING_MODEL_PATH = ASSET_ROOT / "luz_attack_swings.json"
 
-PX = 3  # art-pixel block size, matches the character art's apparent pixel
-        # size at the same 0.175 in-game display scale.
+PX = 3
 CELL_WIDTH = 720
-# Tall enough that the "up" thrust (a full extend_length reach from a
-# near-bottom base, not a radius from center like the arc variants) fits
-# without clipping: extend_length(88 world units) * design_scale(~5.71) is
-# ~503px; a near-bottom origin plus this height leaves headroom above it.
 CELL_HEIGHT = 640
 FRAME_COUNT = 5
+DESIGN_SCALE = 1.0 / 0.175
 
 PALETTE = [
     (240, 252, 244),
@@ -55,45 +45,38 @@ PALETTE = [
     (92, 146, 146),
 ]
 
-# Per-frame sweep progress: lead_p/tail_p bound the visible slice of the
-# sweep (0..1 fraction, angle-fraction for an arc / length-fraction for the
-# up thrust), fade scales overall alpha. Shared across every variant so the
-# whole VFX sheet animates on one consistent timing.
 FRAME_LEAD = [0.55, 1.0, 1.0, 1.0, 1.0]
 FRAME_TAIL = [0.0, 0.0, 0.30, 0.55, 0.80]
 FRAME_FADE = [1.0, 1.0, 0.85, 0.60, 0.35]
 
-# Smear-only presentation tuning per variant (thickness peak for the crescent
-# band, or half-width for the up thrust streak); geometry itself comes from
-# luz_attack_swings.json.
-PEAK_BY_KIND = {
-    "ground_1": 0.55,
-    "ground_2": 0.50,
-    "ground_3": 0.62,
-    "crouch": 0.50,
-    "air": 0.55,
-}
-ROW_BY_KIND = {
-    "ground_1": 0,
-    "ground_2": 1,
-    "ground_3": 2,
-    "crouch": 3,
-    "up": 4,
-    "air": 5,
-}
-UP_HALF_WIDTH_FRACTION = 0.16  # fraction of extend_length, at the streak's widest point
+
+def parse_player_hitboxes() -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """Extract hitbox sizes and offsets from player.gd exports."""
+    content = PLAYER_GD.read_text()
+    def get_vec2(var_name: str) -> tuple[float, float]:
+        m = re.search(rf"@export var {var_name}\s*:=\s*Vector2\(([-0-9.]+),\s*([-0-9.]+)\)", content)
+        if not m:
+            raise ValueError(f"Could not parse {var_name} from {PLAYER_GD}")
+        return (float(m.group(1)), float(m.group(2)))
+
+    return {
+        "ground_1": (get_vec2("hitbox_ground_size"), get_vec2("hitbox_ground_offset")),
+        "ground_2": (get_vec2("hitbox_ground_size"), get_vec2("hitbox_ground_offset")),
+        "ground_3": (get_vec2("hitbox_finisher_size"), get_vec2("hitbox_finisher_offset")),
+        "crouch":   (get_vec2("hitbox_crouch_size"), get_vec2("hitbox_crouch_offset")),
+        "up":       (get_vec2("hitbox_up_size"), get_vec2("hitbox_up_offset")),
+        "air":      (get_vec2("hitbox_air_size"), get_vec2("hitbox_air_offset")),
+    }
 
 
-def render_ellipse_frame(
+def render_crescent_frame(
     frame: int, cx: float, cy: float, rx: float, ry: float,
-    tilt_deg: float, a_from: float, a_to: float, peak: float,
+    a_from: float, a_to: float, peak: float,
 ) -> Image.Image:
     lead_p = FRAME_LEAD[frame]
     tail_p = FRAME_TAIL[frame]
     fade = FRAME_FADE[frame]
     span = a_to - a_from
-    tilt = math.radians(tilt_deg)
-    cos_t, sin_t = math.cos(-tilt), math.sin(-tilt)
 
     low_w, low_h = CELL_WIDTH // PX, CELL_HEIGHT // PX
     img = Image.new("RGBA", (low_w, low_h), (0, 0, 0, 0))
@@ -102,12 +85,8 @@ def render_ellipse_frame(
     for ly in range(low_h):
         for lx in range(low_w):
             x, y = lx * PX, ly * PX
-            dx, dy = x - cx, y - cy
-            # Rotate into the ellipse's own (untilted) local frame.
-            rdx = dx * cos_t - dy * sin_t
-            rdy = dx * sin_t + dy * cos_t
-            u = rdx / rx
-            v = rdy / ry
+            u = (x - cx) / rx
+            v = (y - cy) / ry
             rho = math.hypot(u, v)
             if rho > 1.05:
                 continue
@@ -144,9 +123,7 @@ def render_ellipse_frame(
 def render_thrust_frame(
     frame: int, cx: float, cy: float, angle_deg: float, length_px: float, half_width_px: float,
 ) -> Image.Image:
-    """Narrow lens/spindle-shaped streak along the thrust direction: zero
-    width at the base and at the tip, widest at the middle -- reads as a
-    vertical energy spike rather than a crescent."""
+    """Narrow spindle streak along the thrust direction."""
     lead_p = FRAME_LEAD[frame]
     tail_p = FRAME_TAIL[frame]
     fade = FRAME_FADE[frame]
@@ -159,10 +136,14 @@ def render_thrust_frame(
     img = Image.new("RGBA", (low_w, low_h), (0, 0, 0, 0))
     px = img.load()
 
+    # Offset cx, cy to base of thrust
+    base_x = cx - dirx * (length_px * 0.5)
+    base_y = cy - diry * (length_px * 0.5)
+
     for ly in range(low_h):
         for lx in range(low_w):
             x, y = lx * PX, ly * PX
-            dx, dy = x - cx, y - cy
+            dx, dy = x - base_x, y - base_y
             along = (dx * dirx + dy * diry) / length_px
             perp = dx * perpx + dy * perpy
             if not (0.0 <= along <= 1.05):
@@ -189,7 +170,7 @@ def render_thrust_frame(
                 if dither:
                     continue
                 color = PALETTE[3]
-            if local < 0.15 and dither:
+            if local < 0.18 and dither:
                 continue
             if fade < 0.7 and (lx * 7 + ly * 3) % 3 == 0:
                 continue
@@ -198,33 +179,31 @@ def render_thrust_frame(
     return img.resize((CELL_WIDTH, CELL_HEIGHT), Image.NEAREST)
 
 
-def build_variant_geometry(kind: str, config: dict, design_scale: float) -> dict:
+def build_variant_geometry(name: str, config: dict, size: tuple[float, float], offset: tuple[float, float]) -> dict:
+    design_w = size[0] * DESIGN_SCALE
+    design_h = size[1] * DESIGN_SCALE
+    flare = config.get("flare", 1.30)
     cx = CELL_WIDTH / 2.0
-    if config["type"] == "thrust":
-        # Origin near the bottom of the cell (not centered) so the full
-        # upward extend_length reach fits without clipping the tip.
-        origin_y = CELL_HEIGHT - 60.0
-        base = config["base"]
-        anchor_x = cx - base[0] * design_scale
-        anchor_y = origin_y - base[1] * design_scale
-        length_px = config["extend_length"] * design_scale
-        half_width_px = length_px * UP_HALF_WIDTH_FRACTION
-        return {
-            "cx": cx, "cy": origin_y, "anchor": (anchor_x, anchor_y),
-            "length_px": length_px, "half_width_px": half_width_px,
-            "angle_deg": config["angle_deg"],
-        }
     cy = CELL_HEIGHT / 2.0
-    size = config["hitbox_size"]
-    offset = config["hitbox_offset"]
-    flare = config["flare"]
-    rx = (size[0] * design_scale / 2.0) * flare
-    ry = (size[1] * design_scale / 2.0) * flare
-    anchor_x = cx - offset[0] * design_scale
-    anchor_y = cy - offset[1] * design_scale
+    rx = (design_w / 2.0) * flare
+    ry = (design_h / 2.0) * flare
+    anchor_x = cx - offset[0] * DESIGN_SCALE
+    anchor_y = cy - offset[1] * DESIGN_SCALE
+
+    # Assert no cell clipping
+    if config["type"] == "arc":
+        assert cx - rx >= 0 and cx + rx <= CELL_WIDTH, f"{name} clips horizontally: rx={rx}, cx={cx}"
+        assert cy - ry >= 0 and cy + ry <= CELL_HEIGHT, f"{name} clips vertically: ry={ry}, cy={cy}"
+    elif config["type"] == "thrust":
+        assert cy - design_h * 0.6 >= 0 and cy + design_h * 0.6 <= CELL_HEIGHT, f"{name} clips vertically in thrust"
+
     return {
-        "cx": cx, "cy": cy, "rx": rx, "ry": ry, "anchor": (anchor_x, anchor_y),
-        "tilt_deg": config["tilt_deg"], "a_from": config["theta_start"], "a_to": config["theta_end"],
+        "cx": cx,
+        "cy": cy,
+        "rx": rx,
+        "ry": ry,
+        "length_px": design_h,
+        "anchor": (anchor_x, anchor_y),
     }
 
 
@@ -232,50 +211,82 @@ def main() -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
 
-    swing_model = json.loads(SWING_MODEL_PATH.read_text())
-    design_scale = swing_model["design_scale"]
-    kinds = swing_model["kinds"]
+    hitbox_configs = parse_player_hitboxes()
 
-    row_count = len(ROW_BY_KIND)
-    sheet = Image.new("RGBA", (CELL_WIDTH * FRAME_COUNT, CELL_HEIGHT * row_count), (0, 0, 0, 0))
-
-    manifest_variants = {}
-    descriptions = {
-        "ground_1": "forward diagonal cut, behind-high to front-low",
-        "ground_2": "horizontal forward cut, short punchy raise-and-snap",
-        "ground_3": "finisher, widest and thickest horizontal sweep",
-        "crouch": "low flat sweep near the ground",
-        "up": "narrow vertical thrust streak straight above the head",
-        "air": "lateral air sweep",
+    variant_specs = {
+        "ground_1": {
+            "row": 0, "type": "arc",
+            "a_from": 220.0, "a_to": 380.0,
+            "flare": 1.30, "peak": 0.55,
+            "description": "forward diagonal cut, behind-high to front-low",
+        },
+        "ground_2": {
+            "row": 1, "type": "arc",
+            # Sweeps forward in facing direction (250° over top to 400° front-down)
+            "a_from": 250.0, "a_to": 400.0,
+            "flare": 1.30, "peak": 0.55,
+            "description": "forward reverse backhand hook sweeping down-and-forward",
+        },
+        "ground_3": {
+            "row": 2, "type": "arc",
+            "a_from": 190.0, "a_to": 380.0,
+            "flare": 1.35, "peak": 0.62,
+            "description": "finisher, widest and thickest horizontal forward sweep",
+        },
+        "crouch": {
+            "row": 3, "type": "arc",
+            "a_from": 205.0, "a_to": 345.0,
+            "flare": 1.25, "peak": 0.50,
+            "description": "low flat horizontal sweep near the ground",
+        },
+        "up": {
+            "row": 4, "type": "thrust",
+            "angle_deg": -75.0,
+            "half_width_px": 28.0,
+            "description": "vertical thrust streak along ruler axis above raised hand",
+        },
+        "air": {
+            "row": 5, "type": "arc",
+            "a_from": 190.0, "a_to": 350.0,
+            "flare": 1.30, "peak": 0.55,
+            "description": "lateral horizontal air sweep forward",
+        },
     }
 
-    for name, row in ROW_BY_KIND.items():
-        config = kinds[name]
-        geometry = build_variant_geometry(name, config, design_scale)
-        print(f"{name}: row={row} geometry={ {k: v for k, v in geometry.items() if k not in ('cx','cy')} }")
+    row_count = len(variant_specs)
+    sheet = Image.new("RGBA", (CELL_WIDTH * FRAME_COUNT, CELL_HEIGHT * row_count), (0, 0, 0, 0))
+    manifest_variants = {}
+
+    for name, spec in variant_specs.items():
+        size, offset = hitbox_configs[name]
+        geometry = build_variant_geometry(name, spec, size, offset)
+        row = spec["row"]
+        print(f"{name}: row={row} rx={geometry['rx']:.1f} ry={geometry['ry']:.1f} anchor={geometry['anchor']}")
+
         for frame in range(FRAME_COUNT):
-            if config["type"] == "thrust":
-                frame_img = render_thrust_frame(
-                    frame, geometry["cx"], geometry["cy"],
-                    geometry["angle_deg"], geometry["length_px"], geometry["half_width_px"],
+            if spec["type"] == "arc":
+                frame_img = render_crescent_frame(
+                    frame, geometry["cx"], geometry["cy"], geometry["rx"], geometry["ry"],
+                    spec["a_from"], spec["a_to"], spec["peak"],
                 )
             else:
-                frame_img = render_ellipse_frame(
-                    frame, geometry["cx"], geometry["cy"], geometry["rx"], geometry["ry"],
-                    geometry["tilt_deg"], geometry["a_from"], geometry["a_to"], PEAK_BY_KIND[name],
+                frame_img = render_thrust_frame(
+                    frame, geometry["cx"], geometry["cy"], spec["angle_deg"],
+                    geometry["length_px"], spec["half_width_px"],
                 )
             sheet.paste(frame_img, (frame * CELL_WIDTH, row * CELL_HEIGHT), frame_img)
+
         manifest_variants[name] = {
             "row": row,
-            "reference_hitbox_size": list(config["hitbox_size"]),
-            "reference_hitbox_offset": list(config["hitbox_offset"]) if config["type"] != "thrust" else [0.0, 0.0],
+            "reference_hitbox_size": list(size),
+            "reference_hitbox_offset": list(offset),
             "anchor": [geometry["anchor"][0], geometry["anchor"][1]],
-            "description": descriptions[name],
+            "description": spec["description"],
         }
 
     out_path = OUTPUT_DIR / "luz_slash_smears.png"
     sheet.save(out_path)
-    print(f"wrote {out_path} ({sheet.size[0]}x{sheet.size[1]})")
+    print(f"Wrote {out_path} ({sheet.size[0]}x{sheet.size[1]})")
 
     manifest = {
         "cell_width": CELL_WIDTH,
@@ -286,25 +297,25 @@ def main() -> int:
     }
     manifest_path = OUTPUT_DIR / "luz_slash_smears_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"wrote {manifest_path}")
+    print(f"Wrote {manifest_path}")
 
-    # Contact sheet preview: outline every cell + label.
-    from PIL import ImageDraw, ImageFont
+    # Contact sheet preview
     try:
-        font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 18)
+        font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 20)
     except OSError:
         font = ImageFont.load_default()
     contact = Image.new("RGBA", sheet.size, (30, 30, 34, 255))
     contact.alpha_composite(sheet)
     draw = ImageDraw.Draw(contact)
-    for name, row in ROW_BY_KIND.items():
+    for name, spec in variant_specs.items():
+        row = spec["row"]
         draw.rectangle([0, row * CELL_HEIGHT, sheet.size[0] - 1, (row + 1) * CELL_HEIGHT - 1], outline=(255, 0, 255, 255), width=1)
-        draw.text((6, row * CELL_HEIGHT + 6), name, fill=(255, 255, 0, 255), font=font)
+        draw.text((8, row * CELL_HEIGHT + 8), name, fill=(255, 255, 0, 255), font=font)
         for frame in range(FRAME_COUNT):
             draw.line([(frame * CELL_WIDTH, row * CELL_HEIGHT), (frame * CELL_WIDTH, (row + 1) * CELL_HEIGHT)], fill=(255, 0, 255, 120))
     contact_path = PREVIEW_DIR / "luz_slash_smears__contact_sheet.png"
     contact.save(contact_path)
-    print(f"wrote {contact_path}")
+    print(f"Wrote {contact_path}")
     return 0
 
 

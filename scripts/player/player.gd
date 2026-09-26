@@ -92,9 +92,7 @@ const PHASE_RECOVERY := 2
 @export var ledge_climb_forward_offset := 40.0
 
 @export_group("Attack")
-## Startup/active/window times raised slightly (T3b, odd/tasks/luz-blasphemous-animation.md)
-## for a more fluid, slightly longer combo now that the procedural ruler
-## weapon needs room to wind up and follow through.
+## Slightly longer, more fluid attack timing (T3b).
 @export var attack_startup_time := 0.08
 @export var attack_active_time := 0.12
 ## Total time (from attack start) before combo hit 1/2 close and buffer expires.
@@ -118,25 +116,13 @@ const PHASE_RECOVERY := 2
 
 @export_group("Attack Hitboxes")
 ## Reach enlarged ~40% (see odd/tasks/luz-blasphemous-animation.md T3) to
-## match the longer ruler + crescent smear reach.
-## Sizes are unchanged from T3 (user-approved as "PERFECT"); only the
-## Y offsets moved (T3b/T3b-fix) so the smear/ruler read centered on the
-## body instead of riding high near the chest/shoulder -- hitbox_up_offset
-## specifically is now derived from up_attack's own measured contact-frame
-## hand height, not an abstract head-top reference (see its own comment
-## below). See assets/player/luz/luz_attack_swings.json for the shared
-## swing geometry these offsets double as ellipse pivots for.
+## match the longer ruler + crescent smear reach; offsets lowered and centered (T3b/T3b-fix).
 @export var hitbox_ground_size := Vector2(76.0, 32.0)
 @export var hitbox_ground_offset := Vector2(46.0, -26.0)
 @export var hitbox_finisher_size := Vector2(90.0, 38.0)
 @export var hitbox_finisher_offset := Vector2(53.0, -25.0)
 @export var hitbox_crouch_size := Vector2(72.0, 20.0)
 @export var hitbox_crouch_offset := Vector2(43.0, -10.0)
-## up_offset re-derived in T3b from the actual measured hand height in
-## up_attack's art (the standing-collider-based -89 put the box floating
-## well above this curled airborne pose): -80 puts the box bottom at the
-## contact frame's measured hand height (~-46) and its top ~68 above that,
-## instead of an abstract head-top reference this pose never matches.
 @export var hitbox_up_size := Vector2(26.0, 68.0)
 @export var hitbox_up_offset := Vector2(0.0, -80.0)
 @export var hitbox_air_size := Vector2(74.0, 30.0)
@@ -158,7 +144,6 @@ const PHASE_RECOVERY := 2
 @onready var _headroom_check: RayCast2D = $HeadroomCheck
 @onready var _attack_hitbox: AttackHitbox = $AttackHitbox
 @onready var _slash_vfx: PlayerSlashVfx = $SlashVfx
-@onready var _ruler_weapon: RulerWeapon = $RulerWeapon
 @onready var _animation_sprite_frames: SpriteFrames = LuzAnimationCatalog.build_sprite_frames({
 	"ground_dash": dash_duration,
 	"air_dash": air_dash_duration,
@@ -227,9 +212,6 @@ func _ready() -> void:
 	# Measured from the idle standing frames' opaque pixel height (~331px)
 	# so Luz renders at roughly the CollisionShape2D's 58px standing height.
 	_sprite.scale = Vector2(0.175, 0.175)
-	# Lets RulerWeapon read _sprite.frame every tick so the ruler's base
-	# always anchors to whichever body frame is actually displayed.
-	_ruler_weapon.set_body_sprite(_sprite)
 	_spawn_position = global_position
 	_recompute_jump_physics()
 
@@ -566,7 +548,7 @@ func _update_attack(delta: float) -> void:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
 			_activate_directional_attack(
-				_ground_attack_name(_attack_combo_index), _attack_facing, _attack_combo_index, &"ground", window
+				_ground_attack_name(_attack_combo_index), _attack_facing, _attack_combo_index, &"ground"
 			)
 		if not is_on_floor():
 			velocity.x = float(_attack_facing) * attack_forward_step_speed
@@ -627,7 +609,7 @@ func _update_crouch_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_crouch", _attack_facing, 0, &"crouch", attack_window_hit3)
+			_activate_directional_attack(&"attack_crouch", _attack_facing, 0, &"crouch")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -661,7 +643,7 @@ func _update_up_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_up", _attack_facing, 0, &"up", attack_window_hit3)
+			_activate_directional_attack(&"attack_up", _attack_facing, 0, &"up")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -694,7 +676,7 @@ func _update_air_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air", air_attack_recovery)
+			_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -759,29 +741,11 @@ func _activate_attack_hitbox(attack_name: StringName, facing: int = 0) -> Dictio
 	return config
 
 
-const SWING_KIND_BY_SLASH_KIND_AND_VARIANT := {
-	&"ground": ["ground_1", "ground_2", "ground_3"],
-	&"crouch": ["crouch"],
-	&"up": ["up"],
-	&"air": ["air"],
-}
-
-
 func _activate_directional_attack(
-	attack_name: StringName, facing: int, variant: int, slash_kind: StringName, window_end: float
+	attack_name: StringName, facing: int, variant: int, slash_kind: StringName
 ) -> void:
 	var config := _activate_attack_hitbox(attack_name, facing)
 	_slash_vfx.play_slash(slash_kind, variant, facing, config.size, config.offset)
-	var swing_kind := _swing_kind_for(slash_kind, variant)
-	if not swing_kind.is_empty():
-		_ruler_weapon.start_swing(swing_kind, facing, attack_startup_time, attack_active_time, window_end)
-
-
-func _swing_kind_for(slash_kind: StringName, variant: int) -> StringName:
-	var names: Array = SWING_KIND_BY_SLASH_KIND_AND_VARIANT.get(slash_kind, [])
-	if names.is_empty():
-		return &""
-	return names[clampi(variant, 0, names.size() - 1)]
 
 
 func _deactivate_attack_hitbox() -> void:
@@ -1107,7 +1071,6 @@ func _enter_state(new_state: State) -> void:
 	_state_time = 0.0
 	if not _is_directional_attack_state():
 		_slash_vfx.stop_slash()
-		_ruler_weapon.stop_swing()
 
 	if previous == State.DASH and new_state != State.DASH:
 		_dash_cooldown_left = dash_cooldown

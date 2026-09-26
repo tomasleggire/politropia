@@ -34,7 +34,7 @@
         97.14285714285711,
         468.57142857142856
       ],
-      "description": "horizontal forward cut, short punchy raise-and-snap"
+      "description": "forward reverse backhand hook sweeping down-and-forward"
     },
     "ground_3": {
       "row": 2,
@@ -50,7 +50,7 @@
         57.14285714285711,
         462.8571428571429
       ],
-      "description": "finisher, widest and thickest horizontal sweep"
+      "description": "finisher, widest and thickest horizontal forward sweep"
     },
     "crouch": {
       "row": 3,
@@ -66,7 +66,7 @@
         114.28571428571428,
         377.14285714285717
       ],
-      "description": "low flat sweep near the ground"
+      "description": "low flat horizontal sweep near the ground"
     },
     "up": {
       "row": 4,
@@ -76,13 +76,13 @@
       ],
       "reference_hitbox_offset": [
         0.0,
-        0.0
+        -80.0
       ],
       "anchor": [
         360.0,
-        808.5714285714286
+        777.1428571428571
       ],
-      "description": "narrow vertical thrust streak straight above the head"
+      "description": "vertical thrust streak along ruler axis above raised hand"
     },
     "air": {
       "row": 5,
@@ -98,7 +98,7 @@
         102.85714285714283,
         508.57142857142856
       ],
-      "description": "lateral air sweep"
+      "description": "lateral horizontal air sweep forward"
     }
   }
 }
