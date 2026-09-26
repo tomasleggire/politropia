@@ -190,6 +190,7 @@ var _ledge_climb_time := 0.0
 
 var _attack_phase := PHASE_STARTUP
 var _attack_combo_index := 0
+var _attack_facing := 1
 var _attack_buffered := false
 var _air_attack_buffered := false
 var _attack_buffer_left := 0.0
@@ -318,12 +319,24 @@ func _horizontal_input() -> float:
 
 
 func _update_facing() -> void:
+	if _is_directional_attack_state():
+		_sprite.flip_h = _attack_facing < 0
+		return
 	if _state == State.DASH or _state == State.WALL_CLING or _state == State.LEDGE_HANG or _state == State.LEDGE_CLIMB:
 		return
 	var axis := _horizontal_input()
 	if not is_zero_approx(axis):
 		_facing = 1 if axis > 0.0 else -1
 	_sprite.flip_h = _facing < 0
+
+
+func _is_directional_attack_state() -> bool:
+	return _state in [State.ATTACK, State.CROUCH_ATTACK, State.UP_ATTACK, State.AIR_ATTACK]
+
+
+func _capture_attack_facing() -> void:
+	_attack_facing = _facing
+	_sprite.flip_h = _attack_facing < 0
 
 
 func _update_facing_rays() -> void:
@@ -510,15 +523,17 @@ func _end_generic_attack() -> void:
 func _start_ground_attack() -> void:
 	_attack_combo_index = 0
 	_attack_buffered = false
+	_capture_attack_facing()
 	_enter_state(State.ATTACK)
 	_attack_phase = PHASE_STARTUP
 
 
 func _update_attack(delta: float) -> void:
-	velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
 	if is_on_floor():
+		velocity.x = 0.0
 		velocity.y = 0.0
 	else:
+		velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
 		_apply_gravity(delta)
 
 	var window := _attack_window_for(_attack_combo_index)
@@ -529,8 +544,9 @@ func _update_attack(delta: float) -> void:
 	elif t < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(_ground_attack_name(_attack_combo_index))
-		velocity.x = float(_facing) * attack_forward_step_speed
+			_activate_attack_hitbox(_ground_attack_name(_attack_combo_index), _attack_facing)
+		if not is_on_floor():
+			velocity.x = float(_attack_facing) * attack_forward_step_speed
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -571,12 +587,16 @@ func _ground_attack_name(index: int) -> StringName:
 ## -- Combat: crouch attack -----------------------------------------------------
 
 func _start_crouch_attack() -> void:
+	_capture_attack_facing()
 	_enter_state(State.CROUCH_ATTACK)
 	_attack_phase = PHASE_STARTUP
 
 
 func _update_crouch_attack(delta: float) -> void:
-	velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
+	if is_on_floor():
+		velocity.x = 0.0
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
 	velocity.y = 0.0
 
 	if _state_time < attack_startup_time:
@@ -584,7 +604,7 @@ func _update_crouch_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_crouch")
+			_activate_attack_hitbox(&"attack_crouch", _attack_facing)
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -599,13 +619,14 @@ func _update_crouch_attack(delta: float) -> void:
 ## -- Combat: up attack (ground or air) -----------------------------------------
 
 func _start_up_attack() -> void:
+	_capture_attack_facing()
 	_enter_state(State.UP_ATTACK)
 	_attack_phase = PHASE_STARTUP
 
 
 func _update_up_attack(delta: float) -> void:
 	if is_on_floor():
-		velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
+		velocity.x = 0.0
 		velocity.y = 0.0
 	else:
 		var axis := _horizontal_input()
@@ -617,7 +638,7 @@ func _update_up_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_up")
+			_activate_attack_hitbox(&"attack_up", _attack_facing)
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -630,6 +651,7 @@ func _update_up_attack(delta: float) -> void:
 
 func _start_air_attack() -> void:
 	_air_attack_buffered = false
+	_capture_attack_facing()
 	_enter_state(State.AIR_ATTACK)
 	_attack_phase = PHASE_STARTUP
 
@@ -649,7 +671,7 @@ func _update_air_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_air")
+			_activate_attack_hitbox(&"attack_air", _attack_facing)
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -705,10 +727,11 @@ func _update_plunge_land(_delta: float) -> void:
 
 ## -- Combat: hitbox helpers -------------------------------------------------------
 
-func _activate_attack_hitbox(attack_name: StringName) -> void:
+func _activate_attack_hitbox(attack_name: StringName, facing: int = 0) -> void:
 	var config := _hitbox_config_for(attack_name)
 	var offset: Vector2 = config.offset
-	_attack_hitbox.configure(config.size, Vector2(offset.x * float(_facing), offset.y))
+	var attack_direction := _facing if facing == 0 else facing
+	_attack_hitbox.configure(config.size, Vector2(offset.x * float(attack_direction), offset.y))
 	_attack_hitbox.activate(attack_name)
 
 
@@ -1127,7 +1150,8 @@ func _update_footsteps(delta: float) -> void:
 
 
 func _update_animation() -> void:
-	_sprite.flip_h = _facing < 0
+	var animation_facing := _attack_facing if _is_directional_attack_state() else _facing
+	_sprite.flip_h = animation_facing < 0
 	match _state:
 		State.CROUCH:
 			_play_animation(&"crouch")
