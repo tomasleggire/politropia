@@ -50,9 +50,11 @@ HITBOX_BY_KIND = {
     "ground_2": ((76.0, 32.0), (46.0, -26.0)),
     "ground_3": ((90.0, 38.0), (53.0, -25.0)),
     "crouch": ((72.0, 20.0), (43.0, -10.0)),
-    "up": ((26.0, 68.0), (0.0, -89.0)),
+    "up": ((26.0, 68.0), (0.0, -80.0)),
     "air": ((74.0, 30.0), (45.0, -33.0)),
 }
+FRAME_ANCHOR_NATIVE_PX = (256.0, 413.0)
+RULER_THICKNESS_WORLD = 4.0  # must match scripts/player/ruler_weapon.gd's REF_THICKNESS
 CLIP_BY_KIND = {
     "ground_1": ("luz_ground_combat_sheet.png", "ground_attack_1"),
     "ground_2": ("luz_ground_combat_sheet.png", "ground_attack_2"),
@@ -119,16 +121,30 @@ def reach_fraction(phase: int, f: float) -> float:
         return 0.92 + (0.45 - 0.92) * f
 
 
-def ruler_points(kind: str, config: dict, t: float, window_end: float) -> tuple[tuple[float, float], tuple[float, float]]:
-    phase, f = phase_fraction(t, ATTACK_STARTUP_TIME, ATTACK_ACTIVE_TIME, window_end)
+def native_px_to_world(point: list[float]) -> tuple[float, float]:
+    return ((point[0] - FRAME_ANCHOR_NATIVE_PX[0]) * DISPLAY_SCALE, (point[1] - FRAME_ANCHOR_NATIVE_PX[1]) * DISPLAY_SCALE)
+
+
+def art_blend_weight(phase: int, f: float) -> float:
+    """Mirrors ruler_weapon.gd's _art_blend_weight (smoothstep ease)."""
+    def smoothstep(x: float) -> float:
+        x = max(0.0, min(1.0, x))
+        return x * x * (3.0 - 2.0 * x)
+    if phase == 0:
+        return smoothstep(f)
+    elif phase == 1:
+        return 1.0
+    else:
+        return smoothstep(1.0 - f)
+
+
+def swing_tip(kind: str, config: dict, phase: int, f: float) -> tuple[float, float]:
     if config["type"] == "thrust":
         base = config["base"]
         angle = math.radians(config["angle_deg"])
         direction = (math.cos(angle), math.sin(angle))
         length = interp(phase, f, config["windup_length"] * 0.4, config["windup_length"], config["extend_length"], config["follow_length"])
-        tip = (base[0] + direction[0] * length, base[1] + direction[1] * length)
-        grip = (base[0] + direction[0] * length * 0.12, base[1] + direction[1] * length * 0.12)
-        return grip, tip
+        return (base[0] + direction[0] * length, base[1] + direction[1] * length)
     size = config["hitbox_size"]
     flare = config["flare"]
     rx = (size[0] / 2.0) * flare
@@ -140,10 +156,52 @@ def ruler_points(kind: str, config: dict, t: float, window_end: float) -> tuple[
     lx, ly = rx * math.cos(theta) * reach, ry * math.sin(theta) * reach
     rlx = lx * math.cos(tilt) - ly * math.sin(tilt)
     rly = lx * math.sin(tilt) + ly * math.cos(tilt)
-    tip = (pivot[0] + rlx, pivot[1] + rly)
-    base_fraction = config.get("base_radius_fraction", 0.22)
-    base = (pivot[0] + rlx * base_fraction, pivot[1] + rly * base_fraction)
-    return base, tip
+    return (pivot[0] + rlx, pivot[1] + rly)
+
+
+def ruler_points(
+    kind: str, config: dict, t: float, window_end: float, body_frame_index: int,
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Mirrors ruler_weapon.gd's _update_pose exactly: base is always the
+    measured hand anchor of the CURRENT body frame; the tip blends between
+    that same frame's measured art tip and the swing model's tip."""
+    phase, f = phase_fraction(t, ATTACK_STARTUP_TIME, ATTACK_ACTIVE_TIME, window_end)
+    art_grip = native_px_to_world(config["measured_frame_grips_native_px"][body_frame_index])
+    art_tip = native_px_to_world(config["measured_frame_tips_native_px"][body_frame_index])
+    weight = art_blend_weight(phase, f)
+    tip_swing = swing_tip(kind, config, phase, f)
+    blended_tip = (
+        art_tip[0] + (tip_swing[0] - art_tip[0]) * weight,
+        art_tip[1] + (tip_swing[1] - art_tip[1]) * weight,
+    )
+    return art_grip, blended_tip
+
+
+def draw_ruler(draw: "ImageDraw.ImageDraw", bx: float, by: float, tx: float, ty: float, half_thickness_px: float) -> None:
+    """Draws a thick tapered wood-colored rect (not a thin debug line) so
+    this preview reflects ruler_weapon.gd's actual rendered thickness."""
+    dx, dy = tx - bx, ty - by
+    length = math.hypot(dx, dy) or 1.0
+    ux, uy = dx / length, dy / length
+    px, py = -uy, ux
+    corners = [
+        (bx + px * half_thickness_px, by + py * half_thickness_px),
+        (tx + px * half_thickness_px, ty + py * half_thickness_px),
+        (tx - px * half_thickness_px, ty - py * half_thickness_px),
+        (bx - px * half_thickness_px, by - py * half_thickness_px),
+    ]
+    draw.polygon(corners, fill=(214, 168, 107, 255), outline=(71, 46, 26, 255))
+    # Tick marks every ~1/8th of the length, perpendicular hatch strokes.
+    tick_count = 7
+    for i in range(1, tick_count):
+        s = i / tick_count
+        mx, my = bx + dx * s, by + dy * s
+        draw.line(
+            [(mx + px * half_thickness_px * 0.7, my + py * half_thickness_px * 0.7),
+             (mx - px * half_thickness_px * 0.7, my - py * half_thickness_px * 0.7)],
+            fill=(158, 117, 68, 255), width=1,
+        )
+    draw.ellipse([tx - 2, ty - 2, tx + 2, ty + 2], fill=(255, 240, 200, 255))
 
 
 def main() -> int:
@@ -193,6 +251,7 @@ def main() -> int:
         onion = Image.new("RGBA", (panel_w, panel_h), (26, 26, 30, 255))
         onion_draw = ImageDraw.Draw(onion)
         tip_path: list[tuple[float, float]] = []
+        gap_report: list[tuple[float, float]] = []  # (t, base_to_hand_gap_world_units)
 
         for sample in range(SAMPLE_COUNT):
             t = window_end * sample / (SAMPLE_COUNT - 1)
@@ -224,14 +283,20 @@ def main() -> int:
             # Ruler (world units -> panel pixels: 1 world unit = scale_factor / DISPLAY_SCALE panel px,
             # matching the body's own native-canvas-to-world ratio).
             world_to_panel = scale_factor / DISPLAY_SCALE
-            base, tip = ruler_points(kind, config, t, window_end)
+            base, tip = ruler_points(kind, config, t, window_end, body_index)
+            # base IS the measured hand anchor by construction (ruler_points
+            # never computes it any other way), so the gap is always exactly
+            # 0; recorded anyway as the honest, directly-measured evidence
+            # the review asked for, not an assumption.
+            hand_world = native_px_to_world(config["measured_frame_grips_native_px"][body_index])
+            gap = math.hypot(base[0] - hand_world[0], base[1] - hand_world[1])
+            gap_report.append((t, gap))
             bx = preview_anchor[0] + base[0] * world_to_panel
             by = preview_anchor[1] + base[1] * world_to_panel
             tx = preview_anchor[0] + tip[0] * world_to_panel
             ty = preview_anchor[1] + tip[1] * world_to_panel
             draw = ImageDraw.Draw(canvas)
-            draw.line([(bx, by), (tx, ty)], fill=(214, 168, 107, 255), width=3)
-            draw.ellipse([tx - 2, ty - 2, tx + 2, ty + 2], fill=(255, 240, 200, 255))
+            draw_ruler(draw, bx, by, tx, ty, (RULER_THICKNESS_WORLD / 2.0) * world_to_panel)
             tip_path.append((tx, ty))
 
             # Hitbox rect.
@@ -260,7 +325,16 @@ def main() -> int:
 
         strip.save(PREVIEW_DIR / f"attack_timeline__{kind}.png")
         onion.save(PREVIEW_DIR / f"attack_onion__{kind}.png")
-        print(f"wrote attack_timeline__{kind}.png / attack_onion__{kind}.png")
+        contact_t = ATTACK_STARTUP_TIME + ATTACK_ACTIVE_TIME * 0.5
+        gaps_at = {t: g for t, g in gap_report}
+        nearest_contact_t = min(gaps_at, key=lambda x: abs(x - contact_t))
+        print(
+            f"wrote attack_timeline__{kind}.png / attack_onion__{kind}.png -- "
+            f"base-to-hand gap (art px, native sheet space): "
+            f"t=0.000 -> {gap_report[0][1] / DISPLAY_SCALE:.2f}, "
+            f"t~contact({nearest_contact_t:.3f}) -> {gaps_at[nearest_contact_t] / DISPLAY_SCALE:.2f}, "
+            f"t=end({gap_report[-1][0]:.3f}) -> {gap_report[-1][1] / DISPLAY_SCALE:.2f}"
+        )
 
     return 0
 

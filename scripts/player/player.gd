@@ -118,22 +118,27 @@ const PHASE_RECOVERY := 2
 
 @export_group("Attack Hitboxes")
 ## Reach enlarged ~40% (see odd/tasks/luz-blasphemous-animation.md T3) to
-## match the longer ruler + crescent smear reach; hitbox_up_* is sized so its
-## extent above the head equals hitbox_ground_*'s extent beyond the body's
-## front edge (both 65px), not by the same +40% ratio.
+## match the longer ruler + crescent smear reach.
 ## Sizes are unchanged from T3 (user-approved as "PERFECT"); only the
-## Y offsets moved lower (T3b) so the smear/ruler read centered on the body
-## instead of riding high near the chest/shoulder. See
-## assets/player/luz/luz_attack_swings.json for the shared swing geometry
-## these offsets double as ellipse pivots for.
+## Y offsets moved (T3b/T3b-fix) so the smear/ruler read centered on the
+## body instead of riding high near the chest/shoulder -- hitbox_up_offset
+## specifically is now derived from up_attack's own measured contact-frame
+## hand height, not an abstract head-top reference (see its own comment
+## below). See assets/player/luz/luz_attack_swings.json for the shared
+## swing geometry these offsets double as ellipse pivots for.
 @export var hitbox_ground_size := Vector2(76.0, 32.0)
 @export var hitbox_ground_offset := Vector2(46.0, -26.0)
 @export var hitbox_finisher_size := Vector2(90.0, 38.0)
 @export var hitbox_finisher_offset := Vector2(53.0, -25.0)
 @export var hitbox_crouch_size := Vector2(72.0, 20.0)
 @export var hitbox_crouch_offset := Vector2(43.0, -10.0)
+## up_offset re-derived in T3b from the actual measured hand height in
+## up_attack's art (the standing-collider-based -89 put the box floating
+## well above this curled airborne pose): -80 puts the box bottom at the
+## contact frame's measured hand height (~-46) and its top ~68 above that,
+## instead of an abstract head-top reference this pose never matches.
 @export var hitbox_up_size := Vector2(26.0, 68.0)
-@export var hitbox_up_offset := Vector2(0.0, -89.0)
+@export var hitbox_up_offset := Vector2(0.0, -80.0)
 @export var hitbox_air_size := Vector2(74.0, 30.0)
 @export var hitbox_air_offset := Vector2(45.0, -33.0)
 @export var hitbox_plunge_size := Vector2(28.0, 18.0)
@@ -222,6 +227,9 @@ func _ready() -> void:
 	# Measured from the idle standing frames' opaque pixel height (~331px)
 	# so Luz renders at roughly the CollisionShape2D's 58px standing height.
 	_sprite.scale = Vector2(0.175, 0.175)
+	# Lets RulerWeapon read _sprite.frame every tick so the ruler's base
+	# always anchors to whichever body frame is actually displayed.
+	_ruler_weapon.set_body_sprite(_sprite)
 	_spawn_position = global_position
 	_recompute_jump_physics()
 
