@@ -11,8 +11,10 @@ const TEXTURE_PATH := "res://assets/player/luz/vfx/luz_slash_smears.png"
 const MANIFEST_PATH := "res://assets/player/luz/vfx/luz_slash_smears_manifest.json"
 
 ## Same numeric texture_filter as the character AnimatedSprite2D
-## (scripts/player/player.gd / scenes/player/player.tscn), so the smear's
-## chunky pixels read the same way as Luz's own art.
+## (scripts/player/player.gd / scenes/player/player.tscn), so the smear is
+## filtered/scaled the same way as Luz's own art (the art-pixel "chunkiness"
+## comes from the low native resolution both textures share, not from
+## nearest-neighbor filtering).
 const TEXTURE_FILTER := CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 const TOTAL_DURATION := 0.14
