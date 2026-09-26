@@ -114,16 +114,20 @@ const PHASE_RECOVERY := 2
 @export var plunge_land_recovery_time := 0.25
 
 @export_group("Attack Hitboxes")
-@export var hitbox_ground_size := Vector2(52.0, 30.0)
-@export var hitbox_ground_offset := Vector2(34.0, -35.0)
-@export var hitbox_finisher_size := Vector2(64.0, 34.0)
-@export var hitbox_finisher_offset := Vector2(40.0, -34.0)
-@export var hitbox_crouch_size := Vector2(50.0, 18.0)
-@export var hitbox_crouch_offset := Vector2(32.0, -13.0)
-@export var hitbox_up_size := Vector2(26.0, 54.0)
-@export var hitbox_up_offset := Vector2(0.0, -82.0)
-@export var hitbox_air_size := Vector2(50.0, 26.0)
-@export var hitbox_air_offset := Vector2(34.0, -40.0)
+## Reach enlarged ~40% (see odd/tasks/luz-blasphemous-animation.md T3) to
+## match the longer ruler + crescent smear reach; hitbox_up_* is sized so its
+## extent above the head equals hitbox_ground_*'s extent beyond the body's
+## front edge (both 65px), not by the same +40% ratio.
+@export var hitbox_ground_size := Vector2(76.0, 32.0)
+@export var hitbox_ground_offset := Vector2(46.0, -35.0)
+@export var hitbox_finisher_size := Vector2(90.0, 38.0)
+@export var hitbox_finisher_offset := Vector2(53.0, -34.0)
+@export var hitbox_crouch_size := Vector2(72.0, 20.0)
+@export var hitbox_crouch_offset := Vector2(43.0, -13.0)
+@export var hitbox_up_size := Vector2(26.0, 68.0)
+@export var hitbox_up_offset := Vector2(0.0, -89.0)
+@export var hitbox_air_size := Vector2(74.0, 30.0)
+@export var hitbox_air_offset := Vector2(45.0, -40.0)
 @export var hitbox_plunge_size := Vector2(28.0, 18.0)
 @export var hitbox_plunge_offset := Vector2(0.0, 12.0)
 @export var hitbox_plunge_land_size := Vector2(150.0, 20.0)
@@ -154,7 +158,7 @@ const PHASE_RECOVERY := 2
 	"up_attack": attack_window_hit3,
 	"air_attack": air_attack_recovery,
 	"plunge_land": plunge_land_active_time + plunge_land_recovery_time,
-})
+}, attack_startup_time)
 
 var _state := State.IDLE
 var _state_time := 0.0
@@ -730,19 +734,20 @@ func _update_plunge_land(_delta: float) -> void:
 
 ## -- Combat: hitbox helpers -------------------------------------------------------
 
-func _activate_attack_hitbox(attack_name: StringName, facing: int = 0) -> void:
+func _activate_attack_hitbox(attack_name: StringName, facing: int = 0) -> Dictionary:
 	var config := _hitbox_config_for(attack_name)
 	var offset: Vector2 = config.offset
 	var attack_direction := _facing if facing == 0 else facing
 	_attack_hitbox.configure(config.size, Vector2(offset.x * float(attack_direction), offset.y))
 	_attack_hitbox.activate(attack_name)
+	return config
 
 
 func _activate_directional_attack(
 	attack_name: StringName, facing: int, variant: int, slash_kind: StringName
 ) -> void:
-	_activate_attack_hitbox(attack_name, facing)
-	_slash_vfx.call("play_slash", slash_kind, variant, facing)
+	var config := _activate_attack_hitbox(attack_name, facing)
+	_slash_vfx.call("play_slash", slash_kind, variant, facing, config.size, config.offset)
 
 
 func _deactivate_attack_hitbox() -> void:

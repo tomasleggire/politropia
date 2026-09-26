@@ -1,0 +1,104 @@
+{
+  "cell_width": 720,
+  "cell_height": 460,
+  "frame_count": 5,
+  "display_scale": 0.175,
+  "variants": {
+    "ground_1": {
+      "row": 0,
+      "reference_hitbox_size": [
+        76.0,
+        32.0
+      ],
+      "reference_hitbox_offset": [
+        46.0,
+        -35.0
+      ],
+      "anchor": [
+        97.14285714285711,
+        430.0
+      ],
+      "description": "forward diagonal cut, behind-high to front-low"
+    },
+    "ground_2": {
+      "row": 1,
+      "reference_hitbox_size": [
+        76.0,
+        32.0
+      ],
+      "reference_hitbox_offset": [
+        46.0,
+        -35.0
+      ],
+      "anchor": [
+        97.14285714285711,
+        430.0
+      ],
+      "description": "reverse backhand, low arc sweeping up-and-back"
+    },
+    "ground_3": {
+      "row": 2,
+      "reference_hitbox_size": [
+        90.0,
+        38.0
+      ],
+      "reference_hitbox_offset": [
+        53.0,
+        -34.0
+      ],
+      "anchor": [
+        57.14285714285711,
+        424.2857142857143
+      ],
+      "description": "finisher, widest and thickest horizontal sweep"
+    },
+    "crouch": {
+      "row": 3,
+      "reference_hitbox_size": [
+        72.0,
+        20.0
+      ],
+      "reference_hitbox_offset": [
+        43.0,
+        -13.0
+      ],
+      "anchor": [
+        114.28571428571428,
+        304.2857142857143
+      ],
+      "description": "low flat sweep near the ground"
+    },
+    "up": {
+      "row": 4,
+      "reference_hitbox_size": [
+        26.0,
+        68.0
+      ],
+      "reference_hitbox_offset": [
+        0.0,
+        -89.0
+      ],
+      "anchor": [
+        360.0,
+        738.5714285714286
+      ],
+      "description": "vertical crescent over the head, arcing front-to-back over the top"
+    },
+    "air": {
+      "row": 5,
+      "reference_hitbox_size": [
+        74.0,
+        30.0
+      ],
+      "reference_hitbox_offset": [
+        45.0,
+        -40.0
+      ],
+      "anchor": [
+        102.85714285714283,
+        458.57142857142856
+      ],
+      "description": "lateral air sweep"
+    }
+  }
+}

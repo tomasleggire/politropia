@@ -1,111 +1,136 @@
 class_name PlayerSlashVfx
 extends Node2D
 
-const DURATION := 0.16
-const PARTICLE_VELOCITIES := [
-	Vector2(-24.0, -28.0),
-	Vector2(-10.0, -38.0),
-	Vector2(10.0, -36.0),
-	Vector2(25.0, -24.0),
-	Vector2(17.0, -10.0),
-	Vector2(-17.0, -12.0),
-]
+## Plays a pre-rendered Blasphemous-style crescent slash smear over Luz's
+## attacks (see tools/generate_luz_slash_smears.py). Presentation only: this
+## node never touches collision, damage, or gameplay state -- player.gd owns
+## the AttackHitbox independently and just tells this node which variant to
+## play and what hitbox rect it should visually cover.
 
-var _slash_kind: StringName = &"ground"
-var _variant := 0
-var _facing := 1
-var _time_left := 0.0
+const TEXTURE_PATH := "res://assets/player/luz/vfx/luz_slash_smears.png"
+const MANIFEST_PATH := "res://assets/player/luz/vfx/luz_slash_smears_manifest.json"
+
+## Same numeric texture_filter as the character AnimatedSprite2D
+## (scripts/player/player.gd / scenes/player/player.tscn), so the smear's
+## chunky pixels read the same way as Luz's own art.
+const TEXTURE_FILTER := CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+
+const TOTAL_DURATION := 0.14
+
+const VARIANT_BY_KIND_AND_INDEX := {
+	&"ground": ["ground_1", "ground_2", "ground_3"],
+	&"crouch": ["crouch"],
+	&"up": ["up"],
+	&"air": ["air"],
+}
+
+var _manifest: Dictionary
+var _texture: Texture2D
+var _sprite: Sprite2D
+var _frame_textures_by_variant: Dictionary = {}  # String -> Array[AtlasTexture]
+var _frame_duration := TOTAL_DURATION / 5.0
+
+var _active_frames: Array = []
+var _elapsed := 0.0
+var _current_frame := -1
 
 
 func _ready() -> void:
 	visible = false
 	set_process(false)
+	_manifest = _read_manifest()
+	_texture = load(TEXTURE_PATH) as Texture2D
+	assert(_texture != null, "Missing Luz slash smear sheet")
+	_frame_duration = TOTAL_DURATION / float(_manifest["frame_count"])
+	_sprite = Sprite2D.new()
+	_sprite.centered = true
+	_sprite.texture_filter = TEXTURE_FILTER
+	add_child(_sprite)
+	for variant_name in _manifest["variants"]:
+		_frame_textures_by_variant[variant_name] = _build_frame_textures(variant_name)
 
 
-func play_slash(slash_kind: StringName, variant: int, facing: int) -> void:
-	_slash_kind = slash_kind
-	_variant = clampi(variant, 0, 2)
-	_facing = -1 if facing < 0 else 1
-	_time_left = DURATION
+## hitbox_size/hitbox_offset are the attack's current (unsigned, right-facing)
+## hitbox tunables -- see player.gd's _hitbox_config_for -- so the smear is
+## always scaled/positioned to cover exactly the hitbox that is actually
+## active, even if those tunables change later without regenerating art.
+func play_slash(
+	slash_kind: StringName, variant: int, facing: int, hitbox_size: Vector2, hitbox_offset: Vector2
+) -> void:
+	var variant_name := _variant_name_for(slash_kind, variant)
+	if variant_name.is_empty() or not _frame_textures_by_variant.has(variant_name):
+		return
+	var config: Dictionary = _manifest["variants"][variant_name]
+	var reference_size: Array = config["reference_hitbox_size"]
+	var display_scale: float = _manifest["display_scale"]
+
+	_sprite.scale = Vector2(
+		display_scale * (hitbox_size.x / float(reference_size[0])),
+		display_scale * (hitbox_size.y / float(reference_size[1])),
+	)
+	var anchor: Array = config["anchor"]
+	_sprite.offset = Vector2(
+		float(_manifest["cell_width"]) * 0.5 - float(anchor[0]),
+		float(_manifest["cell_height"]) * 0.5 - float(anchor[1]),
+	)
+	_sprite.flip_h = facing < 0
+	_active_frames = _frame_textures_by_variant[variant_name]
+	_elapsed = 0.0
+	_current_frame = -1
+	_advance_frame(0)
 	visible = true
 	set_process(true)
-	queue_redraw()
 
 
 func stop_slash() -> void:
-	_time_left = 0.0
+	_elapsed = 0.0
+	_current_frame = -1
+	_active_frames = []
 	visible = false
 	set_process(false)
 
 
 func _process(delta: float) -> void:
-	_time_left = maxf(_time_left - delta, 0.0)
-	if is_zero_approx(_time_left):
+	_elapsed += delta
+	if _elapsed >= TOTAL_DURATION:
 		stop_slash()
-	else:
-		queue_redraw()
+		return
+	@warning_ignore("integer_division")
+	var frame_index := clampi(int(_elapsed / _frame_duration), 0, _active_frames.size() - 1)
+	_advance_frame(frame_index)
 
 
-func _draw() -> void:
-	var progress := 1.0 - (_time_left / DURATION)
-	var alpha := 1.0 - progress * 0.35
-	var style := _style_for_kind()
-	var points: PackedVector2Array = style.points
-	var mirrored_points := PackedVector2Array()
-	for point in points:
-		mirrored_points.append(Vector2(point.x * float(_facing), point.y))
-	draw_polyline(mirrored_points, Color(0.98, 0.86, 0.57, alpha), style.width, false)
-	draw_polyline(mirrored_points, Color(1.0, 0.98, 0.86, alpha), maxf(style.width - 2.0, 1.0), false)
-	_draw_particles(progress, alpha, style.particle_count)
+func _advance_frame(frame_index: int) -> void:
+	if frame_index == _current_frame or _active_frames.is_empty():
+		return
+	_current_frame = frame_index
+	_sprite.texture = _active_frames[frame_index]
 
 
-func _style_for_kind() -> Dictionary:
-	if _slash_kind == &"up":
-		return {
-			points = PackedVector2Array([
-				Vector2(-20.0, -45.0), Vector2(-17.0, -62.0), Vector2(-8.0, -78.0),
-				Vector2(5.0, -86.0), Vector2(19.0, -83.0), Vector2(29.0, -72.0),
-			]),
-			width = 4.0,
-			particle_count = 4,
-		}
-
-	var vertical_adjustment := 0.0
-	if _slash_kind == &"crouch":
-		vertical_adjustment = 20.0
-	elif _slash_kind == &"air":
-		vertical_adjustment = -8.0
-
-	var points_by_variant: Array[PackedVector2Array] = [
-		PackedVector2Array([
-			Vector2(-12.0, -35.0), Vector2(0.0, -44.0), Vector2(16.0, -45.0),
-			Vector2(32.0, -38.0), Vector2(47.0, -25.0),
-		]),
-		PackedVector2Array([
-			Vector2(-10.0, -46.0), Vector2(3.0, -51.0), Vector2(21.0, -44.0),
-			Vector2(39.0, -30.0), Vector2(53.0, -13.0),
-		]),
-		PackedVector2Array([
-			Vector2(-16.0, -27.0), Vector2(-1.0, -43.0), Vector2(19.0, -49.0),
-			Vector2(41.0, -40.0), Vector2(62.0, -21.0),
-		]),
-	]
-	var points := PackedVector2Array()
-	for point in points_by_variant[_variant]:
-		points.append(point + Vector2(0.0, vertical_adjustment))
-	return {
-		points = points,
-		width = [4.0, 3.0, 6.0][_variant],
-		particle_count = [3, 4, 6][_variant],
-	}
+func _variant_name_for(slash_kind: StringName, variant: int) -> String:
+	var names: Array = VARIANT_BY_KIND_AND_INDEX.get(slash_kind, [])
+	var index := clampi(variant, 0, names.size() - 1) if not names.is_empty() else -1
+	return names[index] if index >= 0 else ""
 
 
-func _draw_particles(progress: float, alpha: float, particle_count: int) -> void:
-	var travel := progress * 0.16
-	for index in range(particle_count):
-		var velocity: Vector2 = PARTICLE_VELOCITIES[index]
-		var sign := float(_facing) if _slash_kind != &"up" else 1.0
-		var position := Vector2(velocity.x * sign, velocity.y) * travel
-		var particle_size := 3.0 if index % 2 == 0 else 2.0
-		var color := Color(1.0, 0.95, 0.78, alpha) if index % 2 == 0 else Color(0.86, 0.63, 0.31, alpha)
-		draw_rect(Rect2(position, Vector2.ONE * particle_size), color, true)
+func _build_frame_textures(variant_name: String) -> Array:
+	var config: Dictionary = _manifest["variants"][variant_name]
+	var row := int(config["row"])
+	var cell_width := int(_manifest["cell_width"])
+	var cell_height := int(_manifest["cell_height"])
+	var frame_count := int(_manifest["frame_count"])
+	var textures: Array = []
+	for frame in frame_count:
+		var atlas_texture := AtlasTexture.new()
+		atlas_texture.atlas = _texture
+		atlas_texture.region = Rect2(frame * cell_width, row * cell_height, cell_width, cell_height)
+		textures.append(atlas_texture)
+	return textures
+
+
+static func _read_manifest() -> Dictionary:
+	var file := FileAccess.open(MANIFEST_PATH, FileAccess.READ)
+	assert(file != null, "Cannot read Luz slash smear manifest")
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	assert(parsed is Dictionary, "Invalid Luz slash smear manifest JSON")
+	return parsed

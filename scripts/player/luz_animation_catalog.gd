@@ -55,13 +55,29 @@ const CLIP_SOURCE_NAMES := {
 	"air_attack": "air_horizontal_attack",
 }
 
+## Animations whose manifest "contact_frames" entry (if any) should be
+## honored: their frames get stretched/compressed so the contact frame's
+## *start* time lines up exactly with attack_startup_time (see
+## _frame_durations). Every other animation ignores contact_frames even if
+## the manifest happened to define one for its source clip.
+const CONTACT_SYNCED_CLIPS := [
+	"attack_1", "attack_2", "attack_3", "crouch_attack", "up_attack", "air_attack",
+]
+
 
 ## clip_durations optionally maps an animation name (StringName or String) to
 ## a target total playback duration in seconds; the resulting speed is
 ## derived as frame_count / duration so the clip finishes exactly when the
 ## matching gameplay window/timer does. Animations not present keep their
 ## CLIP_SPEEDS default.
-static func build_sprite_frames(clip_durations: Dictionary = {}) -> SpriteFrames:
+##
+## attack_startup_time is the player's exported startup phase length
+## (seconds) shared by every attack state; for a CONTACT_SYNCED_CLIPS
+## animation whose clip has a manifest "contact_frames" entry, frame
+## durations are adjusted so that frame starts showing at exactly
+## attack_startup_time -- i.e. precisely when the attack's hitbox
+## activates -- instead of every frame getting an equal slice of the clip.
+static func build_sprite_frames(clip_durations: Dictionary = {}, attack_startup_time := 0.0) -> SpriteFrames:
 	var manifest := _read_manifest()
 	var frames := SpriteFrames.new()
 	for animation_name in CLIP_SPEEDS:
@@ -73,16 +89,59 @@ static func build_sprite_frames(clip_durations: Dictionary = {}) -> SpriteFrames
 		var atlas := _load_sheet_texture(sheet_name, sheet)
 		var grid: Dictionary = sheet["grid"]
 		var clips: Dictionary = sheet["clips"]
+		var contact_frames: Dictionary = sheet.get("contact_frames", {})
 		for clip_name in clips:
 			var animation_name := _animation_name_for(clip_name)
 			if animation_name.is_empty():
 				continue
 			var frame_indices: Array = clips[clip_name]
-			frames.set_animation_speed(animation_name, _clip_speed(animation_name, frame_indices.size(), clip_durations))
-			for frame_index in frame_indices:
-				frames.add_frame(animation_name, _build_frame_texture(atlas, grid, int(frame_index)))
+			var frame_count := frame_indices.size()
+			var speed := _clip_speed(animation_name, frame_count, clip_durations)
+			frames.set_animation_speed(animation_name, speed)
+
+			var contact_index := int(contact_frames.get(clip_name, -1))
+			var total_duration: float = clip_durations.get(animation_name, float(frame_count) / speed)
+			var seconds := _frame_seconds(
+				animation_name, frame_count, contact_index, total_duration, attack_startup_time
+			)
+			for i in frame_count:
+				var texture := _build_frame_texture(atlas, grid, int(frame_indices[i]))
+				frames.add_frame(animation_name, texture, seconds[i] * speed)
 
 	return frames
+
+
+## Per-frame duration (seconds) for a clip: equal shares of total_duration,
+## unless this animation is contact-synced and its clip has a manifest
+## contact_frame, in which case frames 0..contact_index-1 are compressed to
+## fit exactly into attack_startup_time and frames contact_index..end are
+## stretched to fill the remaining (total_duration - attack_startup_time).
+static func _frame_seconds(
+	animation_name: String, frame_count: int, contact_index: int,
+	total_duration: float, attack_startup_time: float
+) -> Array[float]:
+	var uniform: Array[float] = []
+	uniform.resize(frame_count)
+	uniform.fill(total_duration / float(frame_count))
+
+	var synced := (
+		animation_name in CONTACT_SYNCED_CLIPS
+		and contact_index > 0 and contact_index < frame_count
+		and attack_startup_time > 0.0 and attack_startup_time < total_duration
+	)
+	if not synced:
+		return uniform
+
+	var result: Array[float] = []
+	result.resize(frame_count)
+	var lead_frame_seconds := attack_startup_time / float(contact_index)
+	for i in contact_index:
+		result[i] = lead_frame_seconds
+	var trail_frame_count := frame_count - contact_index
+	var trail_frame_seconds := (total_duration - attack_startup_time) / float(trail_frame_count)
+	for i in range(contact_index, frame_count):
+		result[i] = trail_frame_seconds
+	return result
 
 
 static func _load_sheet_texture(sheet_name: String, sheet: Dictionary) -> Texture2D:
