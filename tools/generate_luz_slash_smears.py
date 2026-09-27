@@ -464,7 +464,12 @@ def main() -> int:
             "peak": 0.55,
             "track_clip": "ground_attack_2",
             "lateral_from_track": {"reach_multiplier": GROUND_REACH_MULTIPLIER, "ry_world": LATERAL_RY_GROUND},
-            "description": "flat lateral backhand cut at waist height, hit 2 (measured from ground_attack_2 art)",
+            # The approved raw art's own measured contact height (-28.52) came
+            # out close to hit 1's (-27.65), not distinctly lower/"waist" as
+            # the revised prompt asked for -- described honestly here rather
+            # than as "waist height", which the rendered art doesn't actually
+            # show (see odd/tasks/luz-blasphemous-animation.md T4b part 2).
+            "description": "flat lateral backhand cut, hit 2 (measured from ground_attack_2 art; contact height reads close to hit 1's, not distinctly lower)",
         },
         "ground_3": {
             "row": 2, "type": "arc",

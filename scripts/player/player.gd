@@ -94,11 +94,21 @@ const PHASE_RECOVERY := 2
 @export_group("Attack")
 @export var attack_startup_time := 0.08
 @export var attack_active_time := 0.12
-## Total time (from attack start) before combo hit 1/2 close and buffer expires.
-@export var attack_window_hit1 := 0.36
-@export var attack_window_hit2 := 0.36
-## Total time for the finisher (hit 3) and for crouch/up-attack windows.
-@export var attack_window_hit3 := 0.50
+## Combo cadence: this is also each hit's own minimum interval -- the next
+## combo hit cannot start (even with a buffered input) before this much time
+## has passed since THIS hit started, so the combo cannot be spammed faster
+## than a readable cut-per-cut cadence. Recovery frames (never startup/
+## active frames) are what stretches to fill the extra time -- see
+## LuzAnimationCatalog._frame_seconds, unchanged by this iteration. Old
+## values (pre-iPhone-playtest "too spammable" feedback): hit1/hit2 0.36s,
+## hit3 (finisher) 0.50s.
+@export var attack_window_hit1 := 0.45
+@export var attack_window_hit2 := 0.45
+## Total time for the finisher (hit 3) and for crouch/up-attack windows --
+## also the minimum interval before the combo can loop back to hit 1 (see
+## _queue_attack's State.ATTACK branch: a press during the finisher is
+## buffered without a timeout and fires exactly at this mark, never dropped).
+@export var attack_window_hit3 := 0.60
 @export var attack_forward_step_speed := 60.0
 ## Air attack total cycle (startup + active + recovery); re-attack allowed once recovery starts.
 @export var air_attack_recovery := 0.40
@@ -203,6 +213,13 @@ var _attack_phase := PHASE_STARTUP
 var _attack_combo_index := 0
 var _attack_facing := 1
 var _attack_buffered := false
+## A press during the finisher (combo index 2): unlike the generic
+## _attack_buffer_left/_attack_buffer_direction pair (a short, timed grace
+## window used by every OTHER "can't attack right now" state), this never
+## expires -- it must survive the finisher's whole recovery so the combo
+## loop back to hit 1 never silently drops an early press, matching hit
+## 1->2/2->3's own buffer (_attack_buffered), which is likewise untimed.
+var _attack_restart_buffered := false
 var _air_attack_buffered := false
 var _attack_buffer_left := 0.0
 var _attack_buffer_direction := 0
@@ -486,6 +503,11 @@ func _queue_attack(direction: int) -> void:
 		State.ATTACK:
 			if _attack_combo_index < 2:
 				_attack_buffered = true
+			else:
+				# Playing the finisher: buffer a fresh combo restart (loop
+				# back to hit 1) the same untimed way, instead of silently
+				# dropping the press -- see _attack_restart_buffered.
+				_attack_restart_buffered = true
 			return
 		State.AIR_ATTACK:
 			if _attack_phase == PHASE_RECOVERY:
@@ -533,6 +555,7 @@ func _end_generic_attack() -> void:
 func _start_ground_attack() -> void:
 	_attack_combo_index = 0
 	_attack_buffered = false
+	_attack_restart_buffered = false
 	_capture_attack_facing()
 	_enter_state(State.ATTACK)
 	_attack_phase = PHASE_STARTUP
@@ -572,6 +595,8 @@ func _update_attack(delta: float) -> void:
 			_attack_buffered = false
 			_state_time = 0.0
 			_attack_phase = PHASE_STARTUP
+		elif _attack_restart_buffered and _attack_combo_index >= 2:
+			_start_ground_attack()
 		else:
 			_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
 
