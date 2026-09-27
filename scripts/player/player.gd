@@ -129,13 +129,14 @@ const PHASE_RECOVERY := 2
 ## reach_multiplier * contact tip.x (LATERAL_FLARE-widened), and the box
 ## covers only the part of that crescent in front of the body and at/above
 ## the feet (BODY_FRONT_X/FEET_LINE_Y). Running that script FAILS if these
-## values drift from its derivation.
+## values drift from its derivation. Box height is padded up to
+## LATERAL_MIN_HITBOX_HEIGHT so the thin crescent still gets a fair hit band.
 ## ground_1/ground_2 share this rect (union of both hits' forward extent).
-@export var hitbox_ground_size := Vector2(60.32, 13.59)
-@export var hitbox_ground_offset := Vector2(49.16, -38.53)
+@export var hitbox_ground_size := Vector2(60.32, 24.0)
+@export var hitbox_ground_offset := Vector2(49.16, -27.52)
 ## ground_3's own forward extent (its crescent reaches farther/is thicker).
-@export var hitbox_finisher_size := Vector2(83.39, 15.19)
-@export var hitbox_finisher_offset := Vector2(60.69, -43.26)
+@export var hitbox_finisher_size := Vector2(83.39, 24.0)
+@export var hitbox_finisher_offset := Vector2(60.69, -30.36)
 @export var hitbox_crouch_size := Vector2(72.0, 20.0)
 @export var hitbox_crouch_offset := Vector2(43.0, -10.0)
 @export var hitbox_up_size := Vector2(26.0, 68.0)

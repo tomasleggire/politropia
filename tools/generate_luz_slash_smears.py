@@ -96,6 +96,11 @@ LATERAL_FLARE = 1.08
 # "thick leading edge, thin tail" read crouch already has.
 LATERAL_A_FROM = 205.0
 LATERAL_A_TO = 345.0
+# Minimum hitbox height (world units) for the flat lateral cuts: the drawn
+# crescent's forward arc can be thinner than a fair melee hit band, so the
+# derived box is padded symmetrically about its own center up to this height
+# (the crouch hitbox, the thinnest approved flat attack, is 20 units tall).
+LATERAL_MIN_HITBOX_HEIGHT = 24.0
 
 PALETTE = [
     (240, 252, 244),
@@ -244,6 +249,14 @@ def load_ruler_track() -> dict:
     return json.loads(TRACK_PATH.read_text())
 
 
+def lateral_band_mid_sin(a_from: float, a_to: float, steps: int = 720) -> float:
+    """Midpoint of sin(theta) over the sweep [a_from, a_to] (degrees): the
+    vertical center of the drawn arc, in units of ry, relative to the
+    ellipse center (y-down)."""
+    sines = [math.sin(math.radians(a_from + (a_to - a_from) * i / (steps - 1))) for i in range(steps)]
+    return (min(sines) + max(sines)) / 2.0
+
+
 def lateral_swing_geometry(clip_track: dict, reach_multiplier: float, ry_world: float) -> dict:
     """Derives a FLAT LATERAL ellipse (cx, cy, rx, ry, a_from, a_to) for a
     ground_1/2/3 variant from ONLY the clip's CONTACT frame measured ruler
@@ -279,7 +292,11 @@ def lateral_swing_geometry(clip_track: dict, reach_multiplier: float, ry_world: 
             "measurement (low_confidence); cannot derive lateral swing geometry from it."
         )
     tip, grip = contact["tip"], contact["grip"]
-    center_y = (tip["y"] + grip["y"]) / 2.0
+    ruler_y = (tip["y"] + grip["y"]) / 2.0
+    # The sweep only draws part of the ellipse, so its visible band is not
+    # centered on the ellipse center; shift the center so that band's middle
+    # sits on the ruler line (the cut must trail the blade, not float above it).
+    center_y = ruler_y - lateral_band_mid_sin(LATERAL_A_FROM, LATERAL_A_TO) * ry_world
     near_x = BODY_FRONT_X
     far_x = reach_multiplier * tip["x"]
     cx = (near_x + far_x) / 2.0
@@ -316,8 +333,10 @@ def forward_extent(
 def derive_hitbox(extent: tuple[float, float, float]) -> tuple[tuple[float, float], tuple[float, float]]:
     """(far_x, y_min, y_max) -> (size, offset), near edge fixed at BODY_FRONT_X."""
     far_x, y_min, y_max = extent
-    size = (far_x - BODY_FRONT_X, y_max - y_min)
-    offset = ((far_x + BODY_FRONT_X) / 2.0, (y_max + y_min) / 2.0)
+    center_y = (y_max + y_min) / 2.0
+    height = max(y_max - y_min, LATERAL_MIN_HITBOX_HEIGHT)
+    size = (far_x - BODY_FRONT_X, height)
+    offset = ((far_x + BODY_FRONT_X) / 2.0, center_y)
     return size, offset
 
 

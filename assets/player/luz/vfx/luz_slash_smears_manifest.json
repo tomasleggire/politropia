@@ -8,15 +8,15 @@
       "row": 0,
       "reference_hitbox_size": [
         60.32,
-        13.59
+        24.0
       ],
       "reference_hitbox_offset": [
         49.16,
-        -38.53
+        -27.52
       ],
       "anchor": [
         82.74285714285713,
-        479.0
+        416.059056951849
       ],
       "description": "flat lateral cut at chest height, hit 1 (measured from ground_attack_1 art)"
     },
@@ -24,15 +24,15 @@
       "row": 1,
       "reference_hitbox_size": [
         60.32,
-        13.59
+        24.0
       ],
       "reference_hitbox_offset": [
         49.16,
-        -38.53
+        -27.52
       ],
       "anchor": [
         123.7142857142857,
-        475.48571428571427
+        412.54477123756334
       ],
       "description": "flat lateral backhand cut, hit 2 (measured from ground_attack_2 art; contact height reads close to hit 1's, not distinctly lower)"
     },
@@ -40,15 +40,15 @@
       "row": 2,
       "reference_hitbox_size": [
         83.39,
-        15.19
+        24.0
       ],
       "reference_hitbox_offset": [
         60.69,
-        -43.26
+        -30.36
       ],
       "anchor": [
         18.214285714285722,
-        493.48571428571427
+        419.75489528645176
       ],
       "description": "flat lateral finisher cut at chest height, wider/thicker/farther reach (measured from ground_attack_3 art)"
     },
