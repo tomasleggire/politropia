@@ -57,8 +57,9 @@ const CLIP_SOURCE_NAMES := {
 
 ## Animations whose manifest "contact_frames" entry (if any) should be
 ## honored: their frames get stretched/compressed so the contact frame's
-## *start* time lines up exactly with attack_startup_time (see
-## _frame_durations). Every other animation ignores contact_frames even if
+## *start* time lines up exactly with that clip's own startup time, passed
+## per-animation via build_sprite_frames's startup_times (see
+## _frame_seconds). Every other animation ignores contact_frames even if
 ## the manifest happened to define one for its source clip.
 const CONTACT_SYNCED_CLIPS := [
 	"attack_1", "attack_2", "attack_3", "crouch_attack", "up_attack", "air_attack",
@@ -118,11 +119,11 @@ static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: 
 ## Per-frame duration (seconds) for a clip: equal shares of total_duration,
 ## unless this animation is contact-synced and its clip has a manifest
 ## contact_frame, in which case frames 0..contact_index-1 are compressed to
-## fit exactly into attack_startup_time and frames contact_index..end are
-## stretched to fill the remaining (total_duration - attack_startup_time).
+## fit exactly into startup_time and frames contact_index..end are
+## stretched to fill the remaining (total_duration - startup_time).
 static func _frame_seconds(
 	animation_name: String, frame_count: int, contact_index: int,
-	total_duration: float, attack_startup_time: float
+	total_duration: float, startup_time: float
 ) -> Array[float]:
 	var uniform: Array[float] = []
 	uniform.resize(frame_count)
@@ -131,18 +132,18 @@ static func _frame_seconds(
 	var synced := (
 		animation_name in CONTACT_SYNCED_CLIPS
 		and contact_index > 0 and contact_index < frame_count
-		and attack_startup_time > 0.0 and attack_startup_time < total_duration
+		and startup_time > 0.0 and startup_time < total_duration
 	)
 	if not synced:
 		return uniform
 
 	var result: Array[float] = []
 	result.resize(frame_count)
-	var lead_frame_seconds := attack_startup_time / float(contact_index)
+	var lead_frame_seconds := startup_time / float(contact_index)
 	for i in contact_index:
 		result[i] = lead_frame_seconds
 	var trail_frame_count := frame_count - contact_index
-	var trail_frame_seconds := (total_duration - attack_startup_time) / float(trail_frame_count)
+	var trail_frame_seconds := (total_duration - startup_time) / float(trail_frame_count)
 	for i in range(contact_index, frame_count):
 		result[i] = trail_frame_seconds
 	return result

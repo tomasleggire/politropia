@@ -188,7 +188,12 @@ const PHASE_RECOVERY := 2
 	"attack_2": attack_window_hit2,
 	"attack_3": attack_window_hit3,
 	"crouch_attack": crouch_up_attack_window,
-	"up_attack": crouch_up_attack_window,
+	# Ends together with the slash VFX (attack_startup_time + its fixed
+	# TOTAL_DURATION), not with the whole up-attack state's recovery
+	# (crouch_up_attack_window) -- otherwise the body clip freezes on a
+	# still-extended pose for the rest of the state after the slash is
+	# already gone (see PlayerSlashVfx.TOTAL_DURATION).
+	"up_attack": attack_startup_time + PlayerSlashVfx.TOTAL_DURATION,
 	"air_attack": air_attack_recovery,
 	"plunge_land": plunge_land_active_time + plunge_land_recovery_time,
 }, {
