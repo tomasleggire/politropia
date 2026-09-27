@@ -2,23 +2,25 @@
 """Generate Luz's Blasphemous-style crescent slash smear and thrust VFX sheet.
 
 - 6 variants x 5 frames:
-  - ground_1/2/3: FLAT LATERAL crescents (Blasphemous main-attack style: a
-    long, flat, mostly-horizontal band at the contact frame's own ruler
-    height, sweeping forward from near the body), same elongated-ellipse
-    technique as crouch (large rx, small ry) -- NOT the earlier per-clip
+  - ground_1/2/3/crouch/air: FLAT LATERAL crescents (Blasphemous main-attack
+    style: a long, flat, mostly-horizontal band at the contact frame's own
+    ruler height, sweeping forward from near the body), all 5 driven by
+    their own clip's measured ruler track (T4d item 3 extended this from
+    ground_1/2/3 only to crouch/air too) -- NOT the earlier per-clip
     angular-sweep-across-every-frame derivation (see git history), which
     read as a round/vertical arc instead of the requested lateral cut.
-  - crouch: low flat horizontal sweep forward (unchanged, this is the style
-    ground_1/2/3 now reuse).
-  - up: vertical thrust streak (narrow spindle along ruler axis, no clipping)
-    (unchanged).
-  - air: lateral horizontal air sweep forward (unchanged).
+  - up: diagonal thrust streak (narrow spindle along the MEASURED ruler
+    axis above the raised hand -- the placeholder up-attack art is a
+    diagonal jump thrust, not a purely vertical one; see UP_THRUST_ANGLE_DEG).
 - Pale mint 4-tone palette with checker dithering (PX=3 chunky pixel art).
 - Cell size 720x640: generously sized so up-thrust and tall arcs have zero clipping.
-- ground_1/2/3's hitbox size/offset are DERIVED here (from luz_ruler_track.json's
-  contact-frame tip + this script's reach/thickness constants) and validated
-  against scripts/player/player.gd, which only reads the derived values;
-  crouch/up/air's hitbox size/offset are parsed from player.gd as authored there.
+- T4d item 3: ONE shared hitbox size/reach for every horizontal attack
+  (ground_1/2/3/crouch/air), only vertical placement differs; up is the same
+  size rotated 90 degrees. All 6 are DERIVED here (see derive_shared_hitboxes,
+  from luz_ruler_track.json's contact-frame heights + REACH_WORLD/
+  SHARED_LENGTH/SHARED_THICKNESS) and validated against
+  scripts/player/player.gd, which only reads the derived values -- this
+  script fails the build if player.gd has drifted from the derivation.
 - Assert bounds on all variants to guarantee no cell clipping.
 
 Outputs:
@@ -47,60 +49,70 @@ CELL_HEIGHT = 640
 FRAME_COUNT = 5
 DESIGN_SCALE = 1.0 / 0.175
 
-# "You hit what you see": ground_1/2/3's hitboxes are derived from the
-# rendered smear crescent (see lateral_swing_geometry/forward_extent below),
-# not from the ruler bar alone. Only the part of that crescent actually in
-# front of the body and at/above the feet counts -- the rest wraps behind
-# her or into the ground and is never the forward "you hit what you see"
-# region a melee swing should represent.
+# T4d item 3: ONE shared hitbox for every horizontal attack (ground combo
+# hits 1-3, crouch, air) -- same size (length x thickness) and same reach
+# from the player's own local origin; only the vertical placement (offset.y)
+# differs per attack. The up attack uses the same size rotated 90 degrees,
+# reaching the same distance upward. This replaces the previous per-attack
+# "hitbox = forward part of ITS OWN smear, each independently sized" scheme
+# (T4's ground_1/2 vs ground_3-finisher split), which is exactly what T4d's
+# user feedback (a) rejected ("in the 3rd hit Luz gets bigger and so does
+# the attack hitbox; that must not happen").
+#
+# REACH_WORLD must match tools/paint_luz_ruler.py's own REACH_WORLD -- that
+# tool bakes the long ruler art to reach this same distance (see its module
+# docstring for the measurement), so the hitbox and the visible ruler agree
+# by construction rather than by a separate reach-multiplier fudge factor
+# (removed here -- T4's GROUND_REACH_MULTIPLIER/FINISHER_REACH_MULTIPLIER
+# existed only to project a SHORT drawn ruler into a virtual longer reach;
+# now that the ruler itself is long, that multiplier would double-count).
+REACH_WORLD = 79.3
 # BODY_FRONT_X is the standing CollisionShape2D's own half-width
 # (scenes/player/player.tscn, RectangleShape2D_body size=(38,58), half=19).
 BODY_FRONT_X = 19.0
 FEET_LINE_Y = 0.0
 HITBOX_TOLERANCE = 0.05  # world units; player.gd values must match within this
 
-# Flat lateral crescent geometry for ground_1/2/3 (Blasphemous main-attack
-# style: a long, flat, horizontal cut at chest/waist height reaching far
-# beyond the weapon), derived ONLY from each clip's CONTACT frame measured
-# ruler tip (luz_ruler_track.json) -- every other frame may be a
-# low-confidence/foreshortened reading (the ruler pointing toward/away from
-# the camera mid-swing) and must not drive geometry; the contact frame is
-# always fully horizontal by the art's own spec, so it alone is reliable.
-# far_edge = REACH_MULTIPLIER * contact_tip.x (tip.x is already measured
-# from the player's own local origin, i.e. roughly "how far the ruler tip
-# reaches beyond the body"). Multipliers tuned to land near the pre-T4
-# reach values (84 for the shared ground hitbox, 98 for the finisher) -- see
-# odd/tasks/luz-blasphemous-animation.md for the exact achieved numbers.
-GROUND_REACH_MULTIPLIER = 2.0
-FINISHER_REACH_MULTIPLIER = 2.3
+SHARED_LENGTH = REACH_WORLD - BODY_FRONT_X
+# One shared hit-band thickness for every horizontal attack (previously
+# 24/24/20/30 world units for ground/finisher/crouch/air respectively).
+SHARED_THICKNESS = 24.0
+SHARED_OFFSET_X = (REACH_WORLD + BODY_FRONT_X) / 2.0
+
+# Flat lateral crescent geometry for ground_1/2/3/crouch/air (Blasphemous
+# main-attack style: a long, flat, horizontal cut reaching far beyond the
+# weapon), derived ONLY from each clip's CONTACT frame measured ruler tip
+# (luz_ruler_track.json) -- every other frame may be a low-confidence/
+# foreshortened reading (the ruler pointing toward/away from the camera
+# mid-swing) and must not drive geometry; the contact frame is always fully
+# horizontal by the art's own spec, so it alone is reliable.
+# far_edge = SMEAR_FLARE * contact_tip.x (tip.x is already measured from the
+# player's own local origin, i.e. roughly "how far the ruler tip reaches
+# beyond the body") -- the ruler is now baked long enough on its own (see
+# REACH_WORLD above), so the smear only needs a small visual overshoot past
+# it, not a reach-inflating multiplier.
+SMEAR_FLARE = 1.08
 # Ellipse vertical half-height (ry, world units, before the a_from/a_to
-# forward-region sampling below trims it) -- a fixed "blade thickness"
-# shared by ground_1/ground_2 (they share one hitbox) rather than a ratio of
-# rx, so the two differently-reaching cuts still read as the same weapon
-# width; the finisher is a touch thicker per the Blasphemous reference. At
-# the shared LATERAL_A_FROM/LATERAL_A_TO sweep below, the forward-region
-# vertical span comes out to (1 - sin(345deg)) * ry = 1.2588 * ry (the sweep
-# includes the ellipse's top point but not its bottom one) -- tuned so the
-# derived hitbox lands in the same ballpark as this game's other flat
-# attacks (hitbox_crouch_size.y=20, hitbox_air_size.y=30), not the near-zero
-# sliver a small rx-relative ratio would give the shorter-reaching cuts.
+# forward-region sampling below trims it) -- a fixed "blade thickness" (the
+# finisher is a touch thicker per the Blasphemous reference) independent of
+# the hitbox's own SHARED_THICKNESS, since this only shapes the visual
+# crescent, never the hitbox (which is now set directly from REACH_WORLD/
+# SHARED_THICKNESS above, not derived from the smear).
 LATERAL_RY_GROUND = 17.5
 LATERAL_RY_FINISHER = 20.5
-# Slight outer overshoot past the raw near/far span, same idea as the old
-# OUTER_RADIUS_FLARE: the rendered crescent (and the hitbox derived from it)
-# reads a little past the bare numeric reach for visual follow-through.
-LATERAL_FLARE = 1.08
 # Same flat-crescent angle sweep as the approved crouch smear (a_from/a_to
 # below atan2 convention, y-down): covers the ellipse's forward arc without
 # reaching fully behind (a_from) or fully in front (a_to), matching the
 # "thick leading edge, thin tail" read crouch already has.
 LATERAL_A_FROM = 205.0
 LATERAL_A_TO = 345.0
-# Minimum hitbox height (world units) for the flat lateral cuts: the drawn
-# crescent's forward arc can be thinner than a fair melee hit band, so the
-# derived box is padded symmetrically about its own center up to this height
-# (the crouch hitbox, the thinnest approved flat attack, is 20 units tall).
-LATERAL_MIN_HITBOX_HEIGHT = 24.0
+# Up attack's thrust streak angle (atan2 degrees, y-down): measured directly
+# from luz_ruler_track.json's up_attack contact-frame tip/grip axis -- the
+# placeholder up-attack art is a diagonal raised-jump thrust, not a purely
+# vertical one (see odd/tasks/luz-blasphemous-animation.md T4d item 3 for
+# the disclosed hitbox/visual mismatch this causes against the now-purely-
+# vertical hitbox_up rotation).
+UP_THRUST_ANGLE_DEG = -26.23
 
 PALETTE = [
     (240, 252, 244),
@@ -115,21 +127,37 @@ FRAME_FADE = [1.0, 1.0, 0.85, 0.60, 0.35]
 
 
 def parse_player_hitboxes() -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
-    """Extract hitbox sizes and offsets from player.gd exports."""
+    """Extract hitbox sizes and offsets from player.gd exports (T4d item 3's
+    unified scheme: one shared hitbox_attack_size/hitbox_attack_reach_x for
+    every horizontal attack, one offset.y per attack category, plus the
+    separately-rotated hitbox_up_size/hitbox_up_offset)."""
     content = PLAYER_GD.read_text()
+
     def get_vec2(var_name: str) -> tuple[float, float]:
         m = re.search(rf"@export var {var_name}\s*:=\s*Vector2\(([-0-9.]+),\s*([-0-9.]+)\)", content)
         if not m:
             raise ValueError(f"Could not parse {var_name} from {PLAYER_GD}")
         return (float(m.group(1)), float(m.group(2)))
 
+    def get_float(var_name: str) -> float:
+        m = re.search(rf"@export var {var_name}\s*:=\s*(-?[0-9.]+)", content)
+        if not m:
+            raise ValueError(f"Could not parse {var_name} from {PLAYER_GD}")
+        return float(m.group(1))
+
+    size = get_vec2("hitbox_attack_size")
+    reach_x = get_float("hitbox_attack_reach_x")
+    ground_y = get_float("hitbox_ground_offset_y")
+    crouch_y = get_float("hitbox_crouch_offset_y")
+    air_y = get_float("hitbox_air_offset_y")
+
     return {
-        "ground_1": (get_vec2("hitbox_ground_size"), get_vec2("hitbox_ground_offset")),
-        "ground_2": (get_vec2("hitbox_ground_size"), get_vec2("hitbox_ground_offset")),
-        "ground_3": (get_vec2("hitbox_finisher_size"), get_vec2("hitbox_finisher_offset")),
-        "crouch":   (get_vec2("hitbox_crouch_size"), get_vec2("hitbox_crouch_offset")),
+        "ground_1": (size, (reach_x, ground_y)),
+        "ground_2": (size, (reach_x, ground_y)),
+        "ground_3": (size, (reach_x, ground_y)),
+        "crouch":   (size, (reach_x, crouch_y)),
+        "air":      (size, (reach_x, air_y)),
         "up":       (get_vec2("hitbox_up_size"), get_vec2("hitbox_up_offset")),
-        "air":      (get_vec2("hitbox_air_size"), get_vec2("hitbox_air_offset")),
     }
 
 
@@ -257,32 +285,29 @@ def lateral_band_mid_sin(a_from: float, a_to: float, steps: int = 720) -> float:
     return (min(sines) + max(sines)) / 2.0
 
 
-def lateral_swing_geometry(clip_track: dict, reach_multiplier: float, ry_world: float) -> dict:
+def lateral_swing_geometry(clip_track: dict, ry_world: float) -> dict:
     """Derives a FLAT LATERAL ellipse (cx, cy, rx, ry, a_from, a_to) for a
-    ground_1/2/3 variant from ONLY the clip's CONTACT frame measured ruler
-    tip/grip (assets/player/luz/luz_ruler_track.json) -- unlike the earlier
-    per-clip angular-sweep-across-every-frame derivation (see git history),
-    this needs no windup/follow-through measurements (some of which are
-    legitimately low-confidence: the ruler foreshortens when it points
-    toward/away from the camera mid-swing) since the contact frame alone is
-    reliable (always fully horizontal, by the art's own spec) and is the
-    only frame whose height/reach we actually want to key the cut to.
+    ground_1/2/3/crouch/air variant from ONLY the clip's CONTACT frame
+    measured ruler tip/grip (assets/player/luz/luz_ruler_track.json, now
+    baked long by tools/paint_luz_ruler.py -- see T4d item 2) -- unlike the
+    earlier per-clip angular-sweep-across-every-frame derivation (see git
+    history), this needs no windup/follow-through measurements (some of
+    which are legitimately low-confidence: the ruler foreshortens when it
+    points toward/away from the camera mid-swing) since the contact frame
+    alone is reliable (always fully horizontal, by the art's own spec) and
+    is the only frame whose height/reach we actually want to key the cut to.
 
-    - center_y: the ruler's own height at contact (average of tip/grip y) --
-      chest-ish for ground_1/ground_3; ground_2's own measured height reads
-      close to ground_1's rather than distinctly lower, per whatever the
-      approved art actually drew (not independently re-tunable without new
-      art -- see odd/tasks/luz-blasphemous-animation.md T4b part 2).
-    - far_x: reach_multiplier * contact tip.x (tip.x is already measured
-      from the player's own local origin), i.e. how far *beyond the body*
-      the cut should read, Blasphemous-style (fit to the pre-T4 reach
-      values, see module docstring for the tuned multipliers).
+    - center_y: the ruler's own height at contact (average of tip/grip y).
+    - far_x: SMEAR_FLARE * contact tip.x (tip.x is already measured from the
+      player's own local origin) -- a small visual overshoot past the now-
+      long baked ruler tip, not a reach-inflating multiplier (removed, see
+      module docstring).
     - near_x: BODY_FRONT_X -- the cut starts at the body's own front edge,
       matching "you hit what you see"'s existing near-edge convention.
     - The ellipse is centered between near_x/far_x, half-width rx = half
-      that span (before LATERAL_FLARE); ry is the fixed "blade thickness"
-      (LATERAL_RY_GROUND/LATERAL_RY_FINISHER) -- "large rx, small ry", same
-      flattened style as the approved crouch smear.
+      that span; ry is the fixed "blade thickness" (LATERAL_RY_GROUND/
+      LATERAL_RY_FINISHER) -- "large rx, small ry", same flattened style as
+      the approved crouch smear.
     """
     contact_index = clip_track["contact_frame"]
     contact = clip_track["frames"][contact_index]
@@ -298,53 +323,15 @@ def lateral_swing_geometry(clip_track: dict, reach_multiplier: float, ry_world: 
     # sits on the ruler line (the cut must trail the blade, not float above it).
     center_y = ruler_y - lateral_band_mid_sin(LATERAL_A_FROM, LATERAL_A_TO) * ry_world
     near_x = BODY_FRONT_X
-    far_x = reach_multiplier * tip["x"]
+    far_x = SMEAR_FLARE * tip["x"]
     cx = (near_x + far_x) / 2.0
-    rx = (far_x - near_x) / 2.0 * LATERAL_FLARE
+    rx = (far_x - near_x) / 2.0
     ry = ry_world
     return {
         "cx": cx, "cy": center_y, "rx": rx, "ry": ry,
         "a_from": LATERAL_A_FROM, "a_to": LATERAL_A_TO,
         "contact_tip_x": tip["x"], "far_x_target": far_x,
     }
-
-
-def forward_extent(
-    cx: float, cy: float, rx: float, ry: float, a_from: float, a_to: float, steps: int = 2000
-) -> tuple[float, float, float] | None:
-    """Samples the ellipse (center cx,cy, radii rx,ry) from a_from to a_to
-    and returns (far_x, y_min, y_max) restricted to the forward,
-    at-or-above-feet region (x >= BODY_FRONT_X, y <= FEET_LINE_Y) -- "the
-    part in front of the body" a melee hitbox should cover, per the "you hit
-    what you see" rule. Returns None if no sampled point qualifies."""
-    xs, ys = [], []
-    for i in range(steps):
-        theta = math.radians(a_from + (a_to - a_from) * i / (steps - 1))
-        x = cx + rx * math.cos(theta)
-        y = cy + ry * math.sin(theta)
-        if x >= BODY_FRONT_X and y <= FEET_LINE_Y:
-            xs.append(x)
-            ys.append(y)
-    if not xs:
-        return None
-    return max(xs), min(ys), max(ys)
-
-
-def derive_hitbox(extent: tuple[float, float, float]) -> tuple[tuple[float, float], tuple[float, float]]:
-    """(far_x, y_min, y_max) -> (size, offset), near edge fixed at BODY_FRONT_X."""
-    far_x, y_min, y_max = extent
-    center_y = (y_max + y_min) / 2.0
-    height = max(y_max - y_min, LATERAL_MIN_HITBOX_HEIGHT)
-    size = (far_x - BODY_FRONT_X, height)
-    offset = ((far_x + BODY_FRONT_X) / 2.0, center_y)
-    return size, offset
-
-
-def combine_extents(extents: list[tuple[float, float, float]]) -> tuple[float, float, float]:
-    """Union of several (far_x, y_min, y_max) forward extents -- for a
-    hitbox shared by more than one attack (ground_1/ground_2), it must cover
-    each attack's own visible crescent, not just one of them."""
-    return max(e[0] for e in extents), min(e[1] for e in extents), max(e[2] for e in extents)
 
 
 def build_variant_geometry(
@@ -358,7 +345,7 @@ def build_variant_geometry(
     lateral = config.get("lateral_from_track")
     track_clip = config.get("track_clip")
     if lateral and track_clip and track.get("clips", {}).get(track_clip):
-        geo = lateral_swing_geometry(track["clips"][track_clip], lateral["reach_multiplier"], lateral["ry_world"])
+        geo = lateral_swing_geometry(track["clips"][track_clip], lateral["ry_world"])
         config["a_from"], config["a_to"] = geo["a_from"], geo["a_to"]
         rx, ry = geo["rx"] * DESIGN_SCALE, geo["ry"] * DESIGN_SCALE
         anchor_x = cx - geo["cx"] * DESIGN_SCALE
@@ -391,54 +378,58 @@ def build_variant_geometry(
     }
 
 
+def _clip_mid_y(track: dict, clip_name: str) -> float:
+    """Contact-frame (tip.y + grip.y) / 2 for one clip -- "the ruler's own
+    height at contact", used as that attack's vertical hitbox placement."""
+    clip = track["clips"][clip_name]
+    frame = clip["frames"][clip["contact_frame"]]
+    return (frame["tip"]["y"] + frame["grip"]["y"]) / 2.0
+
+
+def derive_shared_hitboxes(track: dict) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """T4d item 3: the single source of truth for player.gd's unified
+    hitbox scheme. One shared size/reach (SHARED_LENGTH x SHARED_THICKNESS,
+    reaching REACH_WORLD from the player's own origin) for every horizontal
+    attack; only the vertical placement differs, taken directly from each
+    attack's own measured ruler height at contact (the ground combo's three
+    hits share ONE "chest" placement, averaged across all three, per the
+    brief's "chest for combo" -- not three slightly different placements).
+    The up attack is the same size rotated 90 degrees, reaching the same
+    distance upward (see module docstring for the disclosed mismatch this
+    causes against that clip's own, diagonal, placeholder-art thrust pose)."""
+    combo_y = sum(_clip_mid_y(track, c) for c in ("ground_attack_1", "ground_attack_2", "ground_attack_3")) / 3.0
+    crouch_y = _clip_mid_y(track, "crouch_attack")
+    air_y = _clip_mid_y(track, "air_horizontal_attack")
+    size = (SHARED_LENGTH, SHARED_THICKNESS)
+    return {
+        "ground_1": (size, (SHARED_OFFSET_X, combo_y)),
+        "ground_2": (size, (SHARED_OFFSET_X, combo_y)),
+        "ground_3": (size, (SHARED_OFFSET_X, combo_y)),
+        "crouch": (size, (SHARED_OFFSET_X, crouch_y)),
+        "air": (size, (SHARED_OFFSET_X, air_y)),
+        "up": ((SHARED_THICKNESS, SHARED_LENGTH), (0.0, -SHARED_OFFSET_X)),
+    }
+
+
 def validate_hitboxes(ruler_track: dict, hitbox_configs: dict) -> None:
-    """Fails the build if scripts/player/player.gd's hitbox_ground_*/
-    hitbox_finisher_* have drifted from the geometry derived here (from the
-    measured ruler track + the same outer smear radius the crescent is
-    rendered with) -- this script/the track JSON are the single source of
-    truth for WHAT the values should be; player.gd is where gameplay reads
-    them from, and the two must never silently disagree."""
+    """Fails the build if scripts/player/player.gd's unified hitbox exports
+    have drifted from derive_shared_hitboxes's analytical derivation (from
+    REACH_WORLD/SHARED_LENGTH/SHARED_THICKNESS + the measured ruler track's
+    per-clip contact height) -- this script/the track JSON are the single
+    source of truth for WHAT the values should be; player.gd is where
+    gameplay reads them from, and the two must never silently disagree."""
     if not ruler_track.get("clips"):
         print("  (no ruler track data; skipping hitbox validation)")
         return
 
-    groups = [
-        (
-            "hitbox_ground",
-            [("ground_attack_1", GROUND_REACH_MULTIPLIER, LATERAL_RY_GROUND), ("ground_attack_2", GROUND_REACH_MULTIPLIER, LATERAL_RY_GROUND)],
-            hitbox_configs["ground_1"],
-        ),
-        (
-            "hitbox_finisher",
-            [("ground_attack_3", FINISHER_REACH_MULTIPLIER, LATERAL_RY_FINISHER)],
-            hitbox_configs["ground_3"],
-        ),
-    ]
+    derived = derive_shared_hitboxes(ruler_track)
     failures: list[str] = []
-    for label, clips, (actual_size, actual_offset) in groups:
-        extents = []
-        for clip, reach_multiplier, ry_world in clips:
-            clip_track = ruler_track["clips"].get(clip)
-            if not clip_track:
-                print(f"  (no track data for {clip} yet; skipping {label} validation)")
-                extents = None
-                break
-            geo = lateral_swing_geometry(clip_track, reach_multiplier, ry_world)
-            ext = forward_extent(geo["cx"], geo["cy"], geo["rx"], geo["ry"], geo["a_from"], geo["a_to"])
-            if ext is None:
-                raise RuntimeError(
-                    f"{label}: {clip}'s forward-region smear extent is empty "
-                    "(no sampled point had x >= BODY_FRONT_X and y <= FEET_LINE_Y)"
-                )
-            extents.append(ext)
-        if not extents:
-            continue
-
-        combined = combine_extents(extents)
-        derived_size, derived_offset = derive_hitbox(combined)
+    for label in ("ground_1", "ground_2", "ground_3", "crouch", "air", "up"):
+        derived_size, derived_offset = derived[label]
+        actual_size, actual_offset = hitbox_configs[label]
         print(
             f"  {label}: derived size=({derived_size[0]:.2f},{derived_size[1]:.2f}) "
-            f"offset=({derived_offset[0]:.2f},{derived_offset[1]:.2f}) far_edge={combined[0]:.2f}  |  "
+            f"offset=({derived_offset[0]:.2f},{derived_offset[1]:.2f})  |  "
             f"player.gd size={actual_size} offset={actual_offset}"
         )
         checks = (
@@ -449,13 +440,13 @@ def validate_hitboxes(ruler_track: dict, hitbox_configs: dict) -> None:
         )
         for got, want, axis in checks:
             if abs(got - want) > HITBOX_TOLERANCE:
-                failures.append(f"{axis}: player.gd has {got}, smear-derived is {want:.2f}")
+                failures.append(f"{axis}: player.gd has {got}, derived is {want:.2f}")
 
     if failures:
         raise SystemExit(
             "scripts/player/player.gd's hitbox @export values have drifted from the "
-            "smear-derived geometry (single source of truth: luz_ruler_track.json + "
-            "this script's LATERAL_FLARE/BODY_FRONT_X):\n  "
+            "unified derivation (single source of truth: luz_ruler_track.json + "
+            "this script's REACH_WORLD/SHARED_LENGTH/SHARED_THICKNESS):\n  "
             + "\n  ".join(failures)
             + "\nUpdate the @export values in player.gd to match the derived numbers printed above, then rerun."
         )
@@ -480,14 +471,14 @@ def main() -> int:
             # "crouch" below, at the contact frame's own ruler height.
             "peak": 0.55,
             "track_clip": "ground_attack_1",
-            "lateral_from_track": {"reach_multiplier": GROUND_REACH_MULTIPLIER, "ry_world": LATERAL_RY_GROUND},
+            "lateral_from_track": {"ry_world": LATERAL_RY_GROUND},
             "description": "flat lateral cut at chest height, hit 1 (measured from ground_attack_1 art)",
         },
         "ground_2": {
             "row": 1, "type": "arc",
             "peak": 0.55,
             "track_clip": "ground_attack_2",
-            "lateral_from_track": {"reach_multiplier": GROUND_REACH_MULTIPLIER, "ry_world": LATERAL_RY_GROUND},
+            "lateral_from_track": {"ry_world": LATERAL_RY_GROUND},
             # The approved raw art's own measured contact height (-28.52) came
             # out close to hit 1's (-27.65), not distinctly lower/"waist" as
             # the revised prompt asked for -- described honestly here rather
@@ -499,26 +490,28 @@ def main() -> int:
             "row": 2, "type": "arc",
             "peak": 0.62,
             "track_clip": "ground_attack_3",
-            "lateral_from_track": {"reach_multiplier": FINISHER_REACH_MULTIPLIER, "ry_world": LATERAL_RY_FINISHER},
+            "lateral_from_track": {"ry_world": LATERAL_RY_FINISHER},
             "description": "flat lateral finisher cut at chest height, wider/thicker/farther reach (measured from ground_attack_3 art)",
         },
         "crouch": {
             "row": 3, "type": "arc",
-            "a_from": 205.0, "a_to": 345.0,
-            "flare": 1.25, "peak": 0.50,
-            "description": "low flat horizontal sweep near the ground",
+            "peak": 0.50,
+            "track_clip": "crouch_attack",
+            "lateral_from_track": {"ry_world": LATERAL_RY_GROUND},
+            "description": "low flat horizontal sweep near the ground (measured from crouch_attack art)",
         },
         "up": {
             "row": 4, "type": "thrust",
-            "angle_deg": -75.0,
+            "angle_deg": UP_THRUST_ANGLE_DEG,
             "half_width_px": 28.0,
-            "description": "vertical thrust streak along ruler axis above raised hand",
+            "description": "diagonal thrust streak along the measured ruler axis above the raised hand",
         },
         "air": {
             "row": 5, "type": "arc",
-            "a_from": 190.0, "a_to": 350.0,
-            "flare": 1.30, "peak": 0.55,
-            "description": "lateral horizontal air sweep forward",
+            "peak": 0.55,
+            "track_clip": "air_horizontal_attack",
+            "lateral_from_track": {"ry_world": LATERAL_RY_GROUND},
+            "description": "lateral horizontal air sweep forward (measured from air_horizontal_attack art)",
         },
     }
 
@@ -543,7 +536,7 @@ def main() -> int:
                     frame, geometry["cx"], geometry["cy"], spec["angle_deg"],
                     geometry["length_px"], spec["half_width_px"],
                 )
-            sheet.paste(frame_img, (frame * CELL_WIDTH, row * CELL_HEIGHT), frame_img)
+            sheet.alpha_composite(frame_img, (frame * CELL_WIDTH, row * CELL_HEIGHT))
 
         manifest_variants[name] = {
             "row": row,

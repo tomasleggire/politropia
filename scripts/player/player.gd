@@ -140,27 +140,28 @@ const PHASE_RECOVERY := 2
 @export var plunge_land_recovery_time := 0.25
 
 @export_group("Attack Hitboxes")
-## "You hit what you see": ground_1/ground_2/ground_3 are derived from the
-## visible FLAT LATERAL smear crescent (tools/generate_luz_slash_smears.py,
-## single source of truth via assets/player/luz/luz_ruler_track.json's
-## contact-frame ruler tip), not the ruler bar alone -- far edge is
-## reach_multiplier * contact tip.x (LATERAL_FLARE-widened), and the box
-## covers only the part of that crescent in front of the body and at/above
-## the feet (BODY_FRONT_X/FEET_LINE_Y). Running that script FAILS if these
-## values drift from its derivation. Box height is padded up to
-## LATERAL_MIN_HITBOX_HEIGHT so the thin crescent still gets a fair hit band.
-## ground_1/ground_2 share this rect (union of both hits' forward extent).
-@export var hitbox_ground_size := Vector2(60.32, 24.0)
-@export var hitbox_ground_offset := Vector2(49.16, -27.52)
-## ground_3's own forward extent (its crescent reaches farther/is thicker).
-@export var hitbox_finisher_size := Vector2(83.39, 24.0)
-@export var hitbox_finisher_offset := Vector2(60.69, -30.36)
-@export var hitbox_crouch_size := Vector2(72.0, 20.0)
-@export var hitbox_crouch_offset := Vector2(43.0, -10.0)
-@export var hitbox_up_size := Vector2(26.0, 68.0)
-@export var hitbox_up_offset := Vector2(0.0, -80.0)
-@export var hitbox_air_size := Vector2(74.0, 30.0)
-@export var hitbox_air_offset := Vector2(45.0, -33.0)
+## T4d item 3 (iPhone playtest: "in the 3rd hit Luz gets bigger and so does
+## the attack hitbox; that must not happen. All hits must have the same
+## hitbox, vertical or horizontal"). ONE shared hitbox size/reach for every
+## horizontal attack (ground combo hits 1-3, crouch, air): same length
+## (reach from the player's own local origin) and same thickness -- only
+## the vertical placement (offset.y) differs, taken from each attack's own
+## measured ruler height at contact (the ground combo's three hits share
+## ONE "chest" placement, averaged across all three; crouch is low; air is
+## mid-air torso height). hitbox_up_size/offset is the same size rotated 90
+## degrees, reaching the same distance upward. Single source of truth:
+## tools/generate_luz_slash_smears.py's derive_shared_hitboxes, from
+## assets/player/luz/luz_ruler_track.json (which tools/paint_luz_ruler.py
+## bakes so the drawn ruler itself reaches this same distance) -- that
+## script FAILS the build if these values drift from its derivation.
+@export var hitbox_attack_size := Vector2(60.3, 24.0)
+## offset.x, shared by every horizontal attack (ground combo, crouch, air).
+@export var hitbox_attack_reach_x := 49.15
+@export var hitbox_ground_offset_y := -27.2   ## combo (hits 1-3): chest height
+@export var hitbox_crouch_offset_y := -0.96   ## crouch: low
+@export var hitbox_air_offset_y := -37.92     ## air: mid-air torso height
+@export var hitbox_up_size := Vector2(24.0, 60.3)
+@export var hitbox_up_offset := Vector2(0.0, -49.15)
 @export var hitbox_plunge_size := Vector2(28.0, 18.0)
 @export var hitbox_plunge_offset := Vector2(0.0, 12.0)
 @export var hitbox_plunge_land_size := Vector2(150.0, 20.0)
@@ -849,22 +850,20 @@ func _deactivate_attack_hitbox() -> void:
 
 func _hitbox_config_for(attack_name: StringName) -> Dictionary:
 	match attack_name:
-		&"attack_ground_1", &"attack_ground_2":
-			return {size = hitbox_ground_size, offset = hitbox_ground_offset}
-		&"attack_ground_3":
-			return {size = hitbox_finisher_size, offset = hitbox_finisher_offset}
+		&"attack_ground_1", &"attack_ground_2", &"attack_ground_3":
+			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_ground_offset_y)}
 		&"attack_crouch":
-			return {size = hitbox_crouch_size, offset = hitbox_crouch_offset}
+			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_crouch_offset_y)}
+		&"attack_air":
+			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_air_offset_y)}
 		&"attack_up":
 			return {size = hitbox_up_size, offset = hitbox_up_offset}
-		&"attack_air":
-			return {size = hitbox_air_size, offset = hitbox_air_offset}
 		&"attack_plunge":
 			return {size = hitbox_plunge_size, offset = hitbox_plunge_offset}
 		&"attack_plunge_land":
 			return {size = hitbox_plunge_land_size, offset = hitbox_plunge_land_offset}
 		_:
-			return {size = hitbox_ground_size, offset = hitbox_ground_offset}
+			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_ground_offset_y)}
 
 
 ## -- Airborne: jump / fall ----------------------------------------------------
@@ -1289,7 +1288,20 @@ func _update_animation() -> void:
 		State.CROUCH_ATTACK:
 			_play_animation(&"crouch_attack")
 		State.UP_ATTACK:
-			_play_animation(&"up_attack")
+			# T4d item 4 (iPhone playtest: the up-attack body pose now ends
+			# together with its slash -- commit 126d6ff -- but was still
+			# DISPLAYED for the rest of the state's recovery: the up_attack
+			# clip freezes on its last frame, which is a pointing-up pose,
+			# for crouch_up_attack_window - slash_end (~0.38s). Switch to the
+			# appropriate airborne/idle animation the instant the slash ends
+			# instead of holding that pose.
+			var up_attack_slash_end := attack_startup_time + PlayerSlashVfx.TOTAL_DURATION
+			if _state_time < up_attack_slash_end:
+				_play_animation(&"up_attack")
+			elif is_on_floor():
+				_play_animation(&"idle")
+			else:
+				_play_animation(&"fall" if velocity.y >= 0.0 else &"jump")
 		State.AIR_ATTACK:
 			_play_animation(&"air_attack")
 		State.PLUNGE:
