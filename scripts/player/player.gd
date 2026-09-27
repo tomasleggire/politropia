@@ -103,17 +103,24 @@ const PHASE_RECOVERY := 2
 @export var attack_window_hit1 := 0.45
 @export var attack_window_hit2 := 0.45
 ## Total time for the finisher (hit 3) and for crouch/up-attack windows --
-## also the minimum interval before the combo can loop back to hit 1 (see
-## _queue_attack's State.ATTACK branch: a press during the finisher is
-## buffered without a timeout and fires exactly at this mark, never dropped).
+## also the minimum interval before the combo can loop back to hit 1: a
+## press during the finisher restarts the combo here only if it is still
+## within attack_buffer_time of this mark (see _queue_attack's State.ATTACK
+## branch and _attack_restart_buffered_left); an earlier press is dropped.
 @export var attack_window_hit3 := 0.60
 @export var attack_forward_step_speed := 60.0
 ## Air attack total cycle (startup + active + recovery); re-attack allowed once recovery starts.
 @export var air_attack_recovery := 0.40
-## How long a press that can't start an attack right away (dash, wall cling,
-## crouch/up/plunge attack, plunge land) stays queued so it fires the instant
-## a new attack becomes possible, instead of being silently dropped.
-@export var attack_buffer_time := 0.12
+## How long ANY buffered attack press stays queued before being dropped:
+## a press that can't start an attack right away (dash, wall cling,
+## crouch/up/plunge attack, plunge land), a press for the next combo hit
+## (hit1->2, hit2->3), and a press during the finisher that would restart
+## the combo -- all three share this one short window (~0.15s, matching the
+## Blasphemous reference) so a press is consumed at most once and a press
+## older than this window is dropped instead of firing an unexpected attack
+## later ("one attack too many" from a burst of taps -- see
+## _attack_buffered_left/_attack_restart_buffered_left below).
+@export var attack_buffer_time := 0.15
 
 @export_group("Plunge")
 @export var plunge_hang_time := 0.12
@@ -211,15 +218,22 @@ var _ledge_climb_time := 0.0
 var _attack_phase := PHASE_STARTUP
 var _attack_combo_index := 0
 var _attack_facing := 1
-var _attack_buffered := false
-## A press during the finisher (combo index 2): unlike the generic
-## _attack_buffer_left/_attack_buffer_direction pair (a short, timed grace
-## window used by every OTHER "can't attack right now" state), this never
-## expires -- it must survive the finisher's whole recovery so the combo
-## loop back to hit 1 never silently drops an early press, matching hit
-## 1->2/2->3's own buffer (_attack_buffered), which is likewise untimed.
-var _attack_restart_buffered := false
-var _air_attack_buffered := false
+## Time left (seconds) for a pending hit1->2 / hit2->3 combo continuation;
+## <= 0.0 means no press is queued. Set to attack_buffer_time on a
+## qualifying press, ticked down every frame (_update_shared_timers) and
+## consumed (reset to 0.0) the instant the current hit's window ends -- a
+## press older than attack_buffer_time has already ticked down to 0.0 and is
+## dropped, matching every other buffered action instead of firing
+## unexpectedly later.
+var _attack_buffered_left := 0.0
+## Same mechanism as _attack_buffered_left, for a press during the finisher
+## (combo index 2) that should restart the combo (loop back to hit 1) --
+## see _queue_attack's State.ATTACK branch and _update_attack's window-end
+## check.
+var _attack_restart_buffered_left := 0.0
+## Same mechanism, for a press during the air attack's active phase that
+## should restart it once its recovery phase begins.
+var _air_attack_buffered_left := 0.0
 var _attack_buffer_left := 0.0
 var _attack_buffer_direction := 0
 
@@ -318,6 +332,9 @@ func _update_shared_timers(delta: float) -> void:
 	_wall_kick_lock_left = maxf(_wall_kick_lock_left - delta, 0.0)
 	_dash_cooldown_left = maxf(_dash_cooldown_left - delta, 0.0)
 	_attack_buffer_left = maxf(_attack_buffer_left - delta, 0.0)
+	_attack_buffered_left = maxf(_attack_buffered_left - delta, 0.0)
+	_attack_restart_buffered_left = maxf(_attack_restart_buffered_left - delta, 0.0)
+	_air_attack_buffered_left = maxf(_air_attack_buffered_left - delta, 0.0)
 
 	if _drop_left > 0.0:
 		_drop_left -= delta
@@ -501,19 +518,19 @@ func _queue_attack(direction: int) -> void:
 	match _state:
 		State.ATTACK:
 			if _attack_combo_index < 2:
-				_attack_buffered = true
+				_attack_buffered_left = attack_buffer_time
 			else:
-				# Playing the finisher: buffer a fresh combo restart (loop
-				# back to hit 1) the same untimed way, instead of silently
-				# dropping the press -- see _attack_restart_buffered.
-				_attack_restart_buffered = true
+				# Playing the finisher: buffer a combo restart (loop back to
+				# hit 1) the same short, timed way -- see
+				# _attack_restart_buffered_left.
+				_attack_restart_buffered_left = attack_buffer_time
 			return
 		State.AIR_ATTACK:
 			if _attack_phase == PHASE_RECOVERY:
 				_state_time = 0.0
 				_attack_phase = PHASE_STARTUP
 			else:
-				_air_attack_buffered = true
+				_air_attack_buffered_left = attack_buffer_time
 			return
 		State.CROUCH_ATTACK, State.UP_ATTACK, State.PLUNGE, State.PLUNGE_LAND, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB:
 			_attack_buffer_left = attack_buffer_time
@@ -549,12 +566,25 @@ func _end_generic_attack() -> void:
 		_enter_state(State.JUMP if velocity.y < 0.0 else State.FALL)
 
 
+## Invalidates a pending generic attack buffer (_attack_buffer_left/
+## _attack_buffer_direction, used by dash/wall-cling/ledge/crouch/up/plunge
+## states) whenever an attack actually starts through any path. Without
+## this, an older press already superseded by a fresher one that started an
+## attack directly could still sit in the buffer and fire a second,
+## unexpected attack once the new attack ends and the state allows attacking
+## again -- one extra action from what is really two separate presses
+## resolving out of order.
+func _clear_pending_attack_buffer() -> void:
+	_attack_buffer_left = 0.0
+
+
 ## -- Combat: ground combo -----------------------------------------------------
 
 func _start_ground_attack() -> void:
 	_attack_combo_index = 0
-	_attack_buffered = false
-	_attack_restart_buffered = false
+	_attack_buffered_left = 0.0
+	_attack_restart_buffered_left = 0.0
+	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.ATTACK)
 	_attack_phase = PHASE_STARTUP
@@ -589,12 +619,12 @@ func _update_attack(delta: float) -> void:
 			return
 
 	if t >= window:
-		if _attack_buffered and _attack_combo_index < 2:
+		if _attack_buffered_left > 0.0 and _attack_combo_index < 2:
 			_attack_combo_index += 1
-			_attack_buffered = false
+			_attack_buffered_left = 0.0
 			_state_time = 0.0
 			_attack_phase = PHASE_STARTUP
-		elif _attack_restart_buffered and _attack_combo_index >= 2:
+		elif _attack_restart_buffered_left > 0.0 and _attack_combo_index >= 2:
 			_start_ground_attack()
 		else:
 			_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
@@ -623,6 +653,7 @@ func _ground_attack_name(index: int) -> StringName:
 ## -- Combat: crouch attack -----------------------------------------------------
 
 func _start_crouch_attack() -> void:
+	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.CROUCH_ATTACK)
 	_attack_phase = PHASE_STARTUP
@@ -655,6 +686,7 @@ func _update_crouch_attack(delta: float) -> void:
 ## -- Combat: up attack (ground or air) -----------------------------------------
 
 func _start_up_attack() -> void:
+	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.UP_ATTACK)
 	_attack_phase = PHASE_STARTUP
@@ -686,7 +718,8 @@ func _update_up_attack(delta: float) -> void:
 ## -- Combat: air attack ---------------------------------------------------------
 
 func _start_air_attack() -> void:
-	_air_attack_buffered = false
+	_air_attack_buffered_left = 0.0
+	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.AIR_ATTACK)
 	_attack_phase = PHASE_STARTUP
@@ -712,8 +745,8 @@ func _update_air_attack(delta: float) -> void:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
 			_deactivate_attack_hitbox()
-		if _air_attack_buffered:
-			_air_attack_buffered = false
+		if _air_attack_buffered_left > 0.0:
+			_air_attack_buffered_left = 0.0
 			_state_time = 0.0
 			_attack_phase = PHASE_STARTUP
 			return
@@ -725,6 +758,7 @@ func _update_air_attack(delta: float) -> void:
 ## -- Combat: down plunge ---------------------------------------------------------
 
 func _start_plunge() -> void:
+	_clear_pending_attack_buffer()
 	_enter_state(State.PLUNGE)
 	_attack_phase = PHASE_STARTUP
 
