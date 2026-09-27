@@ -66,8 +66,20 @@ func play_slash(
 	var reference_size: Array = config["reference_hitbox_size"]
 	var display_scale: float = _manifest["display_scale"]
 
+	# Mirroring uses scale.x sign, never Sprite2D.flip_h: a Sprite2D's
+	# _get_rects() computes dst_rect.position = offset - frame_size/2 and,
+	# for flip_h, only negates dst_rect.size.x -- the position (and
+	# therefore the reflection axis) stays fixed at that offset-derived
+	# point, NOT at local x=0 (verified against Godot 4.7's own
+	# scene/2d/sprite_2d.cpp). Since this sprite's own offset.x is the
+	# swing's pivot/anchor (never 0 except for "up"), flip_h left every
+	# ground/crouch/air smear anchored on the right side even when facing
+	# left. A negative node scale.x instead mirrors the whole transform
+	# (offset included) about this node's own local origin, which IS the
+	# player's origin -- the correct axis regardless of anchor.
+	var facing_sign := 1.0 if facing >= 0 else -1.0
 	_sprite.scale = Vector2(
-		display_scale * (hitbox_size.x / float(reference_size[0])),
+		display_scale * (hitbox_size.x / float(reference_size[0])) * facing_sign,
 		display_scale * (hitbox_size.y / float(reference_size[1])),
 	)
 	var anchor: Array = config["anchor"]
@@ -75,7 +87,6 @@ func play_slash(
 		float(_manifest["cell_width"]) * 0.5 - float(anchor[0]),
 		float(_manifest["cell_height"]) * 0.5 - float(anchor[1]),
 	)
-	_sprite.flip_h = facing < 0
 	_active_frames = _frame_textures_by_variant[variant_name]
 	_elapsed = 0.0
 	_current_frame = -1
