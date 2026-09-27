@@ -99,9 +99,7 @@ const PHASE_RECOVERY := 2
 ## has passed since THIS hit started, so the combo cannot be spammed faster
 ## than a readable cut-per-cut cadence. Recovery frames (never startup/
 ## active frames) are what stretches to fill the extra time -- see
-## LuzAnimationCatalog._frame_seconds, unchanged by this iteration. Old
-## values (pre-iPhone-playtest "too spammable" feedback): hit1/hit2 0.36s,
-## hit3 (finisher) 0.50s.
+## LuzAnimationCatalog._frame_seconds, unchanged by this iteration.
 @export var attack_window_hit1 := 0.45
 @export var attack_window_hit2 := 0.45
 ## Total time for the finisher (hit 3) and for crouch/up-attack windows --

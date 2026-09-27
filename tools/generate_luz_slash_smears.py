@@ -15,7 +15,10 @@
   - air: lateral horizontal air sweep forward (unchanged).
 - Pale mint 4-tone palette with checker dithering (PX=3 chunky pixel art).
 - Cell size 720x640: generously sized so up-thrust and tall arcs have zero clipping.
-- Hitbox size and offset parsed directly from scripts/player/player.gd as the single source of truth.
+- ground_1/2/3's hitbox size/offset are DERIVED here (from luz_ruler_track.json's
+  contact-frame tip + this script's reach/thickness constants) and validated
+  against scripts/player/player.gd, which only reads the derived values;
+  crouch/up/air's hitbox size/offset are parsed from player.gd as authored there.
 - Assert bounds on all variants to guarantee no cell clipping.
 
 Outputs:
@@ -252,9 +255,11 @@ def lateral_swing_geometry(clip_track: dict, reach_multiplier: float, ry_world: 
     reliable (always fully horizontal, by the art's own spec) and is the
     only frame whose height/reach we actually want to key the cut to.
 
-    - center_y: the ruler's own height at contact (average of tip/grip y)
-      -- chest for ground_1/ground_3, waist for ground_2, per whatever the
-      approved art actually drew.
+    - center_y: the ruler's own height at contact (average of tip/grip y) --
+      chest-ish for ground_1/ground_3; ground_2's own measured height reads
+      close to ground_1's rather than distinctly lower, per whatever the
+      approved art actually drew (not independently re-tunable without new
+      art -- see odd/tasks/luz-blasphemous-animation.md T4b part 2).
     - far_x: reach_multiplier * contact tip.x (tip.x is already measured
       from the player's own local origin), i.e. how far *beyond the body*
       the cut should read, Blasphemous-style (fit to the pre-T4 reach
