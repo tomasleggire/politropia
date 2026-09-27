@@ -71,13 +71,16 @@ const CONTACT_SYNCED_CLIPS := [
 ## matching gameplay window/timer does. Animations not present keep their
 ## CLIP_SPEEDS default.
 ##
-## attack_startup_time is the player's exported startup phase length
-## (seconds) shared by every attack state; for a CONTACT_SYNCED_CLIPS
-## animation whose clip has a manifest "contact_frames" entry, frame
-## durations are adjusted so that frame starts showing at exactly
-## attack_startup_time -- i.e. precisely when the attack's hitbox
-## activates -- instead of every frame getting an equal slice of the clip.
-static func build_sprite_frames(clip_durations: Dictionary = {}, attack_startup_time := 0.0) -> SpriteFrames:
+## startup_times optionally maps an animation name to that specific clip's
+## startup (windup) phase length in seconds -- e.g. the ground combo's
+## finisher (attack_3) can use a longer windup than hits 1/2. For a
+## CONTACT_SYNCED_CLIPS animation whose clip has a manifest "contact_frames"
+## entry and a positive entry in startup_times, frame durations are adjusted
+## so that frame starts showing at exactly that animation's own startup time
+## -- i.e. precisely when the attack's hitbox activates -- instead of every
+## frame getting an equal slice of the clip. An animation missing from
+## startup_times (or mapped to 0.0) is never contact-synced.
+static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: Dictionary = {}) -> SpriteFrames:
 	var manifest := _read_manifest()
 	var frames := SpriteFrames.new()
 	for animation_name in CLIP_SPEEDS:
@@ -101,8 +104,9 @@ static func build_sprite_frames(clip_durations: Dictionary = {}, attack_startup_
 
 			var contact_index := int(contact_frames.get(clip_name, -1))
 			var total_duration: float = clip_durations.get(animation_name, float(frame_count) / speed)
+			var startup_time: float = startup_times.get(animation_name, 0.0)
 			var seconds := _frame_seconds(
-				animation_name, frame_count, contact_index, total_duration, attack_startup_time
+				animation_name, frame_count, contact_index, total_duration, startup_time
 			)
 			for i in frame_count:
 				var texture := _build_frame_texture(atlas, grid, int(frame_indices[i]))

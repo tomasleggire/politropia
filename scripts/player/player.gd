@@ -92,22 +92,33 @@ const PHASE_RECOVERY := 2
 @export var ledge_climb_forward_offset := 40.0
 
 @export_group("Attack")
+## Startup (windup) shared by hits 1/2 of the ground combo and by
+## crouch/up/air attacks. The finisher (hit 3) uses its own, longer
+## attack_finisher_startup_time instead -- see _attack_startup_for.
 @export var attack_startup_time := 0.08
 @export var attack_active_time := 0.12
-## Combo cadence: this is also each hit's own minimum interval -- the next
-## combo hit cannot start (even with a buffered input) before this much time
-## has passed since THIS hit started, so the combo cannot be spammed faster
-## than a readable cut-per-cut cadence. Recovery frames (never startup/
-## active frames) are what stretches to fill the extra time -- see
-## LuzAnimationCatalog._frame_seconds, unchanged by this iteration.
-@export var attack_window_hit1 := 0.45
-@export var attack_window_hit2 := 0.45
-## Total time for the finisher (hit 3) and for crouch/up-attack windows --
-## also the minimum interval before the combo can loop back to hit 1: a
-## press during the finisher restarts the combo here only if it is still
-## within attack_buffer_time of this mark (see _queue_attack's State.ATTACK
-## branch and _attack_restart_buffered_left); an earlier press is dropped.
-@export var attack_window_hit3 := 0.60
+## Combo cadence, measured from a 60fps Blasphemous ground-combo reference:
+## hit1->hit2 contact-to-contact ~0.35s, hit2->hit3 ~0.42s. This is also each
+## hit's own minimum interval -- the next combo hit cannot start (even with a
+## buffered input) before this much time has passed since THIS hit started,
+## so the combo cannot be spammed faster than a readable cut-per-cut
+## cadence. Recovery frames (never startup/active frames) are what
+## stretches to fill the extra time -- see LuzAnimationCatalog._frame_seconds.
+@export var attack_window_hit1 := 0.35
+@export var attack_window_hit2 := 0.42
+## Finisher (hit 3) total window: also the minimum interval before the combo
+## can loop back to hit 1 -- a press during the finisher restarts the combo
+## here only if it is still within attack_buffer_time of this mark (see
+## _queue_attack's State.ATTACK branch and _attack_restart_buffered_left);
+## an earlier press is dropped.
+@export var attack_window_hit3 := 0.42
+## Finisher-only windup before its active (contact) frame -- longer than
+## attack_startup_time, matching the reference's more telegraphed last hit.
+@export var attack_finisher_startup_time := 0.15
+## Crouch/up attack total window -- kept independent of the ground
+## finisher's attack_window_hit3 so retuning the ground combo doesn't also
+## change these.
+@export var crouch_up_attack_window := 0.60
 @export var attack_forward_step_speed := 60.0
 ## Air attack total cycle (startup + active + recovery); re-attack allowed once recovery starts.
 @export var air_attack_recovery := 0.40
@@ -176,11 +187,18 @@ const PHASE_RECOVERY := 2
 	"attack_1": attack_window_hit1,
 	"attack_2": attack_window_hit2,
 	"attack_3": attack_window_hit3,
-	"crouch_attack": attack_window_hit3,
-	"up_attack": attack_window_hit3,
+	"crouch_attack": crouch_up_attack_window,
+	"up_attack": crouch_up_attack_window,
 	"air_attack": air_attack_recovery,
 	"plunge_land": plunge_land_active_time + plunge_land_recovery_time,
-}, attack_startup_time)
+}, {
+	"attack_1": attack_startup_time,
+	"attack_2": attack_startup_time,
+	"attack_3": attack_finisher_startup_time,
+	"crouch_attack": attack_startup_time,
+	"up_attack": attack_startup_time,
+	"air_attack": attack_startup_time,
+})
 
 var _state := State.IDLE
 var _state_time := 0.0
@@ -599,11 +617,12 @@ func _update_attack(delta: float) -> void:
 		_apply_gravity(delta)
 
 	var window := _attack_window_for(_attack_combo_index)
+	var startup := _attack_startup_for(_attack_combo_index)
 	var t := _state_time
 
-	if t < attack_startup_time:
+	if t < startup:
 		_attack_phase = PHASE_STARTUP
-	elif t < attack_startup_time + attack_active_time:
+	elif t < startup + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
 			_activate_directional_attack(
@@ -638,6 +657,12 @@ func _attack_window_for(index: int) -> float:
 			return attack_window_hit2
 		_:
 			return attack_window_hit3
+
+
+## The finisher (hit 3) has its own, longer windup than hits 1/2 -- see
+## attack_finisher_startup_time.
+func _attack_startup_for(index: int) -> float:
+	return attack_finisher_startup_time if index >= 2 else attack_startup_time
 
 
 func _ground_attack_name(index: int) -> StringName:
@@ -676,7 +701,7 @@ func _update_crouch_attack(delta: float) -> void:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
 			_deactivate_attack_hitbox()
-		if _state_time >= attack_window_hit3:
+		if _state_time >= crouch_up_attack_window:
 			if Input.is_action_pressed(&"move_down") or not _has_standing_headroom():
 				_enter_state(State.CROUCH)
 			else:
@@ -711,7 +736,7 @@ func _update_up_attack(delta: float) -> void:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
 			_deactivate_attack_hitbox()
-		if _state_time >= attack_window_hit3:
+		if _state_time >= crouch_up_attack_window:
 			_end_generic_attack()
 
 
