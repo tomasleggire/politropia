@@ -40,7 +40,7 @@
         79.14285714285717,
         528.2266573338652
       ],
-      "description": "flat lateral backhand cut, hit 2 (measured from ground_attack_2 art; contact height reads close to hit 1's, not distinctly lower)",
+      "description": "opposite-curvature lateral backhand cut, hit 2",
       "cut_geometry": {
         "a_from": 15.0,
         "a_to": 155.0,

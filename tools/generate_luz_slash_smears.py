@@ -14,12 +14,10 @@
 - Pale mint 4-tone palette with checker dithering (PX=3 chunky pixel art).
 - Cell size 720x640: generously sized so up-thrust and tall arcs have zero clipping.
 - T4d item 3: ONE shared hitbox size/reach for every horizontal attack
-  (ground_1/2/3/crouch/air), only vertical placement differs; up is the same
-  size rotated 90 degrees. All 6 are DERIVED here (see derive_shared_hitboxes,
-  from luz_ruler_track.json's contact-frame heights + REACH_WORLD/
-  SHARED_LENGTH/SHARED_THICKNESS) and validated against
-  scripts/player/player.gd, which only reads the derived values -- this
-  script fails the build if player.gd has drifted from the derivation.
+  (ground_1/2/3/crouch/air), only vertical placement differs. Those five
+  boxes are derived from the ruler track and shared reach constants. T5b
+  restores the previously accepted up-hitbox geometry; that separate value
+  is checked against UP_HITBOX rather than derived from horizontal reach.
 - Assert bounds on all variants to guarantee no cell clipping.
 
 Outputs:
@@ -407,9 +405,8 @@ def derive_shared_hitboxes(track: dict) -> dict[str, tuple[tuple[float, float], 
     attack's own measured ruler height at contact (the ground combo's three
     hits share ONE "chest" placement, averaged across all three, per the
     brief's "chest for combo" -- not three slightly different placements).
-    The up attack is the same size rotated 90 degrees, reaching the same
-    distance upward (see module docstring for the disclosed mismatch this
-    causes against that clip's own, diagonal, placeholder-art thrust pose)."""
+    The up attack keeps its previously accepted geometry as an explicit
+    value, independent from the horizontal boxes."""
     combo_y = sum(_clip_mid_y(track, c) for c in ("ground_attack_1", "ground_attack_2", "ground_attack_3")) / 3.0
     crouch_y = _clip_mid_y(track, "crouch_attack")
     air_y = _clip_mid_y(track, "air_horizontal_attack")
@@ -428,9 +425,9 @@ def validate_hitboxes(ruler_track: dict, hitbox_configs: dict) -> None:
     """Fails the build if scripts/player/player.gd's unified hitbox exports
     have drifted from derive_shared_hitboxes's analytical derivation (from
     REACH_WORLD/SHARED_LENGTH/SHARED_THICKNESS + the measured ruler track's
-    per-clip contact height) -- this script/the track JSON are the single
-    source of truth for WHAT the values should be; player.gd is where
-    gameplay reads them from, and the two must never silently disagree."""
+    per-clip contact height) -- the up box is validated separately against
+    UP_HITBOX. player.gd is where gameplay reads these values from, and the
+    two must never silently disagree."""
     if not ruler_track.get("clips"):
         print("  (no ruler track data; skipping hitbox validation)")
         return
@@ -492,12 +489,10 @@ def main() -> int:
             "peak": 0.55,
             "track_clip": "ground_attack_2",
             "lateral_from_track": {"ry_world": LATERAL_RY_GROUND, "a_from": 15.0, "a_to": 155.0, "minimum_reach_world": REACH_WORLD},
-            # The approved raw art's own measured contact height (-28.52) came
-            # out close to hit 1's (-27.65), not distinctly lower/"waist" as
-            # the revised prompt asked for -- described honestly here rather
-            # than as "waist height", which the rendered art doesn't actually
-            # show (see odd/tasks/luz-blasphemous-animation.md T4b part 2).
-            "description": "flat lateral backhand cut, hit 2 (measured from ground_attack_2 art; contact height reads close to hit 1's, not distinctly lower)",
+            # T5b uses the tucked across-body source pose for a backhand
+            # contact; the lower-arc silhouette distinguishes this cut from
+            # the forehand without changing hitbox size or reach.
+            "description": "opposite-curvature lateral backhand cut, hit 2",
         },
         "ground_3": {
             "row": 2, "type": "arc",
