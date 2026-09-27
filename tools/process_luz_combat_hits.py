@@ -9,9 +9,12 @@ stay >= 12px inside its own fixed 384x512 cell (see the Codex prompts under
 ``tools/art_sources/luz/prompts/``). So per-cell processing here only needs:
   1. per-cell 8-connected alpha-component labeling, to find and drop stray
      specks (small components far from the character's own silhouette);
-  2. a uniform rescale so the new art's body height matches the existing
+  2. a per-clip rescale so the new art's body height matches the existing
      (already-committed) sheets' character height at the same 0.175 display
-     scale (see NEW_ART_SCALE_FACTOR below for the measurement);
+     scale, AND matches across the three hits themselves (hit 3's raw art
+     draws Luz ~14.6% larger than hits 1/2 -- see
+     RAW_CLIP_READY_HEIGHT_PX/_scale_factor_for_clip below for the
+     measurement and per-clip correction);
   3. feet-baseline + horizontal placement into the shared 512x512 output
      cell convention (frame_anchor (256, 413), same as every other clip).
 
@@ -62,20 +65,43 @@ FRAME_ANCHOR = (256, 413)
 DISPLAY_SCALE = 0.175
 DESIGN_SCALE = 1.0 / DISPLAY_SCALE
 
-# Measured (see odd/tasks/luz-blasphemous-animation.md T4 progress entry):
-# new raw art's "ready stance" bbox height (251px, cell 0 of
-# ground_attack_1_raw.png) vs the OLD (currently-committed, pre-T4) raw
-# ground_attack_1 art's own ready-stance bbox height (292px, cell 0 of
-# tools/art_sources/luz/source/luz_ground_combat_sheet.png under its legacy
-# seed cuts) -- ratio 292/251 = 1.163. Cross-checked against the contact
-# frame (old finisher-less hit1 cell 3, 285px silhouette vs new cell 3's
-# horizontally-extended pose) which is noisier (arm extension dominates
-# bbox height there) but agrees within ~1% (1.175). Both new-art generation
-# runs (hit1 v2, hit2, hit3) share the identical "standing height ~240px,
-# feet baseline 40px above cell bottom" prompt spec, so one scale factor is
-# applied uniformly to all three.
-NEW_ART_SCALE_FACTOR = 1.17
+# Base scale factor (see odd/tasks/luz-blasphemous-animation.md T4 progress
+# entry): tuned so hit 1/2's shared "ready stance" raw bbox height (240px,
+# frame 0 of ground_attack_1_raw.png / ground_attack_2_raw.png -- both
+# measure identically) lands close to the OLD (pre-T4, currently-committed)
+# raw ground_attack_1 art's own ready-stance bbox height (292px under its
+# legacy seed cuts): 240*1.17 = 280.8, within ~4% (the two art generations
+# aren't expected to match exactly, only to be *consistent with each other*,
+# which per-clip correction below now guarantees).
+NEW_ART_SCALE_FACTOR_BASE = 1.17
+
+# T4d item 1 fix (iPhone playtest: "in the 3rd hit Luz gets bigger and so
+# does the attack hitbox; that must not happen"). Measured directly (frame 0
+# of each raw sheet, same planted "ready/guard" stance in all three, alpha
+# bbox height after the speck filter, BEFORE any rescale):
+#   ground_attack_1 frame 0: 240px   ground_attack_2 frame 0: 240px
+#   ground_attack_3 frame 0: 275px  (~14.6% taller than hits 1/2)
+# Cross-checked against each clip's own contact frame (index 3, a different
+# pose but comparable in silhouette height): 223 / 217 / 248px -- hit 3 is
+# 248/220(avg of 1,2) = 1.127x taller there too, agreeing with the frame-0
+# ratio (1.146x) within ~1.7%. This confirms hit 3's raw art draws Luz's body
+# itself larger, not just a taller pose. Fix: hit 3 gets an additional
+# per-clip correction on top of the shared base factor so all three clips'
+# body height matches hits 1/2 exactly (240px reference); hits 1/2 keep
+# factor 1.0 (already agree).
+RAW_CLIP_READY_HEIGHT_PX = {
+    "ground_attack_1": 240.0,
+    "ground_attack_2": 240.0,
+    "ground_attack_3": 275.0,
+}
+SCALE_REFERENCE_HEIGHT_PX = 240.0  # hits 1/2's own measured ready height.
 RESAMPLE = Image.LANCZOS
+
+
+def _scale_factor_for_clip(clip_name: str) -> float:
+    ready_height = RAW_CLIP_READY_HEIGHT_PX.get(clip_name, SCALE_REFERENCE_HEIGHT_PX)
+    per_clip_correction = SCALE_REFERENCE_HEIGHT_PX / ready_height
+    return NEW_ART_SCALE_FACTOR_BASE * per_clip_correction
 
 RAW_GRID = {"columns": 4, "rows": 2, "cell_width": 384, "cell_height": 512}
 RAW_FEET_LOCAL_Y = 472  # measured identically across all 3 new raw sheets
@@ -233,7 +259,7 @@ def unpremultiply(im: Image.Image) -> Image.Image:
     return result
 
 
-def process_raw_frame(raw_sheet: Image.Image, cell_index: int, report: list[str]) -> Image.Image:
+def process_raw_frame(raw_sheet: Image.Image, cell_index: int, report: list[str], scale_factor: float) -> Image.Image:
     """Returns a fresh 512x512 output cell for one frame of new raw art."""
     col = cell_index % RAW_GRID["columns"]
     row = cell_index // RAW_GRID["columns"]
@@ -250,11 +276,11 @@ def process_raw_frame(raw_sheet: Image.Image, cell_index: int, report: list[str]
     region = filtered.crop(bbox)
     region_w, region_h = region.size
 
-    scaled_w = max(1, round(region_w * NEW_ART_SCALE_FACTOR))
-    scaled_h = max(1, round(region_h * NEW_ART_SCALE_FACTOR))
+    scaled_w = max(1, round(region_w * scale_factor))
+    scaled_h = max(1, round(region_h * scale_factor))
     scaled = unpremultiply(premultiply(region).resize((scaled_w, scaled_h), RESAMPLE))
 
-    leading_x = CANVAS_PADDING + round(bbox[0] * NEW_ART_SCALE_FACTOR)
+    leading_x = CANVAS_PADDING + round(bbox[0] * scale_factor)
     leading_y = FEET_ROW - (scaled_h - 1)
 
     # The finisher's widest contact frame can be wider than CANVAS_PADDING +
@@ -288,8 +314,18 @@ def process_raw_frame(raw_sheet: Image.Image, cell_index: int, report: list[str]
             f"(leading=({leading_x},{leading_y}), size=({scaled_w}x{scaled_h}))"
         )
 
+    # T4d fix: Image.paste(im, box, mask=im) blends ALL FOUR channels
+    # (including alpha itself) by the mask weight against a destination that
+    # starts fully transparent -- for a translucent antialiased edge pixel
+    # (alpha=128, say) this computes result_alpha = 128*(128/255) = 64.3, not
+    # 128: alpha gets silently squared/eroded at every frame's silhouette
+    # edge. alpha_composite performs correct over-compositing (equivalent to
+    # a plain copy here, since the destination region is always fully
+    # transparent first) and was found while chasing a foreshortened-frame
+    # ruler-detection bug (T4d item 2) whose axis measurement was sensitive
+    # to this edge erosion.
     out = Image.new("RGBA", (OUT_CELL_SIZE, OUT_CELL_SIZE), (0, 0, 0, 0))
-    out.paste(scaled, (leading_x, leading_y), scaled)
+    out.alpha_composite(scaled, (leading_x, leading_y))
     return out
 
 
@@ -577,14 +613,16 @@ def main() -> int:
                 RAW_GRID["rows"] * RAW_GRID["cell_height"],
             ), f"{clip_name}: unexpected raw sheet size {raw_sheet.size}"
             contact_frames[clip_name] = cfg["contact_frame"]
+            scale_factor = _scale_factor_for_clip(clip_name)
+            print(f"  scale factor for {clip_name}: {scale_factor:.4f} (base {NEW_ART_SCALE_FACTOR_BASE} x per-clip correction {scale_factor / NEW_ART_SCALE_FACTOR_BASE:.4f})")
 
             frame_records = []
             for local_i in range(frame_count):
-                frame_img = process_raw_frame(raw_sheet, local_i, report)
+                frame_img = process_raw_frame(raw_sheet, local_i, report, scale_factor)
                 dest_cell = new_indices[local_i]
                 col = dest_cell % ground_grid["columns"]
                 row = dest_cell // ground_grid["columns"]
-                out_sheet.paste(frame_img, (col * OUT_CELL_SIZE, row * OUT_CELL_SIZE), frame_img)
+                out_sheet.alpha_composite(frame_img, (col * OUT_CELL_SIZE, row * OUT_CELL_SIZE))
                 ruler = measure_ruler(frame_img)
                 frame_records.append({"frame": local_i, **ruler})
                 conf_tag = " [LOW CONFIDENCE, foreshortened/occluded]" if ruler.get("low_confidence") else ""
@@ -608,7 +646,7 @@ def main() -> int:
                 cell_img = legacy_sheet.crop((old_col * OUT_CELL_SIZE, old_row * OUT_CELL_SIZE, (old_col + 1) * OUT_CELL_SIZE, (old_row + 1) * OUT_CELL_SIZE))
                 dest_cell = new_indices[local_i]
                 col, row = dest_cell % ground_grid["columns"], dest_cell // ground_grid["columns"]
-                out_sheet.paste(cell_img, (col * OUT_CELL_SIZE, row * OUT_CELL_SIZE), cell_img)
+                out_sheet.alpha_composite(cell_img, (col * OUT_CELL_SIZE, row * OUT_CELL_SIZE))
 
         render_onion_skin(out_sheet, new_indices, clip_name, PREVIEW_DIR, ground_grid)
 
