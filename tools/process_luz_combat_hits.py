@@ -122,14 +122,25 @@ def _is_ruler_pixel(r: int, g: int, b: int) -> bool:
 RAW_CLIPS = {
     "ground_attack_1": {
         "raw_file": "ground_attack_1_raw.png",
+        # Deterministically reuse the approved poses as one forehand action:
+        # cocked behind -> raised through the backswing -> one contact ->
+        # short follow-through -> settle. Repeated indices are deliberate
+        # holds, not extra movement or additional contact poses.
+        "source_frames": [1, 1, 1, 3, 3, 7, 7, 7],
         "contact_frame": 3,
     },
     "ground_attack_2": {
         "raw_file": "ground_attack_2_raw.png",
-        "contact_frame": 3,  # every new raw sheet's contact frame is index 3 (the 4th)
+        # Backhand: hold the distinct across-body guard through anticipation,
+        # commit once to contact, then drop through into a brief recovery.
+        "source_frames": [0, 0, 0, 2, 2, 4, 4, 4],
+        "contact_frame": 3,  # runtime contact remains the 4th output frame
     },
     "ground_attack_3": {
         "raw_file": "ground_attack_3_raw.png",
+        # Finisher: compact high preparation, one deep planted contact, then
+        # a brief downward follow-through held without a second swing.
+        "source_frames": [1, 1, 1, 3, 3, 6, 6, 6],
         "contact_frame": 3,
     },
 }
@@ -617,8 +628,17 @@ def main() -> int:
             print(f"  scale factor for {clip_name}: {scale_factor:.4f} (base {NEW_ART_SCALE_FACTOR_BASE} x per-clip correction {scale_factor / NEW_ART_SCALE_FACTOR_BASE:.4f})")
 
             frame_records = []
-            for local_i in range(frame_count):
-                frame_img = process_raw_frame(raw_sheet, local_i, report, scale_factor)
+            source_frames = cfg.get("source_frames", list(range(frame_count)))
+            if len(source_frames) != frame_count:
+                raise SegmentationError(
+                    f"{clip_name}: source_frames has {len(source_frames)} entries, expected {frame_count}"
+                )
+            if cfg["contact_frame"] != 3 or source_frames[cfg["contact_frame"]] not in (2, 3):
+                raise SegmentationError(
+                    f"{clip_name}: contact_frame must select an approved horizontal raw contact pose"
+                )
+            for local_i, source_i in enumerate(source_frames):
+                frame_img = process_raw_frame(raw_sheet, source_i, report, scale_factor)
                 dest_cell = new_indices[local_i]
                 col = dest_cell % ground_grid["columns"]
                 row = dest_cell // ground_grid["columns"]

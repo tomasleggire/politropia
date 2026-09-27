@@ -77,6 +77,9 @@ SHARED_LENGTH = REACH_WORLD - BODY_FRONT_X
 # 24/24/20/30 world units for ground/finisher/crouch/air respectively).
 SHARED_THICKNESS = 24.0
 SHARED_OFFSET_X = (REACH_WORLD + BODY_FRONT_X) / 2.0
+# T5b restores the previously accepted upward attack geometry; it remains
+# deliberately independent from the shared horizontal reach derivation.
+UP_HITBOX = ((26.0, 68.0), (0.0, -80.0))
 
 # Flat lateral crescent geometry for ground_1/2/3/crouch/air (Blasphemous
 # main-attack style: a long, flat, horizontal cut reaching far beyond the
@@ -157,7 +160,7 @@ def parse_player_hitboxes() -> dict[str, tuple[tuple[float, float], tuple[float,
 
 def render_crescent_frame(
     frame: int, cx: float, cy: float, rx: float, ry: float,
-    a_from: float, a_to: float, peak: float,
+    a_from: float, a_to: float, peak: float, rotation_deg: float = 0.0,
 ) -> Image.Image:
     lead_p = FRAME_LEAD[frame]
     tail_p = FRAME_TAIL[frame]
@@ -167,12 +170,17 @@ def render_crescent_frame(
     low_w, low_h = CELL_WIDTH // PX, CELL_HEIGHT // PX
     img = Image.new("RGBA", (low_w, low_h), (0, 0, 0, 0))
     px = img.load()
+    rotation = math.radians(rotation_deg)
+    cos_rotation, sin_rotation = math.cos(rotation), math.sin(rotation)
 
     for ly in range(low_h):
         for lx in range(low_w):
             x, y = lx * PX, ly * PX
-            u = (x - cx) / rx
-            v = (y - cy) / ry
+            dx, dy = x - cx, y - cy
+            local_x = dx * cos_rotation + dy * sin_rotation
+            local_y = -dx * sin_rotation + dy * cos_rotation
+            u = local_x / rx
+            v = local_y / ry
             rho = math.hypot(u, v)
             if rho > 1.05:
                 continue
@@ -279,7 +287,10 @@ def lateral_band_mid_sin(a_from: float, a_to: float, steps: int = 720) -> float:
     return (min(sines) + max(sines)) / 2.0
 
 
-def lateral_swing_geometry(clip_track: dict, ry_world: float) -> dict:
+def lateral_swing_geometry(
+    clip_track: dict, ry_world: float, a_from: float, a_to: float, rotation_deg: float = 0.0,
+    minimum_reach_world: float = 0.0,
+) -> dict:
     """Derives a FLAT LATERAL ellipse (cx, cy, rx, ry, a_from, a_to) for a
     ground_1/2/3/crouch/air variant from ONLY the clip's CONTACT frame
     measured ruler tip/grip (assets/player/luz/luz_ruler_track.json, now
@@ -315,15 +326,18 @@ def lateral_swing_geometry(clip_track: dict, ry_world: float) -> dict:
     # The sweep only draws part of the ellipse, so its visible band is not
     # centered on the ellipse center; shift the center so that band's middle
     # sits on the ruler line (the cut must trail the blade, not float above it).
-    center_y = ruler_y - lateral_band_mid_sin(LATERAL_A_FROM, LATERAL_A_TO) * ry_world
+    center_y = ruler_y - lateral_band_mid_sin(a_from, a_to) * ry_world
     near_x = BODY_FRONT_X
-    far_x = SMEAR_FLARE * tip["x"]
+    # Keep the visible cut at least as far as the shared hitbox even when a
+    # backhand's across-body grip places the painted ruler tip closer in x;
+    # the crescent remains a visual effect and does not alter combat reach.
+    far_x = max(SMEAR_FLARE * tip["x"], minimum_reach_world)
     cx = (near_x + far_x) / 2.0
     rx = (far_x - near_x) / 2.0
     ry = ry_world
     return {
         "cx": cx, "cy": center_y, "rx": rx, "ry": ry,
-        "a_from": LATERAL_A_FROM, "a_to": LATERAL_A_TO,
+        "a_from": a_from, "a_to": a_to, "rotation_deg": rotation_deg,
         "contact_tip_x": tip["x"], "far_x_target": far_x,
     }
 
@@ -339,8 +353,13 @@ def build_variant_geometry(
     lateral = config.get("lateral_from_track")
     track_clip = config.get("track_clip")
     if lateral and track_clip and track.get("clips", {}).get(track_clip):
-        geo = lateral_swing_geometry(track["clips"][track_clip], lateral["ry_world"])
+        geo = lateral_swing_geometry(
+            track["clips"][track_clip], lateral["ry_world"],
+            lateral.get("a_from", LATERAL_A_FROM), lateral.get("a_to", LATERAL_A_TO),
+            lateral.get("rotation_deg", 0.0), lateral.get("minimum_reach_world", 0.0),
+        )
         config["a_from"], config["a_to"] = geo["a_from"], geo["a_to"]
+        config["rotation_deg"] = geo["rotation_deg"]
         rx, ry = geo["rx"] * DESIGN_SCALE, geo["ry"] * DESIGN_SCALE
         anchor_x = cx - geo["cx"] * DESIGN_SCALE
         anchor_y = cy - geo["cy"] * DESIGN_SCALE
@@ -401,7 +420,7 @@ def derive_shared_hitboxes(track: dict) -> dict[str, tuple[tuple[float, float], 
         "ground_3": (size, (SHARED_OFFSET_X, combo_y)),
         "crouch": (size, (SHARED_OFFSET_X, crouch_y)),
         "air": (size, (SHARED_OFFSET_X, air_y)),
-        "up": ((SHARED_THICKNESS, SHARED_LENGTH), (0.0, -SHARED_OFFSET_X)),
+        "up": UP_HITBOX,
     }
 
 
@@ -465,14 +484,14 @@ def main() -> int:
             # "crouch" below, at the contact frame's own ruler height.
             "peak": 0.55,
             "track_clip": "ground_attack_1",
-            "lateral_from_track": {"ry_world": LATERAL_RY_GROUND},
+            "lateral_from_track": {"ry_world": LATERAL_RY_GROUND, "a_from": 205.0, "a_to": 345.0, "minimum_reach_world": REACH_WORLD},
             "description": "flat lateral cut at chest height, hit 1 (measured from ground_attack_1 art)",
         },
         "ground_2": {
             "row": 1, "type": "arc",
             "peak": 0.55,
             "track_clip": "ground_attack_2",
-            "lateral_from_track": {"ry_world": LATERAL_RY_GROUND},
+            "lateral_from_track": {"ry_world": LATERAL_RY_GROUND, "a_from": 15.0, "a_to": 155.0, "minimum_reach_world": REACH_WORLD},
             # The approved raw art's own measured contact height (-28.52) came
             # out close to hit 1's (-27.65), not distinctly lower/"waist" as
             # the revised prompt asked for -- described honestly here rather
@@ -484,7 +503,7 @@ def main() -> int:
             "row": 2, "type": "arc",
             "peak": 0.62,
             "track_clip": "ground_attack_3",
-            "lateral_from_track": {"ry_world": LATERAL_RY_FINISHER},
+            "lateral_from_track": {"ry_world": LATERAL_RY_FINISHER, "a_from": 205.0, "a_to": 345.0, "rotation_deg": 18.0, "minimum_reach_world": REACH_WORLD},
             "description": "flat lateral finisher cut at chest height, wider/thicker/farther reach (measured from ground_attack_3 art)",
         },
         "crouch": {
@@ -529,7 +548,7 @@ def main() -> int:
             if spec["type"] == "arc":
                 frame_img = render_crescent_frame(
                     frame, geometry["cx"], geometry["cy"], geometry["rx"], geometry["ry"],
-                    spec["a_from"], spec["a_to"], spec["peak"],
+                    spec["a_from"], spec["a_to"], spec["peak"], spec.get("rotation_deg", 0.0),
                 )
             else:
                 frame_img = render_thrust_frame(
@@ -544,6 +563,11 @@ def main() -> int:
             "reference_hitbox_offset": list(offset),
             "anchor": [geometry["anchor"][0], geometry["anchor"][1]],
             "description": spec["description"],
+            "cut_geometry": {
+                "a_from": spec.get("a_from"), "a_to": spec.get("a_to"),
+                "rotation_deg": spec.get("rotation_deg", 0.0),
+                "ry_world": spec.get("lateral_from_track", {}).get("ry_world"),
+            },
         }
 
     out_path = OUTPUT_DIR / "luz_slash_smears.png"

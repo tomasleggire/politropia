@@ -149,19 +149,17 @@ const PHASE_RECOVERY := 2
 ## measured ruler height at contact (the ground combo's three hits share
 ## ONE "chest" placement, averaged across all three; crouch is low; air is
 ## mid-air torso height). hitbox_up_size/offset is the same size rotated 90
-## degrees, reaching the same distance upward. Single source of truth:
-## tools/generate_luz_slash_smears.py's derive_shared_hitboxes, from
-## assets/player/luz/luz_ruler_track.json (which tools/paint_luz_ruler.py
-## bakes so the drawn ruler itself reaches this same distance) -- that
-## script FAILS the build if these values drift from its derivation.
+## degrees, reaching the same distance upward. The upward box intentionally
+## retains its previously accepted size and offset; it is not part of the
+## shared horizontal-hitbox derivation.
 @export var hitbox_attack_size := Vector2(60.3, 24.0)
 ## offset.x, shared by every horizontal attack (ground combo, crouch, air).
 @export var hitbox_attack_reach_x := 49.15
-@export var hitbox_ground_offset_y := -27.2   ## combo (hits 1-3): chest height
+@export var hitbox_ground_offset_y := -25.69  ## combo (hits 1-3): shared contact height
 @export var hitbox_crouch_offset_y := -17.02  ## crouch: low horizontal cut height
 @export var hitbox_air_offset_y := -30.66     ## air: mid-air torso height
-@export var hitbox_up_size := Vector2(24.0, 60.3)
-@export var hitbox_up_offset := Vector2(0.0, -49.15)
+@export var hitbox_up_size := Vector2(26, 68)
+@export var hitbox_up_offset := Vector2(0, -80)
 @export var hitbox_plunge_size := Vector2(28.0, 18.0)
 @export var hitbox_plunge_offset := Vector2(0.0, 12.0)
 @export var hitbox_plunge_land_size := Vector2(150.0, 20.0)

@@ -36,11 +36,11 @@ SMEAR_FRAME_TO_SHOW = 1  # "full" frame, per FRAME_LEAD/FRAME_TAIL in generate_l
 # (sheet, absolute contact-cell index, hitbox_size, hitbox_offset, smear variant)
 # Hitbox values must match player.gd's current "Attack Hitboxes" export group.
 CASES = [
-    ("luz_ground_combat_sheet.png", 3, (60.3, 24.0), (49.15, -27.2), "ground_1"),
-    ("luz_ground_combat_sheet.png", 11, (60.3, 24.0), (49.15, -27.2), "ground_2"),
-    ("luz_ground_combat_sheet.png", 19, (60.3, 24.0), (49.15, -27.2), "ground_3"),
+    ("luz_ground_combat_sheet.png", 3, (60.3, 24.0), (49.15, -25.69), "ground_1"),
+    ("luz_ground_combat_sheet.png", 11, (60.3, 24.0), (49.15, -25.69), "ground_2"),
+    ("luz_ground_combat_sheet.png", 19, (60.3, 24.0), (49.15, -25.69), "ground_3"),
     ("luz_ground_combat_sheet.png", 27, (60.3, 24.0), (49.15, -17.02), "crouch"),
-    ("luz_air_combat_sheet.png", 3, (24.0, 60.3), (0.0, -49.15), "up"),
+    ("luz_air_combat_sheet.png", 3, (26.0, 68.0), (0.0, -80.0), "up"),
     ("luz_air_combat_sheet.png", 11, (60.3, 24.0), (49.15, -30.66), "air"),
 ]
 

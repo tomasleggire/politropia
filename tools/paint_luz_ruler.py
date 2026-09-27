@@ -461,6 +461,29 @@ def to_world(p: tuple[float, float]) -> dict:
     return {"x": round((p[0] - FRAME_ANCHOR[0]) * DISPLAY_SCALE, 2), "y": round((p[1] - FRAME_ANCHOR[1]) * DISPLAY_SCALE, 2)}
 
 
+def unwrap_axis_path(angles: list[float], preferred_direction: int = 0) -> list[float]:
+    """Choose the nearest 360-degree representation for each adjacent pose.
+
+    The ruler axis is measured directionally from hand to tip. Unwrapping the
+    equivalent angle representation keeps a sequence such as 180 -> -7 from
+    looking like a -187-degree reversal in the audit/track, while the painted
+    pixels remain exactly the same because sine/cosine are 360-degree
+    periodic.
+    """
+    if not angles:
+        return []
+    unwrapped = [angles[0]]
+    for angle in angles[1:]:
+        previous = unwrapped[-1]
+        delta = ((angle - previous + 180.0) % 360.0) - 180.0
+        if preferred_direction > 0 and delta < -0.01:
+            delta += 360.0
+        elif preferred_direction < 0 and delta > 0.01:
+            delta -= 360.0
+        unwrapped.append(previous + delta)
+    return unwrapped
+
+
 def process_clip(clip_name: str, sheet_img: Image.Image, grid: dict, indices: list[int], contact_index: int, report: list[str]) -> dict:
     cw, ch, cols = grid["cell_width"], grid["cell_height"], grid["columns"]
 
@@ -470,6 +493,13 @@ def process_clip(clip_name: str, sheet_img: Image.Image, grid: dict, indices: li
         original_frames.append(sheet_img.crop((col * cw, row * ch, (col + 1) * cw, (row + 1) * ch)))
 
     detections = [detect_ruler(f) for f in original_frames]
+    if clip_name in ("ground_attack_1", "ground_attack_2", "ground_attack_3"):
+        unreliable_frames = [i for i, d in enumerate(detections) if not d["found"] or d["low_confidence"]]
+        if unreliable_frames:
+            raise SystemExit(
+                f"{clip_name}: T5b ground sequence must use reliable source ruler poses; "
+                f"unreliable frames: {unreliable_frames}"
+            )
     contact = detections[contact_index]
     if not contact["found"] or contact["low_confidence"]:
         raise SystemExit(f"{clip_name}: contact frame {contact_index} ruler detection unreliable -- cannot bake ruler length from it")
@@ -560,6 +590,16 @@ def process_clip(clip_name: str, sheet_img: Image.Image, grid: dict, indices: li
             f"    frame {i}: low-confidence, axis={frame_axis[i]:.2f}deg "
             f"ratio={frame_ratio[i]:.3f} ({source}, axis from frames {lo}/{hi})"
         )
+
+    if clip_name in ("ground_attack_1", "ground_attack_2", "ground_attack_3"):
+        # Reordered ground poses form the motion; unwrap equivalent angles so
+        # the baked track reports its actual single direction without an
+        # artificial +/-180-degree endpoint discontinuity.
+        # Hit 3's near-180-degree windup/contact ambiguity resolves clockwise:
+        # its chosen recovery pose continues that same direction.
+        direction = 1 if clip_name == "ground_attack_3" else 0
+        frame_axis = unwrap_axis_path(frame_axis, direction)
+        report.append(f"    unwrapped ruler axis path: {frame_axis}")
 
     painted_length_native = painted_length_world * DESIGN_SCALE
 
