@@ -7,50 +7,50 @@
     "ground_1": {
       "row": 0,
       "reference_hitbox_size": [
-        27.08,
-        66.95
+        60.32,
+        13.59
       ],
       "reference_hitbox_offset": [
-        32.54,
-        -33.5
+        49.16,
+        -38.53
       ],
       "anchor": [
-        307.6857142857143,
-        499.4761904761905
+        82.74285714285713,
+        479.0
       ],
-      "description": "forward diagonal cut, behind-high to front-low (measured from ground_attack_1 art)"
+      "description": "flat lateral cut at chest height, hit 1 (measured from ground_attack_1 art)"
     },
     "ground_2": {
       "row": 1,
       "reference_hitbox_size": [
-        27.08,
-        66.95
+        60.32,
+        13.59
       ],
       "reference_hitbox_offset": [
-        32.54,
-        -33.5
+        49.16,
+        -38.53
       ],
       "anchor": [
-        275.0095238095238,
-        491.48571428571427
+        123.7142857142857,
+        475.48571428571427
       ],
-      "description": "backhand hook sweeping low-to-horizontal-to-up (measured from ground_attack_2 art)"
+      "description": "flat lateral backhand cut at waist height, hit 2 (measured from ground_attack_2 art)"
     },
     "ground_3": {
       "row": 2,
       "reference_hitbox_size": [
-        29.4,
-        65.5
+        83.39,
+        15.19
       ],
       "reference_hitbox_offset": [
-        33.7,
-        -33.51
+        60.69,
+        -43.26
       ],
       "anchor": [
-        271.66666666666663,
-        511.48571428571427
+        18.214285714285722,
+        493.48571428571427
       ],
-      "description": "finisher, low windup lunging to a rising follow-through (measured from ground_attack_3 art)"
+      "description": "flat lateral finisher cut at chest height, wider/thicker/farther reach (measured from ground_attack_3 art)"
     },
     "crouch": {
       "row": 3,

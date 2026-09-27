@@ -8,29 +8,35 @@ Attached references:
    dark navy baggy pants, grey/white sneakers, dark navy backpack. Same anime pixel-art rendering, same outline
    weight, same palette, same proportions.
 2. `blasphemous_slash_ref.png` — quality/feel reference only (Blasphemous, The Penitent One): a fast, weighty,
-   fluid horizontal sword slash. Do NOT copy that character; copy the motion quality.
+   fluid horizontal sword slash (the sideways, flat cut shown is exactly the motion to replicate). Do NOT copy that character; copy the motion quality.
 
 Her weapon is a flat, straight, light-brown WOODEN RULER with dark measurement tick marks along one edge,
 rectangular with square ends, about as long as her arm plus her torso (roughly 55% of her standing height).
 It must read as a ruler, never a bat, stick or sword. Keep the ruler the same length and width in every frame.
 
-Animation: GROUND COMBO HIT 3 (FINISHER) — a heavy RISING-TO-HORIZONTAL two-handed sweep with a big forward
-lunge. It must look clearly DIFFERENT from hit 1 (hit 1 winds up OVERHEAD; this one winds up LOW behind her hip)
-and reach FARTHER than hits 1 and 2. Clearly curved arc, NOT a poke. Facing RIGHT in every frame. 8 frames:
-1. Guard: ruler held in front at chest height pointing up-forward (like hit 2's end).
-2. Low wind-up: she crouches and pulls the ruler down and BACK with both hands behind her right hip, ruler
-   pointing diagonally DOWN and BEHIND her (tip toward the lower left, about 30 degrees below horizontal),
-   torso coiled, weight on the back foot.
-3. Explosive step-in: big forward step, ruler sweeping forward and upward past her front knee, tip pointing
-   right and slightly down (about 15 degrees below horizontal).
+STYLE OF THE CUT (critical, the previous version was rejected): this is a HORIZONTAL, SIDEWAYS sword swing,
+like the main attack of The Penitent One in Blasphemous (attached reference) — the blade travels in a flat
+horizontal plane around her body at chest height, NOT from top to bottom. NEVER raise the ruler above her head.
+Because the swing is horizontal and the camera is a side view, the ruler is FORESHORTENED (looks shorter) in the
+frames where it points toward or away from the camera, and fully long when it points left or right.
+She grips the ruler like a sword and puts her whole body into it (hips and shoulders rotate).
+
+Animation: GROUND COMBO HIT 3 (FINISHER) — a heavy TWO-HANDED horizontal sweep with a big forward step, reaching
+FARTHER than hits 1 and 2. Facing RIGHT in every frame. 8 frames:
+1. Guard: ruler held in front at chest height pointing forward-up (like hit 2's end).
+2. Big wind-back: she steps back onto the rear foot and pulls the ruler back with BOTH hands behind her right
+   shoulder, ruler perfectly HORIZONTAL pointing LEFT behind her at chest height, torso fully coiled away.
+3. Step-in swing: big forward step, body lunging; the ruler sweeps around horizontally, FORESHORTENED (pointing
+   toward the camera) at chest height beside her.
 4. Contact: deepest lunge of the whole combo, back leg almost straight, torso leaning forward, both arms fully
-   extended at chest height, ruler perfectly HORIZONTAL pointing right. The ruler tip must be FARTHER right than
-   in hit 1's contact frame (tip about 350 px from the cell's left edge). This is the widest frame.
-5. Follow-through: the arc keeps rising; ruler angled up-right (about 45 degrees above horizontal), arms extended.
-6. Heavy follow-through: ruler high above her front shoulder pointing up, hair swinging forward, body still low.
-7. Recovery: pushing back up, bringing the ruler down to her side.
-8. Back to ready stance: knees bent, ruler held low in the right hand pointing down-forward (so the combo can
-   loop back to hit 1).
+   extended at chest height, ruler perfectly HORIZONTAL pointing RIGHT, full length. The ruler tip must be FARTHER
+   right than in hit 1's contact frame (tip about 350 px from the cell's left edge). Widest frame.
+5. Follow-through: momentum carries the swing around in the same horizontal plane; ruler FORESHORTENED (pointing
+   away from the camera), arms crossing in front of her.
+6. Heavy follow-through: ruler horizontal across the front of her body pointing LEFT, body still low and rotated,
+   hair swinging forward.
+7. Recovery: pushing back up, bringing the ruler down to her right side.
+8. Ready stance: knees bent, ruler held low in the right hand pointing down-forward (so the combo loops to hit 1).
 
 RULER SIZE (critical): the ruler is LONG — about 130 px long in every frame (a bit more than half of her
 240 px standing height) and about 14 px wide. Measure it: it must be the same length in every frame where it

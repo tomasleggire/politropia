@@ -299,6 +299,18 @@ RULER_MIN_ELONGATION = 15.0  # major/minor eigenvalue ratio; the ruler is a
 # happen to fall in the same warm-tan color range are blobby (elongation
 # 2-6) -- this is what actually isolates the ruler, not color alone.
 
+# Some frames legitimately FORESHORTEN the ruler (it points toward/away from
+# the camera during a horizontal swing and projects as a short, sometimes
+# almost-square blob) -- its elongation can then fall under
+# RULER_MIN_ELONGATION even though it is the ruler, not hair/skin. Rather
+# than failing the whole pipeline on those frames (they are not used to
+# drive smear/hitbox geometry -- only the contact frame is, and the contact
+# frame is by design fully horizontal/unforeshortened), fall back to the
+# single largest ruler-colored component past a relaxed size floor and mark
+# the measurement "low_confidence" instead of raising.
+RULER_FALLBACK_MIN_COMPONENT_SIZE = 120  # px
+RULER_FALLBACK_MIN_ELONGATION = 2.5  # just enough to reject near-circular noise
+
 
 def _pca(pts: list[tuple[int, int]]) -> tuple[float, float, float, float, float, float]:
     """2x2 PCA closed form. Returns (mx, my, lam1, lam2, vx, vy): centroid,
@@ -390,6 +402,7 @@ def measure_ruler(frame_img: Image.Image) -> dict:
 
     components = _connected_components(color_mask, w, h)
     ruler_pts: list[tuple[int, int]] = []
+    low_confidence = False
     for comp in components:
         if len(comp) < RULER_MIN_COMPONENT_SIZE:
             continue
@@ -399,10 +412,30 @@ def measure_ruler(frame_img: Image.Image) -> dict:
             ruler_pts.extend(comp)
 
     if len(ruler_pts) < 8:
-        raise SegmentationError(
-            f"measure_ruler: no elongated ruler-colored component found "
-            f"(largest candidates: {sorted((len(c) for c in components), reverse=True)[:3]})"
-        )
+        # Strict pass found nothing (likely a foreshortened ruler this
+        # frame) -- fall back to the single largest relaxed-threshold
+        # ruler-colored component instead of failing the whole clip.
+        low_confidence = True
+        fallback_candidates = []
+        for comp in components:
+            if len(comp) < RULER_FALLBACK_MIN_COMPONENT_SIZE:
+                continue
+            _, _, lam1, lam2, _, _ = _pca(comp)
+            elongation = lam1 / max(lam2, 1e-6)
+            if elongation >= RULER_FALLBACK_MIN_ELONGATION:
+                fallback_candidates.append(comp)
+        if not fallback_candidates:
+            return {
+                "low_confidence": True,
+                "tip": None,
+                "grip": None,
+                "tip_px": None,
+                "grip_px": None,
+                "axis_angle_deg": None,
+                "ruler_pixel_count": 0,
+                "note": "no ruler-colored component found even at the relaxed fallback threshold (foreshortened/occluded frame)",
+            }
+        ruler_pts = max(fallback_candidates, key=len)
 
     n = len(ruler_pts)
     mx, my, _, _, vx, vy = _pca(ruler_pts)
@@ -435,6 +468,7 @@ def measure_ruler(frame_img: Image.Image) -> dict:
         "grip": to_world(grip),
         "axis_angle_deg": round(axis_deg, 2),
         "ruler_pixel_count": n,
+        "low_confidence": low_confidence,
     }
 
 
@@ -553,7 +587,8 @@ def main() -> int:
                 out_sheet.paste(frame_img, (col * OUT_CELL_SIZE, row * OUT_CELL_SIZE), frame_img)
                 ruler = measure_ruler(frame_img)
                 frame_records.append({"frame": local_i, **ruler})
-                print(f"  frame {local_i} -> cell {dest_cell}: tip={ruler['tip']} grip={ruler['grip']} axis={ruler['axis_angle_deg']}deg")
+                conf_tag = " [LOW CONFIDENCE, foreshortened/occluded]" if ruler.get("low_confidence") else ""
+                print(f"  frame {local_i} -> cell {dest_cell}: tip={ruler['tip']} grip={ruler['grip']} axis={ruler['axis_angle_deg']}deg{conf_tag}")
 
             track[clip_name] = {"contact_frame": cfg["contact_frame"], "frames": frame_records}
         else:

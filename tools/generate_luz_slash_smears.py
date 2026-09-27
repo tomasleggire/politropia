@@ -2,12 +2,17 @@
 """Generate Luz's Blasphemous-style crescent slash smear and thrust VFX sheet.
 
 - 6 variants x 5 frames:
-  - ground_1: diagonal cut sweeping down-forward
-  - ground_2: reverse backhand hook sweeping FORWARD in the facing direction
-  - ground_3: wider, thicker finisher sweep forward
-  - crouch: low flat horizontal sweep forward
+  - ground_1/2/3: FLAT LATERAL crescents (Blasphemous main-attack style: a
+    long, flat, mostly-horizontal band at the contact frame's own ruler
+    height, sweeping forward from near the body), same elongated-ellipse
+    technique as crouch (large rx, small ry) -- NOT the earlier per-clip
+    angular-sweep-across-every-frame derivation (see git history), which
+    read as a round/vertical arc instead of the requested lateral cut.
+  - crouch: low flat horizontal sweep forward (unchanged, this is the style
+    ground_1/2/3 now reuse).
   - up: vertical thrust streak (narrow spindle along ruler axis, no clipping)
-  - air: lateral horizontal sweep forward
+    (unchanged).
+  - air: lateral horizontal air sweep forward (unchanged).
 - Pale mint 4-tone palette with checker dithering (PX=3 chunky pixel art).
 - Cell size 720x640: generously sized so up-thrust and tall arcs have zero clipping.
 - Hitbox size and offset parsed directly from scripts/player/player.gd as the single source of truth.
@@ -39,29 +44,55 @@ CELL_HEIGHT = 640
 FRAME_COUNT = 5
 DESIGN_SCALE = 1.0 / 0.175
 
-# Blasphemous-style slash arcs read wider than the weapon itself: the smear's
-# outer radius (and therefore the hitbox derived from it, see below) extends
-# this far past the measured ruler-tip distance.
-OUTER_RADIUS_FLARE = 1.15
-
-# A per-step shortest-path angle unwrap (track_driven_arc) can accumulate a
-# total swept span past a full circle when one recovery frame swings back
-# sharply (measured on ground_3: 370.8deg, rendering as a near-complete ring
-# instead of a crescent). Caps the span, pulling a_from in and keeping a_to
-# (the later, more visually prominent follow-through direction) fixed.
-MAX_SPAN_DEG = 280.0
-
 # "You hit what you see": ground_1/2/3's hitboxes are derived from the
-# rendered smear crescent (this outer radius, swept across a_from..a_to
-# around the swing's own pivot), not from the ruler bar alone. Only the part
-# of that crescent actually in front of the body and at/above the feet
-# counts -- the rest wraps behind her or into the ground and is never the
-# forward "you hit what you see" region a melee swing should represent.
+# rendered smear crescent (see lateral_swing_geometry/forward_extent below),
+# not from the ruler bar alone. Only the part of that crescent actually in
+# front of the body and at/above the feet counts -- the rest wraps behind
+# her or into the ground and is never the forward "you hit what you see"
+# region a melee swing should represent.
 # BODY_FRONT_X is the standing CollisionShape2D's own half-width
 # (scenes/player/player.tscn, RectangleShape2D_body size=(38,58), half=19).
 BODY_FRONT_X = 19.0
 FEET_LINE_Y = 0.0
 HITBOX_TOLERANCE = 0.05  # world units; player.gd values must match within this
+
+# Flat lateral crescent geometry for ground_1/2/3 (Blasphemous main-attack
+# style: a long, flat, horizontal cut at chest/waist height reaching far
+# beyond the weapon), derived ONLY from each clip's CONTACT frame measured
+# ruler tip (luz_ruler_track.json) -- every other frame may be a
+# low-confidence/foreshortened reading (the ruler pointing toward/away from
+# the camera mid-swing) and must not drive geometry; the contact frame is
+# always fully horizontal by the art's own spec, so it alone is reliable.
+# far_edge = REACH_MULTIPLIER * contact_tip.x (tip.x is already measured
+# from the player's own local origin, i.e. roughly "how far the ruler tip
+# reaches beyond the body"). Multipliers tuned to land near the pre-T4
+# reach values (84 for the shared ground hitbox, 98 for the finisher) -- see
+# odd/tasks/luz-blasphemous-animation.md for the exact achieved numbers.
+GROUND_REACH_MULTIPLIER = 2.0
+FINISHER_REACH_MULTIPLIER = 2.3
+# Ellipse vertical half-height (ry, world units, before the a_from/a_to
+# forward-region sampling below trims it) -- a fixed "blade thickness"
+# shared by ground_1/ground_2 (they share one hitbox) rather than a ratio of
+# rx, so the two differently-reaching cuts still read as the same weapon
+# width; the finisher is a touch thicker per the Blasphemous reference. At
+# the shared LATERAL_A_FROM/LATERAL_A_TO sweep below, the forward-region
+# vertical span comes out to (1 - sin(345deg)) * ry = 1.2588 * ry (the sweep
+# includes the ellipse's top point but not its bottom one) -- tuned so the
+# derived hitbox lands in the same ballpark as this game's other flat
+# attacks (hitbox_crouch_size.y=20, hitbox_air_size.y=30), not the near-zero
+# sliver a small rx-relative ratio would give the shorter-reaching cuts.
+LATERAL_RY_GROUND = 17.5
+LATERAL_RY_FINISHER = 20.5
+# Slight outer overshoot past the raw near/far span, same idea as the old
+# OUTER_RADIUS_FLARE: the rendered crescent (and the hitbox derived from it)
+# reads a little past the bare numeric reach for visual follow-through.
+LATERAL_FLARE = 1.08
+# Same flat-crescent angle sweep as the approved crouch smear (a_from/a_to
+# below atan2 convention, y-down): covers the ellipse's forward arc without
+# reaching fully behind (a_from) or fully in front (a_to), matching the
+# "thick leading edge, thin tail" read crouch already has.
+LATERAL_A_FROM = 205.0
+LATERAL_A_TO = 345.0
 
 PALETTE = [
     (240, 252, 244),
@@ -210,76 +241,65 @@ def load_ruler_track() -> dict:
     return json.loads(TRACK_PATH.read_text())
 
 
-def track_driven_arc(clip_track: dict) -> tuple[float, float, float, tuple[float, float]]:
-    """Derives (a_from, a_to, radius_world, pivot_world) for an arc variant
-    from the measured per-frame ruler tip/grip path
-    (assets/player/luz/luz_ruler_track.json) instead of hand-picked constants.
-    Everything here is in WORLD/hitbox units (angle is scale-invariant, so
-    computing it directly in world units instead of via a pixel round-trip
-    makes no difference); build_variant_geometry converts radius to native
-    smear pixels for rendering.
+def lateral_swing_geometry(clip_track: dict, reach_multiplier: float, ry_world: float) -> dict:
+    """Derives a FLAT LATERAL ellipse (cx, cy, rx, ry, a_from, a_to) for a
+    ground_1/2/3 variant from ONLY the clip's CONTACT frame measured ruler
+    tip/grip (assets/player/luz/luz_ruler_track.json) -- unlike the earlier
+    per-clip angular-sweep-across-every-frame derivation (see git history),
+    this needs no windup/follow-through measurements (some of which are
+    legitimately low-confidence: the ruler foreshortens when it points
+    toward/away from the camera mid-swing) since the contact frame alone is
+    reliable (always fully horizontal, by the art's own spec) and is the
+    only frame whose height/reach we actually want to key the cut to.
 
-    Pivot: the hand-authored variants (crouch/up/air) center their ellipse on
-    the *hitbox* center, sized from the hitbox's own half-extents -- but
-    ground_1/2/3's hitbox is itself derived from this same arc (see
-    forward_extent/derive_hitbox below), so centering the ellipse there would
-    be circular and, measured, collapses to a barely-visible sliver (radius
-    ~34px vs the ~280px a bold Blasphemous-style crescent needs). Pivoting at
-    the character's own local origin (feet) instead put the whole arc up
-    past her shoulder, off to one side -- also wrong (the tip's angle around
-    the feet isn't where the swing actually happens). The grip position
-    (the hand, i.e. roughly the swing's actual mechanical pivot) is stable
-    and centrally located across
-    the whole windup/contact/follow-through path, so its per-frame average
-    is used as the ellipse's pivot; the radius is fit to the contact frame's
-    measured tip distance, then flared out by OUTER_RADIUS_FLARE so the
-    crescent's outer edge reads past the weapon, Blasphemous-style.
+    - center_y: the ruler's own height at contact (average of tip/grip y)
+      -- chest for ground_1/ground_3, waist for ground_2, per whatever the
+      approved art actually drew.
+    - far_x: reach_multiplier * contact tip.x (tip.x is already measured
+      from the player's own local origin), i.e. how far *beyond the body*
+      the cut should read, Blasphemous-style (fit to the pre-T4 reach
+      values, see module docstring for the tuned multipliers).
+    - near_x: BODY_FRONT_X -- the cut starts at the body's own front edge,
+      matching "you hit what you see"'s existing near-edge convention.
+    - The ellipse is centered between near_x/far_x, half-width rx = half
+      that span (before LATERAL_FLARE); ry is the fixed "blade thickness"
+      (LATERAL_RY_GROUND/LATERAL_RY_FINISHER) -- "large rx, small ry", same
+      flattened style as the approved crouch smear.
     """
-    frames = clip_track["frames"]
     contact_index = clip_track["contact_frame"]
-    # Exclude the ready-stance bookend frames (0 and the last), which loop
-    # the combo back to its own start and are not part of the swing arc.
-    swing_indices = list(range(1, len(frames) - 1))
-
-    pivot_x = sum(frames[i]["grip"]["x"] for i in swing_indices) / len(swing_indices)
-    pivot_y = sum(frames[i]["grip"]["y"] for i in swing_indices) / len(swing_indices)
-
-    def angle_for(frame_index: int) -> float:
-        tip = frames[frame_index]["tip"]
-        return math.degrees(math.atan2(tip["y"] - pivot_y, tip["x"] - pivot_x)) % 360.0
-
-    raw_angles = [angle_for(i) for i in swing_indices]
-    unwrapped = [raw_angles[0]]
-    for ang in raw_angles[1:]:
-        prev = unwrapped[-1]
-        delta = ((ang - prev) + 180.0) % 360.0 - 180.0
-        unwrapped.append(prev + delta)
-    a_from, a_to = unwrapped[0], unwrapped[-1]
-    if a_to < a_from:
-        a_from, a_to = a_to, a_from
-
-    if a_to - a_from > MAX_SPAN_DEG:
-        a_from = a_to - MAX_SPAN_DEG
-
-    contact_tip = frames[contact_index]["tip"]
-    radius_world = math.hypot(contact_tip["x"] - pivot_x, contact_tip["y"] - pivot_y)
-    radius_world *= OUTER_RADIUS_FLARE
-    return a_from, a_to, radius_world, (pivot_x, pivot_y)
+    contact = clip_track["frames"][contact_index]
+    if contact.get("low_confidence") or contact.get("tip") is None:
+        raise SystemExit(
+            f"lateral_swing_geometry: contact frame {contact_index} has no reliable ruler "
+            "measurement (low_confidence); cannot derive lateral swing geometry from it."
+        )
+    tip, grip = contact["tip"], contact["grip"]
+    center_y = (tip["y"] + grip["y"]) / 2.0
+    near_x = BODY_FRONT_X
+    far_x = reach_multiplier * tip["x"]
+    cx = (near_x + far_x) / 2.0
+    rx = (far_x - near_x) / 2.0 * LATERAL_FLARE
+    ry = ry_world
+    return {
+        "cx": cx, "cy": center_y, "rx": rx, "ry": ry,
+        "a_from": LATERAL_A_FROM, "a_to": LATERAL_A_TO,
+        "contact_tip_x": tip["x"], "far_x_target": far_x,
+    }
 
 
 def forward_extent(
-    pivot: tuple[float, float], radius: float, a_from: float, a_to: float, steps: int = 2000
+    cx: float, cy: float, rx: float, ry: float, a_from: float, a_to: float, steps: int = 2000
 ) -> tuple[float, float, float] | None:
-    """Samples the (circular, radius=outer smear radius) arc from a_from to
-    a_to and returns (far_x, y_min, y_max) restricted to the forward,
+    """Samples the ellipse (center cx,cy, radii rx,ry) from a_from to a_to
+    and returns (far_x, y_min, y_max) restricted to the forward,
     at-or-above-feet region (x >= BODY_FRONT_X, y <= FEET_LINE_Y) -- "the
     part in front of the body" a melee hitbox should cover, per the "you hit
     what you see" rule. Returns None if no sampled point qualifies."""
     xs, ys = [], []
     for i in range(steps):
         theta = math.radians(a_from + (a_to - a_from) * i / (steps - 1))
-        x = pivot[0] + radius * math.cos(theta)
-        y = pivot[1] + radius * math.sin(theta)
+        x = cx + rx * math.cos(theta)
+        y = cy + ry * math.sin(theta)
         if x >= BODY_FRONT_X and y <= FEET_LINE_Y:
             xs.append(x)
             ys.append(y)
@@ -311,14 +331,18 @@ def build_variant_geometry(
     cx = CELL_WIDTH / 2.0
     cy = CELL_HEIGHT / 2.0
 
+    lateral = config.get("lateral_from_track")
     track_clip = config.get("track_clip")
-    if track_clip and track.get("clips", {}).get(track_clip):
-        a_from, a_to, radius_world, pivot = track_driven_arc(track["clips"][track_clip])
-        config["a_from"], config["a_to"] = a_from, a_to
-        rx = ry = radius_world * DESIGN_SCALE
-        anchor_x = cx - pivot[0] * DESIGN_SCALE
-        anchor_y = cy - pivot[1] * DESIGN_SCALE
-        print(f"  {name}: track-driven a_from={a_from:.1f} a_to={a_to:.1f} radius_world={radius_world:.2f} pivot={pivot}")
+    if lateral and track_clip and track.get("clips", {}).get(track_clip):
+        geo = lateral_swing_geometry(track["clips"][track_clip], lateral["reach_multiplier"], lateral["ry_world"])
+        config["a_from"], config["a_to"] = geo["a_from"], geo["a_to"]
+        rx, ry = geo["rx"] * DESIGN_SCALE, geo["ry"] * DESIGN_SCALE
+        anchor_x = cx - geo["cx"] * DESIGN_SCALE
+        anchor_y = cy - geo["cy"] * DESIGN_SCALE
+        print(
+            f"  {name}: lateral contact_tip_x={geo['contact_tip_x']:.2f} far_x_target={geo['far_x_target']:.2f} "
+            f"center=({geo['cx']:.2f},{geo['cy']:.2f}) rx_world={geo['rx']:.2f} ry_world={geo['ry']:.2f}"
+        )
     else:
         flare = config.get("flare", 1.30)
         rx = (design_w / 2.0) * flare
@@ -355,20 +379,28 @@ def validate_hitboxes(ruler_track: dict, hitbox_configs: dict) -> None:
         return
 
     groups = [
-        ("hitbox_ground", ["ground_attack_1", "ground_attack_2"], hitbox_configs["ground_1"]),
-        ("hitbox_finisher", ["ground_attack_3"], hitbox_configs["ground_3"]),
+        (
+            "hitbox_ground",
+            [("ground_attack_1", GROUND_REACH_MULTIPLIER, LATERAL_RY_GROUND), ("ground_attack_2", GROUND_REACH_MULTIPLIER, LATERAL_RY_GROUND)],
+            hitbox_configs["ground_1"],
+        ),
+        (
+            "hitbox_finisher",
+            [("ground_attack_3", FINISHER_REACH_MULTIPLIER, LATERAL_RY_FINISHER)],
+            hitbox_configs["ground_3"],
+        ),
     ]
     failures: list[str] = []
     for label, clips, (actual_size, actual_offset) in groups:
         extents = []
-        for clip in clips:
+        for clip, reach_multiplier, ry_world in clips:
             clip_track = ruler_track["clips"].get(clip)
             if not clip_track:
                 print(f"  (no track data for {clip} yet; skipping {label} validation)")
                 extents = None
                 break
-            a_from, a_to, radius_world, pivot = track_driven_arc(clip_track)
-            ext = forward_extent(pivot, radius_world, a_from, a_to)
+            geo = lateral_swing_geometry(clip_track, reach_multiplier, ry_world)
+            ext = forward_extent(geo["cx"], geo["cy"], geo["rx"], geo["ry"], geo["a_from"], geo["a_to"])
             if ext is None:
                 raise RuntimeError(
                     f"{label}: {clip}'s forward-region smear extent is empty "
@@ -399,7 +431,7 @@ def validate_hitboxes(ruler_track: dict, hitbox_configs: dict) -> None:
         raise SystemExit(
             "scripts/player/player.gd's hitbox @export values have drifted from the "
             "smear-derived geometry (single source of truth: luz_ruler_track.json + "
-            "this script's OUTER_RADIUS_FLARE/BODY_FRONT_X):\n  "
+            "this script's LATERAL_FLARE/BODY_FRONT_X):\n  "
             + "\n  ".join(failures)
             + "\nUpdate the @export values in player.gd to match the derived numbers printed above, then rerun."
         )
@@ -418,31 +450,28 @@ def main() -> int:
     variant_specs = {
         "ground_1": {
             "row": 0, "type": "arc",
-            # a_from/a_to (and the radius, replacing "flare" entirely) are
-            # overwritten from the measured ruler tip path
-            # (assets/player/luz/luz_ruler_track.json) in
-            # build_variant_geometry when track_clip data is available; these
-            # are only the fallback if the track is ever missing.
-            "a_from": 220.0, "a_to": 380.0,
-            "flare": 1.30, "peak": 0.55,
+            # a_from/a_to/rx/ry/anchor are all overwritten from the contact
+            # frame's measured ruler tip (luz_ruler_track.json) in
+            # build_variant_geometry -- flat lateral crescent, same style as
+            # "crouch" below, at the contact frame's own ruler height.
+            "peak": 0.55,
             "track_clip": "ground_attack_1",
-            "description": "forward diagonal cut, behind-high to front-low (measured from ground_attack_1 art)",
+            "lateral_from_track": {"reach_multiplier": GROUND_REACH_MULTIPLIER, "ry_world": LATERAL_RY_GROUND},
+            "description": "flat lateral cut at chest height, hit 1 (measured from ground_attack_1 art)",
         },
         "ground_2": {
             "row": 1, "type": "arc",
-            # a_from/a_to/radius overwritten from measured tip path (fallback only).
-            "a_from": 250.0, "a_to": 400.0,
-            "flare": 1.30, "peak": 0.55,
+            "peak": 0.55,
             "track_clip": "ground_attack_2",
-            "description": "backhand hook sweeping low-to-horizontal-to-up (measured from ground_attack_2 art)",
+            "lateral_from_track": {"reach_multiplier": GROUND_REACH_MULTIPLIER, "ry_world": LATERAL_RY_GROUND},
+            "description": "flat lateral backhand cut at waist height, hit 2 (measured from ground_attack_2 art)",
         },
         "ground_3": {
             "row": 2, "type": "arc",
-            # a_from/a_to/radius overwritten from measured tip path (fallback only).
-            "a_from": 190.0, "a_to": 380.0,
-            "flare": 1.35, "peak": 0.62,
+            "peak": 0.62,
             "track_clip": "ground_attack_3",
-            "description": "finisher, low windup lunging to a rising follow-through (measured from ground_attack_3 art)",
+            "lateral_from_track": {"reach_multiplier": FINISHER_REACH_MULTIPLIER, "ry_world": LATERAL_RY_FINISHER},
+            "description": "flat lateral finisher cut at chest height, wider/thicker/farther reach (measured from ground_attack_3 art)",
         },
         "crouch": {
             "row": 3, "type": "arc",

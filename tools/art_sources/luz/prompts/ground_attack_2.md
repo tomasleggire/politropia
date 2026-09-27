@@ -8,28 +8,36 @@ Attached references:
    dark navy baggy pants, grey/white sneakers, dark navy backpack. Same anime pixel-art rendering, same outline
    weight, same palette, same proportions.
 2. `blasphemous_slash_ref.png` — quality/feel reference only (Blasphemous, The Penitent One): a fast, weighty,
-   fluid horizontal sword slash. Do NOT copy that character; copy the motion quality.
+   fluid horizontal sword slash (the sideways, flat cut shown is exactly the motion to replicate). Do NOT copy that character; copy the motion quality.
 
 Her weapon is a flat, straight, light-brown WOODEN RULER with dark measurement tick marks along one edge,
 rectangular with square ends, about as long as her arm plus her torso (roughly 55% of her standing height).
 It must read as a ruler, never a bat, stick or sword. Keep the ruler the same length and width in every frame.
 
-Animation: GROUND COMBO HIT 2 — a fast BACKHAND horizontal slash at waist height, chaining from hit 1.
-It must be a clearly curved sweep, NOT a straight poke. Hit 1 ended with the ruler low in front of her; hit 2
-whips the ruler back and around, then cuts forward horizontally at WAIST height (lower than hit 1's chest-height
-cut) with a strong hip twist. Facing RIGHT in every frame. 8 frames, in order:
-1. Start pose: weight on the front foot, ruler low in front of her pointing down-right (like hit 1's end).
-2. Wind-back: she pulls the ruler back across her body to her LEFT hip, ruler roughly horizontal pointing LEFT
-   behind her at waist height, torso twisted away, back foot planted.
-3. Swing: hips snap forward, ruler sweeping around her side, diagonal in front of her with the tip pointing
-   right and slightly DOWN (about 20 degrees below horizontal).
-4. Contact: right arm fully extended forward at WAIST height, ruler perfectly HORIZONTAL pointing right,
-   maximum reach, low wide stance. This is the widest frame.
-5. Follow-through: the sweep continues UP and across; ruler angled up-right (about 40 degrees above
-   horizontal), arm still extended.
-6. Follow-through settle: ruler raised in front of her at shoulder height, pointing up-right.
-7. Recovery: bringing the ruler down toward a guard.
-8. Guard: ruler held in front at chest height pointing up-forward, ready to chain into the finisher.
+STYLE OF THE CUT (critical, the previous version was rejected): this is a HORIZONTAL, SIDEWAYS sword swing,
+like the main attack of The Penitent One in Blasphemous (attached reference) — the blade travels in a flat
+horizontal plane around her body at chest height, NOT from top to bottom. NEVER raise the ruler above her head.
+Because the swing is horizontal and the camera is a side view, the ruler is FORESHORTENED (looks shorter) in the
+frames where it points toward or away from the camera, and fully long when it points left or right.
+She grips the ruler like a sword and puts her whole body into it (hips and shoulders rotate).
+
+Animation: GROUND COMBO HIT 2 — a fast BACKHAND horizontal slash at WAIST height, chaining from hit 1 (hit 1 ended
+with the ruler across the front of her body). Facing RIGHT in every frame. 8 frames:
+1. Start: ruler held horizontal across the front of her chest, tip pointing LEFT past her left shoulder, right arm
+   bent across her body (like hit 1's follow-through).
+2. Coil: she coils further, right hand near her LEFT hip, ruler horizontal pointing LEFT behind her at WAIST height,
+   back of the right hand facing forward.
+3. Swing: she whips the arm outward; the ruler sweeps around in a flat horizontal plane, FORESHORTENED (pointing
+   toward the camera, looks about half length) at waist height in front of her.
+4. Contact: right arm fully extended forward at WAIST height (backhand, knuckles leading), ruler perfectly
+   HORIZONTAL pointing RIGHT, full length, maximum reach, low wide stance. Widest frame.
+5. Follow-through: AFTER the contact the ruler keeps moving to her RIGHT side, never back to the left. Her arm
+   stays extended to her right, the ruler now angled slightly BACK and DOWN to the right of her body (tip pointing
+   right-down), torso opened toward the viewer.
+6. Follow-through settle: arm relaxed at her right side, ruler pointing down-right beside her right leg.
+   IMPORTANT: in frames 5 and 6 the ruler must point to the RIGHT (never to the left, never behind her back).
+7. Recovery: bringing the ruler back in front of her.
+8. Guard: ruler held in front at chest height pointing forward-up, ready to chain into the finisher.
 
 RULER SIZE (critical): the ruler is LONG — about 130 px long in every frame (a bit more than half of her
 240 px standing height) and about 14 px wide. Measure it: it must be the same length in every frame where it
