@@ -81,7 +81,7 @@
     "luz_ground_combat_sheet.png": {
       "grid": {
         "columns": 4,
-        "rows": 7,
+        "rows": 8,
         "cell_width": 512,
         "cell_height": 512
       },
@@ -120,20 +120,24 @@
           24,
           25,
           26,
-          27
+          27,
+          28,
+          29,
+          30,
+          31
         ]
       },
       "contact_frames": {
         "ground_attack_1": 3,
         "ground_attack_2": 3,
         "ground_attack_3": 3,
-        "crouch_attack": 1
+        "crouch_attack": 3
       }
     },
     "luz_air_combat_sheet.png": {
       "grid": {
         "columns": 4,
-        "rows": 4,
+        "rows": 6,
         "cell_width": 512,
         "cell_height": 512
       },
@@ -142,30 +146,38 @@
           0,
           1,
           2,
-          3
-        ],
-        "air_horizontal_attack": [
+          3,
           4,
           5,
           6,
           7
         ],
-        "plunge": [
+        "air_horizontal_attack": [
           8,
           9,
           10,
-          11
-        ],
-        "plunge_land": [
+          11,
           12,
           13,
           14,
           15
+        ],
+        "plunge": [
+          16,
+          17,
+          18,
+          19
+        ],
+        "plunge_land": [
+          20,
+          21,
+          22,
+          23
         ]
       },
       "contact_frames": {
-        "up_attack": 2,
-        "air_horizontal_attack": 1
+        "up_attack": 3,
+        "air_horizontal_attack": 3
       }
     }
   },

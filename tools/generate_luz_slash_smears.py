@@ -9,9 +9,8 @@
     ground_1/2/3 only to crouch/air too) -- NOT the earlier per-clip
     angular-sweep-across-every-frame derivation (see git history), which
     read as a round/vertical arc instead of the requested lateral cut.
-  - up: diagonal thrust streak (narrow spindle along the MEASURED ruler
-    axis above the raised hand -- the placeholder up-attack art is a
-    diagonal jump thrust, not a purely vertical one; see UP_THRUST_ANGLE_DEG).
+  - up: vertical thrust streak (narrow spindle along the measured axis of
+    the true upward contact pose, aligned to the vertical hitbox).
 - Pale mint 4-tone palette with checker dithering (PX=3 chunky pixel art).
 - Cell size 720x640: generously sized so up-thrust and tall arcs have zero clipping.
 - T4d item 3: ONE shared hitbox size/reach for every horizontal attack
@@ -106,13 +105,8 @@ LATERAL_RY_FINISHER = 20.5
 # "thick leading edge, thin tail" read crouch already has.
 LATERAL_A_FROM = 205.0
 LATERAL_A_TO = 345.0
-# Up attack's thrust streak angle (atan2 degrees, y-down): measured directly
-# from luz_ruler_track.json's up_attack contact-frame tip/grip axis -- the
-# placeholder up-attack art is a diagonal raised-jump thrust, not a purely
-# vertical one (see odd/tasks/luz-blasphemous-animation.md T4d item 3 for
-# the disclosed hitbox/visual mismatch this causes against the now-purely-
-# vertical hitbox_up rotation).
-UP_THRUST_ANGLE_DEG = -26.23
+# The up-attack thrust angle is measured from the final art's contact-frame
+# ruler axis so the visual slash and vertical hitbox share one direction.
 
 PALETTE = [
     (240, 252, 244),
@@ -502,9 +496,8 @@ def main() -> int:
         },
         "up": {
             "row": 4, "type": "thrust",
-            "angle_deg": UP_THRUST_ANGLE_DEG,
             "half_width_px": 28.0,
-            "description": "diagonal thrust streak along the measured ruler axis above the raised hand",
+            "description": "vertical upward streak aligned to the measured ruler axis",
         },
         "air": {
             "row": 5, "type": "arc",
@@ -514,6 +507,13 @@ def main() -> int:
             "description": "lateral horizontal air sweep forward (measured from air_horizontal_attack art)",
         },
     }
+
+    up_track = ruler_track["clips"]["up_attack"]
+    up_contact = up_track["frames"][up_track["contact_frame"]]
+    if up_contact.get("low_confidence") or up_contact.get("axis_angle_deg") is None:
+        raise SystemExit("up_attack: contact frame has no reliable measured ruler axis")
+    variant_specs["up"]["angle_deg"] = up_contact["axis_angle_deg"]
+    print(f"up: thrust angle follows measured contact ruler axis {up_contact['axis_angle_deg']:.2f}deg")
 
     row_count = len(variant_specs)
     sheet = Image.new("RGBA", (CELL_WIDTH * FRAME_COUNT, CELL_HEIGHT * row_count), (0, 0, 0, 0))

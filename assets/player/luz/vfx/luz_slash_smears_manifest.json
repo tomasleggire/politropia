@@ -60,11 +60,11 @@
       ],
       "reference_hitbox_offset": [
         49.15,
-        -0.96
+        -17.02
       ],
       "anchor": [
-        43.05828571428566,
-        262.57334266613475
+        74.22399999999999,
+        354.3161998089919
       ],
       "description": "low flat horizontal sweep near the ground (measured from crouch_attack art)"
     },
@@ -82,7 +82,7 @@
         360.0,
         600.8571428571429
       ],
-      "description": "diagonal thrust streak along the measured ruler axis above the raised hand"
+      "description": "vertical upward streak aligned to the measured ruler axis"
     },
     "air": {
       "row": 5,
@@ -92,11 +92,11 @@
       ],
       "reference_hitbox_offset": [
         49.15,
-        -37.92
+        -30.66
       ],
       "anchor": [
-        106.71657142857146,
-        473.7447712375633
+        93.94171428571428,
+        432.2876283804205
       ],
       "description": "lateral horizontal air sweep forward (measured from air_horizontal_attack art)"
     }

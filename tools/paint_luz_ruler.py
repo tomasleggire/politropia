@@ -63,9 +63,9 @@ CLIPS = {
     "ground_attack_1": ("luz_ground_combat_sheet.png", 3),
     "ground_attack_2": ("luz_ground_combat_sheet.png", 3),
     "ground_attack_3": ("luz_ground_combat_sheet.png", 3),
-    "crouch_attack": ("luz_ground_combat_sheet.png", 1),
-    "up_attack": ("luz_air_combat_sheet.png", 2),
-    "air_horizontal_attack": ("luz_air_combat_sheet.png", 1),
+    "crouch_attack": ("luz_ground_combat_sheet.png", 3),
+    "up_attack": ("luz_air_combat_sheet.png", 3),
+    "air_horizontal_attack": ("luz_air_combat_sheet.png", 3),
 }
 
 # -- Shared reach target (see odd/tasks T4d item 3: one shared hitbox reach

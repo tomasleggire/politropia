@@ -158,8 +158,8 @@ const PHASE_RECOVERY := 2
 ## offset.x, shared by every horizontal attack (ground combo, crouch, air).
 @export var hitbox_attack_reach_x := 49.15
 @export var hitbox_ground_offset_y := -27.2   ## combo (hits 1-3): chest height
-@export var hitbox_crouch_offset_y := -0.96   ## crouch: low
-@export var hitbox_air_offset_y := -37.92     ## air: mid-air torso height
+@export var hitbox_crouch_offset_y := -17.02  ## crouch: low horizontal cut height
+@export var hitbox_air_offset_y := -30.66     ## air: mid-air torso height
 @export var hitbox_up_size := Vector2(24.0, 60.3)
 @export var hitbox_up_offset := Vector2(0.0, -49.15)
 @export var hitbox_plunge_size := Vector2(28.0, 18.0)
