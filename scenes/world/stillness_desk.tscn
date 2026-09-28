@@ -1,0 +1,256 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/stillness_desk.gd" id="1_desk"]
+[ext_resource type="PackedScene" path="res://scenes/ui/interaction_prompt.tscn" id="2_prompt"]
+
+[sub_resource type="CanvasItemMaterial" id="Additive"]
+blend_mode = 1
+
+[sub_resource type="Gradient" id="MistFade"]
+offsets = PackedFloat32Array(0, 0.3, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.5, 1, 1, 1, 0)
+
+[sub_resource type="RectangleShape2D" id="InteractionShape"]
+size = Vector2(190, 100)
+
+[node name="StillnessDesk" type="Node2D"]
+process_mode = 3
+script = ExtResource("1_desk")
+
+[node name="SpawnAnchor" type="Marker2D" parent="."]
+position = Vector2(-58, 0)
+
+[node name="InteractionArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea"]
+position = Vector2(-8, -40)
+shape = SubResource("InteractionShape")
+
+[node name="Visuals" type="Node2D" parent="."]
+
+[node name="Background" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = -1
+
+[node name="Arch" type="Polygon2D" parent="Visuals/Background"]
+color = Color(0.17, 0.12, 0.25, 0.9)
+polygon = PackedVector2Array(-64, 0, -64, -70, -50, -102, -26, -124, 0, -134, 26, -124, 50, -102, 64, -70, 64, 0)
+
+[node name="ArchRim" type="Line2D" parent="Visuals/Background"]
+points = PackedVector2Array(-64, 0, -64, -70, -50, -102, -26, -124, 0, -134, 26, -124, 50, -102, 64, -70, 64, 0)
+width = 2.0
+default_color = Color(0.718, 0.514, 0.31, 0.55)
+
+[node name="Protractor" type="Line2D" parent="Visuals/Background"]
+position = Vector2(0, -108)
+points = PackedVector2Array(-38, 0, -35, 14.5, -26.9, 26.9, -14.5, 35.1, 0, 38, 14.5, 35.1, 26.9, 26.9, 35, 14.5, 38, 0)
+width = 1.0
+default_color = Color(0.898, 0.741, 0.467, 0.5)
+
+[node name="Glow" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+position = Vector2(0, -50)
+
+[node name="Halo" type="Polygon2D" parent="Visuals/Glow"]
+material = SubResource("Additive")
+color = Color(0.941, 0.682, 0.298, 0.1)
+polygon = PackedVector2Array(60, 0, 52, 30, 30, 52, 0, 60, -30, 52, -52, 30, -60, 0, -52, -30, -30, -52, 0, -60, 30, -52, 52, -30)
+
+[node name="Core" type="Polygon2D" parent="Visuals/Glow"]
+material = SubResource("Additive")
+color = Color(0.941, 0.682, 0.298, 0.14)
+polygon = PackedVector2Array(30, 0, 26, 15, 15, 26, 0, 30, -15, 26, -26, 15, -30, 0, -26, -15, -15, -26, 0, -30, 15, -26, 26, -15)
+
+[node name="Roots" type="Node2D" parent="Visuals"]
+
+[node name="RootLeft" type="Line2D" parent="Visuals/Roots"]
+points = PackedVector2Array(-24, -1, -34, -3, -42, 1, -50, -1)
+width = 2.0
+default_color = Color(0.788, 0.722, 0.549, 1)
+
+[node name="RootRight" type="Line2D" parent="Visuals/Roots"]
+points = PackedVector2Array(24, -1, 34, -4, 44, 0, 50, -2)
+width = 2.0
+default_color = Color(0.788, 0.722, 0.549, 1)
+
+[node name="RootWrap" type="Line2D" parent="Visuals/Roots"]
+points = PackedVector2Array(-21, -31, -18, -22, -23, -12, -21, -1)
+width = 1.5
+default_color = Color(0.91, 0.863, 0.753, 0.8)
+
+[node name="Desk" type="Node2D" parent="Visuals"]
+
+[node name="LegLeft" type="Polygon2D" parent="Visuals/Desk"]
+color = Color(0.165, 0.106, 0.176, 1)
+polygon = PackedVector2Array(-24, -34, -19, -34, -19, 0, -24, 0)
+
+[node name="LegRight" type="Polygon2D" parent="Visuals/Desk"]
+color = Color(0.165, 0.106, 0.176, 1)
+polygon = PackedVector2Array(19, -34, 24, -34, 24, 0, 19, 0)
+
+[node name="Shelf" type="Polygon2D" parent="Visuals/Desk"]
+color = Color(0.29, 0.196, 0.314, 1)
+polygon = PackedVector2Array(-24, -14, 24, -14, 24, -11, -24, -11)
+
+[node name="Slab" type="Polygon2D" parent="Visuals/Desk"]
+color = Color(0.29, 0.196, 0.314, 1)
+polygon = PackedVector2Array(-30, -38, 30, -38, 30, -33, -30, -33)
+
+[node name="LecternTop" type="Polygon2D" parent="Visuals/Desk"]
+color = Color(0.165, 0.106, 0.176, 1)
+polygon = PackedVector2Array(-26, -38, 26, -38, 18, -50, -18, -50)
+
+[node name="BrassTrim" type="Line2D" parent="Visuals/Desk"]
+points = PackedVector2Array(-30, -38, 30, -38)
+width = 1.5
+default_color = Color(0.718, 0.514, 0.31, 1)
+
+[node name="RulerEdge" type="Line2D" parent="Visuals/Desk"]
+points = PackedVector2Array(-18, -50, 18, -50)
+width = 1.5
+default_color = Color(0.898, 0.741, 0.467, 1)
+
+[node name="Candle" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+position = Vector2(-28, -38)
+
+[node name="CandleGlow" type="Polygon2D" parent="Visuals/Candle"]
+unique_name_in_owner = true
+material = SubResource("Additive")
+position = Vector2(0, -24)
+color = Color(0.941, 0.682, 0.298, 0.16)
+polygon = PackedVector2Array(24, 0, 20.8, 12, 12, 20.8, 0, 24, -12, 20.8, -20.8, 12, -24, 0, -20.8, -12, -12, -20.8, 0, -24, 12, -20.8, 20.8, -12)
+
+[node name="Stick" type="Polygon2D" parent="Visuals/Candle"]
+color = Color(0.898, 0.741, 0.467, 1)
+polygon = PackedVector2Array(-2, -14, 2, -14, 2, 0, -2, 0)
+
+[node name="Flame" type="Polygon2D" parent="Visuals/Candle"]
+unique_name_in_owner = true
+position = Vector2(0, -16)
+color = Color(0.941, 0.682, 0.298, 1)
+polygon = PackedVector2Array(0, -8, 3.2, -2, 0, 3, -3.2, -2)
+
+[node name="FlameCore" type="Polygon2D" parent="Visuals/Candle/Flame"]
+color = Color(1, 0.941, 0.69, 1)
+polygon = PackedVector2Array(0, -3, 1.4, -0.5, 0, 1.5, -1.4, -0.5)
+
+[node name="Inkwell" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+position = Vector2(27, -38)
+
+[node name="InkGlow" type="Polygon2D" parent="Visuals/Inkwell"]
+unique_name_in_owner = true
+material = SubResource("Additive")
+position = Vector2(0, -8)
+color = Color(0.435, 0.627, 1, 0.3)
+polygon = PackedVector2Array(12, 0, 10.4, 6, 6, 10.4, 0, 12, -6, 10.4, -10.4, 6, -12, 0, -10.4, -6, -6, -10.4, 0, -12, 6, -10.4, 10.4, -6)
+
+[node name="Bottle" type="Polygon2D" parent="Visuals/Inkwell"]
+color = Color(0.184, 0.373, 0.816, 1)
+polygon = PackedVector2Array(-4, 0, 4, 0, 4, -8, 2, -11, -2, -11, -4, -8)
+
+[node name="Ripple" type="Line2D" parent="Visuals/Inkwell"]
+unique_name_in_owner = true
+position = Vector2(0, -8)
+points = PackedVector2Array(-2.5, 0, 2.5, 0)
+width = 1.0
+default_color = Color(0.435, 0.627, 1, 1)
+
+[node name="Papers" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+position = Vector2(0, -47)
+
+[node name="Sheet1" type="Polygon2D" parent="Visuals/Papers"]
+color = Color(0.91, 0.863, 0.753, 1)
+polygon = PackedVector2Array(-11, -3, 9, -4, 11, 1, -9, 2)
+
+[node name="Sheet2" type="Polygon2D" parent="Visuals/Papers"]
+color = Color(0.788, 0.722, 0.549, 1)
+polygon = PackedVector2Array(-9, -2, 11, -3, 12, 2, -8, 3)
+
+[node name="Sheet3" type="Polygon2D" parent="Visuals/Papers"]
+color = Color(0.91, 0.863, 0.753, 1)
+polygon = PackedVector2Array(-10, -1, 8, -2, 10, 3, -9, 4)
+
+[node name="Pendulum" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+position = Vector2(0, -108)
+
+[node name="Rod" type="Line2D" parent="Visuals/Pendulum"]
+points = PackedVector2Array(0, 0, 0, 30)
+width = 1.5
+default_color = Color(0.718, 0.514, 0.31, 1)
+
+[node name="Bob" type="Polygon2D" parent="Visuals/Pendulum"]
+color = Color(0.898, 0.741, 0.467, 1)
+polygon = PackedVector2Array(0, 29, 5.5, 36, 0, 43, -5.5, 36)
+
+[node name="BobCore" type="Polygon2D" parent="Visuals/Pendulum"]
+color = Color(0.941, 0.682, 0.298, 1)
+polygon = PackedVector2Array(0, 32, 2.5, 36, 0, 40, -2.5, 36)
+
+[node name="Scale" type="Node2D" parent="Visuals"]
+position = Vector2(42, 0)
+
+[node name="Post" type="Polygon2D" parent="Visuals/Scale"]
+color = Color(0.718, 0.514, 0.31, 1)
+polygon = PackedVector2Array(-1.5, -78, 1.5, -78, 1.5, 0, -1.5, 0)
+
+[node name="Beam" type="Node2D" parent="Visuals/Scale"]
+unique_name_in_owner = true
+position = Vector2(0, -78)
+
+[node name="BeamBar" type="Line2D" parent="Visuals/Scale/Beam"]
+points = PackedVector2Array(-14, 0, 14, 0)
+width = 2.0
+default_color = Color(0.898, 0.741, 0.467, 1)
+
+[node name="PanLeft" type="Node2D" parent="Visuals/Scale/Beam"]
+unique_name_in_owner = true
+position = Vector2(-14, 0)
+
+[node name="Strings" type="Line2D" parent="Visuals/Scale/Beam/PanLeft"]
+points = PackedVector2Array(-5, 13, 0, 0, 5, 13)
+width = 1.0
+default_color = Color(0.718, 0.514, 0.31, 1)
+
+[node name="Bowl" type="Polygon2D" parent="Visuals/Scale/Beam/PanLeft"]
+color = Color(0.718, 0.514, 0.31, 1)
+polygon = PackedVector2Array(-6, 13, 6, 13, 4, 17, -4, 17)
+
+[node name="PanRight" type="Node2D" parent="Visuals/Scale/Beam"]
+unique_name_in_owner = true
+position = Vector2(14, 0)
+
+[node name="Strings" type="Line2D" parent="Visuals/Scale/Beam/PanRight"]
+points = PackedVector2Array(-5, 13, 0, 0, 5, 13)
+width = 1.0
+default_color = Color(0.718, 0.514, 0.31, 1)
+
+[node name="Bowl" type="Polygon2D" parent="Visuals/Scale/Beam/PanRight"]
+color = Color(0.718, 0.514, 0.31, 1)
+polygon = PackedVector2Array(-6, 13, 6, 13, 4, 17, -4, 17)
+
+[node name="Mist" type="CPUParticles2D" parent="Visuals"]
+unique_name_in_owner = true
+position = Vector2(0, -2)
+amount = 14
+lifetime = 4.0
+preprocess = 4.0
+emission_shape = 3
+emission_rect_extents = Vector2(44, 2)
+direction = Vector2(0, -1)
+spread = 25.0
+gravity = Vector2(0, 0)
+initial_velocity_min = 5.0
+initial_velocity_max = 11.0
+scale_amount_min = 2.0
+scale_amount_max = 4.0
+color = Color(0.6, 0.75, 1, 0.5)
+color_ramp = SubResource("MistFade")
+
+[node name="InteractionPrompt" parent="." instance=ExtResource("2_prompt")]
+position = Vector2(0, -148)

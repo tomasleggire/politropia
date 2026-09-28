@@ -1388,6 +1388,9 @@ func _update_footsteps(delta: float) -> void:
 func _update_animation() -> void:
 	var animation_facing := _attack_facing if _is_directional_attack_state() else _facing
 	_sprite.flip_h = animation_facing < 0
+	if _meditating:
+		_play_animation(_meditation_animation())
+		return
 	match _state:
 		State.CROUCH:
 			_play_animation(&"crouch")
@@ -1442,6 +1445,14 @@ func _update_animation() -> void:
 				_play_animation(&"walk", clampf(absf(velocity.x) / 220.0, 0.7, 1.8))
 			else:
 				_play_animation(&"idle")
+
+
+## Dedicated `meditate` clip when the sprite sheet provides one; the crouch
+## pose stands in until final art exists.
+func _meditation_animation() -> StringName:
+	if _sprite.sprite_frames != null and _sprite.sprite_frames.has_animation(&"meditate"):
+		return &"meditate"
+	return &"crouch"
 
 
 ## Clip-local speed: always reassigns speed_scale, even if the animation

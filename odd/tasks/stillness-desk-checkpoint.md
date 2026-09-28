@@ -41,6 +41,7 @@ The prototype currently advances the player's checkpoint through invisible x-coo
 5. Resting regenerates opted-in enemies outside the checkpoint transaction. The behavior is visible through the activation sequence so recovery never hides its cost.
 6. The world uses a bounded pause during committed meditation. The checkpoint and required player presentation continue processing while paused; normal movement/combat input remains locked.
 7. The current concept image remains an art-direction source. Runtime art must preserve mobile-readable silhouettes and remain composable inside the game camera.
+8. T2 ships in-engine placeholder art (shapes, particles, lights; Luz meditation reuses the crouch clip through a named animation seam). Final sprites are generated later and swapped without logic changes (user choice, 2026-09-28).
 
 ## External reference findings
 
@@ -99,13 +100,16 @@ The prototype currently advances the player's checkpoint through invisible x-coo
   - API: `CheckpointService` autoload (`activate`, `is_active`, `has_checkpoint_for_scene`, `get_spawn_position_for_scene`, `apply_to_player`, `reset_resettable_enemies`, `clear`, signal `checkpoint_activated`); enemy contract = group `checkpoint_resettable` + `reset_to_checkpoint_state()`; player `restore_full_health`, `enter_meditation`/`exit_meditation`, `set_input_locked`, `clear_transient_state`, `apply_checkpoint`, signals `health_changed`, `meditation_started`, `meditation_finished`. `interact` = E / joypad button 2.
   - Deferred to T2/T3: meditation animation, touch path for `interact`, whether `respawn()` restores health/clears transients, low-ceiling headroom check on exit.
 
-- [ ] **T2 — Build the animated Stillness Desk component**
+- [x] **T2 — Build the animated Stillness Desk component**
   - Create a placeable checkpoint scene with an interaction area, anchor, prompt, and animation controller.
   - Implement dormant, commit, awakened, resting, and release phases.
   - Add mobile-readable environment motion: pendulum, candle, cobalt inkwell, brass scale, breathing light, paper lift/rebind, mist/dust, and restrained background parallax.
   - Add a meditation presentation for Luz that preserves her identity, ruler, backpack logic, and readable silhouette.
   - Acceptance: the scene runs independently, repeated activation is deterministic, interruption/exit restores control, and no component depends on a concrete level.
   - Verification: standalone component harness plus visual readback/screenshots.
+  - Route: delegated direct (writer trigger: desk scene/script, prompt scene/script, `player.gd`).
+  - API: `StillnessDesk` (`scenes/world/stillness_desk.tscn`); exports `checkpoint_id` (config warning if empty), `commit_duration` 0.5, `resting_duration` 1.6, `release_duration` 0.5, `pause_world` true; `SpawnAnchor` child = rest + respawn point; signals `rest_started`, `rest_completed`, `phase_changed`; `request_rest() -> bool` (touch entry point), `can_rest()`, `get_phase()`, `get_spawn_position()`. Reusable `InteractionPrompt` (`scenes/ui/interaction_prompt.tscn`). Player seam: meditating plays `meditate` if present, else `crouch`.
+  - Deferred to T3/T4: touch/keyboard prompt switching, facing Luz toward the desk, weak glow/mist/arch contrast, Luz overlapping the left paper root.
 
 - [ ] **T3 — Integrate one checkpoint into the prototype level**
   - Instance the component in `level_01.tscn` at a safe playable location.
@@ -122,8 +126,8 @@ The prototype currently advances the player's checkpoint through invisible x-coo
 
 ## Progress
 
-- Current task: T1 complete; T2 next.
-- Next step: build the animated Stillness Desk component (T2) with one bounded writer.
+- Current task: T2 complete; T3 next.
+- Next step: integrate one desk into `level_01` (T3), add the touch path, remove x-threshold checkpoints.
 
 ## Verification evidence
 
@@ -131,11 +135,16 @@ The prototype currently advances the player's checkpoint through invisible x-coo
 - External design research completed with source links and explicit evidence gaps.
 - T1 `Godot --headless --path . --import`: completed, no error/parse/warning lines.
 - T1 `Godot --headless --path . --quit-after 120`: clean load (writer run and parent spot check).
+- T2 `Godot --headless --path . --import` and `--quit-after 120`: 0 error/warning/parse lines (writer run and parent spot check).
+- T2 throwaway harness (scratchpad only): 25/25 checks — pause during rest, meditation lock at anchor, heal 2 → max, service id/spawn match, signals once, unpause/release, deterministic repeat, busy re-request ignored, freeing desk or player mid-rest unpauses and releases.
+- T2 screenshots (Metal render, scratchpad): dormant/resting/awakened; parent viewed `resting.png`, silhouettes readable. Harness note: `--script` harnesses cannot reference `Player`/`StillnessDesk` types (autoload not yet registered); use untyped refs.
 - T1 throwaway `--script` harness (deleted): service activate/query/miss ok; empty resettable-group reset no error; `interact` has 2 events; meditation locks input and blocks movement while tree paused (`process_mode` ALWAYS); exit restores mode and movement; heal from 2 → 5 emits one `health_changed`. Only exit-time ObjectDB leak warnings (normal for `--script`).
 
 ## Commit evidence
 
-- T0 + T1: committed together as slice 1 (tracker + checkpoint/player contract), ~210 authored source lines.
+- T0 + T1: `063f371` feat: add checkpoint service and player meditation contract (slice 1; 5 paths, 358 changed lines incl. tracker). GGA pre-commit review: PASSED.
+- T1 review assessment (`--base-ref 46a14d4 --committed-only`, untracked excluded): risk `medium` (`executable_change` project.godot), `review_due=false` (`under_budget`). Reviewed boundary stays `46a14d4`; pending in slice.
+- Incident: first commit attempt staged the untracked `.DS_Store` files and failed with an invalid object; they were unstaged (`git rm --cached`) and remain untracked on disk.
 
 ## Rollback boundaries
 
