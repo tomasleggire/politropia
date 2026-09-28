@@ -275,6 +275,7 @@ T4d items 1-4 are committed as `e7978f91679dd87165e1528efcc80c2b4252a747`. iPhon
   - **Checks**: Godot 4.7.2 `--import` exited 0. The exact headless runner produced no matches (`PIPESTATUS=0 1`: Godot 0, expected `rg` no-match 1). Real-Player regression passed as above; `git diff --check` passed. Godot iOS Debug export exited 0 and Xcode iOS Debug build succeeded. First device install attempt returned CoreDevice error 3002 / remote connect error 5; one bounded retry installed `com.tomasleggire.politropia` successfully. Launch was denied with CoreDevice error 10002 because the iPhone was locked; fresh-build launch and user visual acceptance are pending device unlock. No changes were made to hitbox values or art.
   - **Partial status**: yellow overlay removal and airborne routing remain accepted; interpolation guard is implemented and structurally/regression checked, but phone launch and visual confirmation of the first slash remain open.
   - **Correction work-unit commit**: `9bcf0825e1ebde2b953a674a02ca03f6c2faf07e` (`fix: evitar el primer tajo interpolado de Luz`). The `GGA_PROVIDER=claude` hook ran but Claude returned the weekly-limit exit 1; no review approval is claimed.
+  - **Correction native review assessment**: `medium`, `review_due=false`, outcome `under_budget` for `15c8976..d532b51`; no review was started.
 
 
 ## Next Step
