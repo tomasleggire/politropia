@@ -159,9 +159,14 @@ The prototype currently advances the player's checkpoint through invisible x-coo
 - Slice assessment after T2 (`--base-ref 46a14d4 --committed-only`, untracked excluded): risk `medium`, 11 paths, 1058 changed lines, `review_due=true` (`slice_budget_reached`). Native review START lineage `review-c37ee063db401ded` returned the candidate consent envelope; user chose `declined` (candidate-scoped, validated `declined_this_candidate`). Off path: tier `medium` → writer self-verification + parent spot check (done). Reviewed boundary advances to `3a33a1b`.
 - T3: `7425bc2` feat: integrate Stillness Desk into level 01 (slice 3; GGA PASSED; no .DS_Store staging after local exclude).
 - T3 assessment (`--base-ref 3a33a1b --committed-only`, untracked excluded): risk `medium` (`executable_change` level_01.tscn), 9 paths, 152 lines, `review_due=false` (`under_budget`). Boundary stays `3a33a1b`; pending in slice.
+- T4: `4c64021` fix: polish Stillness Desk visuals and rest interruption (slice 4; GGA PASSED).
+- T3+T4 assessment (`--base-ref 3a33a1b --committed-only`, untracked excluded): risk `medium`, 10 paths, 241 lines, `review_due=false` (`under_budget`). Boundary stays `3a33a1b`; the T3+T4 range is pending review until a later commit reaches the budget or delivery.
 - Incident: first commit attempt staged the untracked `.DS_Store` files and failed with an invalid object; they were unstaged (`git rm --cached`) and remain untracked on disk. Recurred on T2; mitigated by adding `.DS_Store` to local `.git/info/exclude` (files untouched). Likely source: the opencode reviewer run by the GGA pre-commit hook (unverified).
 
 ## Rollback boundaries
 
 - T0 rollback: remove only `odd/tasks/stillness-desk-checkpoint.md` and its Engram mirror.
-- Later work units must record their own exact file/behavior rollback boundary before closure.
+- T1: revert `063f371` (service, `interact` action, player health/meditation APIs).
+- T2: revert `3a33a1b` (desk + prompt scenes/scripts, meditation animation seam).
+- T3: revert `7425bc2` (restores x-threshold checkpoints, removes desk instance and touch button).
+- T4: revert `4c64021` (visual polish, facing, respawn-mid-rest abort).
