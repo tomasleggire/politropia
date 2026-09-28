@@ -265,7 +265,7 @@ T4d items 1-4 are committed as `e7978f91679dd87165e1528efcc80c2b4252a747`. iPhon
   - **Rollback boundary**: revert the T5d implementation work unit and T5d tracker evidence to restore T5c behavior; no art/assets or T6-T8 content included.
   - **Delivery**: local install/launch on authorized `Tomas` iPhone 16 Pro (`00008140-0018509010E3C01C`); no push or PR. Native review is not started here; parent owns RDD assessment after implementation commit.
   - **Planning commit**: `f872cced0b5d351d0f07bb40a46778a1afa233e5` (`docs: planear los ajustes finales de combate de Luz`). GGA hook ran with `GGA_PROVIDER=claude` but Claude reported weekly-limit exit 1; no review approval is claimed.
-  - **Implementation commit**: to be recorded in a bounded documentation follow-up after source-and-tracker commit.
+  - **Implementation commit**: `169735a7ddf50332701f74df531bddd1ad4c926e` (`fix: pulir la presentación de los ataques de Luz`). The `GGA_PROVIDER=claude` hook ran, but Claude returned weekly-limit exit 1; no review approval is claimed. User visual confirmation remains pending.
 
 
 ## Next Step
