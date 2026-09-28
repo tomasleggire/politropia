@@ -494,9 +494,10 @@ func request_attack(direction: int) -> void:
 
 
 ## Touch UI: upgrades the attack that just started — while it is still in
-## its startup phase, before any hitbox is active — to up/plunge instead of
-## firing a second attack. Used when the finger swipes after touching down
-## on the attack button (see touch_controls.gd's attack_upgrade_window).
+## its startup phase, before any hitbox is active — to an up attack instead
+## of firing a second attack. A downward swipe leaves an air attack lateral.
+## Used when the finger swipes after touching down on the attack button (see
+## touch_controls.gd's attack_upgrade_window).
 func request_attack_upgrade(direction: int) -> void:
 	if direction == 0:
 		return
@@ -506,8 +507,6 @@ func request_attack_upgrade(direction: int) -> void:
 	)
 	if direction == -1 and upgrading_from_neutral:
 		_start_up_attack()
-	elif direction == 1 and _state == State.AIR_ATTACK and _attack_phase == PHASE_STARTUP:
-		_start_plunge()
 
 
 ## Touch UI entry point for the jump button, called directly instead of only
@@ -562,9 +561,7 @@ func _queue_attack(direction: int) -> void:
 			pass
 
 	if not is_on_floor():
-		if direction == 1:
-			_start_plunge()
-		elif direction == -1:
+		if direction == -1:
 			_start_up_attack()
 		else:
 			_start_air_attack()

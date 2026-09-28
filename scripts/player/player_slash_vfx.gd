@@ -50,6 +50,13 @@ func _ready() -> void:
 	add_child(_sprite)
 	for variant_name in _manifest["variants"]:
 		_frame_textures_by_variant[variant_name] = _build_frame_textures(variant_name)
+	# Prime a valid atlas frame while the parent effect remains hidden. Without
+	# this, the first attack starts from a nil Sprite2D texture while subsequent
+	# attacks retain the previous frame, producing a one-time first-session
+	# rendering artifact on device.
+	var initial_frames: Array = _frame_textures_by_variant.get("ground_1", [])
+	assert(not initial_frames.is_empty(), "Missing initial Luz slash smear frame")
+	_sprite.texture = initial_frames[0] as Texture2D
 
 
 ## hitbox_size/hitbox_offset are the attack's current (unsigned, right-facing)
