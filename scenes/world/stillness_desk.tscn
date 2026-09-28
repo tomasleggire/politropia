@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/stillness_desk.gd" id="1_desk"]
 [ext_resource type="PackedScene" path="res://scenes/ui/interaction_prompt.tscn" id="2_prompt"]
@@ -6,9 +6,21 @@
 [sub_resource type="CanvasItemMaterial" id="Additive"]
 blend_mode = 1
 
+[sub_resource type="Gradient" id="GlowFalloff"]
+offsets = PackedFloat32Array(0, 0.45, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.3, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="GlowTexture"]
+gradient = SubResource("GlowFalloff")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
 [sub_resource type="Gradient" id="MistFade"]
 offsets = PackedFloat32Array(0, 0.3, 1)
-colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.5, 1, 1, 1, 0)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.6, 1, 1, 1, 0)
 
 [sub_resource type="RectangleShape2D" id="InteractionShape"]
 size = Vector2(190, 100)
@@ -18,7 +30,7 @@ process_mode = 3
 script = ExtResource("1_desk")
 
 [node name="SpawnAnchor" type="Marker2D" parent="."]
-position = Vector2(-58, 0)
+position = Vector2(-76, 0)
 
 [node name="InteractionArea" type="Area2D" parent="."]
 collision_layer = 0
@@ -35,13 +47,13 @@ unique_name_in_owner = true
 z_index = -1
 
 [node name="Arch" type="Polygon2D" parent="Visuals/Background"]
-color = Color(0.17, 0.12, 0.25, 0.9)
+color = Color(0.21, 0.16, 0.31, 0.92)
 polygon = PackedVector2Array(-64, 0, -64, -70, -50, -102, -26, -124, 0, -134, 26, -124, 50, -102, 64, -70, 64, 0)
 
 [node name="ArchRim" type="Line2D" parent="Visuals/Background"]
 points = PackedVector2Array(-64, 0, -64, -70, -50, -102, -26, -124, 0, -134, 26, -124, 50, -102, 64, -70, 64, 0)
-width = 2.0
-default_color = Color(0.718, 0.514, 0.31, 0.55)
+width = 3.0
+default_color = Color(0.898, 0.62, 0.36, 0.85)
 
 [node name="Protractor" type="Line2D" parent="Visuals/Background"]
 position = Vector2(0, -108)
@@ -53,15 +65,17 @@ default_color = Color(0.898, 0.741, 0.467, 0.5)
 unique_name_in_owner = true
 position = Vector2(0, -50)
 
-[node name="Halo" type="Polygon2D" parent="Visuals/Glow"]
+[node name="Halo" type="Sprite2D" parent="Visuals/Glow"]
+self_modulate = Color(0.941, 0.682, 0.298, 0.5)
 material = SubResource("Additive")
-color = Color(0.941, 0.682, 0.298, 0.1)
-polygon = PackedVector2Array(60, 0, 52, 30, 30, 52, 0, 60, -30, 52, -52, 30, -60, 0, -52, -30, -30, -52, 0, -60, 30, -52, 52, -30)
+scale = Vector2(1.7, 1.7)
+texture = SubResource("GlowTexture")
 
-[node name="Core" type="Polygon2D" parent="Visuals/Glow"]
+[node name="Core" type="Sprite2D" parent="Visuals/Glow"]
+self_modulate = Color(1, 0.8, 0.45, 0.55)
 material = SubResource("Additive")
-color = Color(0.941, 0.682, 0.298, 0.14)
-polygon = PackedVector2Array(30, 0, 26, 15, 15, 26, 0, 30, -15, 26, -26, 15, -30, 0, -26, -15, -15, -26, 0, -30, 15, -26, 26, -15)
+scale = Vector2(0.7, 0.7)
+texture = SubResource("GlowTexture")
 
 [node name="Roots" type="Node2D" parent="Visuals"]
 
@@ -116,12 +130,13 @@ default_color = Color(0.898, 0.741, 0.467, 1)
 unique_name_in_owner = true
 position = Vector2(-28, -38)
 
-[node name="CandleGlow" type="Polygon2D" parent="Visuals/Candle"]
+[node name="CandleGlow" type="Sprite2D" parent="Visuals/Candle"]
 unique_name_in_owner = true
+self_modulate = Color(0.941, 0.682, 0.298, 0.35)
 material = SubResource("Additive")
 position = Vector2(0, -24)
-color = Color(0.941, 0.682, 0.298, 0.16)
-polygon = PackedVector2Array(24, 0, 20.8, 12, 12, 20.8, 0, 24, -12, 20.8, -20.8, 12, -24, 0, -20.8, -12, -12, -20.8, 0, -24, 12, -20.8, 20.8, -12)
+scale = Vector2(0.6, 0.6)
+texture = SubResource("GlowTexture")
 
 [node name="Stick" type="Polygon2D" parent="Visuals/Candle"]
 color = Color(0.898, 0.741, 0.467, 1)
@@ -141,12 +156,13 @@ polygon = PackedVector2Array(0, -3, 1.4, -0.5, 0, 1.5, -1.4, -0.5)
 unique_name_in_owner = true
 position = Vector2(27, -38)
 
-[node name="InkGlow" type="Polygon2D" parent="Visuals/Inkwell"]
+[node name="InkGlow" type="Sprite2D" parent="Visuals/Inkwell"]
 unique_name_in_owner = true
+self_modulate = Color(0.435, 0.627, 1, 0.45)
 material = SubResource("Additive")
 position = Vector2(0, -8)
-color = Color(0.435, 0.627, 1, 0.3)
-polygon = PackedVector2Array(12, 0, 10.4, 6, 6, 10.4, 0, 12, -6, 10.4, -10.4, 6, -12, 0, -10.4, -6, -6, -10.4, 0, -12, 6, -10.4, 10.4, -6)
+scale = Vector2(0.35, 0.35)
+texture = SubResource("GlowTexture")
 
 [node name="Bottle" type="Polygon2D" parent="Visuals/Inkwell"]
 color = Color(0.184, 0.373, 0.816, 1)
@@ -237,7 +253,7 @@ polygon = PackedVector2Array(-6, 13, 6, 13, 4, 17, -4, 17)
 [node name="Mist" type="CPUParticles2D" parent="Visuals"]
 unique_name_in_owner = true
 position = Vector2(0, -2)
-amount = 14
+amount = 26
 lifetime = 4.0
 preprocess = 4.0
 emission_shape = 3
@@ -247,9 +263,9 @@ spread = 25.0
 gravity = Vector2(0, 0)
 initial_velocity_min = 5.0
 initial_velocity_max = 11.0
-scale_amount_min = 2.0
-scale_amount_max = 4.0
-color = Color(0.6, 0.75, 1, 0.5)
+scale_amount_min = 3.0
+scale_amount_max = 6.0
+color = Color(0.7, 0.82, 1, 0.9)
 color_ramp = SubResource("MistFade")
 
 [node name="InteractionPrompt" parent="." instance=ExtResource("2_prompt")]

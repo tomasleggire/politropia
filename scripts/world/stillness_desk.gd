@@ -144,6 +144,7 @@ func _run_rest(player: Player) -> void:
 	var run := _run_id
 	_transaction_player = player
 	player.tree_exiting.connect(_on_player_tree_exiting)
+	player.meditation_finished.connect(_on_meditation_interrupted)
 	_set_phase(Phase.COMMIT)
 	_commit(player)
 	rest_started.emit(checkpoint_id)
@@ -173,6 +174,7 @@ func _commit(player: Player) -> void:
 	player.global_position = _anchor.global_position
 	player.velocity = Vector2.ZERO
 	player.enter_meditation()
+	player.face_towards(global_position.x)
 	if pause_world:
 		get_tree().paused = true
 		_paused_by_desk = true
@@ -204,6 +206,8 @@ func _finish_transaction() -> void:
 	if player != null and is_instance_valid(player):
 		if player.tree_exiting.is_connected(_on_player_tree_exiting):
 			player.tree_exiting.disconnect(_on_player_tree_exiting)
+		if player.meditation_finished.is_connected(_on_meditation_interrupted):
+			player.meditation_finished.disconnect(_on_meditation_interrupted)
 		player.exit_meditation()
 
 
@@ -217,6 +221,12 @@ func _abort_transaction() -> void:
 
 
 func _on_player_tree_exiting() -> void:
+	_abort_transaction()
+	_sync_resting_phase()
+
+
+## The player left meditation on its own (e.g. respawn) mid-transaction.
+func _on_meditation_interrupted() -> void:
 	_abort_transaction()
 	_sync_resting_phase()
 
@@ -267,7 +277,7 @@ func _on_body_exited(body: Node2D) -> void:
 
 func _refresh_prompt() -> void:
 	var available := can_rest()
-	if available:
+	if available and not TouchControls.visible:
 		_prompt.show_prompt()
 	else:
 		_prompt.hide_prompt()

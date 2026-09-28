@@ -1285,6 +1285,15 @@ func enter_meditation() -> void:
 	meditation_started.emit()
 
 
+## Turns the meditating player toward world-space `target_x`. Ignored outside
+## meditation so it can never override player-driven facing.
+func face_towards(target_x: float) -> void:
+	if not _meditating or is_equal_approx(target_x, global_position.x):
+		return
+	_facing = 1 if target_x > global_position.x else -1
+	_sprite.flip_h = _facing < 0
+
+
 func exit_meditation() -> void:
 	if not _meditating:
 		return
@@ -1350,6 +1359,7 @@ func set_checkpoint(checkpoint: Vector2) -> void:
 
 
 func respawn() -> void:
+	exit_meditation()
 	restore_full_health()
 	clear_transient_state()
 	global_position = _spawn_position
