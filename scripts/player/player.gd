@@ -1350,9 +1350,8 @@ func set_checkpoint(checkpoint: Vector2) -> void:
 
 
 func respawn() -> void:
-	set_collision_mask_value(2, true)
-	_drop_left = 0.0
-	velocity = Vector2.ZERO
+	restore_full_health()
+	clear_transient_state()
 	global_position = _spawn_position
 	reset_physics_interpolation()
 	_set_collider_height(_standing_shape_height)

@@ -111,12 +111,16 @@ The prototype currently advances the player's checkpoint through invisible x-coo
   - API: `StillnessDesk` (`scenes/world/stillness_desk.tscn`); exports `checkpoint_id` (config warning if empty), `commit_duration` 0.5, `resting_duration` 1.6, `release_duration` 0.5, `pause_world` true; `SpawnAnchor` child = rest + respawn point; signals `rest_started`, `rest_completed`, `phase_changed`; `request_rest() -> bool` (touch entry point), `can_rest()`, `get_phase()`, `get_spawn_position()`. Reusable `InteractionPrompt` (`scenes/ui/interaction_prompt.tscn`). Player seam: meditating plays `meditate` if present, else `crouch`.
   - Deferred to T3/T4: touch/keyboard prompt switching, facing Luz toward the desk, weak glow/mist/arch contrast, Luz overlapping the left paper root.
 
-- [ ] **T3 — Integrate one checkpoint into the prototype level**
+- [x] **T3 — Integrate one checkpoint into the prototype level**
   - Instance the component in `level_01.tscn` at a safe playable location.
   - Remove the invisible x-threshold checkpoint ownership from `level_01.gd`.
   - Apply persisted checkpoint state when the matching scene starts.
   - Acceptance: interaction works through the dedicated action, resting updates respawn, heal/reset effects occur once, death/respawn returns to the desk, and the level contains no checkpoint-specific duplicated logic.
   - Verification: headless project load and interactive keyboard/touch playtest.
+  - Route: delegated direct (writer trigger: level scene/script, touch controls, desk, service, player).
+  - Result: desk `level_01_desk_a` at (420, 620) on solid floor; x-threshold `CHECKPOINTS` removed; level start calls `CheckpointService.restore_player_for_scene(player, scene_file_path)`; `respawn()` now restores full health and clears transient state; desk now also calls `player.apply_checkpoint(anchor)` on rest (T2 gap found by harness); touch contract = group `interactable` + `request_interact()`, `TouchControls.set_interact_available(source, available)`, Interact button hidden out of range and during meditation.
+  - Known gap: the prototype course previously had 5 threshold checkpoints (up to x=5350); it now has one desk near the start, so late deaths return to it. More desks are a level-design decision.
+  - Not verified: real-device touch and keyboard `E` end to end (touch was simulated); respawn while mid-rest.
 
 - [ ] **T4 — Final regression, visual polish, and recovery record**
   - Run full applicable Godot checks and inspect errors/warnings.
@@ -126,8 +130,8 @@ The prototype currently advances the player's checkpoint through invisible x-coo
 
 ## Progress
 
-- Current task: T2 complete; T3 next.
-- Next step: integrate one desk into `level_01` (T3), add the touch path, remove x-threshold checkpoints.
+- Current task: T3 complete; T4 next.
+- Next step: T4 regression + visual polish (glow, arch contrast, mist, Luz/root overlap, facing), then device playtest.
 
 ## Verification evidence
 
@@ -138,13 +142,17 @@ The prototype currently advances the player's checkpoint through invisible x-coo
 - T2 `Godot --headless --path . --import` and `--quit-after 120`: 0 error/warning/parse lines (writer run and parent spot check).
 - T2 throwaway harness (scratchpad only): 25/25 checks — pause during rest, meditation lock at anchor, heal 2 → max, service id/spawn match, signals once, unpause/release, deterministic repeat, busy re-request ignored, freeing desk or player mid-rest unpauses and releases.
 - T2 screenshots (Metal render, scratchpad): dormant/resting/awakened; parent viewed `resting.png`, silhouettes readable. Harness note: `--script` harnesses cannot reference `Player`/`StillnessDesk` types (autoload not yet registered); use untyped refs.
+- T3 `--import` and `--quit-after 120`: 0 error/warning/parse lines (writer run and parent spot check).
+- T3 harness on `level_01` (scratchpad only): 15/15 — desk id set, start at (180, 620) without checkpoint, touch button hidden/visible by range, simulated touch starts rest, hidden during meditation, checkpoint active for scene after rest, respawn at anchor with full health, level re-instance places Luz at desk, `clear()` restores original start, empty reset group ok. `rg` finds no threshold-checkpoint code. Screenshot viewed by parent: desk on floor, prompt and diamond Interact button visible.
 - T1 throwaway `--script` harness (deleted): service activate/query/miss ok; empty resettable-group reset no error; `interact` has 2 events; meditation locks input and blocks movement while tree paused (`process_mode` ALWAYS); exit restores mode and movement; heal from 2 → 5 emits one `health_changed`. Only exit-time ObjectDB leak warnings (normal for `--script`).
 
 ## Commit evidence
 
 - T0 + T1: `063f371` feat: add checkpoint service and player meditation contract (slice 1; 5 paths, 358 changed lines incl. tracker). GGA pre-commit review: PASSED.
 - T1 review assessment (`--base-ref 46a14d4 --committed-only`, untracked excluded): risk `medium` (`executable_change` project.godot), `review_due=false` (`under_budget`). Reviewed boundary stays `46a14d4`; pending in slice.
-- Incident: first commit attempt staged the untracked `.DS_Store` files and failed with an invalid object; they were unstaged (`git rm --cached`) and remain untracked on disk.
+- T2: `3a33a1b` feat: add Stillness Desk checkpoint component (slice 2; GGA PASSED).
+- Slice assessment after T2 (`--base-ref 46a14d4 --committed-only`, untracked excluded): risk `medium`, 11 paths, 1058 changed lines, `review_due=true` (`slice_budget_reached`). Native review START lineage `review-c37ee063db401ded` returned the candidate consent envelope; user chose `declined` (candidate-scoped, validated `declined_this_candidate`). Off path: tier `medium` → writer self-verification + parent spot check (done). Reviewed boundary advances to `3a33a1b`.
+- Incident: first commit attempt staged the untracked `.DS_Store` files and failed with an invalid object; they were unstaged (`git rm --cached`) and remain untracked on disk. Recurred on T2; mitigated by adding `.DS_Store` to local `.git/info/exclude` (files untouched). Likely source: the opencode reviewer run by the GGA pre-commit hook (unverified).
 
 ## Rollback boundaries
 

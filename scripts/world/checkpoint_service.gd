@@ -61,6 +61,16 @@ func apply_to_player(player: Player, scene_path: String) -> bool:
 	return true
 
 
+## One-line level start: when a checkpoint is active for `scene_path`, points
+## the player's respawn at it and places the player there. Returns false,
+## leaving the player at its scene start position, when there is none.
+func restore_player_for_scene(player: Player, scene_path: String) -> bool:
+	if not apply_to_player(player, scene_path):
+		return false
+	player.respawn()
+	return true
+
+
 ## Asks every resettable enemy to return to its checkpoint state. Safe when
 ## the group is empty.
 func reset_resettable_enemies() -> void:

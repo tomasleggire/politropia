@@ -16,6 +16,9 @@ signal phase_changed(phase: Phase)
 
 enum Phase { DORMANT, AWAKENED, COMMIT, RESTING, RELEASE }
 
+## Touch controls call `request_interact()` on this group; only the desk with
+## Luz in range accepts it.
+const INTERACTABLE_GROUP := &"interactable"
 const AWAKENED_INTENSITY := 0.4
 const PARALLAX_STRENGTH := 0.06
 const PARALLAX_LIMIT := 10.0
@@ -66,6 +69,7 @@ func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group(INTERACTABLE_GROUP)
 	_area.body_entered.connect(_on_body_entered)
 	_area.body_exited.connect(_on_body_exited)
 	CheckpointService.checkpoint_activated.connect(_on_checkpoint_activated)
@@ -78,6 +82,7 @@ func _exit_tree() -> void:
 	if CheckpointService.checkpoint_activated.is_connected(_on_checkpoint_activated):
 		CheckpointService.checkpoint_activated.disconnect(_on_checkpoint_activated)
 	_abort_transaction()
+	TouchControls.set_interact_available(self, false)
 
 
 func _get_configuration_warnings() -> PackedStringArray:
@@ -106,6 +111,11 @@ func request_rest() -> bool:
 		return false
 	_run_rest(_player)
 	return true
+
+
+## Generic entry point for the touch Interact button.
+func request_interact() -> bool:
+	return request_rest()
 
 
 func can_rest() -> bool:
@@ -159,6 +169,7 @@ func _run_rest(player: Player) -> void:
 
 func _commit(player: Player) -> void:
 	_prompt.hide_prompt()
+	TouchControls.set_interact_available(self, false)
 	player.global_position = _anchor.global_position
 	player.velocity = Vector2.ZERO
 	player.enter_meditation()
@@ -169,6 +180,7 @@ func _commit(player: Player) -> void:
 
 func _apply_rest_effects(player: Player) -> void:
 	player.restore_full_health()
+	player.apply_checkpoint(_anchor.global_position)
 	CheckpointService.activate(checkpoint_id, _owner_scene_path(), _anchor.global_position)
 	CheckpointService.reset_resettable_enemies()
 
@@ -254,10 +266,12 @@ func _on_body_exited(body: Node2D) -> void:
 
 
 func _refresh_prompt() -> void:
-	if can_rest():
+	var available := can_rest()
+	if available:
 		_prompt.show_prompt()
 	else:
 		_prompt.hide_prompt()
+	TouchControls.set_interact_available(self, available)
 
 
 # -- Presentation --------------------------------------------------------------

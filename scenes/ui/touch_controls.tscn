@@ -76,3 +76,21 @@ offset_bottom = -30.0
 mouse_filter = 2
 script = ExtResource("3_button")
 icon = 2
+
+[node name="InteractButton" type="Control" parent="Root"]
+visible = false
+custom_minimum_size = Vector2(96, 96)
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 0
+grow_vertical = 0
+offset_left = -310.0
+offset_top = -264.0
+offset_right = -214.0
+offset_bottom = -168.0
+mouse_filter = 2
+script = ExtResource("3_button")
+icon = 3
