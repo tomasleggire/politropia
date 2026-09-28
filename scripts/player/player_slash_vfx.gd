@@ -47,13 +47,15 @@ func _ready() -> void:
 	_sprite = Sprite2D.new()
 	_sprite.centered = true
 	_sprite.texture_filter = TEXTURE_FILTER
+	# This short-lived presentation sprite is configured between physics
+	# ticks; never interpolate its first visible transform from defaults.
+	_sprite.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	add_child(_sprite)
 	for variant_name in _manifest["variants"]:
 		_frame_textures_by_variant[variant_name] = _build_frame_textures(variant_name)
-	# Prime a valid atlas frame while the parent effect remains hidden. Without
-	# this, the first attack starts from a nil Sprite2D texture while subsequent
-	# attacks retain the previous frame, producing a one-time first-session
-	# rendering artifact on device.
+	# Prime a valid atlas frame while the parent effect remains hidden. This is
+	# required frame initialization, but it does not replace the interpolation
+	# guard below: first visibility also resets the configured transform history.
 	var initial_frames: Array = _frame_textures_by_variant.get("ground_1", [])
 	assert(not initial_frames.is_empty(), "Missing initial Luz slash smear frame")
 	_sprite.texture = initial_frames[0] as Texture2D
@@ -98,6 +100,7 @@ func play_slash(
 	_elapsed = 0.0
 	_current_frame = -1
 	_advance_frame(0)
+	_sprite.reset_physics_interpolation()
 	visible = true
 	set_process(true)
 
