@@ -7,6 +7,9 @@ extends CharacterBody2D
 ## a 3-hit ground combo, up/air/crouch attacks and a down plunge.
 
 signal respawned
+signal health_changed(current: int, maximum: int)
+signal meditation_started
+signal meditation_finished
 
 enum State {
 	IDLE, RUN, CROUCH, JUMP, FALL, DASH,
@@ -17,6 +20,9 @@ enum State {
 const PHASE_STARTUP := 0
 const PHASE_ACTIVE := 1
 const PHASE_RECOVERY := 2
+
+@export_group("Health")
+@export var max_health := 5
 
 @export_group("Run")
 @export var run_max_speed := 250.0
@@ -208,6 +214,10 @@ var _state := State.IDLE
 var _state_time := 0.0
 var _facing := 1
 var _spawn_position := Vector2.ZERO
+var _health := 0
+var _input_locked := false
+var _meditating := false
+var _default_process_mode := Node.PROCESS_MODE_INHERIT
 
 var _rise_gravity := 0.0
 var _fall_gravity := 0.0
@@ -272,6 +282,8 @@ func _ready() -> void:
 	# so Luz renders at roughly the CollisionShape2D's 58px standing height.
 	_sprite.scale = Vector2(0.175, 0.175)
 	_spawn_position = global_position
+	_health = max_health
+	_default_process_mode = process_mode
 	_recompute_jump_physics()
 
 	var shape := _collision_shape.shape as RectangleShape2D
@@ -294,6 +306,10 @@ func _recompute_jump_physics() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if is_input_locked():
+		_update_locked(delta)
+		return
+
 	_state_time += delta
 	_update_shared_timers(delta)
 	_update_facing()
@@ -487,6 +503,8 @@ func _held_vertical_direction() -> int:
 ## on-screen joystick is currently holding, same as the keyboard path.
 ## Called immediately on touch-down by the touch UI (zero added latency).
 func request_attack(direction: int) -> void:
+	if is_input_locked():
+		return
 	var resolved := direction
 	if resolved == 0:
 		resolved = _held_vertical_direction()
@@ -499,7 +517,7 @@ func request_attack(direction: int) -> void:
 ## Used when the finger swipes after touching down on the attack button (see
 ## touch_controls.gd's attack_upgrade_window).
 func request_attack_upgrade(direction: int) -> void:
-	if direction == 0:
+	if direction == 0 or is_input_locked():
 		return
 	var upgrading_from_neutral := (
 		(_state == State.ATTACK and _attack_combo_index == 0 and _attack_phase == PHASE_STARTUP)
@@ -517,6 +535,8 @@ func request_attack_upgrade(direction: int) -> void:
 ## (see touch_controls.gd) so the held-release variable jump height keeps
 ## working.
 func request_jump() -> void:
+	if is_input_locked():
+		return
 	_jump_buffer_left = jump_buffer_time
 
 
@@ -524,6 +544,8 @@ func request_jump() -> void:
 ## request_jump above, calling the same start path the keyboard/gamepad
 ## dash uses (ground or air, respects cooldown/state/one-air-dash).
 func request_dash() -> void:
+	if is_input_locked():
+		return
 	_try_start_dash()
 
 
@@ -1211,7 +1233,117 @@ func _standing_on_one_way() -> bool:
 	return false
 
 
+## -- Health -----------------------------------------------------------------
+
+func get_health() -> int:
+	return _health
+
+
+func get_max_health() -> int:
+	return max_health
+
+
+func is_at_full_health() -> bool:
+	return _health >= max_health
+
+
+func restore_full_health() -> void:
+	if _health == max_health:
+		return
+	_health = max_health
+	health_changed.emit(_health, max_health)
+
+
+## -- Input lock / meditation ---------------------------------------------------
+
+## True while gameplay input is ignored, either by an explicit lock or because
+## the player is meditating.
+func is_input_locked() -> bool:
+	return _input_locked or _meditating
+
+
+func is_meditating() -> bool:
+	return _meditating
+
+
+func set_input_locked(locked: bool) -> void:
+	if _input_locked == locked:
+		return
+	_input_locked = locked
+	if locked:
+		clear_transient_state()
+
+
+## Locks input and lets the player keep processing while the tree is paused,
+## so the world can be frozen around a committed rest.
+func enter_meditation() -> void:
+	if _meditating:
+		return
+	clear_transient_state()
+	_meditating = true
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	meditation_started.emit()
+
+
+func exit_meditation() -> void:
+	if not _meditating:
+		return
+	_meditating = false
+	process_mode = _default_process_mode
+	_jump_buffer_left = 0.0
+	meditation_finished.emit()
+
+
+## Cancels every in-flight action and buffered input so control can be
+## handed back (or taken away) from a clean idle state.
+func clear_transient_state() -> void:
+	velocity = Vector2.ZERO
+	set_collision_mask_value(2, true)
+	_drop_left = 0.0
+	_coyote_left = 0.0
+	_jump_buffer_left = 0.0
+	_landing_left = 0.0
+	_dash_cooldown_left = 0.0
+	_air_dash_used = false
+	_wall_recling_lock = 0.0
+	_wall_jump_lock_left = 0.0
+	_wall_kick_lock_left = 0.0
+	_wall_kick_pending = false
+	_attack_combo_index = 0
+	_attack_phase = PHASE_STARTUP
+	_attack_buffered_left = 0.0
+	_attack_restart_buffered_left = 0.0
+	_air_attack_buffered_left = 0.0
+	_attack_buffer_left = 0.0
+	_attack_buffer_direction = 0
+	_set_collider_height(_standing_shape_height)
+	_deactivate_attack_hitbox()
+	_enter_state(State.IDLE)
+
+
+func _update_locked(delta: float) -> void:
+	_state_time += delta
+	var resting_state := State.IDLE if is_on_floor() else State.FALL
+	if _state != resting_state:
+		_enter_state(resting_state)
+
+	var fall_speed_before_move := velocity.y
+	velocity.x = 0.0
+	if is_on_floor():
+		velocity.y = 0.0
+	else:
+		_apply_gravity(delta)
+	move_and_slide()
+	_after_move(fall_speed_before_move)
+	_update_animation()
+
+
 ## -- Checkpoints / respawn -----------------------------------------------------
+
+## Makes `spawn_position` the point respawn() returns to; does not move the player.
+func apply_checkpoint(spawn_position: Vector2) -> void:
+	set_checkpoint(spawn_position)
+
 
 func set_checkpoint(checkpoint: Vector2) -> void:
 	_spawn_position = checkpoint
