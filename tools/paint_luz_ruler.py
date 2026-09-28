@@ -97,6 +97,12 @@ MIN_PAINTED_LENGTH_WORLD = 20.0
 RATIO_MIN = 0.12
 RATIO_MAX = 1.05
 
+# T5c's narrowly-scoped presentation corrections. These alter only the baked
+# ruler endpoint in non-contact poses; the source character frames, contact
+# rulers, hitboxes, and attack timing remain untouched.
+GROUND_RECOVERY_TIP_MAX_Y_WORLD = -2.0
+AIR_BACKWARD_TIP_MIN_X_WORLD = -26.0
+
 # -- Rendering.
 SUPERSAMPLE = 4
 OUTLINE_FRACTION = 0.16     # of the ruler's own width
@@ -614,6 +620,36 @@ def process_clip(clip_name: str, sheet_img: Image.Image, grid: dict, indices: li
         axis_rad = math.radians(frame_axis[i])
         length_native = painted_length_native * frame_ratio[i]
         tip_px = (grip_px[0] + math.cos(axis_rad) * length_native, grip_px[1] + math.sin(axis_rad) * length_native)
+        endpoint_constrained = False
+
+        # The duplicated contact pose spans frames contact_index and
+        # contact_index + 1. Keep both exactly as authored; only constrain the
+        # later ground recovery ruler so its tip cannot cross the feet line.
+        if clip_name in ("ground_attack_1", "ground_attack_3") and i > contact_index + 1:
+            tip_world = to_world(tip_px)
+            if tip_world["y"] > GROUND_RECOVERY_TIP_MAX_Y_WORLD:
+                tip_px = (
+                    tip_px[0],
+                    FRAME_ANCHOR[1] + GROUND_RECOVERY_TIP_MAX_Y_WORLD / DISPLAY_SCALE,
+                )
+                endpoint_constrained = True
+
+        # Air's backwards windup/follow-through poses must not leave an
+        # oversized ruler tail behind Luz. Contact and forward poses remain
+        # unchanged; this is a maximum backward reach for non-contact poses.
+        if clip_name == "air_horizontal_attack" and i != contact_index:
+            tip_world = to_world(tip_px)
+            if tip_world["x"] < AIR_BACKWARD_TIP_MIN_X_WORLD:
+                tip_px = (
+                    FRAME_ANCHOR[0] + AIR_BACKWARD_TIP_MIN_X_WORLD / DISPLAY_SCALE,
+                    tip_px[1],
+                )
+                endpoint_constrained = True
+
+        if endpoint_constrained:
+            dx, dy = tip_px[0] - grip_px[0], tip_px[1] - grip_px[1]
+            length_native = math.hypot(dx, dy)
+            frame_axis[i] = math.degrees(math.atan2(dy, dx))
 
         segment, origin = render_ruler_segment(grip_px, tip_px, contact_width_native, colors["fill"], colors["outline"], colors["tick"])
         if segment is not None:
