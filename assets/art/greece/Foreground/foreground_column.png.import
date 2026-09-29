@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b44ukfsb87n06"
-path="res://.godot/imported/stone_floor_red_top.png-4ed83b5dfb5cc1b0d7f379de8b68c09c.ctex"
+uid="uid://b1t1md8ocmvl4"
+path="res://.godot/imported/foreground_column.png-df11f9baa72594ee70b04794dfa659c6.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/greece/Floor/stone_floor_red_top.png"
-dest_files=["res://.godot/imported/stone_floor_red_top.png-4ed83b5dfb5cc1b0d7f379de8b68c09c.ctex"]
+source_file="res://assets/art/greece/Foreground/foreground_column.png"
+dest_files=["res://.godot/imported/foreground_column.png-df11f9baa72594ee70b04794dfa659c6.ctex"]
 
 [params]
 

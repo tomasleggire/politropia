@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://diilk5o307ovy"
-path="res://.godot/imported/stone_floor_dark_underside.png-8d2bd88381a76937ad470c536f9cd8f1.ctex"
+uid="uid://esg2ic82pa31"
+path="res://.godot/imported/file_00000000fa70820ea35d2497dee97bac.png-83eca21ec88b13e095ed1984560969d3.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/greece/Floor/stone_floor_dark_underside.png"
-dest_files=["res://.godot/imported/stone_floor_dark_underside.png-8d2bd88381a76937ad470c536f9cd8f1.ctex"]
+source_file="res://assets/art/greece/Backgrounds/file_00000000fa70820ea35d2497dee97bac.png"
+dest_files=["res://.godot/imported/file_00000000fa70820ea35d2497dee97bac.png-83eca21ec88b13e095ed1984560969d3.ctex"]
 
 [params]
 

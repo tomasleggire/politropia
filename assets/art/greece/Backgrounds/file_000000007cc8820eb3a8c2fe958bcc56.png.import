@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c4lxpi2ntcssx"
-path="res://.godot/imported/grass_floor_top.png-8b1a58f43624c39b150264ee227474c9.ctex"
+uid="uid://bbp5glls01m7h"
+path="res://.godot/imported/file_000000007cc8820eb3a8c2fe958bcc56.png-3cbabfca6552f425e9c9ca5347e88014.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/greece/Floor/grass_floor_top.png"
-dest_files=["res://.godot/imported/grass_floor_top.png-8b1a58f43624c39b150264ee227474c9.ctex"]
+source_file="res://assets/art/greece/Backgrounds/file_000000007cc8820eb3a8c2fe958bcc56.png"
+dest_files=["res://.godot/imported/file_000000007cc8820eb3a8c2fe958bcc56.png-3cbabfca6552f425e9c9ca5347e88014.ctex"]
 
 [params]
 
