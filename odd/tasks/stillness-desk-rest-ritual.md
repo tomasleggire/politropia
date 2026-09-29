@@ -105,10 +105,13 @@ The checkpoint works on device (parent feature `odd/tasks/stillness-desk-checkpo
 
 - [ ] **T5 — Regression, device playtest, and recovery record**
   - Run full checks, deploy to the iPhone, and record the playtest outcome, evidence, and the next delivery step.
+  - Review fixes applied: shader `x*x` plus clamped radii/softness and atan bias (Metal-safe); paper `z_index` restore; `_usable_count()` array guard; honest `get_fx_node_count()` (36, `FX_NODE_BUDGET` 40); `center_x`; ring `*_alpha` renames; explicit `_reset_to_idle()`; `level_01` null-safe player.
+  - Committed test: `tests/stillness_desk_ritual_test.gd` (139 checks; README with the run command); iOS export excludes `tests/*`.
+  - Verification: headless import/load clean; committed test `PASS 139/139` (writer and parent spot check; about 75s; exit 1 confirmed on a forced failure); ring look unchanged vs T4 screenshots.
 
 ## Progress
 
-- Current task: T5 next (commit the regression harness, full checks, iPhone deploy + playtest).
+- Current task: T5 in progress (delegated writer: review fixes + committed harness), then iPhone deploy.
 - Next step: move the T3/T4 harnesses into the repo as a runnable headless test, deploy to the iPhone.
 
 ## Verification evidence
@@ -136,6 +139,9 @@ The checkpoint works on device (parent feature `odd/tasks/stillness-desk-checkpo
 - T3: `9bda34e` feat: add Stillness Desk rest ritual phases.
 - T3 review (range `88a5c18..9bda34e`, 5 paths, 741 lines): risk `medium`, `slice_budget_reached`. User GRANTED. Lineage `review-f898b12f6a4c766a`, lens `review-reliability` → APPROVED and acknowledged (`gentle-ai.review-acknowledged/v1`). Reviewed boundary advances to `9bda34e`.
 - T3 advisory findings (non-blocking, parent triage): R3-001/R3-002 mount/dismount advance only on `animation_finished`, with no timeout fallback → FIX in T4. R3-003 stale wait after abort → no change (abort increments `_run_id`, line 295). R3-004 harness not committed → commit it in T5. R3-005 `request_attack_upgrade` exit → no change (touch always calls `request_attack` first). R3-006 in-memory activation record → documented; no save system exists.
+- T4: `1a7ace6` feat: bring the Stillness Desk altar to life.
+- T4 review (range `9bda34e..1a7ace6`, 36 paths, 912 lines): risk `high` (processor false positive plus new FX logic). User GRANTED. Lineage `review-e0c973b69fa4b1f3`, 4 lenses (risk, resilience, readability, reliability) run concurrently → APPROVED and acknowledged. Reviewed boundary advances to `1a7ace6`.
+- T4 advisory findings, parent triage (all fixed in T5): R3-001 `pow()` with a negative base in `ring_sweep.gdshader:25` (NaN risk on Metal/iPhone) → use a squared term. R3-002 paper `z_index` not restored → save/restore it. R3-003 harness uncommitted → commit it. R3-004 array bounds in `paper_orbit.gd` → clamp/assert. R2-001 `get_fx_node_count` misnamed/miscounts (the ≤40 claim rested on it) → honest count. R2-002 dead `center.y` → `center_x`. R2-003 ambiguous `resting_level` → rename in the ring. R2-004 implicit abort path → an explicit named reset.
 - Incident: the GGA hook again wrote index entries with missing blobs (manifest); recovered with `git read-tree HEAD` + re-add; `fsck` clean, history intact. Rule: stage every intended change before committing.
 
 ## Rollback boundaries

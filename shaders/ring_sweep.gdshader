@@ -18,11 +18,17 @@ void vertex() {
 }
 
 void fragment() {
-	float angle = atan(-local_pos.y / radii.y, local_pos.x / radii.x);
+	// Guards: zero radii/softness would divide by zero, and smoothstep needs
+	// edge0 < edge1. The tiny x bias keeps atan(0, 0) (undefined) off the centre.
+	vec2 safe_radii = max(radii, vec2(0.001));
+	float soft = max(softness, 0.001);
+	float angle = atan(-local_pos.y / safe_radii.y, local_pos.x / safe_radii.x + 0.000001);
 	float travelled = mod(PI - angle, TAU);
-	float front = progress * (TAU + softness);
-	float revealed = 1.0 - smoothstep(front - softness, front, travelled);
-	float edge = exp(-pow((travelled - front + softness * 0.5) / (softness * 0.5), 2.0));
+	float front = progress * (TAU + soft);
+	float revealed = 1.0 - smoothstep(front - soft, front, travelled);
+	// Explicit square: pow() with a negative base is undefined on Metal.
+	float edge_offset = (travelled - front + soft * 0.5) / (soft * 0.5);
+	float edge = exp(-(edge_offset * edge_offset));
 	edge *= 1.0 - smoothstep(0.95, 1.0, progress);
 	// The lit art is a blue band with amber ticks: re-tint it as warm light.
 	float tick = clamp((COLOR.r - COLOR.b) * 2.0, 0.0, 1.0);

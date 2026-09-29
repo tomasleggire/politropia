@@ -15,6 +15,8 @@ const INTENSITY_AWAKENED := 0.4
 const INTENSITY_RITUAL := 1.0
 const MOUNT_RAMP_TIME := 1.0
 const FLICKER_SPEED := 9.0
+## Ceiling for the nodes the FX layer animates every frame (mobile budget).
+const FX_NODE_BUDGET := 40
 
 @export_group("Pendulum")
 @export_range(0.0, 0.3, 0.005) var swing_amplitude := 0.1
@@ -95,11 +97,14 @@ func _process(delta: float) -> void:
 	_ring_sweep.step(_breath)
 
 
+## Nodes animated by this layer each frame: firefly glows and cores (extras
+## included), motes, paper sheets, the peak bloom and the lit ring halves.
+## Must stay within FX_NODE_BUDGET.
 func get_fx_node_count() -> int:
-	var count := 0
-	for group in [_swarm, _motes, _ring]:
+	var count := 1 # peak bloom
+	for group in [_swarm, _motes, _papers, _ring]:
 		count += group.get_child_count()
-	return count + 1
+	return count
 
 
 func get_swing_angle() -> float:
@@ -111,9 +116,9 @@ func get_swing_angle() -> float:
 func _on_phase_changed(phase: StillnessDesk.Phase) -> void:
 	match phase:
 		StillnessDesk.Phase.DORMANT:
-			_return_to_idle(INTENSITY_DORMANT)
+			_reset_to_idle(INTENSITY_DORMANT)
 		StillnessDesk.Phase.AWAKENED:
-			_return_to_idle(INTENSITY_AWAKENED)
+			_reset_to_idle(INTENSITY_AWAKENED)
 		StillnessDesk.Phase.MOUNT:
 			_ease(&"intensity", INTENSITY_RITUAL, MOUNT_RAMP_TIME)
 		StillnessDesk.Phase.RESTING:
@@ -138,25 +143,25 @@ func _on_celebration_peak() -> void:
 
 
 func _on_dismount_started() -> void:
-	if not _ritual_on:
-		return
-	_ritual_on = false
-	_ease(&"swing", 1.0, SWING_RESUME_TIME, Tween.EASE_IN)
-	_ease(&"breath_weight", 0.0, 0.8)
-	_ease(&"intensity", INTENSITY_AWAKENED, 0.8)
-	_ring_sweep.release()
-	_swarm.disperse()
-	_paper_orbit.glide_home()
+	if _ritual_on:
+		_reset_to_idle(INTENSITY_AWAKENED)
 
 
 func _on_breath_cycle_started() -> void:
 	_breath_clock = 0.0
 
 
-## Covers the desk being aborted (respawn) without a dismount clip.
-func _return_to_idle(target_intensity: float) -> void:
-	_on_dismount_started()
+## Deterministic return to the idle look. Covers a normal dismount and an
+## abort (respawn, freed player) at any phase, including MOUNT, without
+## depending on whether the celebration ever started.
+func _reset_to_idle(target_intensity: float) -> void:
+	_ritual_on = false
+	_ease(&"swing", 1.0, SWING_RESUME_TIME, Tween.EASE_IN)
+	_ease(&"breath_weight", 0.0, 0.8)
 	_ease(&"intensity", target_intensity, 0.6)
+	_ring_sweep.release()
+	_swarm.disperse()
+	_paper_orbit.glide_home()
 
 
 func _play_bloom() -> void:

@@ -29,7 +29,7 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	if _player.global_position.y > 820.0:
+	if is_instance_valid(_player) and _player.global_position.y > 820.0:
 		_player.respawn()
 		_camera.snap_to_target()
 

@@ -10,10 +10,10 @@ const REPEAT_FADE_TIME := 0.3
 const PEAK_LEVEL := 1.0
 const FADE_OUT_TIME := 0.7
 
-@export_group("Levels")
-@export_range(0.0, 1.0, 0.05) var sweep_level := 1.0
-@export_range(0.0, 1.0, 0.05) var repeat_level := 0.85
-@export_range(0.0, 1.0, 0.05) var resting_level := 0.7
+@export_group("Alpha Targets")
+@export_range(0.0, 1.0, 0.05) var sweep_alpha := 1.0
+@export_range(0.0, 1.0, 0.05) var repeat_alpha := 0.85
+@export_range(0.0, 1.0, 0.05) var resting_alpha := 0.7
 @export_range(0.0, 0.5, 0.01) var breath_amplitude := 0.18
 
 var level := 0.0
@@ -40,11 +40,11 @@ func setup(ring: Node2D) -> void:
 func celebrate(first: bool) -> void:
 	if first:
 		progress = 0.0
-		AltarFxKit.ease_property(self, _tweens, self, &"level", sweep_level, 0.15)
+		AltarFxKit.ease_property(self, _tweens, self, &"level", sweep_alpha, 0.15)
 		AltarFxKit.ease_property(self, _tweens, self, &"progress", 1.0, SWEEP_TIME, Tween.EASE_IN_OUT, Tween.TRANS_QUAD)
 	else:
 		progress = 1.0
-		AltarFxKit.ease_property(self, _tweens, self, &"level", repeat_level, REPEAT_FADE_TIME, Tween.EASE_OUT)
+		AltarFxKit.ease_property(self, _tweens, self, &"level", repeat_alpha, REPEAT_FADE_TIME, Tween.EASE_OUT)
 
 
 func peak() -> void:
@@ -52,7 +52,7 @@ func peak() -> void:
 
 
 func settle_into_rest() -> void:
-	AltarFxKit.ease_property(self, _tweens, self, &"level", resting_level, 0.9)
+	AltarFxKit.ease_property(self, _tweens, self, &"level", resting_alpha, 0.9)
 	AltarFxKit.ease_property(self, _tweens, self, &"breath_weight", 1.0, 0.9)
 
 
