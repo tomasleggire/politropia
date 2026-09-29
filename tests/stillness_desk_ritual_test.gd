@@ -5,6 +5,9 @@ extends SceneTree
 
 const LEVEL := "res://scenes/levels/level_01.tscn"
 const DESK_ID := &"level_01_desk_a"
+## Total checks a complete run performs; a smaller count means the run aborted.
+const EXPECTED_CHECKS := 150
+const EXPECTED_CASES := 4
 
 class Dummy extends Node:
 	var n := 0
@@ -13,19 +16,23 @@ class Dummy extends Node:
 		n += 1
 
 var checks := 0
+var cases_done := 0
 var failed: Array[String] = []
-var lvl
-var desk
-var player
-var fx
-var dummy
-var tc
-var cps
-var phases: Array = []
+# StillnessDesk, Player, StillnessDeskFx and the autoloads reference autoload
+# singletons, which are not resolvable in a --script run, so they are typed by
+# their native base class.
+var lvl: Node
+var desk: Node2D
+var player: CharacterBody2D
+var fx: Node2D
+var dummy: Dummy
+var tc: Node
+var cps: Node
+var phases: Array[int] = []
 var acts := 0
-var trace: Array = []   # [anim, frame, backpack visible]
-var ev: Array = []
-var paper_z: Array = []
+var trace: Array[Array] = []   # [anim, frame, backpack visible]
+var ev: Array[Array] = []
+var paper_z: Array[int] = []
 
 
 func check(condition: bool, message: String) -> void:
@@ -35,7 +42,7 @@ func check(condition: bool, message: String) -> void:
 
 
 func frames(n: int) -> void:
-	for i in n:
+	for i: int in n:
 		await process_frame
 
 
@@ -45,7 +52,7 @@ func secs(t: float) -> void:
 		await process_frame
 
 
-func wait_phase(ph: int, timeout := 8.0) -> bool:
+func wait_phase(ph: int, timeout: float = 8.0) -> bool:
 	var end := Time.get_ticks_msec() + int(timeout * 1000.0)
 	while desk.get_phase() != ph and Time.get_ticks_msec() < end:
 		await process_frame
@@ -83,14 +90,14 @@ func setup_level() -> void:
 	ev.clear()
 	acts = 0
 	paper_z.clear()
-	for sheet in desk.get_node("Visuals/Papers").get_children():
+	for sheet: Node2D in desk.get_node("Visuals/Papers").get_children():
 		paper_z.append(sheet.z_index)
-	desk.phase_changed.connect(func(p): phases.append(p))
-	desk.celebration_started.connect(func(f): ev.append(["start", f, Time.get_ticks_msec(), dummy.n, acts]))
-	desk.celebration_peak.connect(func(): ev.append(["peak", Time.get_ticks_msec(), dummy.n, acts, player._health]))
-	desk.celebration_finished.connect(func(): ev.append(["finish", Time.get_ticks_msec()]))
-	desk.dismount_started.connect(func(): ev.append(["dismount", Time.get_ticks_msec()]))
-	desk.rest_completed.connect(func(_id): ev.append(["completed", Time.get_ticks_msec()]))
+	desk.phase_changed.connect(func(p: int) -> void: phases.append(p))
+	desk.celebration_started.connect(func(f: bool) -> void: ev.append(["start", f, Time.get_ticks_msec(), dummy.n, acts]))
+	desk.celebration_peak.connect(func() -> void: ev.append(["peak", Time.get_ticks_msec(), dummy.n, acts, player._health]))
+	desk.celebration_finished.connect(func() -> void: ev.append(["finish", Time.get_ticks_msec()]))
+	desk.dismount_started.connect(func() -> void: ev.append(["dismount", Time.get_ticks_msec()]))
+	desk.rest_completed.connect(func(_id: StringName) -> void: ev.append(["completed", Time.get_ticks_msec()]))
 	if not cps.checkpoint_activated.is_connected(count_activation):
 		cps.checkpoint_activated.connect(count_activation)
 	if not process_frame.is_connected(sample):
@@ -107,37 +114,37 @@ func swing_range(t: float) -> float:
 
 
 func papers_home() -> bool:
-	var orbit = fx.get_node("PaperOrbit")
-	var sheets = desk.get_node("Visuals/Papers").get_children()
-	for i in sheets.size():
+	var orbit := fx.get_node("PaperOrbit")
+	var sheets := desk.get_node("Visuals/Papers").get_children()
+	for i: int in sheets.size():
 		if sheets[i].position.distance_to(orbit.get_rest_position(i)) > 1.0:
 			return false
 	return true
 
 
 func papers_z_home() -> bool:
-	var sheets = desk.get_node("Visuals/Papers").get_children()
-	for i in sheets.size():
+	var sheets := desk.get_node("Visuals/Papers").get_children()
+	for i: int in sheets.size():
 		if sheets[i].z_index != paper_z[i]:
 			return false
 	return true
 
 
 func papers_lifted() -> float:
-	var orbit = fx.get_node("PaperOrbit")
-	var sheets = desk.get_node("Visuals/Papers").get_children()
+	var orbit := fx.get_node("PaperOrbit")
+	var sheets := desk.get_node("Visuals/Papers").get_children()
 	var m := 0.0
-	for i in sheets.size():
+	for i: int in sheets.size():
 		m = maxf(m, sheets[i].position.distance_to(orbit.get_rest_position(i)))
 	return m
 
 
-func count_activation(_id, _path, _position) -> void:
+func count_activation(_id: StringName, _path: String, _position: Vector2) -> void:
 	acts += 1
 
 
 func count_events(kind: String) -> int:
-	return ev.filter(func(e): return e[0] == kind).size()
+	return ev.filter(func(e: Array) -> bool: return e[0] == kind).size()
 
 
 func run() -> void:
@@ -152,12 +159,20 @@ func run() -> void:
 
 
 func finish() -> void:
+	# A script error inside a case aborts that coroutine silently, so a clean
+	# `failed` list alone proves nothing: require every case to have completed.
+	if cases_done != EXPECTED_CASES or checks != EXPECTED_CHECKS:
+		print("FAIL incomplete run (%d checks ran)" % checks)
+		for message: String in failed:
+			print("  - " + message)
+		quit(1)
+		return
 	if failed.is_empty():
-		print("PASS %d/%d" % [checks, checks])
+		print("PASS %d/%d" % [checks, EXPECTED_CHECKS])
 		quit(0)
 		return
 	print("FAIL %d/%d" % [failed.size(), checks])
-	for message in failed:
+	for message: String in failed:
 		print("  - " + message)
 	quit(1)
 
@@ -202,18 +217,18 @@ func run_flow_cases() -> void:
 	await frames(3)
 	check(not paused and not player.is_meditating(), "rest1 unpaused, control returned")
 	check(phases == [2, 3, 4, 5, 1], "rest1 phase order %s" % [phases])
-	var seq: Array = []
-	for t in trace:
+	var seq: Array[StringName] = []
+	for t: Array in trace:
 		if seq.is_empty() or seq[-1] != t[0]: seq.append(t[0])
 	check(seq == [&"rest_mount", &"rest_sit", &"rest_dismount"], "rest1 clips order %s" % [seq])
 	var bad := 0
-	for t in trace:
+	for t: Array in trace:
 		var want: bool = (t[0] == &"rest_mount" and t[1] >= 3) or t[0] == &"rest_sit" or (t[0] == &"rest_dismount" and t[1] < 4)
 		if want != t[2]: bad += 1
 	check(bad == 0, "rest1 backpack visible exactly mount f3..dismount f4 (bad=%d of %d)" % [bad, trace.size()])
-	var st: Array = ev.filter(func(e): return e[0] == "start")
-	var pk: Array = ev.filter(func(e): return e[0] == "peak")
-	var fin: Array = ev.filter(func(e): return e[0] == "finish")
+	var st: Array[Array] = ev.filter(func(e: Array) -> bool: return e[0] == "start")
+	var pk: Array[Array] = ev.filter(func(e: Array) -> bool: return e[0] == "peak")
+	var fin: Array[Array] = ev.filter(func(e: Array) -> bool: return e[0] == "finish")
 	check(st.size() == 1 and st[0][1] == true, "rest1 celebration first=true")
 	check(pk.size() == 1 and fin.size() == 1, "rest1 one peak, one finish")
 	check(st[0][3] == 0 and st[0][4] == 0, "rest1 nothing applied at start")
@@ -242,14 +257,14 @@ func run_flow_cases() -> void:
 	check(await wait_phase(1, 4.0), "rest2 AWAKENED")
 	await frames(3)
 	check(not paused and not player.is_meditating(), "rest2 released")
-	st = ev.filter(func(e): return e[0] == "start")
-	pk = ev.filter(func(e): return e[0] == "peak")
-	fin = ev.filter(func(e): return e[0] == "finish")
+	st = ev.filter(func(e: Array) -> bool: return e[0] == "start")
+	pk = ev.filter(func(e: Array) -> bool: return e[0] == "peak")
+	fin = ev.filter(func(e: Array) -> bool: return e[0] == "finish")
 	dur = (fin[0][1] - st[0][2]) / 1000.0
 	check(st[0][1] == false and absf(dur - 0.8) < 0.25, "rest2 short celebration first=false %.2fs" % dur)
 	check(dummy.n == 1 and acts == 1 and pk.size() == 1, "rest2 reset/activate once")
 	bad = 0
-	for t in trace:
+	for t: Array in trace:
 		var want2: bool = (t[0] == &"rest_mount" and t[1] >= 3) or t[0] == &"rest_sit" or (t[0] == &"rest_dismount" and t[1] < 4)
 		if want2 != t[2]: bad += 1
 	check(bad == 0, "rest2 backpack timing (bad=%d)" % bad)
@@ -275,7 +290,7 @@ func run_flow_cases() -> void:
 	check(player.global_position.x > x0 + 5.0, "movement works (dx=%f)" % (player.global_position.x - x0))
 	check(player._sprite.animation != &"rest_dismount" and player._sprite.animation != &"rest_sit", "sprite left rest clips (%s)" % player._sprite.animation)
 	# ---- respawn mid-rest at each phase
-	for target in [2, 3, 4, 5]:
+	for target: int in [2, 3, 4, 5]:
 		await place()
 		check(desk.request_rest(), "respawn test phase %d: rest accepted" % target)
 		if target == 5:
@@ -318,12 +333,13 @@ func run_flow_cases() -> void:
 	# ---- scene reload returns to desk
 	change_scene_to_file(LEVEL)
 	await frames(10)
-	var p2 = current_scene.get_node("Player")
-	var d2 = current_scene.get_node("StillnessDesk")
+	var p2: CharacterBody2D = current_scene.get_node("Player")
+	var d2: Node2D = current_scene.get_node("StillnessDesk")
 	check(p2.global_position.distance_to(d2.get_spawn_position()) < 2.0, "reload spawns at desk")
 	check(d2.get_phase() == 1, "reloaded desk awakened")
 	cps.clear()
 	check(not cps.was_ever_activated(DESK_ID), "clear() resets activation record")
+	cases_done += 1
 
 
 # -- Clip fallback must not double-advance ---------------------------------------
@@ -348,6 +364,7 @@ func run_fallback_cases() -> void:
 	check(count_events("completed") == 1, "fallback: rest_completed once (%d)" % count_events("completed"))
 	check(phases == [2, 3, 4, 5, 1], "fallback: phases not repeated %s" % [phases])
 	check(not paused and not player.is_meditating(), "fallback: control returned")
+	cases_done += 1
 
 
 # -- FX layer -------------------------------------------------------------------
@@ -356,56 +373,77 @@ func run_fx_cases() -> void:
 	cps.clear()
 	await setup_level()
 	await place()
-	var sw = fx.get_node("Fireflies")
-	var ring = fx.get_node("RingSweep")
+	var sw: FireflySwarm = fx.get_node("Fireflies")
+	var halo: HaloSigil = fx.get_halo()
+	var shaft: AltarLightShaft = fx.get_shaft()
+	var candelabras: Array[GothicCandle] = [desk.get_node("Visuals/CandelabraLeft"), desk.get_node("Visuals/CandelabraRight")]
 	# dormant
-	check(fx.get_node("../Visuals/FloorRingLit").modulate.a == 0.0, "dormant ring alpha 0")
+	check(halo.fill == 0.0 and halo.flare == 0.0, "dormant halo unfilled (fill %.2f)" % halo.fill)
+	check(halo.intensity > 0.2, "dormant halo faintly engraved (%.2f)" % halo.intensity)
+	check(not desk.has_node("Visuals/FloorRingLit"), "floor ring nodes removed")
+	check(halo.can_process() and shaft.can_process(), "halo and shaft process while paused")
+	check(candelabras[0].can_process() and candelabras[1].can_process() and candelabras[0].candelabra, "candelabras exist and process while paused")
+	check(halo.get_parent().z_index + halo.z_index < 0, "halo drawn behind Luz")
+	check(shaft.material.shader.get_shader_uniform_list().any(func(u: Dictionary) -> bool: return u.name == "mask_strength"), "shaft head mask uniform present")
+	var shaft_dormant: float = shaft.get_effective_level()
+	var shaft_awakened := 0.0
+	var shaft_resting := 0.0
 	var mx := await swing_range(3.0)
 	check(mx > 0.06 and mx <= 0.105, "dormant pendulum swings (max %.3f rad)" % mx)
 	check(sw.get_visible_count() == 7, "dormant: 7 fireflies visible (%d)" % sw.get_visible_count())
 	check(papers_home(), "dormant papers at rest")
 	# determinism
-	var a = FireflySwarm.new(); var b = FireflySwarm.new()
+	var a := FireflySwarm.new()
+	var b := FireflySwarm.new()
 	root.add_child(a); root.add_child(b)
 	a.setup(12345); b.setup(12345)
-	for i in 200:
+	for i: int in 200:
 		a.step(0.016, i * 0.016, 0.5); b.step(0.016, i * 0.016, 0.5)
 	var same := true
-	for i in 10:
+	for i: int in 10:
 		if a.get_firefly_position(i) != b.get_firefly_position(i): same = false
 	check(same, "firefly swarm deterministic for equal seed")
 	a.queue_free(); b.queue_free()
 	# bounded wander
 	var inb := true
-	for i in 7:
-		var p = sw.get_firefly_position(i)
+	for i: int in 7:
+		var p := sw.get_firefly_position(i)
 		if p.y < -122.0 or p.y > -8.0 or absf(p.x) > 140.0: inb = false
 	check(inb, "wander bounded")
 	# first rest
 	desk.request_rest()
 	check(await wait_phase(3), "CELEBRATE reached")
 	await secs(0.15)
-	check(ring.progress < 0.5 and fx.get_node("../Visuals/FloorRingLit").modulate.a > 0.0, "first: sweep in progress (%.2f)" % ring.progress)
+	check(halo.fill < 0.5 and halo.intensity > 0.45, "first: halo fill in progress (%.2f)" % halo.fill)
 	check(fx.can_process() and sw.can_process() and fx.get_node("PeakBloom").can_process(), "FX process while paused")
+	check(halo.can_process() and shaft.can_process() and candelabras[0].can_process(), "rest: halo, shaft, candelabras process while paused")
 	check(paused, "tree paused")
 	await wait_phase(4)
 	await secs(1.2)
 	check(absf(fx.get_swing_angle()) < 0.0001, "pendulum still while RESTING (%.5f)" % fx.get_swing_angle())
-	check(fx.get_node("../Visuals/FloorRingLit").modulate.a > 0.3, "ring lit while resting (%.2f)" % fx.get_node("../Visuals/FloorRingLit").modulate.a)
-	check(ring.progress >= 0.999, "sweep completed")
+	check(halo.intensity > 0.6 and halo.warmth > 0.9, "halo lit while resting (%.2f)" % halo.intensity)
+	check(halo.fill >= 0.999, "halo fill completed")
+	check(halo.breath_weight > 0.9, "halo ticks breathe while resting")
 	check(sw.get_visible_count() == 10, "extras present after first celebration (%d)" % sw.get_visible_count())
 	check(papers_lifted() > 20.0, "papers orbit while resting (%.1f)" % papers_lifted())
 	var nodes: int = fx.get_fx_node_count()
 	var budget: int = fx.FX_NODE_BUDGET
-	check(nodes == 36, "FX-driven node count is 36 (%d)" % nodes)
+	check(nodes == 55, "FX-driven node count is 55 (%d)" % nodes)
 	check(nodes <= budget, "FX-driven nodes %d within budget %d" % [nodes, budget])
 	var tot := 0
-	for n in fx.find_children("*", "Sprite2D", true, false):
+	for n: Sprite2D in fx.find_children("*", "Sprite2D", true, false):
 		if n.visible: tot += 1
 	check(tot <= budget, "visible FX sprites %d <= %d" % [tot, budget])
-	await secs(0.4)
+	var shaft_lo := 99.0
+	var shaft_hi := -99.0
+	for i: int in 150:
+		await process_frame
+		shaft_lo = minf(shaft_lo, shaft.get_effective_level())
+		shaft_hi = maxf(shaft_hi, shaft.get_effective_level())
+	shaft_resting = shaft_hi
+	check(shaft_hi - shaft_lo > 0.15, "shaft breathes while resting (%.2f)" % (shaft_hi - shaft_lo))
 	var m2 := 0.0
-	for i in 120:
+	for i: int in 120:
 		await process_frame
 		m2 = maxf(m2, absf(fx.get_swing_angle()))
 	check(m2 < 0.0001, "pendulum held still")
@@ -420,8 +458,12 @@ func run_fx_cases() -> void:
 	await secs(1.6)
 	check(papers_home(), "papers home ±1px after dismount")
 	check(papers_z_home(), "paper z_index restored after dismount")
-	check(fx.get_node("../Visuals/FloorRingLit").modulate.a == 0.0, "ring faded out")
+	check(halo.flare < 0.01 and absf(halo.intensity - halo.awakened_level) < 0.05, "halo back to awakened idle (%.2f)" % halo.intensity)
 	check(sw.get_visible_count() == 7, "extras gone (%d)" % sw.get_visible_count())
+	for i: int in 30:
+		await process_frame
+		shaft_awakened = maxf(shaft_awakened, shaft.get_effective_level())
+	check(shaft_dormant < shaft_awakened and shaft_awakened < shaft_resting, "shaft levels dormant %.2f < awakened %.2f < resting peak %.2f" % [shaft_dormant, shaft_awakened, shaft_resting])
 	var m3 := await swing_range(3.0)
 	check(m3 > 0.05, "pendulum swinging after dismount (%.3f)" % m3)
 	# repeat rest + mount fallback
@@ -431,13 +473,13 @@ func run_fx_cases() -> void:
 	player.rest_animation_finished.disconnect(desk._on_rest_animation_finished)
 	check(await wait_phase(3, 3.0), "mount fallback advances without finished signal")
 	await frames(3)
-	check(ring.progress == 1.0, "repeat: no sweep")
+	check(halo.fill == 1.0, "repeat: no fill sweep")
 	await wait_phase(4)
 	await secs(0.5)
 	check(sw.get_visible_count() == 7, "repeat: no extras (%d)" % sw.get_visible_count())
 	check(absf(fx.get_swing_angle()) < 0.0001, "repeat: pendulum still")
 	# breathing: glow alpha varies with period
-	var g = desk.get_node("Visuals/Glow")
+	var g: Node2D = desk.get_node("Visuals/Glow")
 	var lo := 9.0; var hi := -9.0
 	var end := Time.get_ticks_msec() + 2200
 	while Time.get_ticks_msec() < end:
@@ -452,6 +494,7 @@ func run_fx_cases() -> void:
 	check(papers_home(), "papers home after abort")
 	check(papers_z_home(), "paper z_index restored after abort")
 	await run_mount_abort_case()
+	cases_done += 1
 
 
 func run_mount_abort_case() -> void:
@@ -466,6 +509,8 @@ func run_mount_abort_case() -> void:
 	await secs(1.6)
 	check(fx.intensity <= 0.45, "mount abort: intensity back to idle (%.2f)" % fx.intensity)
 	check(papers_home() and papers_z_home(), "mount abort: papers at rest")
-	check(fx.get_node("../Visuals/FloorRingLit").modulate.a == 0.0, "mount abort: ring off")
+	var halo: HaloSigil = fx.get_halo()
+	check(halo.flare < 0.01 and absf(halo.intensity - halo.awakened_level) < 0.05, "mount abort: halo idle (%.2f)" % halo.intensity)
 	var mx := await swing_range(3.0)
 	check(mx > 0.05, "mount abort: pendulum swings (%.3f)" % mx)
+	cases_done += 1

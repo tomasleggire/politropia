@@ -1,12 +1,10 @@
-[gd_scene load_steps=35 format=3]
+[gd_scene load_steps=41 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/stillness_desk.gd" id="1_desk"]
 [ext_resource type="PackedScene" path="res://scenes/ui/interaction_prompt.tscn" id="2_prompt"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/arch_frame.png" id="t_arch"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/pendulum_bracket.png" id="t_bracket"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/pendulum.png" id="t_pendulum"]
-[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/floor_ring_unlit.png" id="t_ring"]
-[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/floor_ring_lit.png" id="t_ring_lit"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/desk_body.png" id="t_desk"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/candle_jar.png" id="t_jar"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/flame.png" id="t_flame"]
@@ -24,14 +22,33 @@
 [ext_resource type="Script" path="res://scripts/world/firefly_swarm.gd" id="fx_swarm"]
 [ext_resource type="Script" path="res://scripts/world/altar_motes.gd" id="fx_motes"]
 [ext_resource type="Script" path="res://scripts/world/paper_orbit.gd" id="fx_papers"]
-[ext_resource type="Script" path="res://scripts/world/floor_ring_sweep.gd" id="fx_ring"]
-[ext_resource type="Shader" path="res://shaders/ring_sweep.gdshader" id="fx_shader"]
+[ext_resource type="Script" path="res://scripts/world/halo_sigil.gd" id="fx_halo"]
+[ext_resource type="Script" path="res://scripts/world/altar_light_shaft.gd" id="fx_shaft"]
+[ext_resource type="Script" path="res://scripts/world/altar_drift_sheets.gd" id="fx_drift"]
+[ext_resource type="Script" path="res://scripts/world/gothic_candle.gd" id="fx_candle"]
+[ext_resource type="Shader" path="res://shaders/halo_sigil.gdshader" id="sh_halo"]
+[ext_resource type="Shader" path="res://shaders/light_shaft.gdshader" id="sh_shaft"]
+[ext_resource type="Shader" path="res://shaders/rim_light.gdshader" id="sh_rim"]
 
-[sub_resource type="ShaderMaterial" id="RingSweepMaterial"]
-shader = ExtResource("fx_shader")
-shader_parameter/progress = 1.0
-shader_parameter/softness = 0.45
-shader_parameter/radii = Vector2(364, 60)
+[sub_resource type="ShaderMaterial" id="HaloMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("sh_halo")
+
+[sub_resource type="ShaderMaterial" id="ShaftMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("sh_shaft")
+
+[sub_resource type="ShaderMaterial" id="RimMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("sh_rim")
+
+[sub_resource type="Gradient" id="SolidWhite"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture2D" id="WhiteTexture"]
+gradient = SubResource("SolidWhite")
+width = 4
+height = 4
 
 [sub_resource type="CanvasItemMaterial" id="Additive"]
 blend_mode = 1
@@ -108,6 +125,8 @@ unique_name_in_owner = true
 z_index = -10
 
 [node name="ArchFrame" type="Sprite2D" parent="Visuals/Background"]
+unique_name_in_owner = true
+material = SubResource("RimMaterial")
 z_index = 0
 position = Vector2(0.0, 0.0)
 scale = Vector2(0.175, 0.175)
@@ -138,6 +157,25 @@ texture = ExtResource("t_pendulum")
 centered = false
 offset = Vector2(-17, -8)
 
+[node name="Halo" type="Sprite2D" parent="Visuals/Background"]
+unique_name_in_owner = true
+material = SubResource("HaloMaterial")
+z_index = 1
+position = Vector2(0, -50)
+scale = Vector2(20, 20)
+texture_filter = 1
+texture = SubResource("WhiteTexture")
+script = ExtResource("fx_halo")
+
+[node name="LightShaft" type="Sprite2D" parent="Visuals/Background"]
+unique_name_in_owner = true
+material = SubResource("ShaftMaterial")
+z_index = 3
+position = Vector2(0, -320)
+scale = Vector2(50, 160)
+texture = SubResource("WhiteTexture")
+script = ExtResource("fx_shaft")
+
 [node name="Glow" type="Node2D" parent="Visuals"]
 unique_name_in_owner = true
 z_index = -6
@@ -155,56 +193,11 @@ material = SubResource("Additive")
 scale = Vector2(0.6, 0.6)
 texture = SubResource("GlowTexture")
 
-[node name="FloorRingBack" type="Sprite2D" parent="Visuals"]
-z_index = -7
-scale = Vector2(0.175, 0.0875)
-texture_filter = 4
-texture = ExtResource("t_ring")
-centered = false
-offset = Vector2(-364, -60)
-region_enabled = true
-region_rect = Rect2(0, 0, 728, 60)
-
-[node name="FloorRingFront" type="Sprite2D" parent="Visuals"]
-z_index = 3
-scale = Vector2(0.175, 0.0875)
-texture_filter = 4
-texture = ExtResource("t_ring")
-centered = false
-offset = Vector2(-364, 0)
-region_enabled = true
-region_rect = Rect2(0, 60, 728, 60)
-
-[node name="FloorRingLit" type="Node2D" parent="Visuals"]
-unique_name_in_owner = true
-modulate = Color(1, 1, 1, 0)
-
-[node name="LitBack" type="Sprite2D" parent="Visuals/FloorRingLit"]
-material = SubResource("RingSweepMaterial")
-z_index = -6
-scale = Vector2(0.175, 0.0875)
-texture_filter = 4
-texture = ExtResource("t_ring_lit")
-centered = false
-offset = Vector2(-364, -60)
-region_enabled = true
-region_rect = Rect2(0, 0, 728, 60)
-
-[node name="LitFront" type="Sprite2D" parent="Visuals/FloorRingLit"]
-material = SubResource("RingSweepMaterial")
-z_index = 3
-scale = Vector2(0.175, 0.0875)
-texture_filter = 4
-texture = ExtResource("t_ring_lit")
-centered = false
-offset = Vector2(-364, 0)
-region_enabled = true
-region_rect = Rect2(0, 60, 728, 60)
-
 [node name="Desk" type="Node2D" parent="Visuals"]
 z_index = -4
 
 [node name="DeskBody" type="Sprite2D" parent="Visuals/Desk"]
+material = SubResource("RimMaterial")
 z_index = 0
 position = Vector2(0.0, 0.0)
 scale = Vector2(0.175, 0.175)
@@ -322,6 +315,37 @@ centered = false
 offset = Vector2(-19, -23)
 rotation = 0.28
 
+[node name="CandelabraLeft" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = -3
+position = Vector2(-80, 0)
+script = ExtResource("fx_candle")
+candelabra = true
+lit_side = 1
+
+[node name="Glow" type="Sprite2D" parent="Visuals/CandelabraLeft"]
+self_modulate = Color(0.941, 0.62, 0.26, 0.5)
+material = SubResource("Additive")
+position = Vector2(0, -74)
+scale = Vector2(0.9, 0.9)
+texture = SubResource("GlowTexture")
+
+[node name="CandelabraRight" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = -3
+position = Vector2(80, 0)
+script = ExtResource("fx_candle")
+candelabra = true
+phase_offset = 1.7
+lit_side = -1
+
+[node name="Glow" type="Sprite2D" parent="Visuals/CandelabraRight"]
+self_modulate = Color(0.941, 0.62, 0.26, 0.5)
+material = SubResource("Additive")
+position = Vector2(0, -74)
+scale = Vector2(0.9, 0.9)
+texture = SubResource("GlowTexture")
+
 [node name="Roots" type="Node2D" parent="Visuals"]
 z_index = 1
 
@@ -367,13 +391,52 @@ script = ExtResource("fx_motes")
 [node name="PaperOrbit" type="Node" parent="Fx"]
 script = ExtResource("fx_papers")
 
-[node name="RingSweep" type="Node" parent="Fx"]
-script = ExtResource("fx_ring")
+[node name="ShaftMotes" type="Node2D" parent="Fx"]
+z_index = -5
+script = ExtResource("fx_motes")
+count = 14
+base = Vector2(28, -330)
+half_width = 22.0
+rise = -330.0
+lean = -0.085
+idle_alpha = 0.32
+resting_alpha = 0.6
+mote_scale = 0.06
+
+[node name="DriftSheets" type="Node2D" parent="Fx"]
+z_index = -5
+script = ExtResource("fx_drift")
+
+[node name="DriftA" type="Sprite2D" parent="Fx/DriftSheets"]
+modulate = Color(1, 0.9, 0.72, 0)
+scale = Vector2(0.14, 0.14)
+texture_filter = 4
+texture = ExtResource("t_paper1")
+
+[node name="DriftB" type="Sprite2D" parent="Fx/DriftSheets"]
+modulate = Color(1, 0.9, 0.72, 0)
+scale = Vector2(0.14, 0.14)
+texture_filter = 4
+texture = ExtResource("t_paper3")
+
+[node name="FloorPool" type="Sprite2D" parent="Fx"]
+self_modulate = Color(1, 0.7, 0.32, 0.6)
+material = SubResource("Additive")
+z_index = 1
+position = Vector2(0, 0)
+scale = Vector2(1.0, 0.1)
+texture = SubResource("GlowTexture")
 
 [node name="PeakBloom" type="Sprite2D" parent="Fx"]
 modulate = Color(1, 0.78, 0.42, 0)
 material = SubResource("Additive")
 position = Vector2(0, -46)
+texture = SubResource("GlowTexture")
+
+[node name="HeadShade" type="Sprite2D" parent="Fx"]
+self_modulate = Color(0.03, 0.05, 0.12, 0.85)
+position = Vector2(0, -58)
+scale = Vector2(0.42, 0.42)
 texture = SubResource("GlowTexture")
 
 [node name="InteractionPrompt" parent="." instance=ExtResource("2_prompt")]

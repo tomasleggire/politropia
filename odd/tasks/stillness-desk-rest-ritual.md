@@ -116,9 +116,35 @@ The checkpoint works on device (parent feature `odd/tasks/stillness-desk-checkpo
   - Root cause: the `TouchControls` autoload inherited the pause, so while the tree was paused for the rest its `_input` never ran and no touch reached the player. The committed test called `player.request_jump()` directly and bypassed the real path (a test gap).
   - Fix: `TouchControls` `process_mode = ALWAYS` (safe: the player is input-locked during the rest). Test: new check "rest1 touch controls process while paused". RED observed without the fix (probe `can_process=false`; test `FAIL 1/140`), GREEN with it (`PASS 140/140`); headless load clean.
 
+## Iteration 2 — user feedback (device playtest, 2026-09-29)
+
+Feedback: "Se ve bien", but it can't dismount (fixed in T6). The celebration must be much more noticeable. The altar must read as clearly important, not scenery: more life, more imposing. Altar zones always have fireflies and white roots that point the way to a rest altar; today the roots are not noticeable. The filling floor light is invisible because it is almost flat, so replace it. "Necesito más y mejor en general".
+
+Constraint: Codex is still out of credits (rechecked 2026-09-29), so iteration 2 is in-engine (shaders, lights, procedural geometry, existing components). New art can be layered on later.
+
+Design (parent):
+- **Presence from afar**: a warm volumetric light shaft falls from above onto the altar, with drifting dust. It is the only vertical light in the level, so it separates the altar from scenery. Two tall flanking candelabras reuse `gothic_candle.gd`. There is a warm floor light pool, and a warm rim/edge light on the arch and desk.
+- **Vertical protractor halo replaces the floor ring**: a procedural clock/protractor sigil (outer ring + 36 ticks + inner ring + hand) behind Luz inside the arch, facing the camera. Dormant: faint engraved and slowly rotating. Awakened: warmer. Resting: ticks breathe with Luz.
+- **Celebration (first)** in three staged beats over about 3s:
+  1. Stillness: the pendulum stops, an edge vignette dims the world, and the camera eases in on Luz.
+  2. Ignition: halo ticks light sequentially clockwise like a clock filling, the shaft swells to a pillar, then a full-ring flare and an expanding shockwave ring.
+  3. Release: sparks and fireflies burst from the roots and spiral up into orbit; papers burst outward, then orbit.
+  - Repeat: a ~1s condensed version. Dismount reverses the zoom and vignette and returns the shaft to idle.
+- **Wayfinding trail**: a new placeable `AltarTrail` component. White paper roots crawl along the floor toward the altar, denser near it, with light pulses travelling along them toward the altar and sparse fireflies along the way. The altar's own roots join it. Placed in `level_01` leading to the desk.
+
+- [x] **T7 — Altar presence**: light shaft + dust, vertical halo sigil (replaces the floor ring), flanking candelabras, floor light pool, rim light; idle/awakened/resting life.
+  - Result: `altar_light_shaft.gd` + `light_shaft.gdshader` (200x640 additive beam leaning ~4°, noise striations, 14 falling motes; head/shoulder mask uniforms), `halo_sigil.gd` + `halo_sigil.gdshader` (2 rings, 36 ticks, inner ring, protractor scale, hand; texel-snapped; empty centre; `fill`/`flare`/`intensity`/`spin`/`warmth` + `celebrate`/`peak`/`settle_into_rest`/`set_idle`), `GothicCandle` candelabra mode ×2, floor pool, `rim_light.gdshader`, `altar_drift_sheets.gd`, `Fx/HeadShade` cool-dark backing behind Luz's head. The floor ring and its sweep script/shader were removed (PNGs kept). FX nodes 55 (budget 60).
+  - Parent review: from afar the shaft makes the altar read as important; resting is imposing. First pass REJECTED on readability (blonde hair dissolved into the gold beam); fixed with the shaft mask + head shade and re-viewed (hair edge reads).
+  - Verification: headless import/load clean; committed test PASS 150/150; perf 8.32 ms Mac.
+  - Found: the test runner printed a false "PASS 105/105" when a script error aborted the run midway → fix in T10 (assert the expected total / completion flag; exit 1 on an incomplete run).
+  - Risks: shaders unverified on Metal/iPhone; thin halo lines may shimmer on device; additive overdraw unmeasured on iPhone; head mask can drift ≤6 units at the parallax limit.
+- [ ] **T8 — Staged celebration**: stillness/ignition/release beats, camera ease-in + vignette, halo tick fill + flare + shockwave, root burst sparks, paper burst, repeat variant, dismount reversal.
+- [ ] **T9 — `AltarTrail` wayfinding component**: procedural white roots + travelling light pulses + trail fireflies; placed in `level_01`.
+- [ ] **T10 — Regression, tests, iPhone deploy, and playtest record.**
+
 ## Progress
 
-- Current task: T6 fix deployed; design iteration 2 (user feedback) next.
+- Current task: T8 next (staged celebration).
 - Next step: record the playtest; then push/PRs (stacked-to-main, user decision). Pending: Codex roots redo once credits are refilled.
 
 ## Verification evidence

@@ -1,10 +1,11 @@
 class_name StillnessDeskFx
 extends Node2D
 
-## Choreographs the altar's life on the desk's ritual signals: beacon fireflies,
-## flickering candle, a pendulum that stills while Luz rests (time stops), the
-## floor ring sweep, the peak bloom, orbiting papers and light that breathes on
-## Luz's own `rest_sit` period. Runs while the tree is paused.
+## Choreographs the altar's life on the desk's ritual signals: the light shaft
+## and its dust, the vertical halo, flanking candelabras, rim light, beacon
+## fireflies, flickering candle, a pendulum that stills while Luz rests (time
+## stops), the peak bloom, orbiting papers and light that breathes on Luz's own
+## `rest_sit` period. Runs while the tree is paused.
 
 const IDLE_BREATH_PERIOD := 4.0
 const SWING_PERIOD := 2.4
@@ -15,8 +16,16 @@ const INTENSITY_AWAKENED := 0.4
 const INTENSITY_RITUAL := 1.0
 const MOUNT_RAMP_TIME := 1.0
 const FLICKER_SPEED := 9.0
+## Light shaft base levels per altar state.
+const SHAFT_DORMANT := 0.9
+const SHAFT_AWAKENED := 1.3
+const SHAFT_RESTING := 1.55
+const SHAFT_RAMP_TIME := 0.8
+## Rim light strength on the arch and desk edges, dormant to ritual.
+const RIM_DORMANT := 0.35
+const RIM_RITUAL := 1.0
 ## Ceiling for the nodes the FX layer animates every frame (mobile budget).
-const FX_NODE_BUDGET := 40
+const FX_NODE_BUDGET := 60
 
 @export_group("Pendulum")
 @export_range(0.0, 0.3, 0.005) var swing_amplitude := 0.1
@@ -46,6 +55,9 @@ var _breath := 0.5
 var _tweens: Dictionary = {}
 var _flicker := FastNoiseLite.new()
 var _candle_glow_scale := Vector2.ONE
+var _synced_once := false
+var _candelabras: Array[GothicCandle] = []
+var _rim: ShaderMaterial
 
 @onready var _glow: Node2D = %Glow
 @onready var _candle_glow: Node2D = %CandleGlow
@@ -53,11 +65,14 @@ var _candle_glow_scale := Vector2.ONE
 @onready var _ink_glow: Node2D = %InkGlow
 @onready var _pendulum: Node2D = %Pendulum
 @onready var _papers: Node2D = %Papers
-@onready var _ring: Node2D = %FloorRingLit
+@onready var _halo: HaloSigil = %Halo
+@onready var _shaft: AltarLightShaft = %LightShaft
 @onready var _swarm: FireflySwarm = $Fireflies
 @onready var _motes: AltarMotes = $DustMotes
+@onready var _shaft_motes: AltarMotes = $ShaftMotes
 @onready var _paper_orbit: PaperOrbit = $PaperOrbit
-@onready var _ring_sweep: FloorRingSweep = $RingSweep
+@onready var _drift: AltarDriftSheets = $DriftSheets
+@onready var _pool: Sprite2D = $FloorPool
 @onready var _bloom: Sprite2D = $PeakBloom
 
 
@@ -71,9 +86,12 @@ func _ready() -> void:
 	_candle_glow_scale = _candle_glow.scale
 	_swarm.setup(seed_value)
 	_motes.setup(seed_value)
-	_ring_sweep.setup(_ring)
+	_shaft_motes.setup(seed_value + 7)
+	for candelabra: Node in [%CandelabraLeft, %CandelabraRight]:
+		_candelabras.append(candelabra as GothicCandle)
+	_rim = (%ArchFrame as Sprite2D).material as ShaderMaterial
 	var sheets: Array[Node2D] = []
-	for sheet in _papers.get_children():
+	for sheet: Node in _papers.get_children():
 		sheets.append(sheet as Node2D)
 	_paper_orbit.setup(sheets)
 	_bloom.modulate.a = 0.0
@@ -93,22 +111,35 @@ func _process(delta: float) -> void:
 	_swarm.step(delta, _time, _breath)
 	_motes.resting_level = breath_weight
 	_motes.step(delta)
+	_shaft_motes.resting_level = breath_weight
+	_shaft_motes.step(delta)
+	_shaft.step(delta, _breath, breath_weight)
+	_halo.step(delta, _breath, swing)
+	_drift.step(_time)
 	_paper_orbit.step(delta, _time)
-	_ring_sweep.step(_breath)
 
 
 ## Nodes animated by this layer each frame: firefly glows and cores (extras
-## included), motes, paper sheets, the peak bloom and the lit ring halves.
-## Must stay within FX_NODE_BUDGET.
+## included), both mote sets, paper sheets and drifting sheets, the peak bloom,
+## the shaft, halo and floor pool and the candelabra glows. Must stay within
+## FX_NODE_BUDGET.
 func get_fx_node_count() -> int:
-	var count := 1 # peak bloom
-	for group in [_swarm, _motes, _papers, _ring]:
+	var count := 1 + 3 + _candelabras.size() # bloom; shaft, halo, pool; candelabra glows
+	for group: Node2D in [_swarm, _motes, _shaft_motes, _papers, _drift]:
 		count += group.get_child_count()
 	return count
 
 
 func get_swing_angle() -> float:
 	return _pendulum.rotation
+
+
+func get_halo() -> HaloSigil:
+	return _halo
+
+
+func get_shaft() -> AltarLightShaft:
+	return _shaft
 
 
 # -- Ritual beats --------------------------------------------------------------
@@ -121,23 +152,24 @@ func _on_phase_changed(phase: StillnessDesk.Phase) -> void:
 			_reset_to_idle(INTENSITY_AWAKENED)
 		StillnessDesk.Phase.MOUNT:
 			_ease(&"intensity", INTENSITY_RITUAL, MOUNT_RAMP_TIME)
+			_shaft.set_shaft_intensity(SHAFT_RESTING, MOUNT_RAMP_TIME)
 		StillnessDesk.Phase.RESTING:
 			_ease(&"breath_weight", 1.0, 1.0)
 			_swarm.settle_into_rest()
 			_paper_orbit.settle_into_rest()
-			_ring_sweep.settle_into_rest()
+			_halo.settle_into_rest()
 
 
 func _on_celebration_started(first: bool) -> void:
 	_first = first
 	_ritual_on = true
 	_ease(&"swing", 0.0, SWING_STILL_TIME, Tween.EASE_OUT)
-	_ring_sweep.celebrate(first)
+	_halo.celebrate(first)
 	_swarm.gather(first)
 
 
 func _on_celebration_peak() -> void:
-	_ring_sweep.peak()
+	_halo.peak()
 	_paper_orbit.lift_off()
 	_play_bloom()
 
@@ -155,11 +187,16 @@ func _on_breath_cycle_started() -> void:
 ## abort (respawn, freed player) at any phase, including MOUNT, without
 ## depending on whether the celebration ever started.
 func _reset_to_idle(target_intensity: float) -> void:
+	var awakened := target_intensity > INTENSITY_DORMANT
+	# The first sync at scene start snaps, so a reloaded desk never fades in.
+	var ramp := SHAFT_RAMP_TIME if _synced_once else 0.0
+	_synced_once = true
+	_shaft.set_shaft_intensity(SHAFT_AWAKENED if awakened else SHAFT_DORMANT, ramp)
+	_halo.set_idle(awakened, ramp)
 	_ritual_on = false
 	_ease(&"swing", 1.0, SWING_RESUME_TIME, Tween.EASE_IN)
 	_ease(&"breath_weight", 0.0, 0.8)
 	_ease(&"intensity", target_intensity, 0.6)
-	_ring_sweep.release()
 	_swarm.disperse()
 	_paper_orbit.glide_home()
 
@@ -199,6 +236,10 @@ func _animate_lights() -> void:
 	var lift := (_breath - 0.5) * swing_amount
 	_glow.modulate.a = clampf(0.3 + intensity * 0.7 + lift, 0.0, 1.5)
 	_glow.scale = Vector2.ONE * (0.92 + intensity * 0.25 + lift * 0.3)
+	_pool.modulate.a = clampf(0.3 + intensity * 0.7 + lift, 0.0, 1.3)
+	_rim.set_shader_parameter(&"strength", lerpf(RIM_DORMANT, RIM_RITUAL, intensity) * (1.0 + lift))
+	for candelabra: GothicCandle in _candelabras:
+		candelabra.energy = lerpf(0.8, 1.4, intensity)
 
 
 func _ease(property: StringName, value: float, duration: float, easing := Tween.EASE_IN_OUT) -> void:

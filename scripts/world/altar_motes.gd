@@ -1,15 +1,17 @@
 class_name AltarMotes
 extends Node2D
 
-## A few round warm specks rising slowly through the light above the desk.
-## Faint while it waits, a little brighter while Luz rests.
-
-const COUNT := 9
+## A few round warm specks drifting slowly through the light above the desk.
+## Faint while it waits, a little brighter while Luz rests. A negative `rise`
+## makes them fall instead, which is how the light shaft's dust moves.
 
 @export_group("Cone")
+@export_range(1, 40) var count := 9
 @export var base := Vector2(0.0, -30.0)
 @export_range(4.0, 60.0, 1.0) var half_width := 30.0
-@export_range(20.0, 120.0, 1.0) var rise := 78.0
+@export_range(-300.0, 300.0, 1.0) var rise := 78.0
+## Sideways shift per unit of vertical travel (leans the drift with a slanted beam).
+@export_range(-0.5, 0.5, 0.01) var lean := 0.0
 
 @export_group("Look")
 @export var color := Color(1.0, 0.86, 0.55)
@@ -29,7 +31,7 @@ var _sway_phase := PackedFloat32Array()
 
 
 func _ready() -> void:
-	for i in COUNT:
+	for i: int in count:
 		var sprite := AltarFxKit.make_sprite(self, AltarFxKit.glow_texture(), true)
 		sprite.scale = Vector2.ONE * mote_scale
 		_sprites.append(sprite)
@@ -38,26 +40,26 @@ func _ready() -> void:
 
 func setup(seed_value: int) -> void:
 	_rng.seed = seed_value + 1
-	_life.resize(COUNT)
-	_rate.resize(COUNT)
-	_x0.resize(COUNT)
-	_sway.resize(COUNT)
-	_sway_phase.resize(COUNT)
-	for i in COUNT:
-		_life[i] = float(i) / COUNT
+	_life.resize(count)
+	_rate.resize(count)
+	_x0.resize(count)
+	_sway.resize(count)
+	_sway_phase.resize(count)
+	for i: int in count:
+		_life[i] = float(i) / count
 		_respawn(i)
 
 
 func step(delta: float) -> void:
 	var alpha := lerpf(idle_alpha, resting_alpha, resting_level)
-	for i in COUNT:
+	for i: int in count:
 		_life[i] += _rate[i] * delta
 		if _life[i] >= 1.0:
 			_life[i] -= 1.0
 			_respawn(i)
 		var life := _life[i]
 		var sway := sin(life * TAU * 1.5 + _sway_phase[i]) * _sway[i]
-		_sprites[i].position = base + Vector2(_x0[i] + sway, -rise * life)
+		_sprites[i].position = base + Vector2(_x0[i] + sway + lean * -rise * life, -rise * life)
 		_sprites[i].modulate = Color(color, alpha * sin(PI * life))
 
 
