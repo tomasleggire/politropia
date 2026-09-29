@@ -92,20 +92,46 @@ const PHASE_RECOVERY := 2
 @export var ledge_climb_forward_offset := 40.0
 
 @export_group("Attack")
-@export var attack_startup_time := 0.06
-@export var attack_active_time := 0.10
-## Total time (from attack start) before combo hit 1/2 close and buffer expires.
-@export var attack_window_hit1 := 0.30
-@export var attack_window_hit2 := 0.30
-## Total time for the finisher (hit 3) and for crouch/up-attack windows.
-@export var attack_window_hit3 := 0.45
+## Startup (windup) shared by hits 1/2 of the ground combo and by
+## crouch/up/air attacks. The finisher (hit 3) uses its own, longer
+## attack_finisher_startup_time instead -- see _attack_startup_for.
+@export var attack_startup_time := 0.08
+@export var attack_active_time := 0.12
+## Combo cadence, measured from a 60fps Blasphemous ground-combo reference:
+## hit1->hit2 contact-to-contact ~0.35s, hit2->hit3 ~0.42s. This is also each
+## hit's own minimum interval -- the next combo hit cannot start (even with a
+## buffered input) before this much time has passed since THIS hit started,
+## so the combo cannot be spammed faster than a readable cut-per-cut
+## cadence. Recovery frames (never startup/active frames) are what
+## stretches to fill the extra time -- see LuzAnimationCatalog._frame_seconds.
+@export var attack_window_hit1 := 0.35
+@export var attack_window_hit2 := 0.42
+## Finisher (hit 3) total window: also the minimum interval before the combo
+## can loop back to hit 1 -- a press during the finisher restarts the combo
+## here only if it is still within attack_buffer_time of this mark (see
+## _queue_attack's State.ATTACK branch and _attack_restart_buffered_left);
+## an earlier press is dropped.
+@export var attack_window_hit3 := 0.42
+## Finisher-only windup before its active (contact) frame -- longer than
+## attack_startup_time, matching the reference's more telegraphed last hit.
+@export var attack_finisher_startup_time := 0.15
+## Crouch/up attack total window -- kept independent of the ground
+## finisher's attack_window_hit3 so retuning the ground combo doesn't also
+## change these.
+@export var crouch_up_attack_window := 0.60
 @export var attack_forward_step_speed := 60.0
 ## Air attack total cycle (startup + active + recovery); re-attack allowed once recovery starts.
-@export var air_attack_recovery := 0.35
-## How long a press that can't start an attack right away (dash, wall cling,
-## crouch/up/plunge attack, plunge land) stays queued so it fires the instant
-## a new attack becomes possible, instead of being silently dropped.
-@export var attack_buffer_time := 0.12
+@export var air_attack_recovery := 0.40
+## How long ANY buffered attack press stays queued before being dropped:
+## a press that can't start an attack right away (dash, wall cling,
+## crouch/up/plunge attack, plunge land), a press for the next combo hit
+## (hit1->2, hit2->3), and a press during the finisher that would restart
+## the combo -- all three share this one short window (~0.15s, matching the
+## Blasphemous reference) so a press is consumed at most once and a press
+## older than this window is dropped instead of firing an unexpected attack
+## later ("one attack too many" from a burst of taps -- see
+## _attack_buffered_left/_attack_restart_buffered_left below).
+@export var attack_buffer_time := 0.15
 
 @export_group("Plunge")
 @export var plunge_hang_time := 0.12
@@ -114,16 +140,26 @@ const PHASE_RECOVERY := 2
 @export var plunge_land_recovery_time := 0.25
 
 @export_group("Attack Hitboxes")
-@export var hitbox_ground_size := Vector2(52.0, 30.0)
-@export var hitbox_ground_offset := Vector2(34.0, -35.0)
-@export var hitbox_finisher_size := Vector2(64.0, 34.0)
-@export var hitbox_finisher_offset := Vector2(40.0, -34.0)
-@export var hitbox_crouch_size := Vector2(50.0, 18.0)
-@export var hitbox_crouch_offset := Vector2(32.0, -13.0)
-@export var hitbox_up_size := Vector2(26.0, 54.0)
-@export var hitbox_up_offset := Vector2(0.0, -82.0)
-@export var hitbox_air_size := Vector2(50.0, 26.0)
-@export var hitbox_air_offset := Vector2(34.0, -40.0)
+## T4d item 3 (iPhone playtest: "in the 3rd hit Luz gets bigger and so does
+## the attack hitbox; that must not happen. All hits must have the same
+## hitbox, vertical or horizontal"). ONE shared hitbox size/reach for every
+## horizontal attack (ground combo hits 1-3, crouch, air): same length
+## (reach from the player's own local origin) and same thickness -- only
+## the vertical placement (offset.y) differs, taken from each attack's own
+## measured ruler height at contact (the ground combo's three hits share
+## ONE "chest" placement, averaged across all three; crouch is low; air is
+## mid-air torso height). hitbox_up_size/offset is the same size rotated 90
+## degrees, reaching the same distance upward. The upward box intentionally
+## retains its previously accepted size and offset; it is not part of the
+## shared horizontal-hitbox derivation.
+@export var hitbox_attack_size := Vector2(60.3, 24.0)
+## offset.x, shared by every horizontal attack (ground combo, crouch, air).
+@export var hitbox_attack_reach_x := 49.15
+@export var hitbox_ground_offset_y := -25.69  ## combo (hits 1-3): shared contact height
+@export var hitbox_crouch_offset_y := -17.02  ## crouch: low horizontal cut height
+@export var hitbox_air_offset_y := -30.66     ## air: mid-air torso height
+@export var hitbox_up_size := Vector2(26, 68)
+@export var hitbox_up_offset := Vector2(0, -80)
 @export var hitbox_plunge_size := Vector2(28.0, 18.0)
 @export var hitbox_plunge_offset := Vector2(0.0, 12.0)
 @export var hitbox_plunge_land_size := Vector2(150.0, 20.0)
@@ -140,6 +176,7 @@ const PHASE_RECOVERY := 2
 @onready var _ledge_check_above: RayCast2D = $LedgeCheckAbove
 @onready var _headroom_check: RayCast2D = $HeadroomCheck
 @onready var _attack_hitbox: AttackHitbox = $AttackHitbox
+@onready var _slash_vfx: PlayerSlashVfx = $SlashVfx
 @onready var _animation_sprite_frames: SpriteFrames = LuzAnimationCatalog.build_sprite_frames({
 	"ground_dash": dash_duration,
 	"air_dash": air_dash_duration,
@@ -149,10 +186,22 @@ const PHASE_RECOVERY := 2
 	"attack_1": attack_window_hit1,
 	"attack_2": attack_window_hit2,
 	"attack_3": attack_window_hit3,
-	"crouch_attack": attack_window_hit3,
-	"up_attack": attack_window_hit3,
+	"crouch_attack": crouch_up_attack_window,
+	# Ends together with the slash VFX (attack_startup_time + its fixed
+	# TOTAL_DURATION), not with the whole up-attack state's recovery
+	# (crouch_up_attack_window) -- otherwise the body clip freezes on a
+	# still-extended pose for the rest of the state after the slash is
+	# already gone (see PlayerSlashVfx.TOTAL_DURATION).
+	"up_attack": attack_startup_time + PlayerSlashVfx.TOTAL_DURATION,
 	"air_attack": air_attack_recovery,
 	"plunge_land": plunge_land_active_time + plunge_land_recovery_time,
+}, {
+	"attack_1": attack_startup_time,
+	"attack_2": attack_startup_time,
+	"attack_3": attack_finisher_startup_time,
+	"crouch_attack": attack_startup_time,
+	"up_attack": attack_startup_time,
+	"air_attack": attack_startup_time,
 })
 
 var _state := State.IDLE
@@ -190,8 +239,23 @@ var _ledge_climb_time := 0.0
 
 var _attack_phase := PHASE_STARTUP
 var _attack_combo_index := 0
-var _attack_buffered := false
-var _air_attack_buffered := false
+var _attack_facing := 1
+## Time left (seconds) for a pending hit1->2 / hit2->3 combo continuation;
+## <= 0.0 means no press is queued. Set to attack_buffer_time on a
+## qualifying press, ticked down every frame (_update_shared_timers) and
+## consumed (reset to 0.0) the instant the current hit's window ends -- a
+## press older than attack_buffer_time has already ticked down to 0.0 and is
+## dropped, matching every other buffered action instead of firing
+## unexpectedly later.
+var _attack_buffered_left := 0.0
+## Same mechanism as _attack_buffered_left, for a press during the finisher
+## (combo index 2) that should restart the combo (loop back to hit 1) --
+## see _queue_attack's State.ATTACK branch and _update_attack's window-end
+## check.
+var _attack_restart_buffered_left := 0.0
+## Same mechanism, for a press during the air attack's active phase that
+## should restart it once its recovery phase begins.
+var _air_attack_buffered_left := 0.0
 var _attack_buffer_left := 0.0
 var _attack_buffer_direction := 0
 
@@ -199,11 +263,10 @@ var _attack_buffer_direction := 0
 func _ready() -> void:
 	add_to_group(&"player")
 	_sprite.sprite_frames = _animation_sprite_frames
-	# Every Luz frame is placed on a shared 512x512 virtual canvas anchored to
-	# its nominal grid cell (see LuzAnimationCatalog); this offset puts that
-	# canvas' row 413 (padding 100 + cell_height 313, from the manifest) at
-	# local y=0, so the feet-anchored origin lines up with every frame's
-	# corrected opaque bottom regardless of pose.
+	# Every Luz frame is a uniform 512x512 grid cell (see LuzAnimationCatalog
+	# and tools/process_luz_sheet.py) already repacked so its opaque bottom
+	# lands on canvas row 413; this offset puts that row at local y=0, so the
+	# feet-anchored origin lines up with every frame regardless of pose.
 	_sprite.offset = Vector2(0.0, -157.0)
 	# Measured from the idle standing frames' opaque pixel height (~331px)
 	# so Luz renders at roughly the CollisionShape2D's 58px standing height.
@@ -291,6 +354,9 @@ func _update_shared_timers(delta: float) -> void:
 	_wall_kick_lock_left = maxf(_wall_kick_lock_left - delta, 0.0)
 	_dash_cooldown_left = maxf(_dash_cooldown_left - delta, 0.0)
 	_attack_buffer_left = maxf(_attack_buffer_left - delta, 0.0)
+	_attack_buffered_left = maxf(_attack_buffered_left - delta, 0.0)
+	_attack_restart_buffered_left = maxf(_attack_restart_buffered_left - delta, 0.0)
+	_air_attack_buffered_left = maxf(_air_attack_buffered_left - delta, 0.0)
 
 	if _drop_left > 0.0:
 		_drop_left -= delta
@@ -318,12 +384,24 @@ func _horizontal_input() -> float:
 
 
 func _update_facing() -> void:
+	if _is_directional_attack_state():
+		_sprite.flip_h = _attack_facing < 0
+		return
 	if _state == State.DASH or _state == State.WALL_CLING or _state == State.LEDGE_HANG or _state == State.LEDGE_CLIMB:
 		return
 	var axis := _horizontal_input()
 	if not is_zero_approx(axis):
 		_facing = 1 if axis > 0.0 else -1
 	_sprite.flip_h = _facing < 0
+
+
+func _is_directional_attack_state() -> bool:
+	return _state in [State.ATTACK, State.CROUCH_ATTACK, State.UP_ATTACK, State.AIR_ATTACK]
+
+
+func _capture_attack_facing() -> void:
+	_attack_facing = _facing
+	_sprite.flip_h = _attack_facing < 0
 
 
 func _update_facing_rays() -> void:
@@ -416,9 +494,10 @@ func request_attack(direction: int) -> void:
 
 
 ## Touch UI: upgrades the attack that just started — while it is still in
-## its startup phase, before any hitbox is active — to up/plunge instead of
-## firing a second attack. Used when the finger swipes after touching down
-## on the attack button (see touch_controls.gd's attack_upgrade_window).
+## its startup phase, before any hitbox is active — to an up attack instead
+## of firing a second attack. A downward swipe leaves an air attack lateral.
+## Used when the finger swipes after touching down on the attack button (see
+## touch_controls.gd's attack_upgrade_window).
 func request_attack_upgrade(direction: int) -> void:
 	if direction == 0:
 		return
@@ -428,8 +507,6 @@ func request_attack_upgrade(direction: int) -> void:
 	)
 	if direction == -1 and upgrading_from_neutral:
 		_start_up_attack()
-	elif direction == 1 and _state == State.AIR_ATTACK and _attack_phase == PHASE_STARTUP:
-		_start_plunge()
 
 
 ## Touch UI entry point for the jump button, called directly instead of only
@@ -462,14 +539,19 @@ func _queue_attack(direction: int) -> void:
 	match _state:
 		State.ATTACK:
 			if _attack_combo_index < 2:
-				_attack_buffered = true
+				_attack_buffered_left = attack_buffer_time
+			else:
+				# Playing the finisher: buffer a combo restart (loop back to
+				# hit 1) the same short, timed way -- see
+				# _attack_restart_buffered_left.
+				_attack_restart_buffered_left = attack_buffer_time
 			return
 		State.AIR_ATTACK:
 			if _attack_phase == PHASE_RECOVERY:
 				_state_time = 0.0
 				_attack_phase = PHASE_STARTUP
 			else:
-				_air_attack_buffered = true
+				_air_attack_buffered_left = attack_buffer_time
 			return
 		State.CROUCH_ATTACK, State.UP_ATTACK, State.PLUNGE, State.PLUNGE_LAND, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB:
 			_attack_buffer_left = attack_buffer_time
@@ -479,9 +561,7 @@ func _queue_attack(direction: int) -> void:
 			pass
 
 	if not is_on_floor():
-		if direction == 1:
-			_start_plunge()
-		elif direction == -1:
+		if direction == -1:
 			_start_up_attack()
 		else:
 			_start_air_attack()
@@ -505,32 +585,52 @@ func _end_generic_attack() -> void:
 		_enter_state(State.JUMP if velocity.y < 0.0 else State.FALL)
 
 
+## Invalidates a pending generic attack buffer (_attack_buffer_left/
+## _attack_buffer_direction, used by dash/wall-cling/ledge/crouch/up/plunge
+## states) whenever an attack actually starts through any path. Without
+## this, an older press already superseded by a fresher one that started an
+## attack directly could still sit in the buffer and fire a second,
+## unexpected attack once the new attack ends and the state allows attacking
+## again -- one extra action from what is really two separate presses
+## resolving out of order.
+func _clear_pending_attack_buffer() -> void:
+	_attack_buffer_left = 0.0
+
+
 ## -- Combat: ground combo -----------------------------------------------------
 
 func _start_ground_attack() -> void:
 	_attack_combo_index = 0
-	_attack_buffered = false
+	_attack_buffered_left = 0.0
+	_attack_restart_buffered_left = 0.0
+	_clear_pending_attack_buffer()
+	_capture_attack_facing()
 	_enter_state(State.ATTACK)
 	_attack_phase = PHASE_STARTUP
 
 
 func _update_attack(delta: float) -> void:
-	velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
 	if is_on_floor():
+		velocity.x = 0.0
 		velocity.y = 0.0
 	else:
+		velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
 		_apply_gravity(delta)
 
 	var window := _attack_window_for(_attack_combo_index)
+	var startup := _attack_startup_for(_attack_combo_index)
 	var t := _state_time
 
-	if t < attack_startup_time:
+	if t < startup:
 		_attack_phase = PHASE_STARTUP
-	elif t < attack_startup_time + attack_active_time:
+	elif t < startup + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(_ground_attack_name(_attack_combo_index))
-		velocity.x = float(_facing) * attack_forward_step_speed
+			_activate_directional_attack(
+				_ground_attack_name(_attack_combo_index), _attack_facing, _attack_combo_index, &"ground"
+			)
+		if not is_on_floor():
+			velocity.x = float(_attack_facing) * attack_forward_step_speed
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
@@ -539,11 +639,13 @@ func _update_attack(delta: float) -> void:
 			return
 
 	if t >= window:
-		if _attack_buffered and _attack_combo_index < 2:
+		if _attack_buffered_left > 0.0 and _attack_combo_index < 2:
 			_attack_combo_index += 1
-			_attack_buffered = false
+			_attack_buffered_left = 0.0
 			_state_time = 0.0
 			_attack_phase = PHASE_STARTUP
+		elif _attack_restart_buffered_left > 0.0 and _attack_combo_index >= 2:
+			_start_ground_attack()
 		else:
 			_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
 
@@ -556,6 +658,12 @@ func _attack_window_for(index: int) -> float:
 			return attack_window_hit2
 		_:
 			return attack_window_hit3
+
+
+## The finisher (hit 3) has its own, longer windup than hits 1/2 -- see
+## attack_finisher_startup_time.
+func _attack_startup_for(index: int) -> float:
+	return attack_finisher_startup_time if index >= 2 else attack_startup_time
 
 
 func _ground_attack_name(index: int) -> StringName:
@@ -571,12 +679,17 @@ func _ground_attack_name(index: int) -> StringName:
 ## -- Combat: crouch attack -----------------------------------------------------
 
 func _start_crouch_attack() -> void:
+	_clear_pending_attack_buffer()
+	_capture_attack_facing()
 	_enter_state(State.CROUCH_ATTACK)
 	_attack_phase = PHASE_STARTUP
 
 
 func _update_crouch_attack(delta: float) -> void:
-	velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
+	if is_on_floor():
+		velocity.x = 0.0
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
 	velocity.y = 0.0
 
 	if _state_time < attack_startup_time:
@@ -584,12 +697,12 @@ func _update_crouch_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_crouch")
+			_activate_directional_attack(&"attack_crouch", _attack_facing, 0, &"crouch")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
 			_deactivate_attack_hitbox()
-		if _state_time >= attack_window_hit3:
+		if _state_time >= crouch_up_attack_window:
 			if Input.is_action_pressed(&"move_down") or not _has_standing_headroom():
 				_enter_state(State.CROUCH)
 			else:
@@ -599,13 +712,15 @@ func _update_crouch_attack(delta: float) -> void:
 ## -- Combat: up attack (ground or air) -----------------------------------------
 
 func _start_up_attack() -> void:
+	_clear_pending_attack_buffer()
+	_capture_attack_facing()
 	_enter_state(State.UP_ATTACK)
 	_attack_phase = PHASE_STARTUP
 
 
 func _update_up_attack(delta: float) -> void:
 	if is_on_floor():
-		velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
+		velocity.x = 0.0
 		velocity.y = 0.0
 	else:
 		var axis := _horizontal_input()
@@ -617,19 +732,21 @@ func _update_up_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_up")
+			_activate_directional_attack(&"attack_up", _attack_facing, 0, &"up")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
 			_deactivate_attack_hitbox()
-		if _state_time >= attack_window_hit3:
+		if _state_time >= crouch_up_attack_window:
 			_end_generic_attack()
 
 
 ## -- Combat: air attack ---------------------------------------------------------
 
 func _start_air_attack() -> void:
-	_air_attack_buffered = false
+	_air_attack_buffered_left = 0.0
+	_clear_pending_attack_buffer()
+	_capture_attack_facing()
 	_enter_state(State.AIR_ATTACK)
 	_attack_phase = PHASE_STARTUP
 
@@ -649,13 +766,13 @@ func _update_air_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_air")
+			_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
 			_deactivate_attack_hitbox()
-		if _air_attack_buffered:
-			_air_attack_buffered = false
+		if _air_attack_buffered_left > 0.0:
+			_air_attack_buffered_left = 0.0
 			_state_time = 0.0
 			_attack_phase = PHASE_STARTUP
 			return
@@ -667,6 +784,7 @@ func _update_air_attack(delta: float) -> void:
 ## -- Combat: down plunge ---------------------------------------------------------
 
 func _start_plunge() -> void:
+	_clear_pending_attack_buffer()
 	_enter_state(State.PLUNGE)
 	_attack_phase = PHASE_STARTUP
 
@@ -705,11 +823,20 @@ func _update_plunge_land(_delta: float) -> void:
 
 ## -- Combat: hitbox helpers -------------------------------------------------------
 
-func _activate_attack_hitbox(attack_name: StringName) -> void:
+func _activate_attack_hitbox(attack_name: StringName, facing: int = 0) -> Dictionary:
 	var config := _hitbox_config_for(attack_name)
 	var offset: Vector2 = config.offset
-	_attack_hitbox.configure(config.size, Vector2(offset.x * float(_facing), offset.y))
+	var attack_direction := _facing if facing == 0 else facing
+	_attack_hitbox.configure(config.size, Vector2(offset.x * float(attack_direction), offset.y))
 	_attack_hitbox.activate(attack_name)
+	return config
+
+
+func _activate_directional_attack(
+	attack_name: StringName, facing: int, variant: int, slash_kind: StringName
+) -> void:
+	var config := _activate_attack_hitbox(attack_name, facing)
+	_slash_vfx.play_slash(slash_kind, variant, facing, config.size, config.offset)
 
 
 func _deactivate_attack_hitbox() -> void:
@@ -718,22 +845,20 @@ func _deactivate_attack_hitbox() -> void:
 
 func _hitbox_config_for(attack_name: StringName) -> Dictionary:
 	match attack_name:
-		&"attack_ground_1", &"attack_ground_2":
-			return {size = hitbox_ground_size, offset = hitbox_ground_offset}
-		&"attack_ground_3":
-			return {size = hitbox_finisher_size, offset = hitbox_finisher_offset}
+		&"attack_ground_1", &"attack_ground_2", &"attack_ground_3":
+			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_ground_offset_y)}
 		&"attack_crouch":
-			return {size = hitbox_crouch_size, offset = hitbox_crouch_offset}
+			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_crouch_offset_y)}
+		&"attack_air":
+			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_air_offset_y)}
 		&"attack_up":
 			return {size = hitbox_up_size, offset = hitbox_up_offset}
-		&"attack_air":
-			return {size = hitbox_air_size, offset = hitbox_air_offset}
 		&"attack_plunge":
 			return {size = hitbox_plunge_size, offset = hitbox_plunge_offset}
 		&"attack_plunge_land":
 			return {size = hitbox_plunge_land_size, offset = hitbox_plunge_land_offset}
 		_:
-			return {size = hitbox_ground_size, offset = hitbox_ground_offset}
+			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_ground_offset_y)}
 
 
 ## -- Airborne: jump / fall ----------------------------------------------------
@@ -1033,6 +1158,8 @@ func _enter_state(new_state: State) -> void:
 	var previous := _state
 	_state = new_state
 	_state_time = 0.0
+	if not _is_directional_attack_state():
+		_slash_vfx.stop_slash()
 
 	if previous == State.DASH and new_state != State.DASH:
 		_dash_cooldown_left = dash_cooldown
@@ -1127,7 +1254,8 @@ func _update_footsteps(delta: float) -> void:
 
 
 func _update_animation() -> void:
-	_sprite.flip_h = _facing < 0
+	var animation_facing := _attack_facing if _is_directional_attack_state() else _facing
+	_sprite.flip_h = animation_facing < 0
 	match _state:
 		State.CROUCH:
 			_play_animation(&"crouch")
@@ -1155,7 +1283,20 @@ func _update_animation() -> void:
 		State.CROUCH_ATTACK:
 			_play_animation(&"crouch_attack")
 		State.UP_ATTACK:
-			_play_animation(&"up_attack")
+			# T4d item 4 (iPhone playtest: the up-attack body pose now ends
+			# together with its slash -- commit 126d6ff -- but was still
+			# DISPLAYED for the rest of the state's recovery: the up_attack
+			# clip freezes on its last frame, which is a pointing-up pose,
+			# for crouch_up_attack_window - slash_end (~0.38s). Switch to the
+			# appropriate airborne/idle animation the instant the slash ends
+			# instead of holding that pose.
+			var up_attack_slash_end := attack_startup_time + PlayerSlashVfx.TOTAL_DURATION
+			if _state_time < up_attack_slash_end:
+				_play_animation(&"up_attack")
+			elif is_on_floor():
+				_play_animation(&"idle")
+			else:
+				_play_animation(&"fall" if velocity.y >= 0.0 else &"jump")
 		State.AIR_ATTACK:
 			_play_animation(&"air_attack")
 		State.PLUNGE:

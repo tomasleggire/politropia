@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://0ykivkvntasf"
-path="res://.godot/imported/luz_air_combat_sheet.png-159b7fe0ae71935fffe9937ff312bfe3.ctex"
+uid="uid://lkrgigadbgpq"
+path="res://.godot/imported/luz_slash_smears.png-210b957fc91db588a0ee45973e4fb161.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/player/luz/luz_air_combat_sheet.png"
-dest_files=["res://.godot/imported/luz_air_combat_sheet.png-159b7fe0ae71935fffe9937ff312bfe3.ctex"]
+source_file="res://assets/player/luz/vfx/luz_slash_smears.png"
+dest_files=["res://.godot/imported/luz_slash_smears.png-210b957fc91db588a0ee45973e4fb161.ctex"]
 
 [params]
 
