@@ -66,7 +66,7 @@ The checkpoint works on device (parent feature `odd/tasks/stillness-desk-checkpo
 ## Delivery forecast
 
 - Estimated authored change: 600-900 lines (manifest/catalog, desk state machine, FX scenes/scripts, prompts, tracker); generated pixels excluded.
-- Delivery strategy: `ask-on-risk`. Chain strategy: ask before the commit that crosses about 400 lines.
+- Delivery strategy: `ask-on-risk`. Chain strategy: `stacked-to-main` (user choice, 2026-09-29), one PR per task after the checkpoint PRs.
 - Base: stacked on `feat/stillness-desk-checkpoint` at `d013cfb`. Initial reviewed boundary: `3a33a1b` (the T3+T4 range from the parent feature is still pending review).
 
 ## Tasks
@@ -80,7 +80,7 @@ The checkpoint works on device (parent feature `odd/tasks/stillness-desk-checkpo
   - Acceptance: identity fidelity, consistent scale/baseline with the existing clips, a readable sitting silhouette on a desk-height surface, a backpack drop/pickup that reads, and no cell bleed.
   - Verification: raw + processed contact sheets and onion skins inspected; catalog smoke test; headless load clean.
 
-- [ ] **T2 — Layered altar art**
+- [x] **T2 — Layered altar art**
   - Generate the desk body, pendulum, candle, inkwell, papers, floor protractor ring, paper roots, and backpack prop as separate transparent layers, sized so the T1 sitting Luz fits on the desk top. Save the processed layers under `assets/world/stillness_desk/`.
   - Acceptance: matches Luz's rendering and the concept palette; layers are cleanly separable for animation; the desk top height matches the sitting clip.
   - Verification: layer contact sheet plus a composite with the sitting Luz, inspected.
@@ -101,8 +101,8 @@ The checkpoint works on device (parent feature `odd/tasks/stillness-desk-checkpo
 
 ## Progress
 
-- Current task: T2 next (layered altar art).
-- Next step: generate the altar layers sized to the 26.25-unit desk top.
+- Current task: T3 next (rest ritual state machine).
+- Next step: integrate the layers and rest clips into the desk with the mount/celebrate/rest/dismount phases.
 
 ## Verification evidence
 
@@ -110,11 +110,19 @@ The checkpoint works on device (parent feature `odd/tasks/stillness-desk-checkpo
 - T1 parent review (first pass): REJECTED pending fixes. mount frame 4 loses the ruler and floats in a "superman" pose; dismount frames 2-3 show the backpack on her back before the frame-4 pickup; dismount frame 1 drifts about 100px right. Targeted edit pass requested.
 - T1 fix pass: mount frame 4 and dismount frames 2-3 edited per frame with Codex (pre-edit sheets kept in `tools/art_sources/luz/raw/edits/`); dismount frame 1 drift corrected with processor `dx`. Parent re-review: ACCEPTED. Mount frame 4 is a coil-and-reach with the ruler held; the backpack first returns at the dismount frame 4 pickup. Minor: dismount frame 3 jacket slightly bluer; edited frames marginally softer (not visible at 0.175). Re-verified: catalog smoke OK (8/4/8 frames, only `rest_sit` loops), headless import and `--quit-after 120` clean. A stray duplicate Codex edit process was stopped by the parent; processed sheet md5 `a8471eb5`.
 - T1 clip speeds 8/2/10 fps are provisional; tune in T3 against the desk.
+- T2 first pass: 4 Codex runs (desk+arch, roots+ring, props, misc). The Codex sandbox could not copy into the repo, so outputs were copied from `~/.codex/generated_images`. `tools/process_stillness_desk_art.py` (no subprocess) exports 15 layers + `layout.json` to `assets/world/stillness_desk/` (origin = floor under desk centre; seat (0,150); backpack (-125,0); pendulum pivot (0,571), length 167). The lit ring is derived from the unlit one (identical geometry). The desk is stretched 1.2x horizontally to 324 px.
+- T2 parent review: desk, arch, pendulum, props, flame, backpack and ring ACCEPTED (seat fit correct; style coherent at game scale). `roots` REJECTED: a central noodle pile hides the desk's centre panel and is rendered painterly. Redo requested as left/right clusters from the legs.
+- T2 roots redo BLOCKED: Codex workspace out of credits (2 attempts, 0 images). Interim deterministic fix: `split_roots()` masks the centre ±65px and emits `roots_left.png`/`roots_right.png` pivoted at the legs (x=∓140, z=10); every other layer is md5-identical. Parent viewed the composite: centre panel clear, roots flow from the legs; still the softer painterly render. Pending (user: refill Codex credits): regenerate the roots with the prompt saved in `tools/art_sources/checkpoint/prompts/stillness_desk_layers.md`, then swap the two PNGs.
+- T2 headless `--import` + `--quit-after 120`: 0 error/warning/parse lines.
+- T3 notes from the review: squash the floor ring vertically and split it front/back around the desk (a side-view floor has little depth); ink_box is hidden behind inkwell/paper, so adjust offsets; check the arch (about 103x126 units) against the level ceiling/camera.
 - T1 geometry for T2: desk top 150px above the feet row = 26.25 world units (hip height; Luz stands 58); seated head about 68 units; seated body centered on the player x. Backpack prop swaps: off at mount frame 3, pickup at dismount frame 4.
 
 ## Commit evidence
 
-- Pending.
+- T1: `cd5055d` feat: add Luz rest ritual animation clips (also carries the parent feature's device-playtest note).
+- Review (range `3a33a1b..cd5055d`, 17 paths, 804 lines, untracked excluded): risk `high` (`process_boundary` in `tools/process_luz_rest_ritual.py`). Lineage `review-0a2a8a61e728bd07` consent: user `declined` (validated `declined_this_candidate`). Off path, high tier: independent read-only verifier PASSED 4/4. No subprocess/shell/eval in the processor or any `tools/*.py` (the high flag was a false positive); deterministic rerun byte-identical (md5 `a8471eb5`, manifest identical); manifest diff additions only; catalog registers only the 3 clips; headless clean; smoke 8/4/8 frames, only `rest_sit` loops, 24 animations total. Follow-up (low): manifest rewrite is not atomic. Reviewed boundary advances to `cd5055d`.
+- Note: the selection submission without `--base-ref/--committed-only` silently widened the target to the whole branch from `46a14d4`; resubmitted with the preflight selectors to match target `7eef734e`.
+- Incident: the GGA hook again wrote index entries with missing blobs (manifest); recovered with `git read-tree HEAD` + re-add; `fsck` clean, history intact. Rule: stage every intended change before committing.
 
 ## Rollback boundaries
 

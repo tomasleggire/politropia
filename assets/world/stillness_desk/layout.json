@@ -1,0 +1,317 @@
+{
+  "version": 1,
+  "world_scale": 0.175,
+  "units": "source px; origin = floor line under desk centre; x right, y up; pivot in image px (top-left origin)",
+  "desk_top_height": 150,
+  "seat_point": [
+    0,
+    150
+  ],
+  "luz": {
+    "note": "luz_rest_sheet cells are 512 px; place cell point (anchor_x, feet_row) at the desk origin. Seated frames already carry the 150 px lift, so the seat lands on desk_top_height.",
+    "cell_anchor": [
+      256,
+      413
+    ],
+    "stand_x": 0
+  },
+  "backpack_spot": [
+    -125,
+    0
+  ],
+  "pendulum": {
+    "pivot": [
+      0,
+      571
+    ],
+    "length": 167
+  },
+  "arch_inner_apex_height": 614,
+  "layers": {
+    "desk_body": {
+      "file": "desk_body.png",
+      "size": [
+        324,
+        150
+      ],
+      "pivot": [
+        162,
+        150
+      ],
+      "offset": [
+        0,
+        0
+      ],
+      "z": 5
+    },
+    "arch_frame": {
+      "file": "arch_frame.png",
+      "size": [
+        587,
+        720
+      ],
+      "pivot": [
+        293,
+        720
+      ],
+      "offset": [
+        0,
+        0
+      ],
+      "z": 0
+    },
+    "pendulum_bracket": {
+      "file": "pendulum_bracket.png",
+      "size": [
+        62,
+        50
+      ],
+      "pivot": [
+        31,
+        0
+      ],
+      "offset": [
+        0,
+        616
+      ],
+      "z": 1
+    },
+    "pendulum": {
+      "file": "pendulum.png",
+      "size": [
+        35,
+        175
+      ],
+      "pivot": [
+        17,
+        8
+      ],
+      "offset": [
+        0,
+        571
+      ],
+      "z": 2
+    },
+    "roots_left": {
+      "file": "roots_left.png",
+      "size": [
+        170,
+        65
+      ],
+      "pivot": [
+        169,
+        65
+      ],
+      "offset": [
+        -140,
+        -4
+      ],
+      "z": 10
+    },
+    "roots_right": {
+      "file": "roots_right.png",
+      "size": [
+        170,
+        50
+      ],
+      "pivot": [
+        0,
+        50
+      ],
+      "offset": [
+        140,
+        -4
+      ],
+      "z": 10
+    },
+    "floor_ring_unlit": {
+      "file": "floor_ring_unlit.png",
+      "size": [
+        728,
+        120
+      ],
+      "pivot": [
+        364,
+        60
+      ],
+      "offset": [
+        0,
+        0
+      ],
+      "z": 3,
+      "ring_inner_padding": 14
+    },
+    "floor_ring_lit": {
+      "file": "floor_ring_lit.png",
+      "size": [
+        728,
+        120
+      ],
+      "pivot": [
+        364,
+        60
+      ],
+      "offset": [
+        0,
+        0
+      ],
+      "z": 4,
+      "ring_inner_padding": 14
+    },
+    "candle_jar": {
+      "file": "candle_jar.png",
+      "size": [
+        30,
+        34
+      ],
+      "pivot": [
+        15,
+        34
+      ],
+      "offset": [
+        -125,
+        150
+      ],
+      "z": 7
+    },
+    "flame": {
+      "file": "flame.png",
+      "size": [
+        56,
+        26
+      ],
+      "pivot": [
+        7,
+        26
+      ],
+      "offset": [
+        -125,
+        170
+      ],
+      "z": 8,
+      "frames": 4,
+      "frame_size": [
+        14,
+        26
+      ],
+      "fps_suggested": 8
+    },
+    "inkwell": {
+      "file": "inkwell.png",
+      "size": [
+        50,
+        72
+      ],
+      "pivot": [
+        17,
+        72
+      ],
+      "offset": [
+        105,
+        150
+      ],
+      "z": 9
+    },
+    "ink_box": {
+      "file": "ink_box.png",
+      "size": [
+        54,
+        54
+      ],
+      "pivot": [
+        27,
+        54
+      ],
+      "offset": [
+        138,
+        150
+      ],
+      "z": 6
+    },
+    "papers": {
+      "note": "suggested orbit/lift start offsets; pivots are the image centres",
+      "items": [
+        {
+          "file": "paper_0.png",
+          "size": [
+            37,
+            43
+          ],
+          "pivot": [
+            18,
+            21
+          ],
+          "offset": [
+            -125,
+            250
+          ],
+          "z": 11
+        },
+        {
+          "file": "paper_1.png",
+          "size": [
+            38,
+            46
+          ],
+          "pivot": [
+            19,
+            23
+          ],
+          "offset": [
+            135,
+            290
+          ],
+          "z": 11
+        },
+        {
+          "file": "paper_2.png",
+          "size": [
+            43,
+            47
+          ],
+          "pivot": [
+            21,
+            23
+          ],
+          "offset": [
+            -100,
+            370
+          ],
+          "z": 11
+        },
+        {
+          "file": "paper_3.png",
+          "size": [
+            39,
+            46
+          ],
+          "pivot": [
+            19,
+            23
+          ],
+          "offset": [
+            120,
+            215
+          ],
+          "z": 11
+        }
+      ]
+    },
+    "backpack_prop": {
+      "file": "backpack_prop.png",
+      "size": [
+        95,
+        96
+      ],
+      "pivot": [
+        47,
+        96
+      ],
+      "offset": [
+        -125,
+        0
+      ],
+      "z": 12
+    }
+  }
+}
