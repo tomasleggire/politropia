@@ -36,13 +36,16 @@ const CLIP_SPEEDS := {
 	"air_attack": 10.0,
 	"plunge": 10.0,
 	"plunge_land": 10.0,
+	"rest_mount": 8.0,
+	"rest_sit": 2.0,
+	"rest_dismount": 10.0,
 }
 
 ## Animations that should hold/repeat while their state persists, rather
 ## than play once and freeze on the last frame.
 const LOOPING_CLIPS := [
 	"idle", "walk", "crouch", "jump", "fall",
-	"ground_dash", "air_dash", "wall_cling", "ledge_hang",
+	"ground_dash", "air_dash", "wall_cling", "ledge_hang", "rest_sit",
 ]
 
 const CLIP_SOURCE_NAMES := {
