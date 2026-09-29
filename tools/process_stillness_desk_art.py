@@ -95,6 +95,10 @@ INK_BOX_X = 138
 BACKPACK_X = -125
 
 
+FRINGE_ALPHA = 30
+FRINGE_MAGENTA_LEAD = 60
+
+
 def key_magenta(raw: Image.Image) -> Image.Image:
     im = raw.convert("RGBA")
     px = im.load()
@@ -108,6 +112,17 @@ def key_magenta(raw: Image.Image) -> Image.Image:
                 px[x, y] = (0, 0, 0, 0)
             elif m > 30:
                 px[x, y] = (max(0, r - m), g, max(0, b - m), min(a, int(255 * (100 - m) / 70)))
+    return im
+
+
+def despill_faint_magenta(im: Image.Image) -> Image.Image:
+    """Drop near-transparent magenta fringe left by keying and resampling."""
+    px = im.load()
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = px[x, y]
+            if 0 < a <= FRINGE_ALPHA and min(r, b) - g > FRINGE_MAGENTA_LEAD:
+                px[x, y] = (0, 0, 0, 0)
     return im
 
 
@@ -441,7 +456,7 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
     for name, im in layers.items():
-        im.save(OUT_DIR / f"{name}.png")
+        despill_faint_magenta(im).save(OUT_DIR / f"{name}.png")
     (OUT_DIR / "layout.json").write_text(json.dumps(layout, indent=2) + "\n")
     contact_sheet(layers).save(PREVIEW_DIR / "layers_contact.png")
     for scale, tag in ((1.0, "1x"), (0.175 * 4, "game4x")):

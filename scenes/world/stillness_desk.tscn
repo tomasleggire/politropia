@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=35 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/stillness_desk.gd" id="1_desk"]
 [ext_resource type="PackedScene" path="res://scenes/ui/interaction_prompt.tscn" id="2_prompt"]
@@ -19,6 +19,19 @@
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/roots_left.png" id="t_rl"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/roots_right.png" id="t_rr"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/backpack_prop.png" id="t_pack"]
+
+[ext_resource type="Script" path="res://scripts/world/stillness_desk_fx.gd" id="fx_main"]
+[ext_resource type="Script" path="res://scripts/world/firefly_swarm.gd" id="fx_swarm"]
+[ext_resource type="Script" path="res://scripts/world/altar_motes.gd" id="fx_motes"]
+[ext_resource type="Script" path="res://scripts/world/paper_orbit.gd" id="fx_papers"]
+[ext_resource type="Script" path="res://scripts/world/floor_ring_sweep.gd" id="fx_ring"]
+[ext_resource type="Shader" path="res://shaders/ring_sweep.gdshader" id="fx_shader"]
+
+[sub_resource type="ShaderMaterial" id="RingSweepMaterial"]
+shader = ExtResource("fx_shader")
+shader_parameter/progress = 1.0
+shader_parameter/softness = 0.45
+shader_parameter/radii = Vector2(364, 60)
 
 [sub_resource type="CanvasItemMaterial" id="Additive"]
 blend_mode = 1
@@ -167,6 +180,7 @@ unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0)
 
 [node name="LitBack" type="Sprite2D" parent="Visuals/FloorRingLit"]
+material = SubResource("RingSweepMaterial")
 z_index = -6
 scale = Vector2(0.175, 0.0875)
 texture_filter = 4
@@ -177,6 +191,7 @@ region_enabled = true
 region_rect = Rect2(0, 0, 728, 60)
 
 [node name="LitFront" type="Sprite2D" parent="Visuals/FloorRingLit"]
+material = SubResource("RingSweepMaterial")
 z_index = 3
 scale = Vector2(0.175, 0.0875)
 texture_filter = 4
@@ -338,6 +353,28 @@ texture = ExtResource("t_pack")
 centered = false
 offset = Vector2(-47, -96)
 visible = false
+
+[node name="Fx" type="Node2D" parent="."]
+process_mode = 3
+script = ExtResource("fx_main")
+
+[node name="Fireflies" type="Node2D" parent="Fx"]
+script = ExtResource("fx_swarm")
+
+[node name="DustMotes" type="Node2D" parent="Fx"]
+script = ExtResource("fx_motes")
+
+[node name="PaperOrbit" type="Node" parent="Fx"]
+script = ExtResource("fx_papers")
+
+[node name="RingSweep" type="Node" parent="Fx"]
+script = ExtResource("fx_ring")
+
+[node name="PeakBloom" type="Sprite2D" parent="Fx"]
+modulate = Color(1, 0.78, 0.42, 0)
+material = SubResource("Additive")
+position = Vector2(0, -46)
+texture = SubResource("GlowTexture")
 
 [node name="InteractionPrompt" parent="." instance=ExtResource("2_prompt")]
 position = Vector2(0, -142)

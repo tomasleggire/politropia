@@ -17,13 +17,14 @@ signal celebration_started(first: bool)
 signal celebration_peak
 signal celebration_finished
 signal dismount_started
+## The `rest_sit` loop wrapped to its first frame; FX re-sync breathing here.
+signal breath_cycle_started
 
 enum Phase { DORMANT, AWAKENED, MOUNT, CELEBRATE, RESTING, DISMOUNT }
 
 ## Touch controls call `request_interact()` on this group; only the desk with
 ## Luz in range accepts it.
 const INTERACTABLE_GROUP := &"interactable"
-const AWAKENED_INTENSITY := 0.4
 const PARALLAX_STRENGTH := 0.06
 const PARALLAX_LIMIT := 6.0
 const CELEBRATION_PEAK_RATIO := 0.4
@@ -34,6 +35,9 @@ const MOUNT_CLIP := &"rest_mount"
 const SIT_CLIP := &"rest_sit"
 const DISMOUNT_CLIP := &"rest_dismount"
 const DEFAULT_BREATH_PERIOD := 2.0
+## Extra wait past a clip's length before the ritual advances without its finished signal.
+const CLIP_FALLBACK_MARGIN := 0.25
+const CLIP_FALLBACK_MIN := 0.5
 
 @export_group("Checkpoint")
 ## Unique per checkpoint across the whole game. Required.
@@ -58,23 +62,11 @@ var _player: Player
 var _transaction_player: Player
 var _paused_by_desk := false
 var _exit_armed := false
-var _time := 0.0
-var _intensity := 0.0
-var _lift := 0.0
-var _intensity_tween: Tween
-var _lift_tween: Tween
-var _paper_rest: Array[Transform2D] = []
 
 @onready var _anchor: Marker2D = $SpawnAnchor
 @onready var _area: Area2D = $InteractionArea
 @onready var _prompt: InteractionPrompt = $InteractionPrompt
 @onready var _background: Node2D = %Background
-@onready var _glow: Node2D = %Glow
-@onready var _candle_glow: Node2D = %CandleGlow
-@onready var _flame: Node2D = %Flame
-@onready var _ink_glow: Node2D = %InkGlow
-@onready var _papers: Node2D = %Papers
-@onready var _pendulum: Node2D = %Pendulum
 @onready var _backpack: Node2D = %BackpackProp
 
 
@@ -86,8 +78,6 @@ func _ready() -> void:
 	_area.body_entered.connect(_on_body_entered)
 	_area.body_exited.connect(_on_body_exited)
 	CheckpointService.checkpoint_activated.connect(_on_checkpoint_activated)
-	for sheet in _papers.get_children():
-		_paper_rest.append((sheet as Node2D).transform)
 	_backpack.visible = false
 	_sync_resting_phase()
 
@@ -113,11 +103,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
-	_time += delta
-	_animate_environment()
+	_animate_parallax()
 
 
 ## Public entry point for the keyboard action and future touch buttons.
@@ -167,8 +156,8 @@ func _run_rest(player: Player) -> void:
 	_set_phase(Phase.MOUNT)
 	_commit(player)
 	rest_started.emit(checkpoint_id)
-	_tween_intensity(1.0, player.get_animation_length(MOUNT_CLIP))
 	player.play_rest_animation(MOUNT_CLIP)
+	_arm_clip_fallback(MOUNT_CLIP, Phase.MOUNT, _run_id)
 
 
 func _commit(player: Player) -> void:
@@ -195,6 +184,8 @@ func _on_rest_animation_finished(clip: StringName) -> void:
 
 
 func _on_rest_animation_frame_changed(clip: StringName, frame: int) -> void:
+	if clip == SIT_CLIP and frame == 0:
+		breath_cycle_started.emit()
 	if clip == MOUNT_CLIP and _phase == Phase.MOUNT and frame >= BACKPACK_DROP_FRAME:
 		_backpack.visible = true
 	elif clip == DISMOUNT_CLIP and _phase == Phase.DISMOUNT and frame >= BACKPACK_PICKUP_FRAME:
@@ -206,7 +197,6 @@ func _run_celebration(run: int) -> void:
 	var duration := first_celebration_duration if first else repeat_celebration_duration
 	_set_phase(Phase.CELEBRATE)
 	_transaction_player.play_rest_animation(SIT_CLIP)
-	_pulse_papers(duration)
 	celebration_started.emit(first)
 	if not await _wait(duration * CELEBRATION_PEAK_RATIO, run):
 		return
@@ -241,15 +231,24 @@ func _on_rest_exit_requested() -> void:
 func _begin_dismount() -> void:
 	_exit_armed = false
 	_set_phase(Phase.DISMOUNT)
-	_tween_intensity(AWAKENED_INTENSITY, _transaction_player.get_animation_length(DISMOUNT_CLIP))
 	dismount_started.emit()
 	_transaction_player.play_rest_animation(DISMOUNT_CLIP)
+	_arm_clip_fallback(DISMOUNT_CLIP, Phase.DISMOUNT, _run_id)
 
 
 func _complete_dismount() -> void:
 	_finish_transaction()
 	_sync_resting_phase()
 	rest_completed.emit(checkpoint_id)
+
+
+## Advances MOUNT/DISMOUNT even when the clip's finished signal never arrives
+## (missing clip, dropped signal). The phase check makes it fire exactly once.
+func _arm_clip_fallback(clip: StringName, phase: Phase, run: int) -> void:
+	var length := _transaction_player.get_animation_length(clip)
+	var timeout := 0.0 if length <= 0.0 else maxf(length + CLIP_FALLBACK_MARGIN, CLIP_FALLBACK_MIN)
+	if await _wait(timeout, run) and _phase == phase:
+		_on_rest_animation_finished(clip)
 
 
 ## Waits `seconds` on a tween bound to this node. Returns false when the
@@ -329,7 +328,6 @@ func _set_phase(phase: Phase) -> void:
 func _sync_resting_phase() -> void:
 	var awakened := CheckpointService.is_active(checkpoint_id, _owner_scene_path())
 	_set_phase(Phase.AWAKENED if awakened else Phase.DORMANT)
-	_tween_intensity(AWAKENED_INTENSITY if awakened else 0.0, 0.6)
 	_refresh_prompt()
 
 
@@ -362,51 +360,6 @@ func _refresh_prompt() -> void:
 
 
 # -- Presentation --------------------------------------------------------------
-
-func _tween_intensity(target: float, duration: float) -> void:
-	if _intensity_tween != null:
-		_intensity_tween.kill()
-	_intensity_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_intensity_tween.tween_property(self, "_intensity", target, maxf(duration, 0.001))
-
-
-## Papers lift off the desk, then settle back over the celebration.
-func _pulse_papers(duration: float) -> void:
-	if _lift_tween != null:
-		_lift_tween.kill()
-	_lift_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_lift_tween.tween_property(self, "_lift", 1.0, duration * 0.45).set_ease(Tween.EASE_OUT)
-	_lift_tween.tween_interval(duration * 0.1)
-	_lift_tween.tween_property(self, "_lift", 0.0, duration * 0.45).set_ease(Tween.EASE_IN)
-
-
-func _animate_environment() -> void:
-	var t := _time
-	var energy := _intensity
-	_pendulum.rotation = sin(t * 1.3) * lerpf(0.12, 0.3, energy)
-
-	var flicker := 1.0 + sin(t * 11.0) * 0.03 + sin(t * 7.3) * 0.04
-	_flame.scale = Vector2(1.0, flicker)
-	_candle_glow.modulate.a = clampf(0.75 + (flicker - 1.0) * 1.5 + energy * 0.5, 0.0, 1.5)
-	_ink_glow.modulate.a = 0.5 + sin(t * 2.4) * 0.2 + energy * 0.6
-
-	var breath := sin(t * 1.6) * 0.12
-	_glow.modulate.a = clampf(0.3 + energy * 0.7 + breath, 0.0, 1.5)
-	_glow.scale = Vector2.ONE * (0.92 + energy * 0.25 + breath * 0.3)
-
-	_animate_papers(t)
-	_animate_parallax()
-
-
-func _animate_papers(t: float) -> void:
-	var sheets := _papers.get_children()
-	for i in mini(sheets.size(), _paper_rest.size()):
-		var sheet := sheets[i] as Node2D
-		var rest := _paper_rest[i]
-		var spread := float(i) - 1.5
-		sheet.position = rest.origin + Vector2(spread * 3.0 * _lift, -_lift * (6.0 + 3.0 * i) + sin(t * 2.0 + i) * 1.0 * _lift)
-		sheet.rotation = rest.get_rotation() + spread * 0.25 * _lift + sin(t * 1.7 + i) * 0.06 * _lift
-
 
 ## Background drifts against the camera, bounded so it never detaches.
 func _animate_parallax() -> void:
