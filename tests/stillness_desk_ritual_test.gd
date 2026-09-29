@@ -192,6 +192,9 @@ func run_flow_cases() -> void:
 	check(desk.get_phase() == 4 and paused and player.is_meditating(), "rest1 seated >=5s with no input")
 	check(player._sprite.animation == &"rest_sit" and player._sprite.is_playing(), "rest1 rest_sit looping")
 	check(absf(desk.breath_period - 2.0) < 0.01, "breath_period 2.0 (%f)" % desk.breath_period)
+	# The real touch path runs through the TouchControls autoload, which must
+	# keep receiving input while the tree is paused for the rest.
+	check(root.get_node("TouchControls").can_process(), "rest1 touch controls process while paused")
 	player.request_jump()
 	await frames(2)
 	check(desk.get_phase() == 5, "rest1 touch request_jump dismounts")

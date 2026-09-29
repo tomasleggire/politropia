@@ -107,12 +107,19 @@ The checkpoint works on device (parent feature `odd/tasks/stillness-desk-checkpo
   - Run full checks, deploy to the iPhone, and record the playtest outcome, evidence, and the next delivery step.
   - Review fixes applied: shader `x*x` plus clamped radii/softness and atan bias (Metal-safe); paper `z_index` restore; `_usable_count()` array guard; honest `get_fx_node_count()` (36, `FX_NODE_BUDGET` 40); `center_x`; ring `*_alpha` renames; explicit `_reset_to_idle()`; `level_01` null-safe player.
   - Committed test: `tests/stillness_desk_ritual_test.gd` (139 checks; README with the run command); iOS export excludes `tests/*`.
+  - Commit: `ceda801` fix: harden Stillness Desk FX and add ritual regression test. Review (range `1a7ace6..ceda801`, 10 paths, 582 lines): `medium`, `slice_budget_reached`; User GRANTED. Lineage `review-9f4b480fca98caa7` (review-reliability) → APPROVED and acknowledged. Reviewed boundary advances to `ceda801`. Findings triage: R3-002 test double-disconnect → not real (the full test log has no error/warning; the desk reconnects per rest). Follow-ups (not blocking): R3-001 `_reset_to_idle` runs on every DORMANT/AWAKENED change, including scene start (idempotent, but confirm no visible pop on device); R3-003 wall-clock duration checks could flake under load (move them to frame-delta time); R3-004 no test drives `_usable_count()` with mismatched arrays.
+  - Deploy: iOS export (tests excluded) + xcodebuild + devicectl install/launch on the iPhone 16 Pro OK (2026-09-29). Device playtest: PENDING (user).
   - Verification: headless import/load clean; committed test `PASS 139/139` (writer and parent spot check; about 75s; exit 1 confirmed on a forced failure); ring look unchanged vs T4 screenshots.
+
+- [x] **T6 — Fix: cannot dismount on device (touch)**
+  - Device playtest (user, 2026-09-29): "no me deja bajarme, si me muevo o toco cualquier botón no pasa nada".
+  - Root cause: the `TouchControls` autoload inherited the pause, so while the tree was paused for the rest its `_input` never ran and no touch reached the player. The committed test called `player.request_jump()` directly and bypassed the real path (a test gap).
+  - Fix: `TouchControls` `process_mode = ALWAYS` (safe: the player is input-locked during the rest). Test: new check "rest1 touch controls process while paused". RED observed without the fix (probe `can_process=false`; test `FAIL 1/140`), GREEN with it (`PASS 140/140`); headless load clean.
 
 ## Progress
 
-- Current task: T5 in progress (delegated writer: review fixes + committed harness), then iPhone deploy.
-- Next step: move the T3/T4 harnesses into the repo as a runnable headless test, deploy to the iPhone.
+- Current task: T6 fix deployed; design iteration 2 (user feedback) next.
+- Next step: record the playtest; then push/PRs (stacked-to-main, user decision). Pending: Codex roots redo once credits are refilled.
 
 ## Verification evidence
 
