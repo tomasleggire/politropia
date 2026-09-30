@@ -6,7 +6,7 @@ extends SceneTree
 const LEVEL := "res://scenes/levels/level_01.tscn"
 const DESK_ID := &"level_01_desk_a"
 ## Total checks a complete run performs; a smaller count means the run aborted.
-const EXPECTED_CHECKS := 150
+const EXPECTED_CHECKS := 183
 const EXPECTED_CASES := 4
 
 class Dummy extends Node:
@@ -25,6 +25,8 @@ var lvl: Node
 var desk: Node2D
 var player: CharacterBody2D
 var fx: Node2D
+var cam: RoomCamera
+var shaft_awakened_ref := 0.0
 var dummy: Dummy
 var tc: Node
 var cps: Node
@@ -83,6 +85,7 @@ func setup_level() -> void:
 	desk = lvl.get_node("StillnessDesk")
 	player = lvl.get_node("Player")
 	fx = desk.get_node("Fx")
+	cam = lvl.get_node("RoomCamera")
 	dummy = Dummy.new()
 	dummy.add_to_group("checkpoint_resettable")
 	lvl.add_child(dummy)
@@ -145,6 +148,60 @@ func count_activation(_id: StringName, _path: String, _position: Vector2) -> voi
 
 func count_events(kind: String) -> int:
 	return ev.filter(func(e: Array) -> bool: return e[0] == kind).size()
+
+
+## Samples every frame from the celebration's start until 0.6s into RESTING and
+## reports when each beat first showed, so their order can be asserted.
+func record_celebration() -> Dictionary:
+	var halo: HaloSigil = fx.get_halo()
+	var shaft: AltarLightShaft = fx.get_shaft()
+	var vig: AltarVignette = fx.get_vignette()
+	var wave: AltarShockwave = fx.get_shockwave()
+	var sparks: AltarSparks = fx.get_sparks()
+	var peaks_before := count_events("peak")
+	var starts: Array[Array] = ev.filter(func(e: Array) -> bool: return e[0] == "start")
+	var base_ms: int = starts[-1][2]
+	var r := {
+		"vig_t": -1.0, "fill_t": -1.0, "wave_t": -1.0, "spark_t": -1.0, "peak_t": -1.0,
+		"monotonic": true, "max_fill_pre": 0.0, "flare_pre": 0.0, "flare_post": 0.0,
+		"wave_pre": false, "sparks_pre": 0, "max_sparks": 0, "max_swell": 0.0, "max_zoom": 1.0,
+	}
+	var last_fill := 0.0
+	var rest_ms := -1
+	while true:
+		await process_frame
+		var t := (Time.get_ticks_msec() - base_ms) / 1000.0
+		var peaked := count_events("peak") > peaks_before
+		if peaked and r["peak_t"] < 0.0:
+			var peaks: Array[Array] = ev.filter(func(e: Array) -> bool: return e[0] == "peak")
+			r["peak_t"] = (peaks[-1][1] - base_ms) / 1000.0
+		if vig.level > 0.05 and r["vig_t"] < 0.0: r["vig_t"] = t
+		if halo.fill > 0.02 and r["fill_t"] < 0.0: r["fill_t"] = t
+		if wave.is_active() and r["wave_t"] < 0.0: r["wave_t"] = t
+		if sparks.get_live_count() > 0 and r["spark_t"] < 0.0: r["spark_t"] = t
+		if not peaked:
+			if halo.fill < last_fill - 0.0001: r["monotonic"] = false
+			last_fill = halo.fill
+			r["max_fill_pre"] = maxf(r["max_fill_pre"], halo.fill)
+			r["flare_pre"] = maxf(r["flare_pre"], halo.flare)
+			if wave.is_active(): r["wave_pre"] = true
+			r["sparks_pre"] = maxi(r["sparks_pre"], sparks.get_live_count())
+		else:
+			r["flare_post"] = maxf(r["flare_post"], halo.flare)
+		r["max_sparks"] = maxi(r["max_sparks"], sparks.get_live_count())
+		r["max_swell"] = maxf(r["max_swell"], shaft.swell)
+		r["max_zoom"] = maxf(r["max_zoom"], cam.get_zoom_ratio())
+		if desk.get_phase() == 4 and rest_ms < 0:
+			rest_ms = Time.get_ticks_msec()
+		if rest_ms > 0 and Time.get_ticks_msec() - rest_ms > 600:
+			break
+		if t > 8.0:
+			break
+	return r
+
+
+func cam_home() -> bool:
+	return absf(cam.get_zoom_ratio() - 1.0) < 0.02 and cam.get_focus_weight() < 0.01
 
 
 func run() -> void:
@@ -234,7 +291,7 @@ func run_flow_cases() -> void:
 	check(st[0][3] == 0 and st[0][4] == 0, "rest1 nothing applied at start")
 	check(pk[0][2] == 1 and pk[0][3] == 1 and pk[0][4] == player.max_health, "rest1 heal/reset/activate at peak once")
 	var dur: float = (fin[0][1] - st[0][2]) / 1000.0
-	check(absf(dur - 2.4) < 0.25, "rest1 long celebration %.2fs" % dur)
+	check(absf(dur - 3.0) < 0.25, "rest1 long celebration %.2fs" % dur)
 	check(dummy.n == 1 and acts == 1, "rest1 reset/activate exactly once total")
 	check(cps.was_ever_activated(DESK_ID), "service records activation")
 	# ---- rest 2: repeat, keyboard-style parse, grace ignore
@@ -261,7 +318,7 @@ func run_flow_cases() -> void:
 	pk = ev.filter(func(e: Array) -> bool: return e[0] == "peak")
 	fin = ev.filter(func(e: Array) -> bool: return e[0] == "finish")
 	dur = (fin[0][1] - st[0][2]) / 1000.0
-	check(st[0][1] == false and absf(dur - 0.8) < 0.25, "rest2 short celebration first=false %.2fs" % dur)
+	check(st[0][1] == false and absf(dur - 1.0) < 0.25, "rest2 short celebration first=false %.2fs" % dur)
 	check(dummy.n == 1 and acts == 1 and pk.size() == 1, "rest2 reset/activate once")
 	bad = 0
 	for t: Array in trace:
@@ -281,6 +338,36 @@ func run_flow_cases() -> void:
 	ke = InputEventKey.new(); ke.physical_keycode = KEY_D; ke.pressed = false
 	Input.parse_input_event(ke)
 	check(await wait_phase(1, 4.0), "rest3 AWAKENED")
+	# ---- rest 4: end-to-end touch exit. A real InputEventScreenTouch pressed on
+	# the jump button while the tree is paused, through the TouchControls autoload.
+	await place()
+	var was_visible: bool = tc.visible
+	tc.visible = true
+	await frames(3)
+	check(desk.request_rest(), "rest4 accepted")
+	check(await wait_phase(4), "rest4 RESTING")
+	await secs(0.6)
+	var jump_rect: Rect2 = tc._jump_button.get_global_rect()
+	check(paused and jump_rect.size.x > 0.0, "rest4 paused with a laid-out jump button (%s)" % [jump_rect])
+	# Input events arrive in window pixels; the stretch transform maps the
+	# button's canvas position there (the headless window is only 64x64).
+	var window_point: Vector2 = root.get_final_transform() * jump_rect.get_center()
+	var touch_down := InputEventScreenTouch.new()
+	touch_down.index = 0
+	touch_down.position = window_point
+	touch_down.pressed = true
+	Input.parse_input_event(touch_down)
+	await frames(3)
+	check(desk.get_phase() == 5, "rest4 real touch on the jump button dismounts (phase %d)" % desk.get_phase())
+	var touch_up := InputEventScreenTouch.new()
+	touch_up.index = 0
+	touch_up.position = window_point
+	touch_up.pressed = false
+	Input.parse_input_event(touch_up)
+	check(await wait_phase(1, 4.0), "rest4 AWAKENED after touch dismount")
+	await frames(3)
+	check(not paused and not player.is_meditating(), "rest4 control returned")
+	tc.visible = was_visible
 	# ---- movement regression outside rest
 	await frames(20)
 	var x0: float = player.global_position.x
@@ -306,6 +393,7 @@ func run_flow_cases() -> void:
 		check(not paused, "respawn@%d unpaused" % target)
 		check(not player.is_meditating(), "respawn@%d not meditating" % target)
 		check(not desk._backpack.visible, "respawn@%d backpack hidden" % target)
+		check(cam_home() and fx.get_vignette().level < 0.01, "respawn@%d camera and vignette reset (zoom %.3f, vig %.2f)" % [target, cam.get_zoom_ratio(), fx.get_vignette().level])
 		check(desk.is_processing(), "respawn@%d desk alive" % target)
 		var ph: int = desk.get_phase()
 		check(ph == 0 or ph == 1, "respawn@%d idle phase %d" % [target, ph])
@@ -413,11 +501,22 @@ func run_fx_cases() -> void:
 	# first rest
 	desk.request_rest()
 	check(await wait_phase(3), "CELEBRATE reached")
-	await secs(0.15)
-	check(halo.fill < 0.5 and halo.intensity > 0.45, "first: halo fill in progress (%.2f)" % halo.fill)
 	check(fx.can_process() and sw.can_process() and fx.get_node("PeakBloom").can_process(), "FX process while paused")
 	check(halo.can_process() and shaft.can_process() and candelabras[0].can_process(), "rest: halo, shaft, candelabras process while paused")
+	check(fx.get_vignette().can_process() and fx.get_shockwave().can_process() and fx.get_sparks().can_process(), "vignette, shockwave, sparks process while paused")
 	check(paused, "tree paused")
+	var beats: Dictionary = await record_celebration()
+	check(beats["vig_t"] >= 0.0 and beats["fill_t"] >= 0.0 and beats["vig_t"] < beats["fill_t"], "first: vignette (%.2fs) before halo fill (%.2fs)" % [beats["vig_t"], beats["fill_t"]])
+	check(beats["fill_t"] > 0.45, "first: ignition waits for the stillness beat (%.2fs)" % beats["fill_t"])
+	check(beats["monotonic"] and beats["max_fill_pre"] > 0.9, "first: halo fill monotonic to ~1 before the peak (max %.2f)" % beats["max_fill_pre"])
+	check(beats["peak_t"] > 1.6 and beats["peak_t"] < 2.0, "first: peak at ~1.8s (%.2fs)" % beats["peak_t"])
+	check(beats["flare_pre"] < 0.05 and beats["flare_post"] > 0.9, "first: flare only at the peak (pre %.2f post %.2f)" % [beats["flare_pre"], beats["flare_post"]])
+	check(not beats["wave_pre"] and beats["wave_t"] >= beats["peak_t"] - 0.05 and beats["wave_t"] < beats["peak_t"] + 0.15, "first: shockwave at the peak (%.2fs vs %.2fs)" % [beats["wave_t"], beats["peak_t"]])
+	check(beats["sparks_pre"] == 0 and beats["spark_t"] >= beats["peak_t"] - 0.05 and beats["max_sparks"] >= 12, "first: sparks after the peak (t %.2fs, max %d)" % [beats["spark_t"], beats["max_sparks"]])
+	check(beats["max_swell"] > 0.9, "first: shaft swells into a pillar (%.2f)" % beats["max_swell"])
+	check(beats["max_zoom"] > 1.2, "first: camera closes in (x%.2f)" % beats["max_zoom"])
+	check(cam.get_zoom_ratio() > 1.1 and fx.get_vignette().level > 0.9, "first: camera focused and vignette held while resting (x%.2f, %.2f)" % [cam.get_zoom_ratio(), fx.get_vignette().level])
+	check(shaft.swell < 0.05, "first: shaft settled after the release (%.2f)" % shaft.swell)
 	await wait_phase(4)
 	await secs(1.2)
 	check(absf(fx.get_swing_angle()) < 0.0001, "pendulum still while RESTING (%.5f)" % fx.get_swing_angle())
@@ -428,7 +527,7 @@ func run_fx_cases() -> void:
 	check(papers_lifted() > 20.0, "papers orbit while resting (%.1f)" % papers_lifted())
 	var nodes: int = fx.get_fx_node_count()
 	var budget: int = fx.FX_NODE_BUDGET
-	check(nodes == 55, "FX-driven node count is 55 (%d)" % nodes)
+	check(nodes == 80, "FX-driven node count is 80 (%d)" % nodes)
 	check(nodes <= budget, "FX-driven nodes %d within budget %d" % [nodes, budget])
 	var tot := 0
 	for n: Sprite2D in fx.find_children("*", "Sprite2D", true, false):
@@ -458,11 +557,15 @@ func run_fx_cases() -> void:
 	await secs(1.6)
 	check(papers_home(), "papers home ±1px after dismount")
 	check(papers_z_home(), "paper z_index restored after dismount")
+	check(cam_home(), "dismount: camera back to the room framing (x%.3f)" % cam.get_zoom_ratio())
+	check(fx.get_vignette().level < 0.01 and shaft.swell < 0.01, "dismount: vignette off, shaft swell released")
+	check(fx.get_sparks().get_live_count() == 0 and not fx.get_shockwave().is_active(), "dismount: no sparks or shockwave left")
 	check(halo.flare < 0.01 and absf(halo.intensity - halo.awakened_level) < 0.05, "halo back to awakened idle (%.2f)" % halo.intensity)
 	check(sw.get_visible_count() == 7, "extras gone (%d)" % sw.get_visible_count())
 	for i: int in 30:
 		await process_frame
 		shaft_awakened = maxf(shaft_awakened, shaft.get_effective_level())
+	shaft_awakened_ref = shaft_awakened
 	check(shaft_dormant < shaft_awakened and shaft_awakened < shaft_resting, "shaft levels dormant %.2f < awakened %.2f < resting peak %.2f" % [shaft_dormant, shaft_awakened, shaft_resting])
 	var m3 := await swing_range(3.0)
 	check(m3 > 0.05, "pendulum swinging after dismount (%.3f)" % m3)
@@ -472,8 +575,13 @@ func run_fx_cases() -> void:
 	await frames(2)
 	player.rest_animation_finished.disconnect(desk._on_rest_animation_finished)
 	check(await wait_phase(3, 3.0), "mount fallback advances without finished signal")
-	await frames(3)
-	check(halo.fill == 1.0, "repeat: no fill sweep")
+	var rep: Dictionary = await record_celebration()
+	check(rep["vig_t"] >= 0.0 and rep["fill_t"] >= 0.0 and rep["monotonic"] and rep["max_fill_pre"] > 0.9, "repeat: quick monotonic halo fill (max %.2f)" % rep["max_fill_pre"])
+	check(rep["wave_t"] < 0.0, "repeat: no shockwave")
+	check(rep["max_sparks"] > 0 and rep["max_sparks"] <= 8, "repeat: a few sparks (%d)" % rep["max_sparks"])
+	check(rep["peak_t"] > 0.35 and rep["peak_t"] < 0.6, "repeat: peak at ~0.45s (%.2fs)" % rep["peak_t"])
+	check(rep["max_zoom"] > 1.1 and rep["max_swell"] < 0.05, "repeat: camera eases in, no pillar (x%.2f, swell %.2f)" % [rep["max_zoom"], rep["max_swell"]])
+	check(rep["flare_post"] > 0.3 and rep["flare_post"] < 0.7, "repeat: small flare (%.2f)" % rep["flare_post"])
 	await wait_phase(4)
 	await secs(0.5)
 	check(sw.get_visible_count() == 7, "repeat: no extras (%d)" % sw.get_visible_count())
@@ -490,6 +598,8 @@ func run_fx_cases() -> void:
 	player.exit_meditation()
 	await frames(3)
 	check(not paused, "abort unpauses")
+	check(cam_home() and fx.get_vignette().level < 0.01, "abort mid-rest: camera focus popped, vignette off (x%.3f)" % cam.get_zoom_ratio())
+	check(fx.get_sparks().get_live_count() == 0 and not fx.get_shockwave().is_active(), "abort mid-rest: no sparks or shockwave")
 	await secs(1.6)
 	check(papers_home(), "papers home after abort")
 	check(papers_z_home(), "paper z_index restored after abort")
@@ -509,6 +619,9 @@ func run_mount_abort_case() -> void:
 	await secs(1.6)
 	check(fx.intensity <= 0.45, "mount abort: intensity back to idle (%.2f)" % fx.intensity)
 	check(papers_home() and papers_z_home(), "mount abort: papers at rest")
+	var shaft: AltarLightShaft = fx.get_shaft()
+	check(absf(shaft.level - fx.SHAFT_AWAKENED) < 0.02 and shaft.swell < 0.01, "mount abort: shaft back at the awakened level (%.2f, swell %.2f)" % [shaft.level, shaft.swell])
+	check(shaft_awakened_ref > 0.0 and absf(shaft.get_effective_level() - shaft_awakened_ref) < 0.25, "mount abort: shaft effective %.2f near awakened %.2f" % [shaft.get_effective_level(), shaft_awakened_ref])
 	var halo: HaloSigil = fx.get_halo()
 	check(halo.flare < 0.01 and absf(halo.intensity - halo.awakened_level) < 0.05, "mount abort: halo idle (%.2f)" % halo.intensity)
 	var mx := await swing_range(3.0)

@@ -10,6 +10,9 @@ uniform float phase = 0.0;
 uniform float strength = 0.2;
 uniform float top_half = 0.09;
 uniform float bottom_half = 0.2;
+// 0 is the resting beam; 1 swells it into a pillar (wider by `swell_width`).
+uniform float swell : hint_range(0.0, 1.0) = 0.0;
+uniform float swell_width = 0.9;
 // Horizontal offset of the beam's top, so it leans in from the upper right.
 uniform float lean = 0.275;
 uniform float bands = 12.0;
@@ -33,7 +36,7 @@ float value_noise(float x) {
 
 void fragment() {
 	float v = UV.y;
-	float half_width = max(mix(top_half, bottom_half, v), 0.001);
+	float half_width = max(mix(top_half, bottom_half, v) * (1.0 + swell * swell_width), 0.001);
 	float centre = 0.5 + lean * (1.0 - v);
 	float d = (UV.x - centre) / half_width;
 	float edge = 1.0 - smoothstep(0.3, 1.0, abs(d));

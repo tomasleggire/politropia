@@ -24,14 +24,39 @@ const SHAFT_RAMP_TIME := 0.8
 ## Rim light strength on the arch and desk edges, dormant to ritual.
 const RIM_DORMANT := 0.35
 const RIM_RITUAL := 1.0
+## Staged celebration. First: stillness (vignette, camera ease-in), ignition
+## (ticks light clockwise while the shaft swells), peak (flare, shockwave,
+## flash), release (root sparks, firefly gather, paper burst). A repeat is a
+## condensed version without the shockwave.
+const STILLNESS_TIME := 0.6
+const REPEAT_FILL_TIME := 0.35
+const VIGNETTE_FIRST := 1.0
+const VIGNETTE_REPEAT := 0.6
+const VIGNETTE_IN_FIRST := 0.6
+const VIGNETTE_IN_REPEAT := 0.35
+const VIGNETTE_OUT_TIME := 0.45
+## Camera target above the desk origin: Luz's seated torso.
+const CAMERA_FOCUS := Vector2(0.0, -44.0)
+const CAMERA_ZOOM_FIRST := 1.25
+const CAMERA_ZOOM_REPEAT := 1.12
+const CAMERA_IN_FIRST := 0.8
+const CAMERA_IN_REPEAT := 0.5
+const CAMERA_OUT_TIME := 0.45
+## Shaft level while it is a pillar (first ignition) and on a repeat's pulse.
+const SHAFT_PILLAR := 2.6
+const SHAFT_PULSE := 2.2
+const SHAFT_SETTLE_TIME := 1.0
+const FLARE_REPEAT := 0.5
+const SPARKS_FIRST := 24
+const SPARKS_REPEAT := 8
 ## Ceiling for the nodes the FX layer animates every frame (mobile budget).
-const FX_NODE_BUDGET := 60
+const FX_NODE_BUDGET := 80
 
 @export_group("Pendulum")
 @export_range(0.0, 0.3, 0.005) var swing_amplitude := 0.1
 
 @export_group("Peak Bloom")
-@export var bloom_scale_first := 1.5
+@export var bloom_scale_first := 2.4
 @export var bloom_scale_repeat := 1.0
 @export_range(0.0, 1.0, 0.05) var bloom_alpha_first := 0.7
 @export_range(0.0, 1.0, 0.05) var bloom_alpha_repeat := 0.3
@@ -58,6 +83,9 @@ var _candle_glow_scale := Vector2.ONE
 var _synced_once := false
 var _candelabras: Array[GothicCandle] = []
 var _rim: ShaderMaterial
+var _beats: Tween
+var _bloom_tween: Tween
+var _camera: RoomCamera
 
 @onready var _glow: Node2D = %Glow
 @onready var _candle_glow: Node2D = %CandleGlow
@@ -74,6 +102,9 @@ var _rim: ShaderMaterial
 @onready var _drift: AltarDriftSheets = $DriftSheets
 @onready var _pool: Sprite2D = $FloorPool
 @onready var _bloom: Sprite2D = $PeakBloom
+@onready var _sparks: AltarSparks = $Sparks
+@onready var _shockwave: AltarShockwave = $Shockwave
+@onready var _vignette: AltarVignette = $Vignette
 
 
 func _ready() -> void:
@@ -87,6 +118,7 @@ func _ready() -> void:
 	_swarm.setup(seed_value)
 	_motes.setup(seed_value)
 	_shaft_motes.setup(seed_value + 7)
+	_sparks.setup(seed_value)
 	for candelabra: Node in [%CandelabraLeft, %CandelabraRight]:
 		_candelabras.append(candelabra as GothicCandle)
 	_rim = (%ArchFrame as Sprite2D).material as ShaderMaterial
@@ -117,15 +149,23 @@ func _process(delta: float) -> void:
 	_halo.step(delta, _breath, swing)
 	_drift.step(_time)
 	_paper_orbit.step(delta, _time)
+	_sparks.step(delta)
+
+
+func _exit_tree() -> void:
+	# A freed desk must never leave the camera framed or the screen dimmed.
+	_cut_ritual_visuals()
 
 
 ## Nodes animated by this layer each frame: firefly glows and cores (extras
-## included), both mote sets, paper sheets and drifting sheets, the peak bloom,
-## the shaft, halo and floor pool and the candelabra glows. Must stay within
+## included), both mote sets, paper sheets and drifting sheets, the release
+## sparks, the peak bloom, the shaft, halo, shockwave and floor pool and the
+## candelabra glows. Must stay within
 ## FX_NODE_BUDGET.
 func get_fx_node_count() -> int:
-	var count := 1 + 3 + _candelabras.size() # bloom; shaft, halo, pool; candelabra glows
-	for group: Node2D in [_swarm, _motes, _shaft_motes, _papers, _drift]:
+	# bloom; shaft, halo, pool, shockwave; candelabra glows
+	var count := 1 + 4 + _candelabras.size()
+	for group: Node2D in [_swarm, _motes, _shaft_motes, _papers, _drift, _sparks]:
 		count += group.get_child_count()
 	return count
 
@@ -142,13 +182,27 @@ func get_shaft() -> AltarLightShaft:
 	return _shaft
 
 
+func get_shockwave() -> AltarShockwave:
+	return _shockwave
+
+
+func get_vignette() -> AltarVignette:
+	return _vignette
+
+
+func get_sparks() -> AltarSparks:
+	return _sparks
+
+
 # -- Ritual beats --------------------------------------------------------------
 
 func _on_phase_changed(phase: StillnessDesk.Phase) -> void:
 	match phase:
 		StillnessDesk.Phase.DORMANT:
+			_cut_ritual_visuals()
 			_reset_to_idle(INTENSITY_DORMANT)
 		StillnessDesk.Phase.AWAKENED:
+			_cut_ritual_visuals()
 			_reset_to_idle(INTENSITY_AWAKENED)
 		StillnessDesk.Phase.MOUNT:
 			_ease(&"intensity", INTENSITY_RITUAL, MOUNT_RAMP_TIME)
@@ -164,18 +218,50 @@ func _on_celebration_started(first: bool) -> void:
 	_first = first
 	_ritual_on = true
 	_ease(&"swing", 0.0, SWING_STILL_TIME, Tween.EASE_OUT)
-	_halo.celebrate(first)
-	_swarm.gather(first)
+	# Stillness: the ring goes dark, the edges dim and the camera closes in.
+	_halo.celebrate()
+	_vignette.set_level(VIGNETTE_FIRST if first else VIGNETTE_REPEAT, VIGNETTE_IN_FIRST if first else VIGNETTE_IN_REPEAT)
+	_push_camera(first)
+	var peak_time := _desk.get_celebration_peak_time(first)
+	var fill_time := maxf(peak_time - STILLNESS_TIME, 0.05) if first else REPEAT_FILL_TIME
+	_kill_beats()
+	_beats = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_beats.tween_interval(maxf(peak_time - fill_time, 0.001))
+	_beats.tween_callback(_begin_ignition.bind(fill_time))
+
+
+## Ignition: ticks light clockwise like a clock filling; a first activation
+## also swells the shaft into a pillar in step with the fill.
+func _begin_ignition(fill_time: float) -> void:
+	_halo.begin_fill(fill_time)
+	if _first:
+		_shaft.set_shaft_intensity(SHAFT_PILLAR, fill_time)
+		_shaft.set_swell(1.0, fill_time)
 
 
 func _on_celebration_peak() -> void:
-	_halo.peak()
-	_paper_orbit.lift_off()
+	_halo.peak(1.0 if _first else FLARE_REPEAT)
 	_play_bloom()
+	# Release: sparks from the roots, papers burst, fireflies take the orbit.
+	_sparks.burst(SPARKS_FIRST if _first else SPARKS_REPEAT)
+	_paper_orbit.lift_off(_first)
+	_swarm.gather(_first)
+	if _first:
+		_shockwave.fire()
+		_shaft.set_swell(0.0, SHAFT_SETTLE_TIME)
+		_shaft.set_shaft_intensity(SHAFT_RESTING, SHAFT_SETTLE_TIME)
+	else:
+		_shaft.set_shaft_intensity(SHAFT_PULSE, 0.0)
+		_shaft.set_shaft_intensity(SHAFT_RESTING, SHAFT_SETTLE_TIME)
 
 
 func _on_dismount_started() -> void:
 	if _ritual_on:
+		_kill_beats()
+		_vignette.set_level(0.0, VIGNETTE_OUT_TIME)
+		if _camera != null and is_instance_valid(_camera):
+			_camera.pop_focus(CAMERA_OUT_TIME)
+		_shaft.set_swell(0.0, VIGNETTE_OUT_TIME)
 		_reset_to_idle(INTENSITY_AWAKENED)
 
 
@@ -201,8 +287,46 @@ func _reset_to_idle(target_intensity: float) -> void:
 	_paper_orbit.glide_home()
 
 
+func _push_camera(first: bool) -> void:
+	_camera = get_viewport().get_camera_2d() as RoomCamera
+	if _camera == null:
+		return
+	_camera.push_focus(
+		_desk.to_global(CAMERA_FOCUS),
+		CAMERA_ZOOM_FIRST if first else CAMERA_ZOOM_REPEAT,
+		CAMERA_IN_FIRST if first else CAMERA_IN_REPEAT,
+	)
+
+
+func _kill_beats() -> void:
+	if _beats != null:
+		_beats.kill()
+		_beats = null
+
+
+## Immediate, deterministic removal of every ritual-only visual. A dismount
+## eases them out over less than the shortest clip fallback, so reaching an
+## idle phase afterwards finds nothing left to cut; an abort cuts here.
+func _cut_ritual_visuals() -> void:
+	_kill_beats()
+	if _bloom_tween != null:
+		_bloom_tween.kill()
+		_bloom_tween = null
+	_bloom.modulate.a = 0.0
+	_sparks.clear()
+	_shockwave.reset()
+	_shaft.set_swell(0.0, 0.0)
+	_vignette.set_level(0.0, 0.0)
+	if _camera != null and is_instance_valid(_camera):
+		_camera.pop_focus(0.0)
+	_camera = null
+
+
 func _play_bloom() -> void:
+	if _bloom_tween != null:
+		_bloom_tween.kill()
 	var tween := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true)
+	_bloom_tween = tween
 	var end_scale := bloom_scale_first if _first else bloom_scale_repeat
 	_bloom.scale = Vector2.ONE * end_scale * 0.35
 	_bloom.modulate.a = bloom_alpha_first if _first else bloom_alpha_repeat

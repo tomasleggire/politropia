@@ -29,6 +29,11 @@
 [ext_resource type="Shader" path="res://shaders/halo_sigil.gdshader" id="sh_halo"]
 [ext_resource type="Shader" path="res://shaders/light_shaft.gdshader" id="sh_shaft"]
 [ext_resource type="Shader" path="res://shaders/rim_light.gdshader" id="sh_rim"]
+[ext_resource type="Script" path="res://scripts/world/altar_sparks.gd" id="fx_sparks"]
+[ext_resource type="Script" path="res://scripts/world/altar_shockwave.gd" id="fx_shock"]
+[ext_resource type="Script" path="res://scripts/world/altar_vignette.gd" id="fx_vignette"]
+[ext_resource type="Shader" path="res://shaders/shockwave_ring.gdshader" id="sh_shock"]
+[ext_resource type="Shader" path="res://shaders/screen_vignette.gdshader" id="sh_vignette"]
 
 [sub_resource type="ShaderMaterial" id="HaloMaterial"]
 resource_local_to_scene = true
@@ -37,6 +42,14 @@ shader = ExtResource("sh_halo")
 [sub_resource type="ShaderMaterial" id="ShaftMaterial"]
 resource_local_to_scene = true
 shader = ExtResource("sh_shaft")
+
+[sub_resource type="ShaderMaterial" id="ShockwaveMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("sh_shock")
+
+[sub_resource type="ShaderMaterial" id="VignetteMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("sh_vignette")
 
 [sub_resource type="ShaderMaterial" id="RimMaterial"]
 resource_local_to_scene = true
@@ -430,8 +443,30 @@ texture = SubResource("GlowTexture")
 [node name="PeakBloom" type="Sprite2D" parent="Fx"]
 modulate = Color(1, 0.78, 0.42, 0)
 material = SubResource("Additive")
+z_index = -2
 position = Vector2(0, -46)
 texture = SubResource("GlowTexture")
+
+[node name="Shockwave" type="Sprite2D" parent="Fx"]
+material = SubResource("ShockwaveMaterial")
+z_index = -2
+position = Vector2(0, -50)
+scale = Vector2(50, 50)
+texture = SubResource("WhiteTexture")
+script = ExtResource("fx_shock")
+
+[node name="Sparks" type="Node2D" parent="Fx"]
+script = ExtResource("fx_sparks")
+
+[node name="Vignette" type="CanvasLayer" parent="Fx"]
+script = ExtResource("fx_vignette")
+
+[node name="Shade" type="ColorRect" parent="Fx/Vignette"]
+material = SubResource("VignetteMaterial")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
 
 [node name="HeadShade" type="Sprite2D" parent="Fx"]
 self_modulate = Color(0.03, 0.05, 0.12, 0.85)

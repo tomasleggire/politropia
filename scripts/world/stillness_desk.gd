@@ -27,7 +27,10 @@ enum Phase { DORMANT, AWAKENED, MOUNT, CELEBRATE, RESTING, DISMOUNT }
 const INTERACTABLE_GROUP := &"interactable"
 const PARALLAX_STRENGTH := 0.06
 const PARALLAX_LIMIT := 6.0
-const CELEBRATION_PEAK_RATIO := 0.4
+## Where the peak (heal, checkpoint, reset) lands in the celebration: the
+## first one ignites for 1.2s after 0.6s of stillness; a repeat is condensed.
+const FIRST_PEAK_RATIO := 0.6
+const REPEAT_PEAK_RATIO := 0.45
 ## Rest clip frames (0-based) where the backpack leaves and returns to Luz.
 const BACKPACK_DROP_FRAME := 3
 const BACKPACK_PICKUP_FRAME := 4
@@ -45,9 +48,9 @@ const CLIP_FALLBACK_MIN := 0.5
 
 @export_group("Rest Sequence")
 ## Celebration length the first time this checkpoint is ever activated.
-@export_range(0.0, 6.0, 0.05) var first_celebration_duration := 2.4
+@export_range(0.0, 6.0, 0.05) var first_celebration_duration := 3.0
 ## Celebration length for every later rest at this checkpoint.
-@export_range(0.0, 3.0, 0.05) var repeat_celebration_duration := 0.8
+@export_range(0.0, 3.0, 0.05) var repeat_celebration_duration := 1.0
 ## Input is ignored this long after resting begins.
 @export_range(0.0, 2.0, 0.05) var exit_grace := 0.35
 ## Freeze the rest of the world while Luz rests.
@@ -134,6 +137,13 @@ func can_rest() -> bool:
 	)
 
 
+## Seconds from the celebration's start to its peak.
+func get_celebration_peak_time(first: bool) -> float:
+	if first:
+		return first_celebration_duration * FIRST_PEAK_RATIO
+	return repeat_celebration_duration * REPEAT_PEAK_RATIO
+
+
 func get_phase() -> Phase:
 	return _phase
 
@@ -195,14 +205,15 @@ func _on_rest_animation_frame_changed(clip: StringName, frame: int) -> void:
 func _run_celebration(run: int) -> void:
 	var first := not CheckpointService.was_ever_activated(checkpoint_id)
 	var duration := first_celebration_duration if first else repeat_celebration_duration
+	var peak_time := get_celebration_peak_time(first)
 	_set_phase(Phase.CELEBRATE)
 	_transaction_player.play_rest_animation(SIT_CLIP)
 	celebration_started.emit(first)
-	if not await _wait(duration * CELEBRATION_PEAK_RATIO, run):
+	if not await _wait(peak_time, run):
 		return
 	_apply_rest_effects(_transaction_player)
 	celebration_peak.emit()
-	if not await _wait(duration * (1.0 - CELEBRATION_PEAK_RATIO), run):
+	if not await _wait(duration - peak_time, run):
 		return
 	celebration_finished.emit()
 	_begin_resting(run)

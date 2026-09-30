@@ -9,8 +9,6 @@ extends Sprite2D
 ## the pendulum is still. Shader uniforms are mirrored as `fill`, `flare`,
 ## `intensity` and `spin` so the staged celebration can drive them directly.
 
-const FILL_TIME := 1.2
-const REPEAT_FILL_TIME := 0.3
 const FLARE_TIME := 0.6
 const RETUNE_TIME := 0.8
 const WARMTH_AWAKENED := 0.6
@@ -32,6 +30,8 @@ var fill := 0.0
 ## Full-ring flash, 0..1.
 var flare := 0.0
 var warmth := 0.0
+## Dims the engraving while the ticks are being lit, 0..1.
+var dark := 0.0
 ## Ring rotation in radians.
 var spin := 0.0
 var breath_weight := 0.0
@@ -55,20 +55,30 @@ func set_idle(awakened: bool, time: float) -> void:
 	_tune(&"fill", 1.0 if awakened else 0.0, time)
 	_tune(&"breath_weight", 0.0, time)
 	_tune(&"flare", 0.0, time)
+	_tune(&"dark", 0.0, time)
 
 
-func celebrate(first: bool) -> void:
+## Stillness beat: the ring warms up and its ticks go dark, ready to be lit.
+func celebrate() -> void:
 	_tune(&"warmth", 1.0, 0.5)
 	_tune(&"intensity", ritual_level, 0.6)
-	if first:
-		fill = 0.0
-		AltarFxKit.ease_property(self, _tweens, self, &"fill", 1.0, FILL_TIME, Tween.EASE_IN_OUT, Tween.TRANS_QUAD)
-	else:
-		_tune(&"fill", 1.0, REPEAT_FILL_TIME)
+	_tune(&"flare", 0.0, 0.0)
+	_tune(&"fill", 0.0, 0.0)
+	_tune(&"dark", 1.0, 0.4)
 
 
-func peak() -> void:
-	flare = 1.0
+## Ignition beat: lights the ticks clockwise, evenly, over `time` seconds.
+func begin_fill(time: float) -> void:
+	fill = 0.0
+	AltarFxKit.ease_property(self, _tweens, self, &"fill", 1.0, time, Tween.EASE_IN_OUT, Tween.TRANS_LINEAR)
+
+
+## Full-ring flash at the peak; `strength` 1 is the first-activation flare.
+func peak(strength := 1.0) -> void:
+	fill = 1.0
+	_tune(&"fill", 1.0, 0.0)
+	flare = strength
+	_tune(&"dark", 0.0, 0.15)
 	AltarFxKit.ease_property(self, _tweens, self, &"flare", 0.0, FLARE_TIME, Tween.EASE_OUT, Tween.TRANS_CUBIC)
 
 
@@ -86,6 +96,7 @@ func step(delta: float, breath: float, time_scale: float) -> void:
 	_material.set_shader_parameter(&"flare", clampf(flare, 0.0, 1.0))
 	_material.set_shader_parameter(&"rotation", spin)
 	_material.set_shader_parameter(&"hand", _hand)
+	_material.set_shader_parameter(&"dark", dark)
 	_material.set_shader_parameter(&"warmth", warmth)
 	_material.set_shader_parameter(&"breath", breath)
 	_material.set_shader_parameter(&"breath_swing", breath_weight * breath_amplitude)

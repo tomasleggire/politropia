@@ -8,6 +8,10 @@ extends Node
 const FRONT_Z := 4
 const LIFT_TIME := 1.1
 const RETURN_TIME := 0.9
+## The burst throws the sheets past their orbit, then they settle into it.
+const BURST_OVERSHOOT := 1.7
+const BURST_OUT_TIME := 0.22
+const BURST_SETTLE_TIME := 0.9
 
 @export_group("Orbit")
 @export var center_x := 0.0
@@ -55,10 +59,19 @@ func get_rest_position(index: int) -> Vector2:
 	return _rest[index].origin
 
 
-func lift_off() -> void:
+func lift_off(burst := false) -> void:
 	_settled = false
 	_returning = false
-	AltarFxKit.ease_property(self, _tweens, self, &"lift", 1.0, LIFT_TIME, Tween.EASE_OUT)
+	if not burst:
+		AltarFxKit.ease_property(self, _tweens, self, &"lift", 1.0, LIFT_TIME, Tween.EASE_OUT)
+		return
+	var previous := _tweens.get(&"lift") as Tween
+	if previous != null:
+		previous.kill()
+	var tween := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_property(self, "lift", BURST_OVERSHOOT, BURST_OUT_TIME).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(self, "lift", 1.0, BURST_SETTLE_TIME).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	_tweens[&"lift"] = tween
 
 
 func settle_into_rest() -> void:

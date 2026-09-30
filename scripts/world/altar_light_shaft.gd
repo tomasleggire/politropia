@@ -16,6 +16,9 @@ extends Sprite2D
 
 ## Base level before breathing; tweened by `set_shaft_intensity()`.
 var level := 0.5
+## 0 is the resting beam, 1 a full pillar (wider and stronger); the ritual's
+## ignition swells it and the release settles it.
+var swell := 0.0
 
 var _material: ShaderMaterial
 var _phase := 0.0
@@ -41,6 +44,17 @@ func set_shaft_intensity(value: float, time := 0.0) -> void:
 	AltarFxKit.ease_property(self, _tweens, self, &"level", value, time)
 
 
+## Sets how wide the beam swells over `time` seconds (immediately when `time` is 0).
+func set_swell(value: float, time := 0.0) -> void:
+	if time <= 0.0:
+		var previous := _tweens.get(&"swell") as Tween
+		if previous != null:
+			previous.kill()
+		swell = value
+		return
+	AltarFxKit.ease_property(self, _tweens, self, &"swell", value, time)
+
+
 ## Level including the breathing swing; what the shader is fed.
 func get_effective_level() -> float:
 	return _effective
@@ -53,3 +67,4 @@ func step(delta: float, breath: float, breath_weight: float) -> void:
 	_effective = maxf(level * (1.0 + (breath - 0.5) * 2.0 * swing), 0.0)
 	_material.set_shader_parameter(&"intensity", _effective)
 	_material.set_shader_parameter(&"phase", _phase)
+	_material.set_shader_parameter(&"swell", clampf(swell, 0.0, 1.0))
