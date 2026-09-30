@@ -8,4 +8,28 @@ check names.
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/stillness_desk_ritual_test.gd
 ```
 
+## Layout
+
+- `stillness_desk_ritual_test.gd`: the single entrypoint (runner and reporter).
+- `support/ritual_harness.gd`: shared state, game-clock waits, event recording.
+- `support/ritual_celebration_recorder.gd`: per-frame beat recorder.
+- `support/ritual_flow_cases.gd`, `ritual_fx_cases.gd`, `ritual_trail_cases.gd`:
+  one `case_*` function per scenario, each small and single-purpose.
+
+## Adding or changing a check
+
+Each suite lists its cases in a `CHECKS` map (case name to number of checks).
+The runner sums those maps into the expected total and also compares every
+case's own count, so a case cut short by a script error is reported by name
+and the run fails as incomplete. After adding a check, bump that case's number;
+a mismatch prints the count actually observed. A watchdog fails a run that
+never finishes.
+
+## Timing
+
+Waits and measured durations use the game clock (accumulated process deltas),
+the same time base as the desk's tweens and the FX, never wall-clock time.
+Duration tolerances widen by the worst frame seen in the measured window
+(`Harness.slack`), so a frame hitch cannot make a check flaky.
+
 The `tests/` folder is excluded from exports (see `export_presets.cfg`).

@@ -131,6 +131,7 @@ func _ready() -> void:
 	_desk.celebration_started.connect(_on_celebration_started)
 	_desk.celebration_peak.connect(_on_celebration_peak)
 	_desk.dismount_started.connect(_on_dismount_started)
+	_desk.transaction_aborted.connect(_on_transaction_aborted)
 	_desk.breath_cycle_started.connect(_on_breath_cycle_started)
 
 
@@ -199,10 +200,8 @@ func get_sparks() -> AltarSparks:
 func _on_phase_changed(phase: StillnessDesk.Phase) -> void:
 	match phase:
 		StillnessDesk.Phase.DORMANT:
-			_cut_ritual_visuals()
 			_reset_to_idle(INTENSITY_DORMANT)
 		StillnessDesk.Phase.AWAKENED:
-			_cut_ritual_visuals()
 			_reset_to_idle(INTENSITY_AWAKENED)
 		StillnessDesk.Phase.MOUNT:
 			_ease(&"intensity", INTENSITY_RITUAL, MOUNT_RAMP_TIME)
@@ -240,6 +239,8 @@ func _begin_ignition(fill_time: float) -> void:
 
 
 func _on_celebration_peak() -> void:
+	# The ignition must never land after the peak (no halo refill or shaft re-swell).
+	_kill_beats()
 	_halo.peak(1.0 if _first else FLARE_REPEAT)
 	_play_bloom()
 	# Release: sparks from the roots, papers burst, fireflies take the orbit.
@@ -263,6 +264,12 @@ func _on_dismount_started() -> void:
 			_camera.pop_focus(CAMERA_OUT_TIME)
 		_shaft.set_swell(0.0, VIGNETTE_OUT_TIME)
 		_reset_to_idle(INTENSITY_AWAKENED)
+
+
+## Only an abort cuts the ritual visuals; a normal dismount lets its eases
+## finish even when the phase reaches AWAKENED before they do.
+func _on_transaction_aborted() -> void:
+	_cut_ritual_visuals()
 
 
 func _on_breath_cycle_started() -> void:
@@ -304,9 +311,9 @@ func _kill_beats() -> void:
 		_beats = null
 
 
-## Immediate, deterministic removal of every ritual-only visual. A dismount
-## eases them out over less than the shortest clip fallback, so reaching an
-## idle phase afterwards finds nothing left to cut; an abort cuts here.
+## Immediate, deterministic removal of every ritual-only visual. Runs on an
+## abort (respawn, freed player or desk) and when the FX leave the tree; a
+## normal dismount eases them out instead.
 func _cut_ritual_visuals() -> void:
 	_kill_beats()
 	if _bloom_tween != null:

@@ -19,6 +19,9 @@ signal celebration_finished
 signal dismount_started
 ## The `rest_sit` loop wrapped to its first frame; FX re-sync breathing here.
 signal breath_cycle_started
+## The ritual was cut short (respawn, player or desk freed). Unlike a normal
+## dismount, visuals must not finish easing out.
+signal transaction_aborted
 
 enum Phase { DORMANT, AWAKENED, MOUNT, CELEBRATE, RESTING, DISMOUNT }
 
@@ -305,6 +308,7 @@ func _abort_transaction() -> void:
 	_run_id += 1
 	_finish_transaction()
 	_phase = Phase.DORMANT
+	transaction_aborted.emit()
 
 
 func _on_player_tree_exiting() -> void:

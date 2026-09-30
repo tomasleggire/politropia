@@ -7,6 +7,8 @@ extends Node2D
 
 const MAX_SPARKS := 24
 const ROOT_HALF_SPAN := Vector2(14.0, 40.0)
+## Floor for a spark's life so its progress never divides by zero.
+const MIN_LIFE := 0.05
 
 @export_group("Flight")
 @export var origin_y := -4.0
@@ -67,7 +69,7 @@ func burst(count: int) -> void:
 		_end_ry[i] = _rng.randf_range(orbit_radius_y.x, orbit_radius_y.y)
 		_end_y[i] = orbit_center.y + _rng.randf_range(-6.0, 6.0)
 		_arc[i] = _rng.randf_range(arc_height.x, arc_height.y)
-		_life[i] = _rng.randf_range(life_range.x, life_range.y)
+		_life[i] = maxf(_rng.randf_range(life_range.x, life_range.y), MIN_LIFE)
 		_delay[i] = float(i) / maxf(float(_active), 1.0) * launch_stagger
 		_age[i] = 0.0
 		_place(i)

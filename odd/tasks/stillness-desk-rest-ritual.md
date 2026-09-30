@@ -155,11 +155,14 @@ Design (parent):
   - Final: `show_roots` (default true; false on both level trails → no canvas or strands); `root_alpha`/`max_thickness`; desk roots length 40, density 0.9, 4 forks, thickness 2, alpha 0.6, flat under the desk. `FireflySwarm` "Field" mode (`field_span`/`field_direction`/`field_band`/`field_drift`, `base_count`, `get_home_position()`): homes stratified with density rising toward the altar, 10–80 units above ground, free seeded drift + slow rise + blink, warmer when awakened; level trails 12 and 10 fireflies. The raster root renderer (texel-quantised strands, surface-following probe, pulse packets, outward wave) is kept for future art.
   - Parent review of `t9_v10_*`: reads as a subtle hint zone (scattered fireflies thickening toward the altar, no guide line); desk roots faint. ACCEPTED.
   - Verification: import/load clean; committed test PASS 225/225 (complete run).
+  - Commit `179c081`. GGA reported FAILED yet allowed the commit ("Could not determine review status", STRICT_MODE=false); parent re-ran `gga run --ci --no-cache`: code typing/naming/grouping pass; violation: oversized test functions (`run_flow_cases` ~193 lines, `run_trail_cases` 173, `run_fx_cases` ~149, `record_celebration` 48) → fix in T10. Pre-existing and out of scope (user decision): hand-authored scene UIDs from `ece0d5d` (`level_01.tscn`, `player.tscn`, `touch_controls.tscn`…) and AI-attribution commits `ece0d5d`, `0e368cb`, `c2d42cf`, `5248ce4`.
 - [ ] **T10 — Regression, tests, iPhone deploy, and playtest record.**
+  - Done: R3-001 via a new `transaction_aborted` signal (only an abort or `_exit_tree` cuts visuals; a normal dismount's 0.45s eases complete even with an early AWAKENED); R3-002 `_kill_beats()` at the peak; R3-005 `MIN_LIFE` 0.05 for sparks; R3-004 desk freed mid-celebration/mid-rest cases. Test split: runner `tests/stillness_desk_ritual_test.gd` + `tests/support/` (harness, suite base, recorder, flow/fx/trail cases): 32 single-purpose cases (longest function 18 lines), per-case `CHECKS` map summed for the expected total, watchdog, game-clock waits with worst-frame slack. PASS 259/259 twice sequentially and with 2 concurrent instances; an injected failure exits 1 and names the check. GGA `run --no-cache`: PASSED. Not covered: no deterministic test for R3-002.
+  - Scope: T8 review findings (dismount ease vs clip length; kill `_beats` at the peak; frame/tween-time beat windows instead of wall clock; test freeing the desk mid-celebration/rest; clamp spark life), split the test into small single-purpose case functions (GGA), document/derive `EXPECTED_CHECKS`, full checks, iPhone deploy, record the playtest.
 
 ## Progress
 
-- Current task: T10 next (robustness findings + regression + deploy).
+- Current task: T10 commit + iPhone deploy; playtest pending (user).
 - Next step: record the playtest; then push/PRs (stacked-to-main, user decision). Pending: Codex roots redo once credits are refilled.
 
 ## Verification evidence
