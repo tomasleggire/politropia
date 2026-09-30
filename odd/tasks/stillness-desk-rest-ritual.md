@@ -156,13 +156,22 @@ Design (parent):
   - Parent review of `t9_v10_*`: reads as a subtle hint zone (scattered fireflies thickening toward the altar, no guide line); desk roots faint. ACCEPTED.
   - Verification: import/load clean; committed test PASS 225/225 (complete run).
   - Commit `179c081`. GGA reported FAILED yet allowed the commit ("Could not determine review status", STRICT_MODE=false); parent re-ran `gga run --ci --no-cache`: code typing/naming/grouping pass; violation: oversized test functions (`run_flow_cases` ~193 lines, `run_trail_cases` 173, `run_fx_cases` ~149, `record_celebration` 48) → fix in T10. Pre-existing and out of scope (user decision): hand-authored scene UIDs from `ece0d5d` (`level_01.tscn`, `player.tscn`, `touch_controls.tscn`…) and AI-attribution commits `ece0d5d`, `0e368cb`, `c2d42cf`, `5248ce4`.
-- [ ] **T10 — Regression, tests, iPhone deploy, and playtest record.**
+- [x] **T10 — Regression, tests, iPhone deploy, and playtest record.**
   - Done: R3-001 via a new `transaction_aborted` signal (only an abort or `_exit_tree` cuts visuals; a normal dismount's 0.45s eases complete even with an early AWAKENED); R3-002 `_kill_beats()` at the peak; R3-005 `MIN_LIFE` 0.05 for sparks; R3-004 desk freed mid-celebration/mid-rest cases. Test split: runner `tests/stillness_desk_ritual_test.gd` + `tests/support/` (harness, suite base, recorder, flow/fx/trail cases): 32 single-purpose cases (longest function 18 lines), per-case `CHECKS` map summed for the expected total, watchdog, game-clock waits with worst-frame slack. PASS 259/259 twice sequentially and with 2 concurrent instances; an injected failure exits 1 and names the check. GGA `run --no-cache`: PASSED. Not covered: no deterministic test for R3-002.
   - Scope: T8 review findings (dismount ease vs clip length; kill `_beats` at the peak; frame/tween-time beat windows instead of wall clock; test freeing the desk mid-celebration/rest; clamp spark life), split the test into small single-purpose case functions (GGA), document/derive `EXPECTED_CHECKS`, full checks, iPhone deploy, record the playtest.
 
+## Iteration 2 playtest (2026-09-30)
+
+- The user tested iteration 2 on the iPhone 16 Pro: "si se ve bien, mejoraremos algunas cosas pero en general está bien". Accepted overall.
+- **Pending: a future polish pass. The user explicitly said we will adjust things** (specifics not given yet; ask the user at the start of the next session). Carry into it:
+  - The T9+T10 review follow-ups (post-peak no-refill assertion, per-case test timeout, AltarTrail editor probe, reconnecting the desk link on tree re-entry).
+  - Codex root art once credits reset (then `show_roots` on level trails).
+  - iPhone performance/overdraw measurement.
+  - Repeat-rest halo snap, and vignette dimming the candelabras.
+
 ## Progress
 
-- Current task: T10 commit + iPhone deploy; playtest pending (user).
+- Current task: iteration 2 accepted by the user on device (2026-09-30); a polish pass is pending, with adjustments to be defined by the user. T10 committed `b2c43aa`; review of `e82307e..b2c43aa` (26 paths, 3244 lines incl. tests) GRANTED; lineage `review-d0461c1f43c1ff64` (review-reliability) APPROVED and acknowledged; boundary advances to `b2c43aa`. Follow-ups (non-blocking, small): R3-001 assert no halo refill or shaft re-swell after the peak; R3-002 a runtime error after a case's first await stalls until the 600s watchdog (add a per-case timeout); R3-003 `AltarTrail` @tool physics probe runs in the editor even with `snap_to_ground` false (disable physics process in the editor); R3-004 re-entering the tree doesn't reconnect the desk link (reconnect on enter). device playtest of iteration 2 pending.
 - Next step: record the playtest; then push/PRs (stacked-to-main, user decision). Pending: Codex roots redo once credits are refilled.
 
 ## Verification evidence
