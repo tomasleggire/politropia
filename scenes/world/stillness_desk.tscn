@@ -14,8 +14,7 @@
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/paper_1.png" id="t_paper1"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/paper_2.png" id="t_paper2"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/paper_3.png" id="t_paper3"]
-[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/roots_left.png" id="t_rl"]
-[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/roots_right.png" id="t_rr"]
+[ext_resource type="PackedScene" path="res://scenes/world/altar_trail.tscn" id="t_trail"]
 [ext_resource type="Texture2D" path="res://assets/world/stillness_desk/backpack_prop.png" id="t_pack"]
 
 [ext_resource type="Script" path="res://scripts/world/stillness_desk_fx.gd" id="fx_main"]
@@ -360,25 +359,35 @@ scale = Vector2(0.9, 0.9)
 texture = SubResource("GlowTexture")
 
 [node name="Roots" type="Node2D" parent="Visuals"]
-z_index = 1
 
-[node name="RootLeft" type="Sprite2D" parent="Visuals/Roots"]
+[node name="RootsLeft" parent="Visuals/Roots" instance=ExtResource("t_trail")]
 z_index = 0
-position = Vector2(-24.5, 0.7)
-scale = Vector2(0.175, 0.175)
-texture_filter = 4
-texture = ExtResource("t_rl")
-centered = false
-offset = Vector2(-169, -65)
+position = Vector2(-66, 0)
+length = 40.0
+texel_size = 0.5
+trail_seed = 11
+density = 0.9
+branch_count = 4
+snap_to_ground = false
+root_alpha = 0.6
+max_thickness = 2
+firefly_count = 0
+desk_path = NodePath("../../..")
 
-[node name="RootRight" type="Sprite2D" parent="Visuals/Roots"]
+[node name="RootsRight" parent="Visuals/Roots" instance=ExtResource("t_trail")]
 z_index = 0
-position = Vector2(24.5, 0.7)
-scale = Vector2(0.175, 0.175)
-texture_filter = 4
-texture = ExtResource("t_rr")
-centered = false
-offset = Vector2(0, -50)
+position = Vector2(66, 0)
+direction = -1
+length = 40.0
+texel_size = 0.5
+trail_seed = 23
+density = 0.9
+branch_count = 4
+snap_to_ground = false
+root_alpha = 0.6
+max_thickness = 2
+firefly_count = 0
+desk_path = NodePath("../../..")
 
 [node name="BackpackProp" type="Sprite2D" parent="Visuals"]
 unique_name_in_owner = true
