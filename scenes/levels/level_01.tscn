@@ -1,8 +1,11 @@
-[gd_scene load_steps=6 format=3 uid="uid://blevel01politropia"]
+[gd_scene load_steps=7 format=3 uid="uid://blevel01politropia"]
 
 [ext_resource type="Script" path="res://scripts/levels/level_01.gd" id="1_level"]
 [ext_resource type="PackedScene" uid="uid://bplayer01politropia" path="res://scenes/player/player.tscn" id="2_player"]
 [ext_resource type="Script" path="res://scripts/camera/room_camera.gd" id="3_camera"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/stillness_desk.tscn" id="4_desk"]
+[ext_resource type="PackedScene" path="res://scenes/world/altar_trail.tscn" id="5_trail"]
 
 [sub_resource type="Shader" id="Shader_gothic_grade"]
 code = "shader_type canvas_item;\n\nvoid fragment() {\n\tvec2 centered = UV - vec2(0.5);\n\tfloat edge = smoothstep(0.30, 0.76, length(centered * vec2(1.0, 1.35)));\n\tfloat top_falloff = smoothstep(0.64, 0.0, UV.y) * 0.12;\n\tfloat bottom_haze = smoothstep(0.70, 1.0, UV.y) * 0.10;\n\tfloat alpha = min(0.58, edge * 0.46 + top_falloff + bottom_haze);\n\tCOLOR = vec4(0.006, 0.010, 0.035, alpha);\n}\n"
@@ -18,6 +21,31 @@ script = ExtResource("1_level")
 [node name="Decor" type="Node2D" parent="."]
 
 [node name="Solids" type="Node2D" parent="."]
+
+[node name="StillnessDesk" parent="." instance=ExtResource("4_desk")]
+position = Vector2(420, 620)
+checkpoint_id = &"level_01_desk_a"
+
+[node name="TrailFromRight" parent="." instance=ExtResource("5_trail")]
+position = Vector2(1100, 620)
+direction = -1
+length = 586.0
+trail_seed = 7
+density = 1.0
+branch_count = 14
+show_roots = false
+firefly_count = 12
+desk_path = NodePath("../StillnessDesk")
+
+[node name="TrailFromLeft" parent="." instance=ExtResource("5_trail")]
+position = Vector2(60, 620)
+length = 256.0
+trail_seed = 19
+density = 0.9
+branch_count = 9
+show_roots = false
+firefly_count = 10
+desk_path = NodePath("../StillnessDesk")
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 position = Vector2(180, 620)

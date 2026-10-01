@@ -7,6 +7,14 @@ extends CharacterBody2D
 ## a 3-hit ground combo, up/air/crouch attacks and a down plunge.
 
 signal respawned
+signal health_changed(current: int, maximum: int)
+signal meditation_started
+signal meditation_finished
+## Emitted while meditating when the player gives gameplay input (a fresh
+## press or a touch request); the resting desk decides whether to release.
+signal rest_exit_requested
+signal rest_animation_finished(animation_name: StringName)
+signal rest_animation_frame_changed(animation_name: StringName, frame: int)
 
 enum State {
 	IDLE, RUN, CROUCH, JUMP, FALL, DASH,
@@ -17,6 +25,13 @@ enum State {
 const PHASE_STARTUP := 0
 const PHASE_ACTIVE := 1
 const PHASE_RECOVERY := 2
+## Gameplay actions that release a resting Luz when freshly pressed.
+const REST_EXIT_ACTIONS: Array[StringName] = [
+	&"move_left", &"move_right", &"jump", &"dash", &"attack", &"interact",
+]
+
+@export_group("Health")
+@export var max_health := 5
 
 @export_group("Run")
 @export var run_max_speed := 250.0
@@ -208,6 +223,11 @@ var _state := State.IDLE
 var _state_time := 0.0
 var _facing := 1
 var _spawn_position := Vector2.ZERO
+var _health := 0
+var _input_locked := false
+var _meditating := false
+var _rest_animation := &""
+var _default_process_mode := Node.PROCESS_MODE_INHERIT
 
 var _rise_gravity := 0.0
 var _fall_gravity := 0.0
@@ -263,6 +283,8 @@ var _attack_buffer_direction := 0
 func _ready() -> void:
 	add_to_group(&"player")
 	_sprite.sprite_frames = _animation_sprite_frames
+	_sprite.animation_finished.connect(_on_sprite_animation_finished)
+	_sprite.frame_changed.connect(_on_sprite_frame_changed)
 	# Every Luz frame is a uniform 512x512 grid cell (see LuzAnimationCatalog
 	# and tools/process_luz_sheet.py) already repacked so its opaque bottom
 	# lands on canvas row 413; this offset puts that row at local y=0, so the
@@ -272,6 +294,8 @@ func _ready() -> void:
 	# so Luz renders at roughly the CollisionShape2D's 58px standing height.
 	_sprite.scale = Vector2(0.175, 0.175)
 	_spawn_position = global_position
+	_health = max_health
+	_default_process_mode = process_mode
 	_recompute_jump_physics()
 
 	var shape := _collision_shape.shape as RectangleShape2D
@@ -294,6 +318,10 @@ func _recompute_jump_physics() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if is_input_locked():
+		_update_locked(delta)
+		return
+
 	_state_time += delta
 	_update_shared_timers(delta)
 	_update_facing()
@@ -487,6 +515,9 @@ func _held_vertical_direction() -> int:
 ## on-screen joystick is currently holding, same as the keyboard path.
 ## Called immediately on touch-down by the touch UI (zero added latency).
 func request_attack(direction: int) -> void:
+	if is_input_locked():
+		_request_rest_exit()
+		return
 	var resolved := direction
 	if resolved == 0:
 		resolved = _held_vertical_direction()
@@ -499,7 +530,7 @@ func request_attack(direction: int) -> void:
 ## Used when the finger swipes after touching down on the attack button (see
 ## touch_controls.gd's attack_upgrade_window).
 func request_attack_upgrade(direction: int) -> void:
-	if direction == 0:
+	if direction == 0 or is_input_locked():
 		return
 	var upgrading_from_neutral := (
 		(_state == State.ATTACK and _attack_combo_index == 0 and _attack_phase == PHASE_STARTUP)
@@ -517,6 +548,9 @@ func request_attack_upgrade(direction: int) -> void:
 ## (see touch_controls.gd) so the held-release variable jump height keeps
 ## working.
 func request_jump() -> void:
+	if is_input_locked():
+		_request_rest_exit()
+		return
 	_jump_buffer_left = jump_buffer_time
 
 
@@ -524,6 +558,9 @@ func request_jump() -> void:
 ## request_jump above, calling the same start path the keyboard/gamepad
 ## dash uses (ground or air, respects cooldown/state/one-air-dash).
 func request_dash() -> void:
+	if is_input_locked():
+		_request_rest_exit()
+		return
 	_try_start_dash()
 
 
@@ -1211,16 +1248,195 @@ func _standing_on_one_way() -> bool:
 	return false
 
 
+## -- Health -----------------------------------------------------------------
+
+func get_health() -> int:
+	return _health
+
+
+func get_max_health() -> int:
+	return max_health
+
+
+func is_at_full_health() -> bool:
+	return _health >= max_health
+
+
+func restore_full_health() -> void:
+	if _health == max_health:
+		return
+	_health = max_health
+	health_changed.emit(_health, max_health)
+
+
+## -- Input lock / meditation ---------------------------------------------------
+
+## True while gameplay input is ignored, either by an explicit lock or because
+## the player is meditating.
+func is_input_locked() -> bool:
+	return _input_locked or _meditating
+
+
+func is_meditating() -> bool:
+	return _meditating
+
+
+func set_input_locked(locked: bool) -> void:
+	if _input_locked == locked:
+		return
+	_input_locked = locked
+	if locked:
+		clear_transient_state()
+
+
+## Locks input and lets the player keep processing while the tree is paused,
+## so the world can be frozen around a committed rest.
+func enter_meditation() -> void:
+	if _meditating:
+		return
+	clear_transient_state()
+	_meditating = true
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	meditation_started.emit()
+
+
+## Turns the meditating player toward world-space `target_x`. Ignored outside
+## meditation so it can never override player-driven facing.
+func face_towards(target_x: float) -> void:
+	if not _meditating or is_equal_approx(target_x, global_position.x):
+		return
+	_facing = 1 if target_x > global_position.x else -1
+	_sprite.flip_h = _facing < 0
+
+
+## Forces the meditating player to face `direction` (-1 left, 1 right).
+func face_direction(direction: int) -> void:
+	if not _meditating or direction == 0:
+		return
+	_facing = signi(direction)
+	_sprite.flip_h = _facing < 0
+
+
+## Plays one of the rest ritual clips from its first frame. Only valid while
+## meditating; the clip owns the pose until another one replaces it.
+func play_rest_animation(animation_name: StringName) -> void:
+	if not _meditating or not _sprite.sprite_frames.has_animation(animation_name):
+		return
+	_rest_animation = animation_name
+	_sprite.stop()
+	_sprite.animation = animation_name
+	_sprite.set_frame_and_progress(0, 0.0)
+	_sprite.speed_scale = 1.0
+	_sprite.play(animation_name)
+
+
+## Seconds one full pass of a clip takes at normal speed.
+func get_animation_length(animation_name: StringName) -> float:
+	var frames := _sprite.sprite_frames
+	if not frames.has_animation(animation_name):
+		return 0.0
+	var speed := frames.get_animation_speed(animation_name)
+	if speed <= 0.0:
+		return 0.0
+	var total := 0.0
+	for i in frames.get_frame_count(animation_name):
+		total += frames.get_frame_duration(animation_name, i)
+	return total / speed
+
+
+func exit_meditation() -> void:
+	if not _meditating:
+		return
+	_meditating = false
+	_rest_animation = &""
+	process_mode = _default_process_mode
+	_jump_buffer_left = 0.0
+	meditation_finished.emit()
+
+
+## Cancels every in-flight action and buffered input so control can be
+## handed back (or taken away) from a clean idle state.
+func clear_transient_state() -> void:
+	velocity = Vector2.ZERO
+	set_collision_mask_value(2, true)
+	_drop_left = 0.0
+	_coyote_left = 0.0
+	_jump_buffer_left = 0.0
+	_landing_left = 0.0
+	_dash_cooldown_left = 0.0
+	_air_dash_used = false
+	_wall_recling_lock = 0.0
+	_wall_jump_lock_left = 0.0
+	_wall_kick_lock_left = 0.0
+	_wall_kick_pending = false
+	_attack_combo_index = 0
+	_attack_phase = PHASE_STARTUP
+	_attack_buffered_left = 0.0
+	_attack_restart_buffered_left = 0.0
+	_air_attack_buffered_left = 0.0
+	_attack_buffer_left = 0.0
+	_attack_buffer_direction = 0
+	_set_collider_height(_standing_shape_height)
+	_deactivate_attack_hitbox()
+	_enter_state(State.IDLE)
+
+
+func _request_rest_exit() -> void:
+	if _meditating:
+		rest_exit_requested.emit()
+
+
+func _poll_rest_exit_input() -> void:
+	for action in REST_EXIT_ACTIONS:
+		if Input.is_action_just_pressed(action):
+			rest_exit_requested.emit()
+			return
+
+
+func _on_sprite_animation_finished() -> void:
+	if _meditating and _rest_animation != &"":
+		rest_animation_finished.emit(_rest_animation)
+
+
+func _on_sprite_frame_changed() -> void:
+	if _meditating and _rest_animation != &"" and _sprite.animation == _rest_animation:
+		rest_animation_frame_changed.emit(_rest_animation, _sprite.frame)
+
+
+func _update_locked(delta: float) -> void:
+	if _meditating:
+		_poll_rest_exit_input()
+	_state_time += delta
+	var resting_state := State.IDLE if is_on_floor() else State.FALL
+	if _state != resting_state:
+		_enter_state(resting_state)
+
+	var fall_speed_before_move := velocity.y
+	velocity.x = 0.0
+	if is_on_floor():
+		velocity.y = 0.0
+	else:
+		_apply_gravity(delta)
+	move_and_slide()
+	_after_move(fall_speed_before_move)
+	_update_animation()
+
+
 ## -- Checkpoints / respawn -----------------------------------------------------
+
+## Makes `spawn_position` the point respawn() returns to; does not move the player.
+func apply_checkpoint(spawn_position: Vector2) -> void:
+	set_checkpoint(spawn_position)
+
 
 func set_checkpoint(checkpoint: Vector2) -> void:
 	_spawn_position = checkpoint
 
 
 func respawn() -> void:
-	set_collision_mask_value(2, true)
-	_drop_left = 0.0
-	velocity = Vector2.ZERO
+	exit_meditation()
+	restore_full_health()
+	clear_transient_state()
 	global_position = _spawn_position
 	reset_physics_interpolation()
 	_set_collider_height(_standing_shape_height)
@@ -1256,6 +1472,10 @@ func _update_footsteps(delta: float) -> void:
 func _update_animation() -> void:
 	var animation_facing := _attack_facing if _is_directional_attack_state() else _facing
 	_sprite.flip_h = animation_facing < 0
+	if _meditating:
+		if _rest_animation == &"":
+			_play_animation(&"idle")
+		return
 	match _state:
 		State.CROUCH:
 			_play_animation(&"crouch")
