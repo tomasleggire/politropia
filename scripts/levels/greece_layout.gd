@@ -12,6 +12,14 @@ const WALL := 64.0
 const PLATFORM_THICKNESS := 20.0
 const GATE := Rect2(2780.0, 2520.0, 350.0, 200.0)
 
+## Medal alcove off the shaft: a corridor whose floor is a sill (take-off), a
+## pit and the medal floor. Nothing in the shaft reaches past the sill, so the
+## pit can only be crossed with a jump plus an air dash.
+const ALCOVE_FLOOR_Y := 1330.0
+const ALCOVE_SILL_END := 2040.0
+const ALCOVE_FAR_START := 2260.0
+const ALCOVE_PIT_FLOOR_Y := 1496.0
+
 ## Shaft interior and its climbing one-way platforms: [side, top y, width].
 ## Sides alternate (L is against the left wall, R against the right wall); the
 ## runs of L at 1380 / 1290 / 1200 form a ladder next to the altar sill.
@@ -24,7 +32,7 @@ const SHAFT_STEPS: Array = [
 	["R", 1880.0, 220.0],  # sill of the exit branch
 	["L", 1780.0, 120.0], ["R", 1680.0, 120.0], ["L", 1580.0, 120.0],
 	["R", 1480.0, 120.0],
-	["L", 1380.0, 150.0],  # 210 px dash gap to the medal alcove floor
+	["R", 1390.0, 120.0],  # steps up onto the medal alcove sill
 	["L", 1290.0, 120.0],
 	["L", 1200.0, 150.0],  # sill of the altar branch
 	["R", 1110.0, 120.0], ["L", 1020.0, 120.0], ["R", 930.0, 120.0],
@@ -42,7 +50,7 @@ static func rooms() -> Dictionary:
 		"T2": _rect(1064, 64, 2600, 544),
 		"T3": _rect(2664, 64, 3600, 544),
 		"Shaft": _rect(1500, 544, 1860, 2240),
-		"ShaftAlcove": _rect(1860, 1220, 2040, 1380),
+		"ShaftAlcove": _rect(1860, 1170, 2464, 1496),
 		"Altar": _rect(760, 880, 1436, 1200),
 		"Exit": _rect(1924, 1560, 2600, 1880),
 		"Entrada": _rect(600, 2240, 1100, 2720),
@@ -59,7 +67,7 @@ static func doorways() -> Array[Dictionary]:
 		_door("T2", "T3", _rect(2600, 404, 2664, 544)),
 		_door("T2", "Shaft", _rect(1500, 544, 1860, 608)),
 		_door("Shaft", "Altar", _rect(1436, 1040, 1500, 1200)),
-		_door("Shaft", "ShaftAlcove", _rect(1860, 1220, 1924, 1380)),
+		_door("Shaft", "ShaftAlcove", _rect(1860, 1170, 1924, 1330)),
 		_door("Shaft", "Exit", _rect(1860, 1720, 1924, 1880)),
 		_door("Shaft", "B2", _rect(1500, 2176, 1860, 2240)),
 		_door("Entrada", "B2", _rect(1100, 2560, 1164, 2720)),
@@ -88,7 +96,7 @@ static func markers() -> Dictionary:
 	return {
 		"Medal1": Vector2(210, 400),
 		"Medal2": Vector2(2470, 230),
-		"Medal3": Vector2(1950, 1340),
+		"Medal3": Vector2(2370, 1330),
 		"Medal4": Vector2(3300, 2680),
 		"ExitDoor": Vector2(2500, 1880),
 		"BossArena": Vector2(3380, 544),
@@ -138,7 +146,7 @@ static func _shaft_solids() -> Array[Rect2]:
 	return [
 		_rect(1436, 644, 1500, 1040),   # left shaft wall above the altar door
 		_rect(1436, 1264, 1500, 2176),  # left shaft wall below the altar floor
-		_rect(1860, 608, 1924, 1156),   # right shaft wall above the alcove
+		_rect(1860, 608, 1924, 1106),   # right shaft wall above the alcove
 		_rect(1860, 1560, 1924, 1720),  # right wall between alcove and exit door
 		_rect(1860, 1880, 1924, 2176),  # right wall below the exit door
 	]
@@ -149,9 +157,10 @@ static func _branch_solids() -> Array[Rect2]:
 		_rect(696, 816, 1436, 880),     # altar ceiling
 		_rect(696, 816, 760, 1264),     # altar left wall
 		_rect(696, 1200, 1500, 1264),   # altar floor (includes the door sill)
-		_rect(1860, 1156, 2104, 1220),  # alcove ceiling
-		_rect(2040, 1220, 2104, 1380),  # alcove back wall
-		_rect(1860, 1380, 2104, 1560),  # alcove floor
+		_rect(1860, 1106, 2528, 1170),  # alcove lintel, thinner than 80 so it cannot be gripped
+		_rect(2464, 1170, 2528, 1330),  # alcove back wall
+		_rect(1860, 1330, 2040, 1560),  # alcove sill, grippable from the pit to climb out
+		_rect(2260, 1330, 2528, 1496),  # medal floor, wider than tall so it cannot be gripped
 		_rect(1924, 1496, 2664, 1560),  # exit room ceiling
 		_rect(2600, 1560, 2664, 1944),  # exit room right wall
 		_rect(1924, 1880, 2664, 1944),  # exit room floor

@@ -8,6 +8,9 @@ const BODY_MID := 29.0
 const MIN_SURFACE_WIDTH := 24.0
 const LINE_SAMPLES := 24
 const LINE_SHRINK := 2.0
+const RUN_SPEED := 250.0
+const JUMP_HEIGHT := 130.0
+const FALL_GRAVITY := 2407.0
 
 var solids: Array[Rect2] = []
 var surfaces: Array[Dictionary] = []   # {x0, x1, y}
@@ -30,24 +33,36 @@ func surface_at(point: Vector2) -> int:
 	return -1
 
 
-## Indices of every surface reachable from `start`.
-func reachable(start: int, max_rise: float, max_gap: float) -> Dictionary:
+## Extra horizontal reach of a running jump that lands `drop` px below its
+## take-off, against a flat one: the fall after the apex lasts longer.
+static func fall_reach_bonus(drop: float) -> float:
+	var flat_fall := sqrt(2.0 * JUMP_HEIGHT / FALL_GRAVITY)
+	var long_fall := sqrt(2.0 * (JUMP_HEIGHT + drop) / FALL_GRAVITY)
+	return RUN_SPEED * (long_fall - flat_fall)
+
+
+## Indices of every surface reachable from `start`. With `fall_reach`, a jump to
+## a lower surface gets the longer reach of its longer fall.
+func reachable(start: int, max_rise: float, max_gap: float, fall_reach := false) -> Dictionary:
 	var seen := {start: true}
 	var queue: Array[int] = [start]
 	while not queue.is_empty():
 		var from_index: int = queue.pop_back()
 		for to_index: int in surfaces.size():
-			if not seen.has(to_index) and can_reach(from_index, to_index, max_rise, max_gap):
+			if not seen.has(to_index) and can_reach(from_index, to_index, max_rise, max_gap, fall_reach):
 				seen[to_index] = true
 				queue.append(to_index)
 	return seen
 
 
-func can_reach(a: int, b: int, max_rise: float, max_gap: float) -> bool:
+func can_reach(a: int, b: int, max_rise: float, max_gap: float, fall_reach := false) -> bool:
 	var from_surface := surfaces[a]
 	var to_surface := surfaces[b]
 	var rise := float(from_surface.y) - float(to_surface.y)
-	if rise > max_rise or _gap(from_surface, to_surface) > max_gap:
+	var reach := max_gap
+	if fall_reach and rise < 0.0:
+		reach += fall_reach_bonus(-rise)
+	if rise > max_rise or _gap(from_surface, to_surface) > reach:
 		return false
 	return _line_is_clear(from_surface, to_surface)
 
