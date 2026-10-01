@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 TouchControls="*res://scenes/ui/touch_controls.tscn"
 CheckpointService="*res://scripts/world/checkpoint_service.gd"
+EnemyRegistry="*res://scripts/enemies/enemy_registry.gd"
 
 [display]
 

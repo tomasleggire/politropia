@@ -195,6 +195,14 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## _attack_buffered_left/_attack_restart_buffered_left below).
 @export var attack_buffer_time := 0.15
 
+@export_group("Attack Recoil")
+## Damage one slash deals to whatever it strikes.
+@export var attack_damage := 1
+## A horizontal slash that lands pushes Luz away from the target at this speed
+## for this long. Up slashes and down slashes never recoil her.
+@export var attack_recoil_speed := 120.0
+@export var attack_recoil_time := 0.08
+
 @export_group("Plunge")
 @export var plunge_hang_time := 0.12
 @export var plunge_fall_speed := 1300.0
@@ -346,6 +354,8 @@ var _attack_restart_buffered_left := 0.0
 var _air_attack_buffered_left := 0.0
 var _attack_buffer_left := 0.0
 var _attack_buffer_direction := 0
+var _recoil_left := 0.0
+var _recoil_velocity := 0.0
 
 
 func _ready() -> void:
@@ -367,6 +377,7 @@ func _ready() -> void:
 	_default_process_mode = process_mode
 	_recompute_jump_physics()
 	_air_jumps_left = air_jumps
+	_attack_hitbox.attack_hit.connect(_on_attack_hit)
 
 	var shape := _collision_shape.shape as RectangleShape2D
 	_standing_shape_height = shape.size.y
@@ -452,6 +463,7 @@ func _physics_process(delta: float) -> void:
 		State.HURT:
 			_update_hurt(delta)
 
+	_apply_attack_recoil(delta)
 	move_and_slide()
 	_after_move(fall_speed_before_move)
 	_track_safe_ground(delta)
@@ -945,6 +957,48 @@ func _update_plunge_land(_delta: float) -> void:
 			_enter_state(State.IDLE)
 
 
+## -- Combat: hits and recoil ---------------------------------------------------------
+
+## Deferred: the hitbox reports from inside a physics query flush, where
+## changing areas, bodies or this state is forbidden.
+func _on_attack_hit(target: Node2D, attack_name: StringName) -> void:
+	_resolve_attack_hit.call_deferred(target, attack_name)
+
+
+## Any target with a `receive_hit(damage, source_position, attack_name)` method
+## can be struck (see Enemy). A landed horizontal slash recoils Luz.
+func _resolve_attack_hit(target: Node2D, attack_name: StringName) -> void:
+	if _dead or not is_instance_valid(target) or not target.has_method(&"receive_hit"):
+		return
+	if target.call(&"receive_hit", attack_damage, global_position, attack_name):
+		_start_attack_recoil(target.global_position)
+
+
+## Pushes her away from `source` for a moment. Only the lateral attack states
+## apply it, and only to horizontal speed, so the double jump and the dash are
+## untouched.
+func _start_attack_recoil(source: Vector2) -> void:
+	if not _is_lateral_attack_state():
+		return
+	var side := signf(global_position.x - source.x)
+	if is_zero_approx(side):
+		side = -float(_attack_facing)
+	_recoil_velocity = side * attack_recoil_speed
+	_recoil_left = attack_recoil_time
+
+
+func _apply_attack_recoil(delta: float) -> void:
+	if _recoil_left <= 0.0:
+		return
+	_recoil_left = maxf(_recoil_left - delta, 0.0)
+	if _is_lateral_attack_state():
+		velocity.x = _recoil_velocity
+
+
+func _is_lateral_attack_state() -> bool:
+	return _state == State.ATTACK or _state == State.CROUCH_ATTACK or _state == State.AIR_ATTACK
+
+
 ## -- Combat: hitbox helpers -------------------------------------------------------
 
 func _activate_attack_hitbox(attack_name: StringName, facing: int = 0) -> Dictionary:
@@ -1319,6 +1373,8 @@ func _enter_state(new_state: State) -> void:
 	var previous := _state
 	_state = new_state
 	_state_time = 0.0
+	if not _is_lateral_attack_state():
+		_recoil_left = 0.0
 	if not _is_directional_attack_state():
 		_slash_vfx.stop_slash()
 
@@ -1458,6 +1514,7 @@ func _knockback_from(source_position: Vector2) -> Vector2:
 
 func _cancel_actions_for_hit() -> void:
 	_deactivate_attack_hitbox()
+	_recoil_left = 0.0
 	_attack_combo_index = 0
 	_attack_buffered_left = 0.0
 	_attack_restart_buffered_left = 0.0

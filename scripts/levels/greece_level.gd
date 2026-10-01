@@ -39,9 +39,8 @@ const BODY_CENTER_OFFSET := GreeceLayout.BODY_CENTER_OFFSET
 ## Emitted when Luz moves from one camera room to another (a doorway
 ## transition, or a respawn or hazard return that lands in a different room).
 ## `from_room` and `to_room` are GreeceLayout room names, with the medal alcove
-## counted as part of "Shaft". Hook for the enemies step: what happens to
-## enemies when she leaves and re-enters a room is a pending product decision,
-## so nothing listens to this yet.
+## counted as part of "Shaft". The EnemyRegistry listens: entering a room
+## resets its living enemies to their spawn and pauses every other room.
 signal room_changed(from_room: StringName, to_room: StringName)
 
 @onready var _player: Player = $Player
@@ -73,10 +72,16 @@ func _ready() -> void:
 	_transition.setup(_player, _camera)
 	_transition.room_switched.connect(_on_room_switched)
 	add_child(_transition)
+	room_changed.connect(_on_room_changed)
 	_player.respawned.connect(_on_player_reset)
 	_player.safe_ground_returned.connect(_enter_room_snapped)
 	CheckpointService.restore_player_for_scene(_player, scene_file_path)
 	_enter_room_snapped()
+
+
+func _exit_tree() -> void:
+	# Lift the off-room pause so other levels' enemies are never frozen.
+	EnemyRegistry.set_active_room(&"")
 
 
 func _physics_process(_delta: float) -> void:
@@ -113,6 +118,10 @@ func _follow_room() -> void:
 		_switch_room(room)
 
 
+func _on_room_changed(_from_room: StringName, to_room: StringName) -> void:
+	EnemyRegistry.enter_room(to_room)
+
+
 func _on_room_switched(_from_room: String, to_room: String) -> void:
 	_set_room(to_room)
 	_camera_bounds = GreeceLayout.camera_bounds(to_room)
@@ -141,7 +150,9 @@ func _switch_room(room: String) -> void:
 func _set_room(room: String) -> void:
 	var previous := _room
 	_room = room
-	if previous != "" and previous != room:
+	if previous == "":
+		EnemyRegistry.set_active_room(StringName(room))
+	elif previous != room:
 		room_changed.emit(StringName(previous), StringName(room))
 
 

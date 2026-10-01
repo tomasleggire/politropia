@@ -59,6 +59,8 @@ func _physics_process(_delta: float) -> void:
 
 
 func _try_hurt(body: Node2D) -> void:
+	if not monitoring:
+		return
 	var player := body as Player
 	if player == null:
 		return

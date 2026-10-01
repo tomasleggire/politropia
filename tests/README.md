@@ -19,6 +19,9 @@ check names.
   and the real camera in the Greece level.
 - `combat_test.gd`: damage, i-frames, knockback, control lock, hit-stop, death,
   respawn and the `ContactDamage` component on a synthetic floor.
+- `enemy_test.gd`: the enemy base and the walker (patrol, ledges and walls,
+  contact damage, hits, corpses), the three room persistence rules, off-room
+  pausing and the player's hit recoil.
 - `health_hud_test.gd`: the mask HUD (pips, loss and refill feedback, rebuild,
   safe area, presence in both levels).
 - `support/ritual_harness.gd`: shared state, game-clock waits, event recording.
