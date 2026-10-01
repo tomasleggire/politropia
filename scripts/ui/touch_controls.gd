@@ -33,6 +33,8 @@ var _knob_offset := Vector2.ZERO
 
 var _jump_touch_id := -1
 var _dash_touch_id := -1
+var _interact_touch_id := -1
+var _interact_sources: Array[Object] = []
 
 var _attack_touch_id := -1
 var _attack_start := Vector2.ZERO
@@ -50,6 +52,7 @@ var _held_actions := {
 @onready var _jump_button: Control = $Root/JumpButton
 @onready var _dash_button: Control = $Root/DashButton
 @onready var _attack_button: Control = $Root/AttackButton
+@onready var _interact_button: Control = $Root/InteractButton
 
 
 func _ready() -> void:
@@ -86,6 +89,13 @@ func _handle_touch(touch: InputEventScreenTouch) -> void:
 		elif _attack_touch_id < 0 and _try_begin_button(_attack_button, touch.index, touch.position):
 			_begin_attack(touch.index, touch.position)
 			get_viewport().set_input_as_handled()
+		elif (
+			_interact_touch_id < 0
+			and _interact_button.visible
+			and _try_begin_button(_interact_button, touch.index, touch.position)
+		):
+			_begin_interact(touch.index)
+			get_viewport().set_input_as_handled()
 	else:
 		if touch.index == _pad_touch_id:
 			_end_pad()
@@ -98,6 +108,9 @@ func _handle_touch(touch: InputEventScreenTouch) -> void:
 			get_viewport().set_input_as_handled()
 		elif touch.index == _attack_touch_id:
 			_end_attack()
+			get_viewport().set_input_as_handled()
+		elif touch.index == _interact_touch_id:
+			_end_interact()
 			get_viewport().set_input_as_handled()
 
 
@@ -251,6 +264,33 @@ func _end_attack() -> void:
 		_attack_button.call(&"set_button_state", false)
 
 
+## -- Interact button (shown only while an interactable is in range) ------
+
+## Interactables report whether they can currently be used. The button is
+## visible while any registered source is available.
+func set_interact_available(source: Object, available: bool) -> void:
+	if available and not _interact_sources.has(source):
+		_interact_sources.append(source)
+	elif not available:
+		_interact_sources.erase(source)
+	if is_instance_valid(_interact_button):
+		_interact_button.visible = not _interact_sources.is_empty()
+	if _interact_sources.is_empty() and _interact_touch_id >= 0:
+		_end_interact()
+
+
+func _begin_interact(index: int) -> void:
+	_interact_touch_id = index
+	_interact_button.call(&"set_button_state", true)
+	get_tree().call_group(&"interactable", &"request_interact")
+
+
+func _end_interact() -> void:
+	_interact_touch_id = -1
+	if is_instance_valid(_interact_button):
+		_interact_button.call(&"set_button_state", false)
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		if is_node_ready():
@@ -261,3 +301,5 @@ func _notification(what: int) -> void:
 				_end_dash()
 			if _attack_touch_id >= 0:
 				_end_attack()
+			if _interact_touch_id >= 0:
+				_end_interact()
