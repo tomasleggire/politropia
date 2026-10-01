@@ -146,6 +146,9 @@ The user wants a playable Greece level as the base for the next mechanics (medal
     - Decision gap: a fresh press a few px before landing fires the air jump, not a ground jump.
 - [ ] T4 Art pass with juani's textures: NinePatch floors and walls, floating platforms, room backgrounds, decor (route TBD)
 - [ ] T5 Device playtest and adjustments
+  - 2026-10-01 playtest 1 (iPhone 16 Pro, build `f5a437a`, flat placeholder visuals):
+    - User verdict: "por ahora sirve pero hay muchas cosas que mejorar". The layout is accepted as a base, and adjustments are still to be defined by the user.
+    - Pending user feedback: which jumps feel wrong, unfair or too easy; the double jump firing near the ground (the T3 decision gap); and how the room camera feels.
 
 ## Acceptance criteria
 - From Entrada, Luz reaches the altar, T1, T2 and the T3 arena using only jump and dash, with no impossible or blind jump.
@@ -158,8 +161,10 @@ The user wants a playable Greece level as the base for the next mechanics (medal
 - 2026-10-01: T1 done, `3dc23c8`, review approved.
 - 2026-10-01: T1b (alcove needs the dash, `75e24c7`) and T2 (room camera, `8ad315e`) done, review approved.
 - 2026-10-01: T3 (gated double jump, `9bbdc58`) done, review approved.
+- 2026-10-01: deployed to the iPhone and playtested; accepted as a base with many improvements pending. Branch pushed.
 - 2026-10-01: T1b (alcove needs the dash, `75e24c7`) and T2 (room camera, `8ad315e`) done, review approved.
 - 2026-10-01: T3 (gated double jump, `9bbdc58`) done, review approved.
+- 2026-10-01: deployed to the iPhone and playtested; accepted as a base with many improvements pending. Branch pushed.
 
 ## Next step
-Device playtest of T1 to T3, then T4 art pass.
+Collect the user's concrete playtest adjustments (T5), then the T4 art pass with juani's textures (also fix the black void in doorway gaps).
