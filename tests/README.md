@@ -22,6 +22,8 @@ check names.
 - `enemy_test.gd`: the enemy base and the walker (patrol, ledges and walls,
   contact damage, hits, corpses), the three room persistence rules, off-room
   pausing and the player's hit recoil.
+- `enemy_archetypes_test.gd`: the airborne and charging archetypes (flyer,
+  charger) plus their persistence rules and pogo.
 - `pogo_test.gd`: the down slash pogo (bounce height, restored air actions,
   hazard grace, missed slash, crouch attack on the ground, touch paths) and the
   removal of the plunge.
