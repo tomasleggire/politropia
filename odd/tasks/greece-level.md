@@ -80,6 +80,15 @@ The user wants a playable Greece level as the base for the next mechanics (medal
     - Ritual test PASS 259/259.
     - Boot with `--quit-after 300` clean.
     - The parent viewed the overview and shaft screenshots: the layout matches the diagram.
+  - Commit: `3dc23c8` feat: add connected Greece room layout. The GGA pre-commit review passed.
+  - Review:
+    - Range `c564e49..3dc23c8`, 13 paths, 861 lines, untracked concept PNG excluded.
+    - Assessed `medium`, `slice_budget_reached`. User GRANTED.
+    - Lineage `review-70b073663a9f49d1` (review-reliability): APPROVED, no findings, acknowledged.
+    - The reviewed boundary advances to `3dc23c8`.
+  - Follow-ups (small):
+    - The reachability test hardcodes `Vector2(1050, 1200)` instead of `GreeceLayout.DESK_POSITION`. Fix in T2.
+    - The Greece test prints exit-time leak warnings.
   - `scripts/levels/greece_layout.gd`: rooms, solids, one-ways, doorways, markers as typed data.
   - `scripts/levels/greece_level.gd` and `scenes/levels/greece_level.tscn`: build collision from the data, give each room a flat placeholder look, set the RoomCamera world rect, respawn on out-of-bounds, place a StillnessDesk (`greece_altar_a`) in the altar room, spawn in Entrada, and add placeholder markers.
   - Set `main_scene` to the Greece level on this branch, so the user can test it on the device.
@@ -99,6 +108,7 @@ The user wants a playable Greece level as the base for the next mechanics (medal
 
 ## Progress
 - 2026-10-01: exploration done (movement, camera, level construction, desk, art, tests). Document created.
+- 2026-10-01: T1 done, `3dc23c8`, review approved.
 
 ## Next step
-T1.
+T2, per-room camera bounds. The user may want to playtest T1 on device first.
