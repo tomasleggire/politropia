@@ -144,12 +144,24 @@ The user wants a playable Greece level as the base for the next mechanics (medal
     - `greece_probe.gd` types `player` as `CharacterBody2D`.
     - `double_jump_test` reads private members.
     - Decision gap: a fresh press a few px before landing fires the air jump, not a ground jump.
-- [ ] T2b Hollow Knight style room transitions (user correction, 2026-10-01; runs after combat C1/C2, because both touch `greece_level.gd`)
+- [x] T2b Hollow Knight style room transitions (user correction, 2026-10-01; runs after combat C1/C2, because both touch `greece_level.gd`)
   - Crossing a doorway is NOT a continuous camera follow. There is a brief dark fade, like a very light loading screen. Then the camera snaps to the new room, and Luz appears walking out of the door she entered through.
     - Rooms can differ in size.
     - This replaces the T2 blend between rooms. The camera still clamps to each room's bounds.
   - Enemy state on leaving and re-entering a room: decision pending. The user said enemies "vuelven a… sino en el último lugar donde quedaron". Ask when the enemies step starts.
   - The camera "doesn't fully convince" the user yet. Polish comes later.
+  - Enemy re-entry DECIDED (2026-10-01):
+    - Killed enemies stay dead, with visible corpses, until a desk rest or death.
+    - Living enemies reset to spawn at full health on re-entry.
+  - Commit: `2e268f6` feat: add Hollow Knight style room transitions (+918/-37).
+  - Doorways: `GreeceLayout.doorways()` gains orientation, `transitions`, sides, arrivals and lips. The `RoomTransition` node fades out 0.12 s, switches while black, and fades in 0.18 s.
+  - Horizontal doors: auto-walk at 250 px/s and arrival 20 px inside the new room (`ARRIVAL_INSET`, lowered to keep clear of the B2 hazard), with a walk-out of about 32 px.
+  - Vertical openings: velocity is kept, plus an upward boost that clears the lip by 24 px.
+  - The player's `ScreenFade` is the single veil owner. There is no damage during a transition, the input lock clears buffers, and `room_changed(from, to)` is emitted. The alcove counts as Shaft.
+  - Tests: room_transition 49/49 (the parent re-ran it: 49/49), room_camera 38/38, greece_layout 70/70, ritual 259/259.
+  - Open:
+    - Coming back into Entrada, the onboarding step stops the walk-out after 13 px.
+    - After a vertical rise with no floor, Luz can drop back through the opening and trigger the reverse transition. Feel call for the user.
 - [ ] T4 Art pass with juani's textures: NinePatch floors and walls, floating platforms, room backgrounds, decor. REASSIGNED to Codex (user, 2026-10-01: all visual work goes to Codex; backlog in Engram `codex/visual-backlog`). Claude does no art.
 - [ ] T5 Device playtest and adjustments
   - 2026-10-01 playtest 1 (iPhone 16 Pro, build `f5a437a`, flat placeholder visuals):

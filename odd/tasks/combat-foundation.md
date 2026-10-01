@@ -89,9 +89,14 @@ This is step 1 of the plan agreed with the user on 2026-10-01: combat foundation
   - User: "se siente bien, se ve bien".
   - Bug: after resting with missing pips, the HUD refills only when Luz stands up. The heal fires at the celebration peak, but `HealthHud` inherits the pause from the desk's `pause_world`, so its tweens freeze until the unpause. Fix in C4.
   - Change: falling out of the map must cost one pip.
-- [ ] C4 Playtest fixes (route: delegated, same writer as Greece T2b)
+- [x] C4 Playtest fixes (route: delegated, same writer as Greece T2b)
   - HUD keeps processing while the tree is paused (`PROCESS_MODE_ALWAYS`), so the refill shows at the peak right after Luz sits.
   - Out-of-bounds fall: 1 damage, then return to the last safe ground (the hazard path). A lethal fall uses the death path. Applies to Greece and level_01.
+  - Commit: `0cc0ae9` fix: keep the HUD live while resting and hurt on falls.
+  - HUD: `HealthHud` sets `PROCESS_MODE_ALWAYS`. A test asserts the pips are full while paused in RESTING, and it fails when the line is reverted.
+  - Falls: `Player.fall_out_of_bounds()` costs a pip even during i-frames (Hollow Knight pits) and still returns her to safe ground. The camera re-snaps on `safe_ground_returned`.
+  - Tests: combat 87/87, health_hud 31/31.
+  - Review: range `1e97b23..2e268f6` (with T2b), 15 paths, 1233 lines, `medium`. User GRANTED. Lineage `review-6b866f555404910d`: APPROVED, acknowledged. Boundary `2e268f6`.
 
 ## Acceptance criteria
 - A hit removes one pip, knocks Luz away from the source and gives about 1 s of i-frames with a visible flicker. Repeated contact during i-frames does nothing.
@@ -106,4 +111,4 @@ This is step 1 of the plan agreed with the user on 2026-10-01: combat foundation
 - Acceptance addition: a hazard hit costs one pip and returns Luz to the last safe ground. She never stays standing in a hazard.
 
 ## Next step
-C4, then Greece T2b (room transitions), then step 2 (spikes and enemies).
+Device check of C4 + T2b, then step 2 (enemies, pogo, soul focus). Decisions are in Engram: `design/enemy-persistence`, `design/enemy-roster`, `design/down-attack-pogo`, `design/soul-focus-heal`.
