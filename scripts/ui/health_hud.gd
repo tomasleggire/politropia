@@ -6,6 +6,9 @@ extends CanvasLayer
 ## sits above the altar vignette (30) and below the touch controls (100),
 ## which live at the bottom of the screen. It listens to the player's
 ## health_changed, which also covers hits, the desk heal and the respawn.
+## It keeps processing while the tree is paused: the desk freezes the world
+## during a rest but heals at the celebration peak, and the refill must show
+## right then, not when Luz stands up.
 
 const HUD_LAYER := 40
 
@@ -33,6 +36,7 @@ var _safe_override := Rect2()
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = HUD_LAYER
 	_row.add_theme_constant_override(&"separation", int(pip_spacing))
 	get_viewport().size_changed.connect(_place)

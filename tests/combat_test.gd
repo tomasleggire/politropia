@@ -44,7 +44,17 @@ const CHECKS := {
 	"case_safe_ground_skips_hazards": 2,
 	"case_camera_shake_settles_to_zero": 3,
 	"case_no_shake_during_death": 2,
+	"case_fall_costs_one_pip_and_returns": 5,
+	"case_lethal_fall_uses_checkpoint": 5,
+	"case_fall_during_iframes_still_hurts": 4,
+	"case_levels_fall_costs_a_pip": 6,
 }
+const LEVELS := {
+	"level_01": "res://scenes/levels/level_01.tscn",
+	"greece": "res://scenes/levels/greece_level.tscn",
+}
+## Far below any level's out-of-bounds line.
+const VOID_Y := 6000.0
 
 
 ## Stands in for an enemy that regenerates at a rest.
@@ -482,3 +492,67 @@ func case_no_shake_during_death() -> void:
 		await process_frame
 		worst = maxf(worst, _camera.offset.length())
 	check(worst == 0.0, "the camera stays still through the death fade (%.2f)" % worst)
+
+
+# -- Falling out of the map ----------------------------------------------------------
+
+## Stands on the floor long enough to record safe ground, then drops her into
+## the void and runs the player's out-of-bounds fall.
+func _fall_from(x: float) -> Vector2:
+	_player.global_position.x = x
+	await _secs(0.4)
+	var safe := _player.get_last_safe_ground()
+	_player.global_position.y = VOID_Y
+	return safe
+
+
+func case_fall_costs_one_pip_and_returns() -> void:
+	await _build_rig()
+	var safe := await _fall_from(40.0)
+	check(_player.fall_out_of_bounds(), "a fall out of the map is accepted")
+	check(not _player.fall_out_of_bounds(), "a second call while she is being returned does nothing")
+	await _secs(1.0)
+	check(_player.get_health() == 2 and _damage_events == [Vector2i(1, 2)], "the fall costs exactly one pip (%d)" % _player.get_health())
+	check(_player.global_position.distance_to(safe) < 3.0, "she lands on the last safe ground (%s vs %s)" % [_player.global_position, safe])
+	check(not _player.is_input_locked() and _died_count == 0, "control is back and she did not die")
+
+
+func case_lethal_fall_uses_checkpoint() -> void:
+	await _build_rig()
+	var enemy := _add_resettable()
+	_checkpoints().activate(&"test_desk", "", CHECKPOINT)
+	_player.apply_checkpoint(CHECKPOINT)
+	_player._health = 1
+	await _fall_from(40.0)
+	check(_player.fall_out_of_bounds(), "a lethal fall is accepted")
+	await _secs(DEATH_BEAT)
+	check(_died_count == 1 and _respawn_count == 1, "the death path runs once")
+	check(_player.global_position.distance_to(CHECKPOINT) < 4.0, "she wakes at the checkpoint, not the safe ground")
+	check(_player.get_health() == 3 and enemy.count == 1, "with full health and the enemies reset")
+	check(_veil_alpha() == 0.0, "no veil is left on screen")
+
+
+func case_fall_during_iframes_still_hurts() -> void:
+	await _build_rig()
+	_player.take_damage(1, SOURCE_LEFT)
+	var safe := await _fall_from(40.0)
+	check(_player.get_health() == 2, "a hit leaves her in her i-frames (%d)" % _player.get_health())
+	check(_player.fall_out_of_bounds(), "a fall inside the i-frames is still accepted")
+	await _secs(1.0)
+	check(_player.get_health() == 1, "a pit hurts even during the i-frames (%d)" % _player.get_health())
+	check(_player.global_position.distance_to(safe) < 3.0, "and she is still returned to the safe ground")
+
+
+func case_levels_fall_costs_a_pip() -> void:
+	for level_name: String in LEVELS:
+		_checkpoints().clear()
+		change_scene_to_file(LEVELS[level_name])
+		await _frames(10)
+		var player := current_scene.get_node("Player") as Player
+		await _secs(0.6)
+		var safe := player.get_last_safe_ground()
+		player.global_position.y = VOID_Y
+		await _secs(1.2)
+		check(player.get_health() == 2, "%s: falling out of the map costs one pip (%d)" % [level_name, player.get_health()])
+		check(player.global_position.distance_to(safe) < 4.0, "%s: she is back on the last safe ground" % level_name)
+		check(not player.is_input_locked(), "%s: control is back" % level_name)

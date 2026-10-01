@@ -60,6 +60,7 @@ func _ready() -> void:
 	_build_double_jump_placeholder()
 	_build_hazards()
 	_player.respawned.connect(_enter_room_snapped)
+	_player.safe_ground_returned.connect(_enter_room_snapped)
 	CheckpointService.restore_player_for_scene(_player, scene_file_path)
 	_enter_room_snapped()
 
@@ -68,7 +69,7 @@ func _physics_process(_delta: float) -> void:
 	if not is_instance_valid(_player):
 		return
 	if _player.global_position.y > GreeceLayout.WORLD_SIZE.y + OUT_OF_BOUNDS_MARGIN:
-		_player.respawn()
+		_player.fall_out_of_bounds()
 		return
 	_follow_room()
 

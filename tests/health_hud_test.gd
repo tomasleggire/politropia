@@ -30,7 +30,12 @@ const CHECKS := {
 	"case_rapid_double_damage": 3,
 	"case_safe_area": 3,
 	"case_levels_bind_hud": 4,
+	"case_refill_shows_while_resting": 6,
 }
+const DESK_LEVEL := "res://scenes/levels/level_01.tscn"
+const DESK_ID := &"level_01_desk_a"
+## StillnessDesk.Phase.RESTING; the class does not compile in a --script run.
+const DESK_PHASE_RESTING := 4
 
 var checks := 0
 var failed: Array[String] = []
@@ -232,3 +237,38 @@ func case_levels_bind_hud() -> void:
 		var hud := current_scene.get_node_or_null("HealthHud") as HealthHud
 		check(hud != null and hud.is_bound(), "%s has a bound HUD" % level_name)
 		check(hud != null and hud.get_pips().size() == 3, "%s shows three pips" % level_name)
+
+
+## The desk freezes the world with pause_world, but heals at the celebration
+## peak: the pips must be visibly full while still resting, before Luz stands.
+func case_refill_shows_while_resting() -> void:
+	var checkpoints := root.get_node("CheckpointService")
+	checkpoints.clear()
+	change_scene_to_file(DESK_LEVEL)
+	await _frames(10)
+	var level := current_scene
+	var desk := level.get_node("StillnessDesk")
+	var player := level.get_node("Player") as Player
+	var hud := level.get_node("HealthHud") as HealthHud
+	checkpoints.activate(DESK_ID, DESK_LEVEL, desk.get_spawn_position())
+	for i: int in 2:
+		player._invuln_left = 0.0
+		player.take_damage(1, Vector2(-100.0, 0.0))
+	await _secs(LOSS_DONE)
+	player.global_position = desk.get_spawn_position()
+	await _frames(30)
+	var full_before := 0
+	for pip: HealthPip in hud.get_pips():
+		full_before += 1 if pip.is_full() else 0
+	check(full_before == 1, "setup: one of three pips is full (%d)" % full_before)
+	check(desk.request_rest(), "the rest is accepted")
+	await _secs(2.5)
+	check(paused and desk.get_phase() == DESK_PHASE_RESTING, "she is still sitting with the world paused")
+	var shown := 0
+	for pip: HealthPip in hud.get_pips():
+		shown += 1 if pip.is_full() and pip.fill == 1.0 and pip.scale == Vector2.ONE else 0
+	check(player.get_health() == 3, "the desk healed her at the peak")
+	check(shown == 3, "every pip shows its final full look before she stands (%d)" % shown)
+	check(hud.process_mode == Node.PROCESS_MODE_ALWAYS, "the HUD keeps processing through the pause")
+	paused = false
+	checkpoints.clear()

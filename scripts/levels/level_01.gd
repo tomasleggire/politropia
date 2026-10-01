@@ -24,6 +24,7 @@ func _ready() -> void:
 	# Player already adds itself to the "player" group in its own _ready().
 	_camera.target = _player
 	_player.respawned.connect(_camera.snap_to_target)
+	_player.safe_ground_returned.connect(_camera.snap_to_target)
 	_build_course()
 	CheckpointService.restore_player_for_scene(_player, scene_file_path)
 	_camera.snap_to_target()
@@ -31,8 +32,7 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	if is_instance_valid(_player) and _player.global_position.y > 820.0:
-		_player.respawn()
-		_camera.snap_to_target()
+		_player.fall_out_of_bounds()
 
 
 func _build_course() -> void:

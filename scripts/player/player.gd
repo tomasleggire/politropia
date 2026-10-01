@@ -7,6 +7,9 @@ extends CharacterBody2D
 ## a 3-hit ground combo, up/air/crouch attacks and a down plunge.
 
 signal respawned
+## Emitted after a hazard return has moved her onto the last safe ground, while
+## the screen is still dark, so a level can re-frame its camera.
+signal safe_ground_returned
 ## Emitted when a gated movement ability is granted (e.g. &"double_jump").
 signal ability_unlocked(ability: StringName)
 signal health_changed(current: int, maximum: int)
@@ -1402,8 +1405,10 @@ func take_hazard_damage(amount: int, source_position: Vector2) -> bool:
 	return _apply_damage(amount, source_position, true)
 
 
-func _apply_damage(amount: int, source_position: Vector2, hazard: bool) -> bool:
-	if amount <= 0 or _dead or _invuln_left > 0.0 or is_input_locked():
+func _apply_damage(amount: int, source_position: Vector2, hazard: bool, force := false) -> bool:
+	if amount <= 0 or _dead:
+		return false
+	if not force and (_invuln_left > 0.0 or is_input_locked()):
 		return false
 	_health = maxi(_health - amount, 0)
 	health_changed.emit(_health, max_health)
@@ -1422,6 +1427,21 @@ func _apply_damage(amount: int, source_position: Vector2, hazard: bool) -> bool:
 	else:
 		_hurt_left = hurt_control_lock
 		_enter_state(State.HURT)
+	return true
+
+
+## Falling out of the map costs one pip like a hazard hit and then returns her
+## to the last safe ground; a lethal fall dies normally instead. Unlike a hit
+## it ignores the i-frames and any control lock (Hollow Knight pits always
+## hurt), so a fall right after a hit still counts. Returns false only while
+## she is already dead or already being returned, so a level may call it on
+## every tick she stays below the map.
+func fall_out_of_bounds() -> bool:
+	if _dead or _return_phase != ReturnPhase.NONE:
+		return false
+	if not _apply_damage(1, global_position, true, true):
+		return false
+	velocity = Vector2.ZERO
 	return true
 
 
@@ -1483,6 +1503,7 @@ func return_to_safe_ground() -> void:
 	global_position = get_last_safe_ground()
 	velocity = Vector2.ZERO
 	reset_physics_interpolation()
+	safe_ground_returned.emit()
 
 
 func _begin_safe_return() -> void:
