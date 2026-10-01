@@ -4,7 +4,7 @@ extends CharacterBody2D
 ## Blasphemous-style finite state machine: weighty ground run, a precise
 ## jump arc, crouch, a dash/slide usable on the ground or in the air (one
 ## air dash per airborne period), wall cling + climb kick, ledge grab,
-## a 3-hit ground combo, up/air/crouch attacks and a down plunge.
+## a 3-hit ground combo, up/air/crouch attacks and a pogo down slash.
 
 signal respawned
 ## Emitted after a hazard return has moved her onto the last safe ground, while
@@ -30,7 +30,7 @@ enum ReturnPhase { NONE, OUT, IN }
 enum State {
 	IDLE, RUN, CROUCH, JUMP, FALL, DASH,
 	WALL_CLING, LEDGE_HANG, LEDGE_CLIMB,
-	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK, PLUNGE, PLUNGE_LAND,
+	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK,
 	HURT, DEAD,
 }
 
@@ -186,7 +186,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var air_attack_recovery := 0.40
 ## How long ANY buffered attack press stays queued before being dropped:
 ## a press that can't start an attack right away (dash, wall cling,
-## crouch/up/plunge attack, plunge land), a press for the next combo hit
+## crouch/up attack), a press for the next combo hit
 ## (hit1->2, hit2->3), and a press during the finisher that would restart
 ## the combo -- all three share this one short window (~0.15s, matching the
 ## Blasphemous reference) so a press is consumed at most once and a press
@@ -203,11 +203,16 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var attack_recoil_speed := 120.0
 @export var attack_recoil_time := 0.08
 
-@export_group("Plunge")
-@export var plunge_hang_time := 0.12
-@export var plunge_fall_speed := 1300.0
-@export var plunge_land_active_time := 0.12
-@export var plunge_land_recovery_time := 0.25
+@export_group("Pogo")
+## Rise of the bounce after a down slash lands on an enemy, a hazard or
+## anything in the `pogoable` group. Launched with the main jump's rise
+## gravity, at a fixed speed: releasing jump does not shorten it.
+@export var pogo_height := 130.0
+## Grace window after a pogo: hazard damage is ignored for this long, so the
+## frame in which her body and the slash reach the same spike cannot cost her
+## the bounce (Hollow Knight forgives it the same way). A hazard touched with
+## no slash covering it hurts as usual.
+@export var pogo_grace_time := 0.12
 
 @export_group("Attack Hitboxes")
 ## T4d item 3 (iPhone playtest: "in the 3rd hit Luz gets bigger and so does
@@ -230,10 +235,9 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var hitbox_air_offset_y := -30.66     ## air: mid-air torso height
 @export var hitbox_up_size := Vector2(26, 68)
 @export var hitbox_up_offset := Vector2(0, -80)
-@export var hitbox_plunge_size := Vector2(28.0, 18.0)
-@export var hitbox_plunge_offset := Vector2(0.0, 12.0)
-@export var hitbox_plunge_land_size := Vector2(150.0, 20.0)
-@export var hitbox_plunge_land_offset := Vector2(0.0, 6.0)
+## Down slash: a box right below her feet (the origin is at the feet).
+@export var hitbox_down_size := Vector2(36.0, 44.0)
+@export var hitbox_down_offset := Vector2(0.0, 22.0)
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
@@ -264,7 +268,6 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 	# already gone (see PlayerSlashVfx.TOTAL_DURATION).
 	"up_attack": attack_startup_time + PlayerSlashVfx.TOTAL_DURATION,
 	"air_attack": air_attack_recovery,
-	"plunge_land": plunge_land_active_time + plunge_land_recovery_time,
 }, {
 	"attack_1": attack_startup_time,
 	"attack_2": attack_startup_time,
@@ -356,6 +359,11 @@ var _attack_buffer_left := 0.0
 var _attack_buffer_direction := 0
 var _recoil_left := 0.0
 var _recoil_velocity := 0.0
+var _air_attack_down := false
+var _pogo_bounced := false
+var _pogo_rising := false
+var _pogo_grace_left := 0.0
+var _down_slash_mark: Polygon2D
 
 
 func _ready() -> void:
@@ -456,10 +464,6 @@ func _physics_process(delta: float) -> void:
 			_update_up_attack(delta)
 		State.AIR_ATTACK:
 			_update_air_attack(delta)
-		State.PLUNGE:
-			_update_plunge(delta)
-		State.PLUNGE_LAND:
-			_update_plunge_land(delta)
 		State.HURT:
 			_update_hurt(delta)
 
@@ -481,6 +485,7 @@ func _update_shared_timers(delta: float) -> void:
 	_attack_buffered_left = maxf(_attack_buffered_left - delta, 0.0)
 	_attack_restart_buffered_left = maxf(_attack_restart_buffered_left - delta, 0.0)
 	_air_attack_buffered_left = maxf(_air_attack_buffered_left - delta, 0.0)
+	_pogo_grace_left = maxf(_pogo_grace_left - delta, 0.0)
 
 	if _drop_left > 0.0:
 		_drop_left -= delta
@@ -624,7 +629,8 @@ func request_attack(direction: int) -> void:
 
 ## Touch UI: upgrades the attack that just started — while it is still in
 ## its startup phase, before any hitbox is active — to an up attack instead
-## of firing a second attack. A downward swipe leaves an air attack lateral.
+## of firing a second attack. A downward swipe turns an air attack into the
+## pogo down slash and does nothing on the ground.
 ## Used when the finger swipes after touching down on the attack button (see
 ## touch_controls.gd's attack_upgrade_window).
 func request_attack_upgrade(direction: int) -> void:
@@ -636,6 +642,8 @@ func request_attack_upgrade(direction: int) -> void:
 	)
 	if direction == -1 and upgrading_from_neutral:
 		_start_up_attack()
+	elif direction == 1 and _state == State.AIR_ATTACK and _attack_phase == PHASE_STARTUP:
+		_air_attack_down = true
 
 
 ## Touch UI entry point for the jump button, called directly instead of only
@@ -684,12 +692,11 @@ func _queue_attack(direction: int) -> void:
 			return
 		State.AIR_ATTACK:
 			if _attack_phase == PHASE_RECOVERY:
-				_state_time = 0.0
-				_attack_phase = PHASE_STARTUP
+				_restart_air_attack(direction == 1)
 			else:
 				_air_attack_buffered_left = attack_buffer_time
 			return
-		State.CROUCH_ATTACK, State.UP_ATTACK, State.PLUNGE, State.PLUNGE_LAND, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB, State.HURT:
+		State.CROUCH_ATTACK, State.UP_ATTACK, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB, State.HURT:
 			_attack_buffer_left = attack_buffer_time
 			_attack_buffer_direction = direction
 			return
@@ -700,7 +707,7 @@ func _queue_attack(direction: int) -> void:
 		if direction == -1:
 			_start_up_attack()
 		else:
-			_start_air_attack()
+			_start_air_attack(direction == 1)
 		return
 
 	if _state == State.CROUCH:
@@ -722,7 +729,7 @@ func _end_generic_attack() -> void:
 
 
 ## Invalidates a pending generic attack buffer (_attack_buffer_left/
-## _attack_buffer_direction, used by dash/wall-cling/ledge/crouch/up/plunge
+## _attack_buffer_direction, used by dash/wall-cling/ledge/crouch/up
 ## states) whenever an attack actually starts through any path. Without
 ## this, an older press already superseded by a fresher one that started an
 ## attack directly could still sit in the buffer and fire a second,
@@ -879,12 +886,22 @@ func _update_up_attack(delta: float) -> void:
 
 ## -- Combat: air attack ---------------------------------------------------------
 
-func _start_air_attack() -> void:
+## `down` turns it into the pogo down slash (down + attack in the air).
+func _start_air_attack(down := false) -> void:
 	_air_attack_buffered_left = 0.0
 	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.AIR_ATTACK)
 	_attack_phase = PHASE_STARTUP
+	_air_attack_down = down
+	_pogo_bounced = false
+
+
+func _restart_air_attack(down: bool) -> void:
+	_state_time = 0.0
+	_attack_phase = PHASE_STARTUP
+	_air_attack_down = down
+	_pogo_bounced = false
 
 
 func _update_air_attack(delta: float) -> void:
@@ -902,59 +919,21 @@ func _update_air_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
+			if _air_attack_down:
+				_activate_down_slash()
+			else:
+				_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
 			_deactivate_attack_hitbox()
 		if _air_attack_buffered_left > 0.0:
 			_air_attack_buffered_left = 0.0
-			_state_time = 0.0
-			_attack_phase = PHASE_STARTUP
+			_restart_air_attack(_held_vertical_direction() == 1)
 			return
 
 	if _state_time >= air_attack_recovery:
 		_state = State.JUMP if velocity.y < 0.0 else State.FALL
-
-
-## -- Combat: down plunge ---------------------------------------------------------
-
-func _start_plunge() -> void:
-	_clear_pending_attack_buffer()
-	_enter_state(State.PLUNGE)
-	_attack_phase = PHASE_STARTUP
-
-
-func _update_plunge(_delta: float) -> void:
-	if is_on_floor():
-		_deactivate_attack_hitbox()
-		_enter_state(State.PLUNGE_LAND)
-		return
-
-	velocity.x = 0.0
-	if _state_time < plunge_hang_time:
-		velocity.y = 0.0
-		return
-
-	if _attack_phase != PHASE_ACTIVE:
-		_attack_phase = PHASE_ACTIVE
-		_activate_attack_hitbox(&"attack_plunge")
-	velocity.y = plunge_fall_speed
-
-
-func _update_plunge_land(_delta: float) -> void:
-	velocity = Vector2.ZERO
-
-	if _state_time < plunge_land_active_time:
-		if _attack_phase != PHASE_ACTIVE:
-			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_plunge_land")
-	else:
-		if _attack_phase != PHASE_RECOVERY:
-			_attack_phase = PHASE_RECOVERY
-			_deactivate_attack_hitbox()
-		if _state_time >= plunge_land_active_time + plunge_land_recovery_time:
-			_enter_state(State.IDLE)
 
 
 ## -- Combat: hits and recoil ---------------------------------------------------------
@@ -968,10 +947,80 @@ func _on_attack_hit(target: Node2D, attack_name: StringName) -> void:
 ## Any target with a `receive_hit(damage, source_position, attack_name)` method
 ## can be struck (see Enemy). A landed horizontal slash recoils Luz.
 func _resolve_attack_hit(target: Node2D, attack_name: StringName) -> void:
-	if _dead or not is_instance_valid(target) or not target.has_method(&"receive_hit"):
+	if _dead or not is_instance_valid(target):
 		return
-	if target.call(&"receive_hit", attack_damage, global_position, attack_name):
+	var struck := false
+	if target.has_method(&"receive_hit"):
+		struck = target.call(&"receive_hit", attack_damage, global_position, attack_name)
+	if attack_name == &"attack_down":
+		if struck or target.is_in_group(ContactDamage.POGO_GROUP):
+			_pogo()
+	elif struck:
 		_start_attack_recoil(target.global_position)
+
+
+## -- Combat: pogo down slash -----------------------------------------------------
+
+## Bounces her up at a fixed speed after a down slash connected, gives back her
+## air dash and double jump, and starts the hazard grace window. Once per slash.
+func _pogo() -> void:
+	if _state != State.AIR_ATTACK or not _air_attack_down or _pogo_bounced:
+		return
+	_pogo_bounced = true
+	_pogo_rising = true
+	_pogo_grace_left = pogo_grace_time
+	velocity.y = -sqrt(2.0 * _rise_gravity * pogo_height)
+	_restore_air_actions()
+	_deactivate_attack_hitbox()
+	_enter_state(State.JUMP)
+
+
+func _activate_down_slash() -> void:
+	var config := _activate_attack_hitbox(&"attack_down", _attack_facing)
+	_show_down_slash_mark(config.size, config.offset)
+
+
+## Placeholder for the missing art: a translucent box over the hitbox.
+func _show_down_slash_mark(size: Vector2, offset: Vector2) -> void:
+	if _down_slash_mark == null:
+		_down_slash_mark = Polygon2D.new()
+		_down_slash_mark.color = Color(1.0, 1.0, 1.0, 0.35)
+		_down_slash_mark.z_index = 1
+		add_child(_down_slash_mark)
+	var half := size * 0.5
+	_down_slash_mark.position = offset
+	_down_slash_mark.polygon = PackedVector2Array([
+		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
+		Vector2(half.x, half.y), Vector2(-half.x, half.y),
+	])
+	_down_slash_mark.visible = true
+
+
+## True while the active down slash covers the hazard whose contact is hurting
+## her (`source_position` is the hazard's centre). The slash then wins: the
+## bounce happens at once, even if the hitbox report has not arrived yet.
+func _down_slash_covers(source_position: Vector2) -> bool:
+	if _state != State.AIR_ATTACK or not _air_attack_down or _attack_phase != PHASE_ACTIVE:
+		return false
+	var shape := _attack_hitbox.get_node("CollisionShape2D") as CollisionShape2D
+	var size := (shape.shape as RectangleShape2D).size
+	var slash := Rect2(_attack_hitbox.global_position + shape.position - size * 0.5, size)
+	for node: Node in get_tree().get_nodes_in_group(ContactDamage.HAZARD_GROUP):
+		var hazard := node as ContactDamage
+		if hazard.global_position.is_equal_approx(source_position) and hazard.get_world_rect().intersects(slash):
+			return true
+	return false
+
+
+## Hazard damage is refused right after a pogo, and while the active down
+## slash covers the hazard (which pogoes immediately).
+func _pogo_shields(source_position: Vector2) -> bool:
+	if _pogo_grace_left > 0.0:
+		return true
+	if not _down_slash_covers(source_position):
+		return false
+	_pogo()
+	return true
 
 
 ## Pushes her away from `source` for a moment. Only the lateral attack states
@@ -1019,6 +1068,8 @@ func _activate_directional_attack(
 
 func _deactivate_attack_hitbox() -> void:
 	_attack_hitbox.deactivate()
+	if _down_slash_mark != null:
+		_down_slash_mark.visible = false
 
 
 func _hitbox_config_for(attack_name: StringName) -> Dictionary:
@@ -1031,10 +1082,8 @@ func _hitbox_config_for(attack_name: StringName) -> Dictionary:
 			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_air_offset_y)}
 		&"attack_up":
 			return {size = hitbox_up_size, offset = hitbox_up_offset}
-		&"attack_plunge":
-			return {size = hitbox_plunge_size, offset = hitbox_plunge_offset}
-		&"attack_plunge_land":
-			return {size = hitbox_plunge_land_size, offset = hitbox_plunge_land_offset}
+		&"attack_down":
+			return {size = hitbox_down_size, offset = hitbox_down_offset}
 		_:
 			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_ground_offset_y)}
 
@@ -1045,7 +1094,9 @@ func _update_airborne(delta: float) -> void:
 	if _wall_kick_lock_left <= 0.0:
 		_apply_air_horizontal_control(delta)
 
-	if Input.is_action_just_released(&"jump") and velocity.y < 0.0:
+	if velocity.y >= 0.0:
+		_pogo_rising = false
+	if Input.is_action_just_released(&"jump") and velocity.y < 0.0 and not _pogo_rising:
 		velocity.y *= jump_release_multiplier
 
 	_apply_gravity(delta)
@@ -1375,6 +1426,8 @@ func _enter_state(new_state: State) -> void:
 	_state_time = 0.0
 	if not _is_lateral_attack_state():
 		_recoil_left = 0.0
+	if new_state != State.JUMP:
+		_pogo_rising = false
 	if not _is_directional_attack_state():
 		_slash_vfx.stop_slash()
 
@@ -1469,6 +1522,8 @@ func _apply_damage(amount: int, source_position: Vector2, hazard: bool, force :=
 		return false
 	if not force and (_invuln_left > 0.0 or is_input_locked()):
 		return false
+	if hazard and not force and _pogo_shields(source_position):
+		return false
 	_health = maxi(_health - amount, 0)
 	health_changed.emit(_health, max_health)
 	damaged.emit(amount, _health)
@@ -1515,6 +1570,8 @@ func _knockback_from(source_position: Vector2) -> Vector2:
 func _cancel_actions_for_hit() -> void:
 	_deactivate_attack_hitbox()
 	_recoil_left = 0.0
+	_pogo_rising = false
+	_pogo_grace_left = 0.0
 	_attack_combo_index = 0
 	_attack_buffered_left = 0.0
 	_attack_restart_buffered_left = 0.0
@@ -1804,6 +1861,8 @@ func _cancel_inputs_for_transition() -> void:
 	_air_attack_buffered_left = 0.0
 	_attack_buffer_left = 0.0
 	_attack_buffer_direction = 0
+	_recoil_left = 0.0
+	_pogo_grace_left = 0.0
 	_deactivate_attack_hitbox()
 	_set_collider_height(_standing_shape_height)
 
@@ -1898,6 +1957,8 @@ func clear_transient_state() -> void:
 	_air_attack_buffered_left = 0.0
 	_attack_buffer_left = 0.0
 	_attack_buffer_direction = 0
+	_recoil_left = 0.0
+	_pogo_grace_left = 0.0
 	_clear_damage_state()
 	_set_collider_height(_standing_shape_height)
 	_deactivate_attack_hitbox()
@@ -2063,10 +2124,6 @@ func _update_animation() -> void:
 				_play_animation(&"fall" if velocity.y >= 0.0 else &"jump")
 		State.AIR_ATTACK:
 			_play_animation(&"air_attack")
-		State.PLUNGE:
-			_play_animation(&"plunge")
-		State.PLUNGE_LAND:
-			_play_animation(&"plunge_land")
 		State.HURT:
 			_play_animation(&"fall")
 		State.DEAD:

@@ -13,6 +13,11 @@ enum Kind { ENEMY, HAZARD }
 const PLAYER_LAYER := 1
 ## Hazards register here so the player can keep safe ground away from them.
 const HAZARD_GROUP := &"damage_hazard"
+## Hazards are also pogoable: the player's down slash bounces off them. Any
+## other node can opt in by joining POGO_GROUP and sitting on POGO_LAYER
+## (physics layer 5, "pogoable"), which the attack hitbox watches.
+const POGO_GROUP := &"pogoable"
+const POGO_LAYER := 16
 
 @export var damage := 1
 @export var kind := Kind.ENEMY
@@ -23,6 +28,8 @@ func _ready() -> void:
 	collision_mask = PLAYER_LAYER
 	if kind == Kind.HAZARD:
 		add_to_group(HAZARD_GROUP)
+		add_to_group(POGO_GROUP)
+		collision_layer = POGO_LAYER
 	var shape_node := get_node_or_null("CollisionShape2D") as CollisionShape2D
 	if shape_node != null and shape_node.shape != null:
 		# Instances of the scene would otherwise share one resizable shape.

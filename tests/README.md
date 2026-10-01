@@ -22,6 +22,9 @@ check names.
 - `enemy_test.gd`: the enemy base and the walker (patrol, ledges and walls,
   contact damage, hits, corpses), the three room persistence rules, off-room
   pausing and the player's hit recoil.
+- `pogo_test.gd`: the down slash pogo (bounce height, restored air actions,
+  hazard grace, missed slash, crouch attack on the ground, touch paths) and the
+  removal of the plunge.
 - `health_hud_test.gd`: the mask HUD (pips, loss and refill feedback, rebuild,
   safe area, presence in both levels).
 - `support/ritual_harness.gd`: shared state, game-clock waits, event recording.
