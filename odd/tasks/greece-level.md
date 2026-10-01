@@ -95,7 +95,33 @@ The user wants a playable Greece level as the base for the next mechanics (medal
   - Test `tests/greece_layout_test.gd`:
     - Data validation: rooms connected, critical-path steps and gaps within the metrics, gate 200 px tall (above the 130 px jump, below the ~260 px double jump) and not clingable.
     - Physics probes: spawn lands, the altar is reachable, and the gate blocks without the double jump.
-- [ ] T2 Per-room camera bounds (route TBD)
+- [x] T1b Make the shaft medal alcove require the jump + air dash (user request 2026-10-01: the 210 px gap was cosmetic; route: delegated, same writer as T2)
+  - Commit: `75e24c7` fix: require the dash to reach the shaft medal alcove (+299/-17).
+  - Geometry:
+    - A corridor off the shaft with a 160-tall window (y 1170..1330) under a thin 64 px lintel.
+    - Take-off sill x 1860..2040 at y 1330. Pit 220 wide (x 2040..2260) and 166 deep. Medal floor x 2260..2464, `Medal3` (2370,1330). `L1380` was replaced by `R1390`.
+  - No-dash worst case: the lintel caps the rise at 102 px, so edge jumps fall at least 45 px short (the test asserts at least 25). An air dash 0.15 to 0.4 s after take-off lands.
+  - Exit paths: a jump + dash back to the sill, walking off the sill to a shaft platform, or wall kicks out of the pit. No soft-lock.
+  - Tests: no-dash sweeps from every nearby surface, the dash route, and the exit. A mutation (pit 150 wide) fails both the model and the probes. The test also uses `GreeceLayout.DESK_POSITION` now.
+  - Risk: the gap holds only because of the lintel. Without it, the open-air no-dash reach is about 237, and the sweep test guards this.
+- [x] T2 Per-room camera bounds (route: delegated, writer trigger: camera + level + test files)
+  - Commit: `8ad315e` feat: clamp the camera to each Greece room (+533/-13). About 530 lines, above the 400 heuristic, because the new camera test is 356 lines.
+  - Camera API: `RoomCamera.set_room_bounds(rect, t)`, `clear_room_bounds(t)`, `get_room_bounds()`, and `bounds_transition_time` 0.35 s (`@export_group("Room Bounds")`).
+    - The clamp blends with a sine tween. A span smaller than the view is centred.
+    - `snap_to_target` finishes the blend. Desk focus clamps to the same rect. With no bounds it behaves as before.
+  - Rooms: `GreeceLayout.camera_bounds(room)` is the interior plus the 64 px wall, and the shaft bounds merge the alcove. `room_for(point, current)` has 24 px hysteresis, and doorways belong to no room.
+  - Level wiring: `greece_level.gd` applies the bounds per physics tick and snaps on `respawned` and `_ready`.
+  - Verification:
+    - Import clean.
+    - `greece_layout_test` PASS 58/58 (about 80 s; it runs real-time probes).
+    - `room_camera_bounds_test` PASS 38/38 (the parent re-ran it: 38/38).
+    - Ritual test PASS 259/259.
+    - Boot clean.
+    - The parent viewed the alcove and altar camera screenshots: the alcove geometry is correct, and the altar room is centred and framed.
+  - Review:
+    - Range `3dc23c8..8ad315e`, 11 paths, 870 lines. Assessed `medium`, `slice_budget_reached`. User GRANTED.
+    - Lineage `review-35a057613be8b193` (review-reliability): APPROVED, acknowledged. The reviewed boundary advances to `8ad315e`.
+  - Open (T4): doorway gaps show black void instead of room colour.
 - [ ] T3 Double-jump ability, gated, plus gate verification (route TBD)
 - [ ] T4 Art pass with juani's textures: NinePatch floors and walls, floating platforms, room backgrounds, decor (route TBD)
 - [ ] T5 Device playtest and adjustments
@@ -109,6 +135,8 @@ The user wants a playable Greece level as the base for the next mechanics (medal
 ## Progress
 - 2026-10-01: exploration done (movement, camera, level construction, desk, art, tests). Document created.
 - 2026-10-01: T1 done, `3dc23c8`, review approved.
+- 2026-10-01: T1b (alcove needs the dash, `75e24c7`) and T2 (room camera, `8ad315e`) done, review approved.
+- 2026-10-01: T1b (alcove needs the dash, `75e24c7`) and T2 (room camera, `8ad315e`) done, review approved.
 
 ## Next step
-T2, per-room camera bounds. The user may want to playtest T1 on device first.
+T3, gated double jump. A device playtest is advisable before T4.
