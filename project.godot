@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="politropia"
-run/main_scene="res://scenes/levels/level_01.tscn"
+run/main_scene="res://scenes/levels/greece_level.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 
