@@ -122,7 +122,28 @@ The user wants a playable Greece level as the base for the next mechanics (medal
     - Range `3dc23c8..8ad315e`, 11 paths, 870 lines. Assessed `medium`, `slice_budget_reached`. User GRANTED.
     - Lineage `review-35a057613be8b193` (review-reliability): APPROVED, acknowledged. The reviewed boundary advances to `8ad315e`.
   - Open (T4): doorway gaps show black void instead of room colour.
-- [ ] T3 Double-jump ability, gated, plus gate verification (route TBD)
+- [x] T3 Double-jump ability, gated, plus gate verification (route: delegated, writer trigger: player + level + tests)
+  - Commit: `9bbdc58` feat: add a gated double jump (about 540 lines, mostly the new 367-line test).
+  - Player:
+    - `@export_group("Double Jump")`: `can_double_jump` false, `double_jump_height` 130, `air_jumps` 1. API `unlock_double_jump()`, `has_double_jump()`, signal `ability_unlocked(&"double_jump")`.
+    - The air jump fires only on a fresh press after coyote time. It replaces vy, and the release multiplier applies.
+    - A stale buffered press stays a ground jump. `_restore_air_actions()` resets the dash and air jumps at every former `_air_dash_used = false` site.
+  - Greece: `DoubleJumpPlaceholder` (Area2D, group `greece_placeholder`) sits at `BossArena` and unlocks the double jump on touch. It is runtime only, not persisted. It will be replaced by the boss reward.
+  - Measured: double jump peak about 260 px. The scripted gate run peaks at 268 against the 200 px gate (68 px margin) and reaches the Medal4 side.
+  - Verification:
+    - Import clean.
+    - `double_jump_test` PASS 30/30 (the writer saw one earlier timing flake and fixed it by waiting on physics frames; the parent ran it twice: 30/30 both times).
+    - `greece_layout_test` PASS 66/66.
+    - `room_camera_bounds_test` PASS 38/38.
+    - Ritual test PASS 259/259.
+    - Boot clean.
+  - Review:
+    - Range `8ad315e..9bbdc58`, 8 paths, 572 lines. Assessed `medium`, `slice_budget_reached`. User GRANTED.
+    - Lineage `review-dc1c3d95a208bfc6`: APPROVED, acknowledged. The boundary advances to `9bbdc58`.
+  - Follow-ups:
+    - `greece_probe.gd` types `player` as `CharacterBody2D`.
+    - `double_jump_test` reads private members.
+    - Decision gap: a fresh press a few px before landing fires the air jump, not a ground jump.
 - [ ] T4 Art pass with juani's textures: NinePatch floors and walls, floating platforms, room backgrounds, decor (route TBD)
 - [ ] T5 Device playtest and adjustments
 
@@ -136,7 +157,9 @@ The user wants a playable Greece level as the base for the next mechanics (medal
 - 2026-10-01: exploration done (movement, camera, level construction, desk, art, tests). Document created.
 - 2026-10-01: T1 done, `3dc23c8`, review approved.
 - 2026-10-01: T1b (alcove needs the dash, `75e24c7`) and T2 (room camera, `8ad315e`) done, review approved.
+- 2026-10-01: T3 (gated double jump, `9bbdc58`) done, review approved.
 - 2026-10-01: T1b (alcove needs the dash, `75e24c7`) and T2 (room camera, `8ad315e`) done, review approved.
+- 2026-10-01: T3 (gated double jump, `9bbdc58`) done, review approved.
 
 ## Next step
-T3, gated double jump. A device playtest is advisable before T4.
+Device playtest of T1 to T3, then T4 art pass.
