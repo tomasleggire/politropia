@@ -14,6 +14,12 @@ const PLATFORM_THICKNESS := 20.0
 ## move on to another room, so a doorway never flickers between two.
 const ROOM_SWITCH_MARGIN := 24.0
 const GATE := Rect2(2780.0, 2520.0, 350.0, 200.0)
+const HORIZONTAL := &"horizontal"
+const VERTICAL := &"vertical"
+## How far inside a room (centre of the body) Luz appears after a doorway.
+const ARRIVAL_INSET := 20.0
+## Centre of the standing collider, relative to the feet the player node sits on.
+const BODY_CENTER_OFFSET := Vector2(0.0, -29.0)
 
 ## Medal alcove off the shaft: a corridor whose floor is a sill (take-off), a
 ## pit and the medal floor. Nothing in the shaft reaches past the sill, so the
@@ -95,7 +101,16 @@ static func room_for(point: Vector2, current: String) -> String:
 
 
 ## Openings between rooms. `rect` is the free passage; a wider-than-tall rect
-## is a vertical hole in a floor or ceiling.
+## is a vertical hole in a floor or ceiling. Besides the two rooms, every
+## entry carries what a room transition needs (all derived from the rects):
+##   orientation: HORIZONTAL (a side door) or VERTICAL (a hole).
+##   transitions: false when both rooms share one camera room (the alcove).
+##   from_side / to_side: which half of the passage belongs to each room, as
+##     the sign (-1 or 1) along the passage's long axis.
+##   from_arrival / to_arrival: where Luz's feet appear when she arrives into
+##     that room (inside the door for side doors, the room-side edge of a hole).
+##   from_lip / to_lip: y of the floor edge she must clear to enter that room
+##     from below, or NAN when there is none.
 static func doorways() -> Array[Dictionary]:
 	return [
 		_door("T1", "T2", _rect(1000, 404, 1064, 544)),
@@ -108,6 +123,68 @@ static func doorways() -> Array[Dictionary]:
 		_door("Entrada", "B2", _rect(1100, 2560, 1164, 2720)),
 		_door("B2", "B3", _rect(2000, 2560, 2064, 2720)),
 	]
+
+
+## The room the camera frames for `room_name`: the medal alcove belongs to the
+## shaft, so walking between them never changes room.
+static func camera_room(room_name: String) -> String:
+	return "Shaft" if room_name == "ShaftAlcove" else room_name
+
+
+## The room whose half of `door` holds `point`, or "" outside the passage (or
+## exactly on its middle line). A transition fires once the body centre is in
+## the half of the room it is not in, so merely touching a doorway is harmless.
+static func door_side_room(door: Dictionary, point: Vector2) -> String:
+	var rect: Rect2 = door["rect"]
+	if not rect.has_point(point):
+		return ""
+	var offset := point - rect.get_center()
+	var along: float = offset.x if door["orientation"] == HORIZONTAL else offset.y
+	if is_zero_approx(along):
+		return ""
+	var side := 1 if along > 0.0 else -1
+	return door["from"] if side == door["from_side"] else door["to"]
+
+
+## The transition that a body centre at `point` starts while the camera frames
+## `current`, as {door, from, to}; empty when there is none.
+static func transition_for(point: Vector2, current: String, doors: Array[Dictionary]) -> Dictionary:
+	for door: Dictionary in doors:
+		if not door["transitions"]:
+			continue
+		var target := door_side_room(door, point)
+		if target == "" or target == current:
+			continue
+		if current == door["from"] or current == door["to"]:
+			return {"door": door, "from": current, "to": target}
+	return {}
+
+
+## True when `point` is inside a passage of `current` that triggers room
+## transitions, where the camera room must not follow her position.
+static func in_transition_door(point: Vector2, current: String, doors: Array[Dictionary]) -> bool:
+	for door: Dictionary in doors:
+		var touches_current: bool = current == door["from"] or current == door["to"]
+		if door["transitions"] and touches_current and (door["rect"] as Rect2).has_point(point):
+			return true
+	return false
+
+
+## Unit vector Luz moves along when she goes through `door` into `into_room`.
+static func travel_direction(door: Dictionary, into_room: String) -> Vector2:
+	var side: int = door["from_side"] if into_room == door["from"] else door["to_side"]
+	return Vector2(side, 0) if door["orientation"] == HORIZONTAL else Vector2(0, side)
+
+
+## Feet position where Luz appears when she arrives into `into_room` through `door`.
+static func arrival_point(door: Dictionary, into_room: String) -> Vector2:
+	return door["from_arrival"] if into_room == door["from"] else door["to_arrival"]
+
+
+## y of the floor edge she must rise over to enter `into_room` through `door`
+## from below, or NAN when the way in has no lip.
+static func entry_lip_y(door: Dictionary, into_room: String) -> float:
+	return door["from_lip"] if into_room == door["from"] else door["to_lip"]
 
 
 static func solids() -> Array[Rect2]:
@@ -257,4 +334,42 @@ static func _rect(x0: float, y0: float, x1: float, y1: float) -> Rect2:
 
 
 static func _door(from_room: String, to_room: String, opening: Rect2) -> Dictionary:
-	return {"from": from_room, "to": to_room, "rect": opening}
+	var all := rooms()
+	var orientation := VERTICAL if opening.size.x > opening.size.y else HORIZONTAL
+	var from_side := _side_of(all[from_room], opening, orientation)
+	var to_side := _side_of(all[to_room], opening, orientation)
+	return {
+		"from": from_room,
+		"to": to_room,
+		"rect": opening,
+		"orientation": orientation,
+		"transitions": camera_room(from_room) != camera_room(to_room),
+		"from_side": from_side,
+		"to_side": to_side,
+		"from_arrival": _arrival(opening, orientation, from_side),
+		"to_arrival": _arrival(opening, orientation, to_side),
+		"from_lip": _lip(all[from_room], opening, orientation, from_side),
+		"to_lip": _lip(all[to_room], opening, orientation, to_side),
+	}
+
+
+## -1 or 1: on which side of the passage's middle line `room` lies.
+static func _side_of(room: Rect2, opening: Rect2, orientation: StringName) -> int:
+	var offset := room.get_center() - opening.get_center()
+	return 1 if (offset.x if orientation == HORIZONTAL else offset.y) > 0.0 else -1
+
+
+static func _arrival(opening: Rect2, orientation: StringName, side: int) -> Vector2:
+	if orientation == HORIZONTAL:
+		var edge := opening.end.x if side > 0 else opening.position.x
+		return Vector2(edge + float(side) * ARRIVAL_INSET, opening.end.y)
+	var edge_y := opening.end.y if side > 0 else opening.position.y
+	return Vector2(opening.get_center().x, edge_y)
+
+
+## Rising into a room whose interior ends where the hole begins means climbing
+## over the hole's upper edge, its floor lip.
+static func _lip(room: Rect2, opening: Rect2, orientation: StringName, side: int) -> float:
+	if orientation == VERTICAL and side < 0 and not room.intersects(opening):
+		return opening.position.y
+	return NAN

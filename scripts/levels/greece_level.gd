@@ -34,8 +34,15 @@ const HAZARD_COLOR := Color("c0392b")
 const HAZARD_STRIPE_COLOR := Color("1a0d0d")
 const HAZARD_STRIPE_WIDTH := 16.0
 const OUT_OF_BOUNDS_MARGIN := 200.0
-## Centre of the standing collider, relative to the feet the player node sits on.
-const BODY_CENTER_OFFSET := Vector2(0.0, -29.0)
+const BODY_CENTER_OFFSET := GreeceLayout.BODY_CENTER_OFFSET
+
+## Emitted when Luz moves from one camera room to another (a doorway
+## transition, or a respawn or hazard return that lands in a different room).
+## `from_room` and `to_room` are GreeceLayout room names, with the medal alcove
+## counted as part of "Shaft". Hook for the enemies step: what happens to
+## enemies when she leaves and re-enters a room is a pending product decision,
+## so nothing listens to this yet.
+signal room_changed(from_room: StringName, to_room: StringName)
 
 @onready var _player: Player = $Player
 @onready var _camera: RoomCamera = $RoomCamera
@@ -46,6 +53,8 @@ const BODY_CENTER_OFFSET := Vector2(0.0, -29.0)
 
 var _room := ""
 var _camera_bounds := Rect2()
+var _doors: Array[Dictionary] = []
+var _transition := RoomTransition.new()
 
 
 func _ready() -> void:
@@ -54,12 +63,17 @@ func _ready() -> void:
 	_player.position = GreeceLayout.SPAWN
 	_camera.target = _player
 	_camera.world_size = GreeceLayout.WORLD_SIZE
+	_doors = GreeceLayout.doorways()
 	_build_backgrounds()
 	_build_collision()
 	_build_markers()
 	_build_double_jump_placeholder()
 	_build_hazards()
-	_player.respawned.connect(_enter_room_snapped)
+	_transition.name = "RoomTransition"
+	_transition.setup(_player, _camera)
+	_transition.room_switched.connect(_on_room_switched)
+	add_child(_transition)
+	_player.respawned.connect(_on_player_reset)
 	_player.safe_ground_returned.connect(_enter_room_snapped)
 	CheckpointService.restore_player_for_scene(_player, scene_file_path)
 	_enter_room_snapped()
@@ -74,26 +88,61 @@ func _physics_process(_delta: float) -> void:
 	_follow_room()
 
 
-## Moves the camera onto the room Luz stands in, blending when it changes.
+## The camera room Luz is in (the alcove counts as the shaft).
+func get_room() -> StringName:
+	return StringName(_room)
+
+
+## Starts a doorway transition when her body centre crosses into the other
+## room's half of a passage. Anywhere else the camera room simply follows her
+## (a respawn or hazard return can land her in another room): bounds switch at
+## once, which is hidden by the fade those already play.
 func _follow_room() -> void:
-	var room := GreeceLayout.room_for(_player.global_position + BODY_CENTER_OFFSET, _room)
+	if _transition.is_active():
+		return
+	var center := _player.global_position + BODY_CENTER_OFFSET
+	if not _player.is_input_locked():
+		var crossing := GreeceLayout.transition_for(center, _room, _doors)
+		if not crossing.is_empty():
+			_transition.begin(crossing["door"], crossing["from"], crossing["to"])
+			return
+	if GreeceLayout.in_transition_door(center, _room, _doors):
+		return
+	var room := GreeceLayout.camera_room(GreeceLayout.room_for(center, _room))
 	if room != _room:
-		_room = room
-		_apply_camera_bounds(-1.0)
+		_switch_room(room)
 
 
-## After a spawn, respawn or checkpoint restore: pick the room and jump to it.
+func _on_room_switched(_from_room: String, to_room: String) -> void:
+	_set_room(to_room)
+	_camera_bounds = GreeceLayout.camera_bounds(to_room)
+
+
+## After a respawn: the death fade already covers the cut, and she wakes with
+## no doorway walk-out.
+func _on_player_reset() -> void:
+	_transition.abort()
+	_enter_room_snapped()
+
+
+## After a spawn, respawn, checkpoint restore or hazard return: pick the room
+## and jump to it.
 func _enter_room_snapped() -> void:
-	_room = GreeceLayout.room_for(_player.global_position + BODY_CENTER_OFFSET, "")
-	_apply_camera_bounds(0.0)
+	_switch_room(GreeceLayout.camera_room(GreeceLayout.room_for(_player.global_position + BODY_CENTER_OFFSET, "")))
+
+
+func _switch_room(room: String) -> void:
+	_set_room(room)
+	_camera_bounds = GreeceLayout.camera_bounds(room)
+	_camera.set_room_bounds(_camera_bounds, 0.0)
 	_camera.snap_to_target()
 
 
-func _apply_camera_bounds(transition_time: float) -> void:
-	var bounds := GreeceLayout.camera_bounds(_room)
-	if bounds != _camera_bounds or transition_time == 0.0:
-		_camera_bounds = bounds
-		_camera.set_room_bounds(bounds, transition_time)
+func _set_room(room: String) -> void:
+	var previous := _room
+	_room = room
+	if previous != "" and previous != room:
+		room_changed.emit(StringName(previous), StringName(room))
 
 
 func _build_backgrounds() -> void:

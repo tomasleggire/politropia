@@ -15,8 +15,6 @@ const WORLD := Vector2(4000.0, 3000.0)
 const TRANSITION := 0.35
 const SETTLE_SECONDS := 1.5
 const EPSILON := 1.0
-## Largest camera move in one frame that still reads as a glide, not a snap.
-const MAX_GLIDE_STEP := 45.0
 
 const CHECKS := {
 	"case_bounds_clamp": 4,
@@ -295,31 +293,30 @@ func case_probe_camera_crossing() -> void:
 	var next_room := GreeceLayout.camera_bounds("B2")
 	await _probe.place(Vector2(1040.0, 2719.0))
 	Input.action_press(&"move_right")
-	var timing := await _watch_crossing(cam, entrada, next_room)
+	var seen := await _watch_crossing(cam, entrada, next_room)
 	_probe.release_all()
-	check(timing.arrived, "crossing the doorway ends on the B2 bounds")
-	check(timing.duration >= TRANSITION * 0.6 and timing.duration <= TRANSITION + 0.15, "bounds blend took %.2fs (about %.2fs)" % [timing.duration, TRANSITION])
-	check(timing.max_step < MAX_GLIDE_STEP, "camera moved at most %.0f px in a frame while crossing" % timing.max_step)
+	check(seen.arrived, "crossing the doorway ends on the B2 bounds")
+	check(not seen.blended, "the bounds jump from Entrada to B2 with no blended rect in between")
+	check(seen.cut_alpha >= 0.95, "the cut happens behind the dark fade (alpha %.2f)" % seen.cut_alpha)
 	await _wait(SETTLE_SECONDS)
 	check(_view_respects(cam, next_room), "camera settles inside the B2 bounds")
 
 
-## Watches the camera until its bounds are `next_room`. Returns whether they
-## got there, how long the blend lasted and the largest camera step per frame.
+## Watches every frame until the camera bounds are `next_room`. Reports whether
+## they got there, whether any other rect was ever visible and the fade alpha on
+## the frame the bounds switched.
 func _watch_crossing(cam: RoomCamera, entrada: Rect2, next_room: Rect2) -> Dictionary:
-	var result := {"arrived": false, "duration": 0.0, "max_step": 0.0}
-	var started := -1.0
-	var last_position := cam.global_position
+	var result := {"arrived": false, "blended": false, "cut_alpha": -1.0}
+	var fade := (_probe.player as Player).get_screen_fade()
 	var give_up := _probe.clock + 4.0
 	while _probe.clock < give_up and not result.arrived:
 		await process_frame
-		result.max_step = maxf(result.max_step, cam.global_position.distance_to(last_position))
-		last_position = cam.global_position
-		if started < 0.0 and not _rects_match(cam.get_room_bounds(), entrada):
-			started = _probe.clock
-		result.arrived = _rects_match(cam.get_room_bounds(), next_room)
-		if result.arrived and started >= 0.0:
-			result.duration = _probe.clock - started
+		var bounds := cam.get_room_bounds()
+		result.arrived = _rects_match(bounds, next_room)
+		if result.arrived:
+			result.cut_alpha = fade.get_alpha()
+		elif not _rects_match(bounds, entrada):
+			result.blended = true
 	return result
 
 

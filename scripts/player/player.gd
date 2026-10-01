@@ -281,6 +281,9 @@ var _base_alpha := 1.0
 var _return_phase := ReturnPhase.NONE
 var _return_left := 0.0
 var _fade: ScreenFade
+var _transition_locked := false
+var _auto_walk := 0
+var _keep_momentum := false
 var _last_safe_ground := Vector2.ZERO
 var _has_safe_ground := false
 var _ground_time := 0.0
@@ -1439,6 +1442,7 @@ func _apply_damage(amount: int, source_position: Vector2, hazard: bool, force :=
 func fall_out_of_bounds() -> bool:
 	if _dead or _return_phase != ReturnPhase.NONE:
 		return false
+	_end_room_transition()
 	if not _apply_damage(1, global_position, true, true):
 		return false
 	velocity = Vector2.ZERO
@@ -1510,9 +1514,16 @@ func _begin_safe_return() -> void:
 	velocity = Vector2.ZERO
 	_return_phase = ReturnPhase.OUT
 	_return_left = maxf(hazard_fade_out, 0.001)
+	get_screen_fade()
+
+
+## The one full-screen veil the player owns. Hazard returns and room
+## transitions both drive it, and never at the same time.
+func get_screen_fade() -> ScreenFade:
 	if _fade == null:
 		_fade = ScreenFade.new()
 		add_child(_fade)
+	return _fade
 
 
 func _update_return(delta: float) -> void:
@@ -1643,7 +1654,7 @@ func restore_full_health() -> void:
 ## True while gameplay input is ignored, either by an explicit lock or because
 ## the player is meditating.
 func is_input_locked() -> bool:
-	return _input_locked or _meditating or _dead or _return_phase != ReturnPhase.NONE
+	return _input_locked or _meditating or _dead or _transition_locked or _return_phase != ReturnPhase.NONE
 
 
 func is_meditating() -> bool:
@@ -1656,6 +1667,88 @@ func set_input_locked(locked: bool) -> void:
 	_input_locked = locked
 	if locked:
 		clear_transient_state()
+
+
+## -- Room transitions ---------------------------------------------------------
+
+## Locks input for a room change. A non-zero `walk_direction` (-1 or 1) walks
+## her that way at run speed; 0 keeps her momentum instead, for vertical
+## openings. Hits are refused while it lasts, like any input lock.
+func begin_room_transition(walk_direction: int) -> void:
+	_transition_locked = true
+	_auto_walk = signi(walk_direction)
+	_keep_momentum = _auto_walk == 0
+	_cancel_inputs_for_transition()
+	if _auto_walk != 0:
+		_facing = _auto_walk
+	else:
+		velocity.x = clampf(velocity.x, -run_max_speed, run_max_speed)
+
+
+func end_room_transition() -> void:
+	_end_room_transition()
+
+
+func is_in_room_transition() -> bool:
+	return _transition_locked
+
+
+## True while the hazard return owns the screen veil.
+func is_returning_to_safe_ground() -> bool:
+	return _return_phase != ReturnPhase.NONE
+
+
+## Stops the auto-walk but keeps the lock.
+func stop_auto_walk() -> void:
+	_auto_walk = 0
+
+
+## Puts her feet at `feet`, at rest, facing `facing` (-1 or 1).
+func place_for_transition(feet: Vector2, facing: int) -> void:
+	global_position = feet
+	velocity = Vector2.ZERO
+	_facing = 1 if facing >= 0 else -1
+	_sprite.flip_h = _facing < 0
+	reset_physics_interpolation()
+
+
+## Makes sure she rises at least `height` px from here (never slows a faster
+## rise), so a transition can lift her over the lip of an opening.
+func boost_upward(height: float) -> void:
+	if height > 0.0:
+		velocity.y = minf(velocity.y, -sqrt(2.0 * _rise_gravity * height))
+
+
+func get_facing() -> int:
+	return _facing
+
+
+func _end_room_transition() -> void:
+	if not _transition_locked:
+		return
+	_transition_locked = false
+	_auto_walk = 0
+	_cancel_inputs_for_transition()
+
+
+func _cancel_inputs_for_transition() -> void:
+	set_collision_mask_value(2, true)
+	_drop_left = 0.0
+	_coyote_left = 0.0
+	_jump_buffer_left = 0.0
+	_jump_press_pending = false
+	_dash_cooldown_left = 0.0
+	_wall_jump_lock_left = 0.0
+	_wall_kick_lock_left = 0.0
+	_wall_kick_pending = false
+	_attack_combo_index = 0
+	_attack_buffered_left = 0.0
+	_attack_restart_buffered_left = 0.0
+	_air_attack_buffered_left = 0.0
+	_attack_buffer_left = 0.0
+	_attack_buffer_direction = 0
+	_deactivate_attack_hitbox()
+	_set_collider_height(_standing_shape_height)
 
 
 ## Locks input and lets the player keep processing while the tree is paused,
@@ -1727,6 +1820,8 @@ func exit_meditation() -> void:
 ## handed back (or taken away) from a clean idle state.
 func clear_transient_state() -> void:
 	velocity = Vector2.ZERO
+	_transition_locked = false
+	_auto_walk = 0
 	set_collision_mask_value(2, true)
 	_drop_left = 0.0
 	_coyote_left = 0.0
@@ -1791,7 +1886,7 @@ func _update_locked(delta: float) -> void:
 		_enter_state(resting_state)
 
 	var fall_speed_before_move := velocity.y
-	velocity.x = 0.0
+	velocity.x = _locked_horizontal_velocity()
 	if is_on_floor():
 		velocity.y = 0.0
 	else:
@@ -1799,6 +1894,17 @@ func _update_locked(delta: float) -> void:
 	move_and_slide()
 	_after_move(fall_speed_before_move)
 	_update_animation()
+
+
+## Walks at run speed during a doorway transition, keeps momentum during a
+## vertical one, and stands still for every other lock.
+func _locked_horizontal_velocity() -> float:
+	if _transition_locked and _auto_walk != 0:
+		_facing = _auto_walk
+		return float(_auto_walk) * run_max_speed
+	if _transition_locked and _keep_momentum:
+		return velocity.x
+	return 0.0
 
 
 ## -- Checkpoints / respawn -----------------------------------------------------
