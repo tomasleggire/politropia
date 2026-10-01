@@ -19,6 +19,8 @@ check names.
   and the real camera in the Greece level.
 - `combat_test.gd`: damage, i-frames, knockback, control lock, hit-stop, death,
   respawn and the `ContactDamage` component on a synthetic floor.
+- `health_hud_test.gd`: the mask HUD (pips, loss and refill feedback, rebuild,
+  safe area, presence in both levels).
 - `support/ritual_harness.gd`: shared state, game-clock waits, event recording.
 - `support/ritual_celebration_recorder.gd`: per-frame beat recorder.
 - `support/ritual_flow_cases.gd`, `ritual_fx_cases.gd`, `ritual_trail_cases.gd`:
