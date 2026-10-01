@@ -15190,6 +15190,7 @@ position = Vector2(344, 400)
 
 [node name="Camera2D" type="Camera2D" parent="Player2" unique_id=474008919]
 position = Vector2(0, -80)
+zoom = Vector2(1.5, 1.5)
 script = ExtResource("26_a34q0")
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
