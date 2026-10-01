@@ -10,6 +10,9 @@ const SPAWN := Vector2(760.0, 2720.0)
 const DESK_POSITION := Vector2(1050.0, 1200.0)
 const WALL := 64.0
 const PLATFORM_THICKNESS := 20.0
+## A body must leave its room's interior by this much before the camera may
+## move on to another room, so a doorway never flickers between two.
+const ROOM_SWITCH_MARGIN := 24.0
 const GATE := Rect2(2780.0, 2520.0, 350.0, 200.0)
 
 ## Medal alcove off the shaft: a corridor whose floor is a sill (take-off), a
@@ -57,6 +60,33 @@ static func rooms() -> Dictionary:
 		"B2": _rect(1164, 2240, 2000, 2720),
 		"B3": _rect(2064, 2360, 3500, 2720),
 	}
+
+
+## Camera clamp rect for `room_name`: its interior plus the surrounding walls,
+## so floors and walls stay in view. The medal alcove is part of the shaft.
+static func camera_bounds(room_name: String) -> Rect2:
+	var all := rooms()
+	if room_name != "Shaft" and room_name != "ShaftAlcove":
+		return all[room_name].grow(WALL)
+	var shaft: Rect2 = all["Shaft"]
+	var alcove: Rect2 = all["ShaftAlcove"]
+	return shaft.grow(WALL).merge(alcove.grow(WALL))
+
+
+## Room the camera frames for a body centre at `point`. `current` is kept until
+## the point sits inside another room's interior, and while it stays within the
+## switch margin of `current`; doorways belong to neither room.
+static func room_for(point: Vector2, current: String) -> String:
+	var all := rooms()
+	if current != "" and all[current].grow(ROOM_SWITCH_MARGIN).has_point(point):
+		return current
+	for room_name: String in all:
+		var interior: Rect2 = all[room_name]
+		if interior.has_point(point):
+			return room_name
+	if current != "":
+		return current
+	return _nearest_room(point, all)
 
 
 ## Openings between rooms. `rect` is the free passage; a wider-than-tall rect
@@ -189,6 +219,22 @@ static func _shaft_one_ways() -> Array[Rect2]:
 		var x := SHAFT_X0 if step[0] == "L" else SHAFT_X1 - width
 		list.append(_platform(x, step[1], width))
 	return list
+
+
+static func _nearest_room(point: Vector2, all: Dictionary) -> String:
+	var best := ""
+	var best_distance := INF
+	for room_name: String in all:
+		var interior: Rect2 = all[room_name]
+		var nearest := Vector2(
+			clampf(point.x, interior.position.x, interior.end.x),
+			clampf(point.y, interior.position.y, interior.end.y)
+		)
+		var distance := point.distance_to(nearest)
+		if distance < best_distance:
+			best_distance = distance
+			best = room_name
+	return best
 
 
 static func _platform(x: float, top: float, width: float) -> Rect2:

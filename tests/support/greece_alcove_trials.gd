@@ -38,8 +38,9 @@ func on_sill() -> bool:
 
 
 ## Starts at `start`, runs toward `direction`, presses jump once the body centre
-## passes `trigger_x` (or after a timeout, if a wall stops it) and holds it for `hold` seconds. A negative `dash_delay`
-## means no dash; otherwise Luz dashes that long after the jump press.
+## passes `trigger_x` (or after a timeout, if a wall stops it) and holds it for
+## `hold` seconds. A negative `dash_delay` means no dash; otherwise Luz dashes
+## that long after the jump press.
 func run_jump(start: Vector2, direction: float, trigger_x: float, hold: float, dash_delay: float) -> void:
 	await _begin(start)
 	Input.action_press(_toward(direction))

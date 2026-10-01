@@ -1,7 +1,8 @@
 extends Node2D
 
 ## Greece level skeleton: builds placeholder collision and visuals from
-## GreeceLayout. Art, per-room camera bounds and abilities come in later tasks.
+## GreeceLayout and clamps the camera to the room Luz is in. Art and abilities
+## come in later tasks.
 
 const VOID_COLOR := Color("05060a")
 const SOLID_COLOR := Color("3a3f4d")
@@ -26,6 +27,8 @@ const MARKER_COLORS := {
 }
 const MARKER_RADIUS := 14.0
 const OUT_OF_BOUNDS_MARGIN := 200.0
+## Centre of the standing collider, relative to the feet the player node sits on.
+const BODY_CENTER_OFFSET := Vector2(0.0, -29.0)
 
 @onready var _player: Player = $Player
 @onready var _camera: RoomCamera = $RoomCamera
@@ -33,6 +36,9 @@ const OUT_OF_BOUNDS_MARGIN := 200.0
 @onready var _backgrounds: Node2D = $Backgrounds
 @onready var _solids: Node2D = $Solids
 @onready var _markers: Node2D = $Markers
+
+var _room := ""
+var _camera_bounds := Rect2()
 
 
 func _ready() -> void:
@@ -44,8 +50,9 @@ func _ready() -> void:
 	_build_backgrounds()
 	_build_collision()
 	_build_markers()
+	_player.respawned.connect(_enter_room_snapped)
 	CheckpointService.restore_player_for_scene(_player, scene_file_path)
-	_camera.snap_to_target()
+	_enter_room_snapped()
 
 
 func _physics_process(_delta: float) -> void:
@@ -53,7 +60,30 @@ func _physics_process(_delta: float) -> void:
 		return
 	if _player.global_position.y > GreeceLayout.WORLD_SIZE.y + OUT_OF_BOUNDS_MARGIN:
 		_player.respawn()
-		_camera.snap_to_target()
+		return
+	_follow_room()
+
+
+## Moves the camera onto the room Luz stands in, blending when it changes.
+func _follow_room() -> void:
+	var room := GreeceLayout.room_for(_player.global_position + BODY_CENTER_OFFSET, _room)
+	if room != _room:
+		_room = room
+		_apply_camera_bounds(-1.0)
+
+
+## After a spawn, respawn or checkpoint restore: pick the room and jump to it.
+func _enter_room_snapped() -> void:
+	_room = GreeceLayout.room_for(_player.global_position + BODY_CENTER_OFFSET, "")
+	_apply_camera_bounds(0.0)
+	_camera.snap_to_target()
+
+
+func _apply_camera_bounds(transition_time: float) -> void:
+	var bounds := GreeceLayout.camera_bounds(_room)
+	if bounds != _camera_bounds or transition_time == 0.0:
+		_camera_bounds = bounds
+		_camera.set_room_bounds(bounds, transition_time)
 
 
 func _build_backgrounds() -> void:

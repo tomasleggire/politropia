@@ -11,6 +11,10 @@ check names.
 ## Layout
 
 - `stillness_desk_ritual_test.gd`: the single entrypoint (runner and reporter).
+- `greece_layout_test.gd`: Greece layout data, reachability model and physics
+  probes (including the medal alcove); helpers in `support/greece_*.gd`.
+- `room_camera_bounds_test.gd`: per-room camera clamp and blend, room selection
+  and the real camera in the Greece level.
 - `support/ritual_harness.gd`: shared state, game-clock waits, event recording.
 - `support/ritual_celebration_recorder.gd`: per-frame beat recorder.
 - `support/ritual_flow_cases.gd`, `ritual_fx_cases.gd`, `ritual_trail_cases.gd`:
