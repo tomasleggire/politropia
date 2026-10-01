@@ -29,6 +29,11 @@ const MEDAL_FLOOR_START := Vector2(2320.0, 1329.0)
 const EDGE_JUMP_OFFSETS: Array[float] = [-40.0, -20.0, -10.0, 0.0, 10.0, 20.0, 28.0, 34.0]
 ## The shaft approaches only need to fail, so they run faster than real time.
 const APPROACH_TIME_SCALE := 3.0
+## Scripted double jump over the gate: take-off distance, delay of the second
+## press, and the least headroom above the gate top the jump must leave.
+const GATE_TAKEOFF_DISTANCE := 110.0
+const GATE_DOUBLE_JUMP_DELAY := 0.30
+const GATE_MIN_MARGIN := 40.0
 const DASH_DELAYS: Array[float] = [0.15, 0.3, 0.4]
 
 const CHECKS := {
@@ -43,6 +48,8 @@ const CHECKS := {
 	"case_shaft_steps": 2,
 	"case_probe_spawn": 3,
 	"case_probe_gate_blocks": 3,
+	"case_probe_gate_double_jump": 4,
+	"case_probe_placeholder_unlocks": 4,
 	"case_probe_drop_through": 2,
 	"case_probe_alcove_no_dash": 2,
 	"case_probe_alcove_edge_sweep": 2,
@@ -389,3 +396,29 @@ func case_probe_alcove_return() -> void:
 	check(player.is_on_floor() and player.global_position.x < Trials.SILL_START + 19.0, "walking off the sill drops onto a shaft platform")
 	await _trials.wall_kicks(Vector2(2150.0, GreeceLayout.ALCOVE_PIT_FLOOR_Y - 1.0), -1.0, 6.0)
 	check(_trials.reached_sill, "from the pit floor, wall kicks on the sill climb back out")
+
+
+func case_probe_gate_double_jump() -> void:
+	await _probe.load_level()
+	_probe.player.unlock_double_jump()
+	var gate := GreeceLayout.GATE
+	var peak: float = await _probe.run_double_jump(Vector2(gate.position.x - GATE_TAKEOFF_DISTANCE, 2720.0), 1.0, GATE_DOUBLE_JUMP_DELAY, 0.7)
+	var margin := (2720.0 - peak) - gate.size.y
+	check(margin >= GATE_MIN_MARGIN, "gate: the double jump tops the gate with %.0f px to spare" % margin)
+	var landed: bool = await _probe.wait_for_floor(2700.0, 4.0)
+	var player := _probe.player
+	check(landed and player.global_position.x > gate.end.x, "gate: walks off the gate and lands past its edge (x %.0f)" % player.global_position.x)
+	await _probe.secs(1.5)
+	_probe.release_all()
+	check(player.global_position.x > GreeceLayout.markers()["Medal4"].x - 20.0, "gate: Luz runs on to the Medal4 side (x %.0f)" % player.global_position.x)
+	check(player.is_on_floor() and player.global_position.y > 2700.0, "gate: Luz ends on the B3 floor, not on top of the gate")
+
+
+func case_probe_placeholder_unlocks() -> void:
+	await _probe.load_level()
+	var pickup := _probe.level.get_node("Markers/DoubleJumpPlaceholder") as Area2D
+	check(pickup.is_in_group(&"greece_placeholder"), "placeholder: pickup is in the greece_placeholder group")
+	check(not _probe.player.has_double_jump(), "placeholder: Luz starts without the double jump")
+	await _probe.place(GreeceLayout.markers()["BossArena"])
+	check(_probe.player.has_double_jump(), "placeholder: touching it unlocks the double jump")
+	check(not pickup.visible, "placeholder: the pickup hides itself after the touch")

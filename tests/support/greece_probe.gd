@@ -74,3 +74,38 @@ func hop_dash_toward(direction: float, duration: float) -> float:
 		best = maxf(best, player.global_position.x) if direction > 0.0 else minf(best, player.global_position.x)
 	Input.action_release(action)
 	return best
+
+
+## Standing at `start`, runs toward `direction`, jumps (held to the apex),
+## then double jumps `delay` seconds after the first press and holds it.
+## Returns the highest point reached (smallest y) during the manoeuvre. The run
+## key stays held: the caller releases it.
+func run_double_jump(start: Vector2, direction: float, delay: float, hold: float) -> float:
+	var action: StringName = &"move_right" if direction > 0.0 else &"move_left"
+	await place(start)
+	var peak := player.global_position.y
+	Input.action_press(action)
+	Input.action_press(&"jump")
+	var end := clock + delay
+	while clock < end:
+		await tree.process_frame
+		peak = minf(peak, player.global_position.y)
+	Input.action_release(&"jump")
+	await frames(TAP_HOLD_FRAMES)
+	Input.action_press(&"jump")
+	end = clock + hold
+	while clock < end:
+		await tree.process_frame
+		peak = minf(peak, player.global_position.y)
+	Input.action_release(&"jump")
+	return peak
+
+
+## Waits until the player stands on a floor at or below `min_y`; false on timeout.
+func wait_for_floor(min_y: float, timeout: float) -> bool:
+	var end := clock + timeout
+	while clock < end:
+		await tree.process_frame
+		if player.is_on_floor() and player.global_position.y >= min_y:
+			return true
+	return false

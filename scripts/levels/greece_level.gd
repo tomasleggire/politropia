@@ -26,6 +26,9 @@ const MARKER_COLORS := {
 	"greece_double_jump_gate": Color("b07cf0"),
 }
 const MARKER_RADIUS := 14.0
+const PLAYER_COLLISION_LAYER := 1
+const PLACEHOLDER_COLOR := Color("fff2a8")
+const PLACEHOLDER_PICKUP_RADIUS := 26.0
 const OUT_OF_BOUNDS_MARGIN := 200.0
 ## Centre of the standing collider, relative to the feet the player node sits on.
 const BODY_CENTER_OFFSET := Vector2(0.0, -29.0)
@@ -50,6 +53,7 @@ func _ready() -> void:
 	_build_backgrounds()
 	_build_collision()
 	_build_markers()
+	_build_double_jump_placeholder()
 	_player.respawned.connect(_enter_room_snapped)
 	CheckpointService.restore_player_for_scene(_player, scene_file_path)
 	_enter_room_snapped()
@@ -113,6 +117,33 @@ func _build_markers() -> void:
 		marker.add_to_group(group)
 		marker.add_child(_make_diamond(MARKER_COLORS[group]))
 		_markers.add_child(marker)
+
+
+## Temporary stand-in for the boss reward: touching it unlocks the double jump
+## for this run only (nothing is persisted).
+func _build_double_jump_placeholder() -> void:
+	var pickup := Area2D.new()
+	pickup.name = "DoubleJumpPlaceholder"
+	pickup.position = GreeceLayout.markers()["BossArena"] + BODY_CENTER_OFFSET
+	pickup.collision_layer = 0
+	pickup.collision_mask = PLAYER_COLLISION_LAYER
+	pickup.add_to_group(&"greece_placeholder")
+	var circle := CircleShape2D.new()
+	circle.radius = PLACEHOLDER_PICKUP_RADIUS
+	var shape := CollisionShape2D.new()
+	shape.shape = circle
+	pickup.add_child(shape)
+	pickup.add_child(_make_diamond(PLACEHOLDER_COLOR))
+	pickup.body_entered.connect(_on_double_jump_placeholder_touched.bind(pickup))
+	_markers.add_child(pickup)
+
+
+func _on_double_jump_placeholder_touched(body: Node2D, pickup: Area2D) -> void:
+	if body != _player:
+		return
+	_player.unlock_double_jump()
+	pickup.hide()
+	pickup.set_deferred("monitoring", false)
 
 
 func _make_diamond(color: Color) -> Polygon2D:

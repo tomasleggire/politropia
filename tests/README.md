@@ -13,6 +13,8 @@ check names.
 - `stillness_desk_ritual_test.gd`: the single entrypoint (runner and reporter).
 - `greece_layout_test.gd`: Greece layout data, reachability model and physics
   probes (including the medal alcove); helpers in `support/greece_*.gd`.
+- `double_jump_test.gd`: the gated double jump (off by default, air jump count,
+  resets, jump buffer, unlock signal) on a synthetic floor.
 - `room_camera_bounds_test.gd`: per-room camera clamp and blend, room selection
   and the real camera in the Greece level.
 - `support/ritual_harness.gd`: shared state, game-clock waits, event recording.

@@ -7,6 +7,8 @@ extends CharacterBody2D
 ## a 3-hit ground combo, up/air/crouch attacks and a down plunge.
 
 signal respawned
+## Emitted when a gated movement ability is granted (e.g. &"double_jump").
+signal ability_unlocked(ability: StringName)
 signal health_changed(current: int, maximum: int)
 signal meditation_started
 signal meditation_finished
@@ -48,6 +50,14 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var max_fall_speed := 900.0
 @export var coyote_time := 0.08
 @export var jump_buffer_time := 0.10
+
+@export_group("Double Jump")
+## Gated ability, off until unlock_double_jump() (the Greece boss reward).
+@export var can_double_jump := false
+## Rise of an air jump, launched with the same rise gravity as the main jump.
+@export var double_jump_height := 130.0
+## Extra jumps available per airborne period.
+@export var air_jumps := 1
 
 @export_group("Air Control")
 @export var air_acceleration := 2600.0
@@ -232,10 +242,16 @@ var _default_process_mode := Node.PROCESS_MODE_INHERIT
 var _rise_gravity := 0.0
 var _fall_gravity := 0.0
 var _jump_velocity := 0.0
+var _double_jump_velocity := 0.0
 var _standing_shape_height := 58.0
 
 var _coyote_left := 0.0
 var _jump_buffer_left := 0.0
+## True only on the physics frame a jump press arrives (keyboard edge or touch
+## request). Air jumps need a fresh press; stale buffered ones stay ground jumps.
+var _jump_pressed_now := false
+var _jump_press_pending := false
+var _air_jumps_left := 0
 var _landing_left := 0.0
 var _footstep_left := 0.0
 var _was_on_floor := false
@@ -297,6 +313,7 @@ func _ready() -> void:
 	_health = max_health
 	_default_process_mode = process_mode
 	_recompute_jump_physics()
+	_air_jumps_left = air_jumps
 
 	var shape := _collision_shape.shape as RectangleShape2D
 	_standing_shape_height = shape.size.y
@@ -314,6 +331,7 @@ func _ready() -> void:
 func _recompute_jump_physics() -> void:
 	_rise_gravity = (2.0 * jump_height) / (jump_time_to_apex * jump_time_to_apex)
 	_jump_velocity = -_rise_gravity * jump_time_to_apex
+	_double_jump_velocity = -sqrt(2.0 * _rise_gravity * double_jump_height)
 	_fall_gravity = _rise_gravity * fall_gravity_multiplier
 
 
@@ -391,6 +409,8 @@ func _update_shared_timers(delta: float) -> void:
 		if _drop_left <= 0.0:
 			set_collision_mask_value(2, true)
 
+	_jump_pressed_now = _jump_press_pending or Input.is_action_just_pressed(&"jump")
+	_jump_press_pending = false
 	if Input.is_action_just_pressed(&"jump"):
 		_jump_buffer_left = jump_buffer_time
 	else:
@@ -552,6 +572,7 @@ func request_jump() -> void:
 		_request_rest_exit()
 		return
 	_jump_buffer_left = jump_buffer_time
+	_jump_press_pending = true
 
 
 ## Touch UI entry point for the dash button; same same-frame-miss guard as
@@ -914,7 +935,7 @@ func _update_airborne(delta: float) -> void:
 			return
 		if _try_start_wall_cling():
 			return
-		if _try_launch_jump():
+		if _try_launch_jump() or _try_air_jump():
 			return
 
 	_state = State.JUMP if velocity.y < 0.0 else State.FALL
@@ -948,6 +969,43 @@ func _try_launch_jump() -> bool:
 	_sfx_jump.play()
 	_enter_state(State.JUMP)
 	return true
+
+
+## Spends one air jump on a fresh press once the ground/coyote jump is no
+## longer possible. A stale buffered press never gets here: it stays a ground
+## jump for the landing. Replaces vy, so the variable-height release applies.
+func _try_air_jump() -> bool:
+	if not can_double_jump or _air_jumps_left <= 0 or not _jump_pressed_now:
+		return false
+	if is_on_floor() or _coyote_left > 0.0:
+		return false
+	_air_jumps_left -= 1
+	velocity.y = _double_jump_velocity
+	_jump_buffer_left = 0.0
+	_sfx_jump.play()
+	_enter_state(State.JUMP)
+	_restart_jump_animation()
+	return true
+
+
+func _restart_jump_animation() -> void:
+	_sprite.stop()
+	_play_animation(&"jump")
+
+
+func _restore_air_actions() -> void:
+	_air_dash_used = false
+	_air_jumps_left = air_jumps
+
+
+func unlock_double_jump() -> void:
+	can_double_jump = true
+	_air_jumps_left = air_jumps
+	ability_unlocked.emit(&"double_jump")
+
+
+func has_double_jump() -> bool:
+	return can_double_jump
 
 
 ## -- Dash / slide -------------------------------------------------------------
@@ -1087,7 +1145,7 @@ func _try_start_wall_cling() -> bool:
 	if not _is_holding_toward_wall(_facing):
 		return false
 	_wall_direction = _facing
-	_air_dash_used = false
+	_restore_air_actions()
 	_enter_state(State.WALL_CLING)
 	return true
 
@@ -1152,7 +1210,7 @@ func _try_start_ledge_hang() -> bool:
 		return false
 	if not _is_wall_ray(_wall_check_chest) or _ledge_check_above.is_colliding():
 		return false
-	_air_dash_used = false
+	_restore_air_actions()
 	_snap_to_ledge()
 	_enter_state(State.LEDGE_HANG)
 	return true
@@ -1364,7 +1422,8 @@ func clear_transient_state() -> void:
 	_jump_buffer_left = 0.0
 	_landing_left = 0.0
 	_dash_cooldown_left = 0.0
-	_air_dash_used = false
+	_restore_air_actions()
+	_jump_press_pending = false
 	_wall_recling_lock = 0.0
 	_wall_jump_lock_left = 0.0
 	_wall_kick_lock_left = 0.0
@@ -1441,7 +1500,7 @@ func respawn() -> void:
 	reset_physics_interpolation()
 	_set_collider_height(_standing_shape_height)
 	_deactivate_attack_hitbox()
-	_air_dash_used = false
+	_restore_air_actions()
 	_enter_state(State.IDLE)
 	respawned.emit()
 
@@ -1453,7 +1512,7 @@ func _after_move(fall_speed_before_move: float) -> void:
 		_landing_left = landing_squash_time
 		_sfx_land.play()
 	if not _was_on_floor and is_on_floor():
-		_air_dash_used = false
+		_restore_air_actions()
 	if is_on_floor() and (_state == State.JUMP or _state == State.FALL):
 		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
 	_was_on_floor = is_on_floor()
