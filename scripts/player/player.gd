@@ -10,6 +10,11 @@ signal respawned
 signal health_changed(current: int, maximum: int)
 signal meditation_started
 signal meditation_finished
+## Emitted while meditating when the player gives gameplay input (a fresh
+## press or a touch request); the resting desk decides whether to release.
+signal rest_exit_requested
+signal rest_animation_finished(animation_name: StringName)
+signal rest_animation_frame_changed(animation_name: StringName, frame: int)
 
 enum State {
 	IDLE, RUN, CROUCH, JUMP, FALL, DASH,
@@ -20,6 +25,10 @@ enum State {
 const PHASE_STARTUP := 0
 const PHASE_ACTIVE := 1
 const PHASE_RECOVERY := 2
+## Gameplay actions that release a resting Luz when freshly pressed.
+const REST_EXIT_ACTIONS: Array[StringName] = [
+	&"move_left", &"move_right", &"jump", &"dash", &"attack", &"interact",
+]
 
 @export_group("Health")
 @export var max_health := 5
@@ -217,6 +226,7 @@ var _spawn_position := Vector2.ZERO
 var _health := 0
 var _input_locked := false
 var _meditating := false
+var _rest_animation := &""
 var _default_process_mode := Node.PROCESS_MODE_INHERIT
 
 var _rise_gravity := 0.0
@@ -273,6 +283,8 @@ var _attack_buffer_direction := 0
 func _ready() -> void:
 	add_to_group(&"player")
 	_sprite.sprite_frames = _animation_sprite_frames
+	_sprite.animation_finished.connect(_on_sprite_animation_finished)
+	_sprite.frame_changed.connect(_on_sprite_frame_changed)
 	# Every Luz frame is a uniform 512x512 grid cell (see LuzAnimationCatalog
 	# and tools/process_luz_sheet.py) already repacked so its opaque bottom
 	# lands on canvas row 413; this offset puts that row at local y=0, so the
@@ -504,6 +516,7 @@ func _held_vertical_direction() -> int:
 ## Called immediately on touch-down by the touch UI (zero added latency).
 func request_attack(direction: int) -> void:
 	if is_input_locked():
+		_request_rest_exit()
 		return
 	var resolved := direction
 	if resolved == 0:
@@ -536,6 +549,7 @@ func request_attack_upgrade(direction: int) -> void:
 ## working.
 func request_jump() -> void:
 	if is_input_locked():
+		_request_rest_exit()
 		return
 	_jump_buffer_left = jump_buffer_time
 
@@ -545,6 +559,7 @@ func request_jump() -> void:
 ## dash uses (ground or air, respects cooldown/state/one-air-dash).
 func request_dash() -> void:
 	if is_input_locked():
+		_request_rest_exit()
 		return
 	_try_start_dash()
 
@@ -1294,10 +1309,46 @@ func face_towards(target_x: float) -> void:
 	_sprite.flip_h = _facing < 0
 
 
+## Forces the meditating player to face `direction` (-1 left, 1 right).
+func face_direction(direction: int) -> void:
+	if not _meditating or direction == 0:
+		return
+	_facing = signi(direction)
+	_sprite.flip_h = _facing < 0
+
+
+## Plays one of the rest ritual clips from its first frame. Only valid while
+## meditating; the clip owns the pose until another one replaces it.
+func play_rest_animation(animation_name: StringName) -> void:
+	if not _meditating or not _sprite.sprite_frames.has_animation(animation_name):
+		return
+	_rest_animation = animation_name
+	_sprite.stop()
+	_sprite.animation = animation_name
+	_sprite.set_frame_and_progress(0, 0.0)
+	_sprite.speed_scale = 1.0
+	_sprite.play(animation_name)
+
+
+## Seconds one full pass of a clip takes at normal speed.
+func get_animation_length(animation_name: StringName) -> float:
+	var frames := _sprite.sprite_frames
+	if not frames.has_animation(animation_name):
+		return 0.0
+	var speed := frames.get_animation_speed(animation_name)
+	if speed <= 0.0:
+		return 0.0
+	var total := 0.0
+	for i in frames.get_frame_count(animation_name):
+		total += frames.get_frame_duration(animation_name, i)
+	return total / speed
+
+
 func exit_meditation() -> void:
 	if not _meditating:
 		return
 	_meditating = false
+	_rest_animation = &""
 	process_mode = _default_process_mode
 	_jump_buffer_left = 0.0
 	meditation_finished.emit()
@@ -1330,7 +1381,31 @@ func clear_transient_state() -> void:
 	_enter_state(State.IDLE)
 
 
+func _request_rest_exit() -> void:
+	if _meditating:
+		rest_exit_requested.emit()
+
+
+func _poll_rest_exit_input() -> void:
+	for action in REST_EXIT_ACTIONS:
+		if Input.is_action_just_pressed(action):
+			rest_exit_requested.emit()
+			return
+
+
+func _on_sprite_animation_finished() -> void:
+	if _meditating and _rest_animation != &"":
+		rest_animation_finished.emit(_rest_animation)
+
+
+func _on_sprite_frame_changed() -> void:
+	if _meditating and _rest_animation != &"" and _sprite.animation == _rest_animation:
+		rest_animation_frame_changed.emit(_rest_animation, _sprite.frame)
+
+
 func _update_locked(delta: float) -> void:
+	if _meditating:
+		_poll_rest_exit_input()
 	_state_time += delta
 	var resting_state := State.IDLE if is_on_floor() else State.FALL
 	if _state != resting_state:
@@ -1398,7 +1473,8 @@ func _update_animation() -> void:
 	var animation_facing := _attack_facing if _is_directional_attack_state() else _facing
 	_sprite.flip_h = animation_facing < 0
 	if _meditating:
-		_play_animation(_meditation_animation())
+		if _rest_animation == &"":
+			_play_animation(&"idle")
 		return
 	match _state:
 		State.CROUCH:
@@ -1454,14 +1530,6 @@ func _update_animation() -> void:
 				_play_animation(&"walk", clampf(absf(velocity.x) / 220.0, 0.7, 1.8))
 			else:
 				_play_animation(&"idle")
-
-
-## Dedicated `meditate` clip when the sprite sheet provides one; the crouch
-## pose stands in until final art exists.
-func _meditation_animation() -> StringName:
-	if _sprite.sprite_frames != null and _sprite.sprite_frames.has_animation(&"meditate"):
-		return &"meditate"
-	return &"crouch"
 
 
 ## Clip-local speed: always reassigns speed_scale, even if the animation

@@ -129,12 +129,12 @@ The prototype currently advances the player's checkpoint through invisible x-coo
   - Acceptance: all required checks are recorded honestly; failures or unavailable checks remain explicit.
   - Route: delegated direct (writer trigger: desk scene/script, player).
   - Result: soft additive radial glows (Halo/Core/CandleGlow/InkGlow), brighter arch rim + fill, visible mist, `SpawnAnchor` -58 → -76 (clears the paper root); `Player.face_towards(target_x)` (meditation only) called at commit; `respawn()` exits meditation first and the desk aborts cleanly on `meditation_finished`; key prompt hidden when `TouchControls` is visible.
-  - Pending (user): real-device touch + keyboard `E` playtest. Documented, not fixed: low-ceiling headroom check when leaving meditation.
+  - Device playtest: PASSED by the user on iPhone 16 Pro (2026-09-28, build d013cfb) — touch interact, rest, respawn at desk, repeated rests. Documented, not fixed: low-ceiling headroom check when leaving meditation.
 
 ## Progress
 
-- Current task: all tasks complete; device playtest pending.
-- Next step: user playtest on device (touch + keyboard), then push and open the stacked PRs to `main` (user decision). Final sprites replace the placeholder `Visuals` later.
+- Current task: feature complete; device playtest passed.
+- Next step: push and stacked PRs to `main` (user decision). Follow-up feature: rest ritual animation and altar life (`odd/tasks/stillness-desk-rest-ritual.md`).
 
 ## Verification evidence
 

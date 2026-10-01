@@ -15,13 +15,21 @@ const RESET_METHOD := &"reset_to_checkpoint_state"
 var _active_id := &""
 var _active_scene_path := ""
 var _active_spawn_position := Vector2.ZERO
+var _activated_ids := {}
 
 
 func activate(checkpoint_id: StringName, scene_path: String, spawn_position: Vector2) -> void:
 	_active_id = checkpoint_id
 	_active_scene_path = scene_path
 	_active_spawn_position = spawn_position
+	_activated_ids[checkpoint_id] = true
 	checkpoint_activated.emit(checkpoint_id, scene_path, spawn_position)
+
+
+## True once `checkpoint_id` was activated during this run, even if another
+## checkpoint is active now. Lets a checkpoint tell a first ceremony from a repeat.
+func was_ever_activated(checkpoint_id: StringName) -> bool:
+	return _activated_ids.has(checkpoint_id)
 
 
 func has_active_checkpoint() -> bool:
@@ -81,3 +89,4 @@ func clear() -> void:
 	_active_id = &""
 	_active_scene_path = ""
 	_active_spawn_position = Vector2.ZERO
+	_activated_ids.clear()

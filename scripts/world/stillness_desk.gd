@@ -3,66 +3,77 @@ class_name StillnessDesk
 extends Node2D
 
 ## Reusable checkpoint: a school desk fused with a cathedral lectern. Resting
-## is one transaction (commit -> rest -> release) that heals Luz, records the
-## checkpoint in `CheckpointService`, regenerates resettable enemies and hands
-## control back only when the activation sequence is over. Global checkpoint
-## state lives in the service; this node owns interaction and presentation.
-## All art lives under `Visuals` so final sprites can replace it without
-## touching this logic.
+## is one ritual: Luz mounts the desk, celebrates (heal, checkpoint and enemy
+## reset land at the celebration peak), sits until the player gives input and
+## then dismounts. Global checkpoint state lives in the service; this node owns
+## interaction, the ritual phases and the static altar layers under `Visuals`.
 
 signal rest_started(checkpoint_id: StringName)
 signal rest_completed(checkpoint_id: StringName)
 signal phase_changed(phase: Phase)
+## Celebration beats other nodes choreograph FX on. `first` is true the first
+## time this checkpoint id is ever activated.
+signal celebration_started(first: bool)
+signal celebration_peak
+signal celebration_finished
+signal dismount_started
+## The `rest_sit` loop wrapped to its first frame; FX re-sync breathing here.
+signal breath_cycle_started
+## The ritual was cut short (respawn, player or desk freed). Unlike a normal
+## dismount, visuals must not finish easing out.
+signal transaction_aborted
 
-enum Phase { DORMANT, AWAKENED, COMMIT, RESTING, RELEASE }
+enum Phase { DORMANT, AWAKENED, MOUNT, CELEBRATE, RESTING, DISMOUNT }
 
 ## Touch controls call `request_interact()` on this group; only the desk with
 ## Luz in range accepts it.
 const INTERACTABLE_GROUP := &"interactable"
-const AWAKENED_INTENSITY := 0.4
 const PARALLAX_STRENGTH := 0.06
-const PARALLAX_LIMIT := 10.0
+const PARALLAX_LIMIT := 6.0
+## Where the peak (heal, checkpoint, reset) lands in the celebration: the
+## first one ignites for 1.2s after 0.6s of stillness; a repeat is condensed.
+const FIRST_PEAK_RATIO := 0.6
+const REPEAT_PEAK_RATIO := 0.45
+## Rest clip frames (0-based) where the backpack leaves and returns to Luz.
+const BACKPACK_DROP_FRAME := 3
+const BACKPACK_PICKUP_FRAME := 4
+const MOUNT_CLIP := &"rest_mount"
+const SIT_CLIP := &"rest_sit"
+const DISMOUNT_CLIP := &"rest_dismount"
+const DEFAULT_BREATH_PERIOD := 2.0
+## Extra wait past a clip's length before the ritual advances without its finished signal.
+const CLIP_FALLBACK_MARGIN := 0.25
+const CLIP_FALLBACK_MIN := 0.5
 
 @export_group("Checkpoint")
 ## Unique per checkpoint across the whole game. Required.
 @export var checkpoint_id: StringName = &""
 
 @export_group("Rest Sequence")
-## Time Luz holds the committed pose before the effects apply.
-@export_range(0.0, 3.0, 0.05) var commit_duration := 0.5
-## Time the restoring effects play (heal, save, enemy reset feedback).
-@export_range(0.0, 5.0, 0.05) var resting_duration := 1.6
-## Time the desk settles before control returns.
-@export_range(0.0, 3.0, 0.05) var release_duration := 0.5
+## Celebration length the first time this checkpoint is ever activated.
+@export_range(0.0, 6.0, 0.05) var first_celebration_duration := 3.0
+## Celebration length for every later rest at this checkpoint.
+@export_range(0.0, 3.0, 0.05) var repeat_celebration_duration := 1.0
+## Input is ignored this long after resting begins.
+@export_range(0.0, 2.0, 0.05) var exit_grace := 0.35
 ## Freeze the rest of the world while Luz rests.
 @export var pause_world := true
+
+## Seconds one `rest_sit` loop takes; FX sync their breathing to it.
+var breath_period := DEFAULT_BREATH_PERIOD
 
 var _phase := Phase.DORMANT
 var _run_id := 0
 var _player: Player
 var _transaction_player: Player
 var _paused_by_desk := false
-var _time := 0.0
-var _intensity := 0.0
-var _lift := 0.0
-var _intensity_tween: Tween
-var _lift_tween: Tween
+var _exit_armed := false
 
 @onready var _anchor: Marker2D = $SpawnAnchor
 @onready var _area: Area2D = $InteractionArea
 @onready var _prompt: InteractionPrompt = $InteractionPrompt
 @onready var _background: Node2D = %Background
-@onready var _glow: Node2D = %Glow
-@onready var _candle_glow: Node2D = %CandleGlow
-@onready var _flame: Node2D = %Flame
-@onready var _ink_glow: Node2D = %InkGlow
-@onready var _ripple: Node2D = %Ripple
-@onready var _papers: Node2D = %Papers
-@onready var _pendulum: Node2D = %Pendulum
-@onready var _beam: Node2D = %Beam
-@onready var _pan_left: Node2D = %PanLeft
-@onready var _pan_right: Node2D = %PanRight
-@onready var _mist: CPUParticles2D = %Mist
+@onready var _backpack: Node2D = %BackpackProp
 
 
 func _ready() -> void:
@@ -73,6 +84,7 @@ func _ready() -> void:
 	_area.body_entered.connect(_on_body_entered)
 	_area.body_exited.connect(_on_body_exited)
 	CheckpointService.checkpoint_activated.connect(_on_checkpoint_activated)
+	_backpack.visible = false
 	_sync_resting_phase()
 
 
@@ -97,11 +109,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
-	_time += delta
-	_animate_environment()
+	_animate_parallax()
 
 
 ## Public entry point for the keyboard action and future touch buttons.
@@ -129,6 +140,13 @@ func can_rest() -> bool:
 	)
 
 
+## Seconds from the celebration's start to its peak.
+func get_celebration_peak_time(first: bool) -> float:
+	if first:
+		return first_celebration_duration * FIRST_PEAK_RATIO
+	return repeat_celebration_duration * REPEAT_PEAK_RATIO
+
+
 func get_phase() -> Phase:
 	return _phase
 
@@ -141,31 +159,18 @@ func get_spawn_position() -> Vector2:
 
 func _run_rest(player: Player) -> void:
 	_run_id += 1
-	var run := _run_id
 	_transaction_player = player
 	player.tree_exiting.connect(_on_player_tree_exiting)
 	player.meditation_finished.connect(_on_meditation_interrupted)
-	_set_phase(Phase.COMMIT)
+	player.rest_exit_requested.connect(_on_rest_exit_requested)
+	player.rest_animation_finished.connect(_on_rest_animation_finished)
+	player.rest_animation_frame_changed.connect(_on_rest_animation_frame_changed)
+	_exit_armed = false
+	_set_phase(Phase.MOUNT)
 	_commit(player)
 	rest_started.emit(checkpoint_id)
-	_tween_intensity(1.0, commit_duration)
-	if not await _wait(commit_duration, run):
-		return
-
-	_set_phase(Phase.RESTING)
-	_apply_rest_effects(player)
-	_pulse_papers(resting_duration)
-	if not await _wait(resting_duration, run):
-		return
-
-	_set_phase(Phase.RELEASE)
-	_tween_intensity(AWAKENED_INTENSITY, release_duration)
-	if not await _wait(release_duration, run):
-		return
-
-	_finish_transaction()
-	_sync_resting_phase()
-	rest_completed.emit(checkpoint_id)
+	player.play_rest_animation(MOUNT_CLIP)
+	_arm_clip_fallback(MOUNT_CLIP, Phase.MOUNT, _run_id)
 
 
 func _commit(player: Player) -> void:
@@ -174,10 +179,47 @@ func _commit(player: Player) -> void:
 	player.global_position = _anchor.global_position
 	player.velocity = Vector2.ZERO
 	player.enter_meditation()
-	player.face_towards(global_position.x)
+	# The source art is right-facing and the backpack prop sits left of the desk.
+	player.face_direction(1)
+	var sit_length := player.get_animation_length(SIT_CLIP)
+	breath_period = sit_length if sit_length > 0.0 else DEFAULT_BREATH_PERIOD
+	_backpack.visible = false
 	if pause_world:
 		get_tree().paused = true
 		_paused_by_desk = true
+
+
+func _on_rest_animation_finished(clip: StringName) -> void:
+	if clip == MOUNT_CLIP and _phase == Phase.MOUNT:
+		_run_celebration(_run_id)
+	elif clip == DISMOUNT_CLIP and _phase == Phase.DISMOUNT:
+		_complete_dismount()
+
+
+func _on_rest_animation_frame_changed(clip: StringName, frame: int) -> void:
+	if clip == SIT_CLIP and frame == 0:
+		breath_cycle_started.emit()
+	if clip == MOUNT_CLIP and _phase == Phase.MOUNT and frame >= BACKPACK_DROP_FRAME:
+		_backpack.visible = true
+	elif clip == DISMOUNT_CLIP and _phase == Phase.DISMOUNT and frame >= BACKPACK_PICKUP_FRAME:
+		_backpack.visible = false
+
+
+func _run_celebration(run: int) -> void:
+	var first := not CheckpointService.was_ever_activated(checkpoint_id)
+	var duration := first_celebration_duration if first else repeat_celebration_duration
+	var peak_time := get_celebration_peak_time(first)
+	_set_phase(Phase.CELEBRATE)
+	_transaction_player.play_rest_animation(SIT_CLIP)
+	celebration_started.emit(first)
+	if not await _wait(peak_time, run):
+		return
+	_apply_rest_effects(_transaction_player)
+	celebration_peak.emit()
+	if not await _wait(duration - peak_time, run):
+		return
+	celebration_finished.emit()
+	_begin_resting(run)
 
 
 func _apply_rest_effects(player: Player) -> void:
@@ -187,6 +229,42 @@ func _apply_rest_effects(player: Player) -> void:
 	CheckpointService.reset_resettable_enemies()
 
 
+func _begin_resting(run: int) -> void:
+	_set_phase(Phase.RESTING)
+	_exit_armed = false
+	if not await _wait(exit_grace, run):
+		return
+	_exit_armed = true
+
+
+func _on_rest_exit_requested() -> void:
+	if _phase == Phase.RESTING and _exit_armed:
+		_begin_dismount()
+
+
+func _begin_dismount() -> void:
+	_exit_armed = false
+	_set_phase(Phase.DISMOUNT)
+	dismount_started.emit()
+	_transaction_player.play_rest_animation(DISMOUNT_CLIP)
+	_arm_clip_fallback(DISMOUNT_CLIP, Phase.DISMOUNT, _run_id)
+
+
+func _complete_dismount() -> void:
+	_finish_transaction()
+	_sync_resting_phase()
+	rest_completed.emit(checkpoint_id)
+
+
+## Advances MOUNT/DISMOUNT even when the clip's finished signal never arrives
+## (missing clip, dropped signal). The phase check makes it fire exactly once.
+func _arm_clip_fallback(clip: StringName, phase: Phase, run: int) -> void:
+	var length := _transaction_player.get_animation_length(clip)
+	var timeout := 0.0 if length <= 0.0 else maxf(length + CLIP_FALLBACK_MARGIN, CLIP_FALLBACK_MIN)
+	if await _wait(timeout, run) and _phase == phase:
+		_on_rest_animation_finished(clip)
+
+
 ## Waits `seconds` on a tween bound to this node. Returns false when the
 ## transaction was aborted meanwhile; if the desk itself is freed the tween
 ## dies with it and the caller simply never resumes.
@@ -194,21 +272,33 @@ func _wait(seconds: float, run: int) -> bool:
 	var timer := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	timer.tween_interval(maxf(seconds, 0.001))
 	await timer.finished
-	return run == _run_id and _phase in [Phase.COMMIT, Phase.RESTING, Phase.RELEASE]
+	return run == _run_id
 
 
 func _finish_transaction() -> void:
 	if _paused_by_desk and is_inside_tree():
 		get_tree().paused = false
 	_paused_by_desk = false
+	_exit_armed = false
+	_backpack.visible = false
 	var player := _transaction_player
 	_transaction_player = null
 	if player != null and is_instance_valid(player):
-		if player.tree_exiting.is_connected(_on_player_tree_exiting):
-			player.tree_exiting.disconnect(_on_player_tree_exiting)
-		if player.meditation_finished.is_connected(_on_meditation_interrupted):
-			player.meditation_finished.disconnect(_on_meditation_interrupted)
+		_disconnect_player(player)
 		player.exit_meditation()
+
+
+func _disconnect_player(player: Player) -> void:
+	if player.tree_exiting.is_connected(_on_player_tree_exiting):
+		player.tree_exiting.disconnect(_on_player_tree_exiting)
+	if player.meditation_finished.is_connected(_on_meditation_interrupted):
+		player.meditation_finished.disconnect(_on_meditation_interrupted)
+	if player.rest_exit_requested.is_connected(_on_rest_exit_requested):
+		player.rest_exit_requested.disconnect(_on_rest_exit_requested)
+	if player.rest_animation_finished.is_connected(_on_rest_animation_finished):
+		player.rest_animation_finished.disconnect(_on_rest_animation_finished)
+	if player.rest_animation_frame_changed.is_connected(_on_rest_animation_frame_changed):
+		player.rest_animation_frame_changed.disconnect(_on_rest_animation_frame_changed)
 
 
 ## Safe from any point of a running transaction (desk or player leaving).
@@ -218,6 +308,7 @@ func _abort_transaction() -> void:
 	_run_id += 1
 	_finish_transaction()
 	_phase = Phase.DORMANT
+	transaction_aborted.emit()
 
 
 func _on_player_tree_exiting() -> void:
@@ -252,7 +343,6 @@ func _set_phase(phase: Phase) -> void:
 func _sync_resting_phase() -> void:
 	var awakened := CheckpointService.is_active(checkpoint_id, _owner_scene_path())
 	_set_phase(Phase.AWAKENED if awakened else Phase.DORMANT)
-	_tween_intensity(AWAKENED_INTENSITY if awakened else 0.0, 0.6)
 	_refresh_prompt()
 
 
@@ -285,56 +375,6 @@ func _refresh_prompt() -> void:
 
 
 # -- Presentation --------------------------------------------------------------
-
-func _tween_intensity(target: float, duration: float) -> void:
-	if _intensity_tween != null:
-		_intensity_tween.kill()
-	_intensity_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_intensity_tween.tween_property(self, "_intensity", target, maxf(duration, 0.001))
-
-
-## Papers lift off the lectern, fan out, then rebind flat.
-func _pulse_papers(duration: float) -> void:
-	if _lift_tween != null:
-		_lift_tween.kill()
-	_lift_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_lift_tween.tween_property(self, "_lift", 1.0, duration * 0.45).set_ease(Tween.EASE_OUT)
-	_lift_tween.tween_interval(duration * 0.1)
-	_lift_tween.tween_property(self, "_lift", 0.0, duration * 0.45).set_ease(Tween.EASE_IN)
-
-
-func _animate_environment() -> void:
-	var t := _time
-	var energy := _intensity
-	_pendulum.rotation = sin(t * 1.3) * lerpf(0.12, 0.38, energy)
-	_beam.rotation = sin(t * 0.9 + 1.0) * lerpf(0.04, 0.12, energy)
-	_pan_left.rotation = -_beam.rotation
-	_pan_right.rotation = -_beam.rotation
-
-	var flicker := 1.0 + sin(t * 11.0) * 0.06 + sin(t * 7.3) * 0.09
-	_flame.scale = Vector2(1.0 + sin(t * 9.0) * 0.08, flicker + energy * 0.25)
-	_candle_glow.modulate.a = clampf(0.75 + (flicker - 1.0) * 1.5 + energy * 0.5, 0.0, 1.5)
-
-	_ripple.scale.x = 1.0 + sin(t * 3.1) * 0.3 * (1.0 + energy)
-	_ink_glow.modulate.a = 0.5 + sin(t * 2.4) * 0.2 + energy * 0.6
-
-	var breath := sin(t * 1.6) * 0.12
-	_glow.modulate.a = clampf(0.3 + energy * 0.7 + breath, 0.0, 1.5)
-	_glow.scale = Vector2.ONE * (0.92 + energy * 0.25 + breath * 0.3)
-
-	_animate_papers(t)
-	_mist.speed_scale = 1.0 + energy
-	_animate_parallax()
-
-
-func _animate_papers(t: float) -> void:
-	var sheets := _papers.get_children()
-	for i in sheets.size():
-		var sheet := sheets[i] as Node2D
-		var spread := float(i) - 1.0
-		sheet.position = Vector2(spread * 6.0 * _lift, -_lift * (10.0 + 5.0 * i) + sin(t * 2.0 + i) * 1.5 * _lift)
-		sheet.rotation = spread * 0.35 * _lift + sin(t * 1.7 + i) * 0.08 * _lift
-
 
 ## Background drifts against the camera, bounded so it never detaches.
 func _animate_parallax() -> void:
