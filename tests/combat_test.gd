@@ -1,0 +1,327 @@
+extends SceneTree
+## Regression test for the combat foundation: damage, i-frames, knockback,
+## the control lock, the flicker, hit-stop, death and the respawn, plus the
+## ContactDamage component.
+## Run: godot --headless --path . --script res://tests/combat_test.gd
+## Exits 0 when every check passes, 1 otherwise.
+##
+## Each case lists its check count in CHECKS; the runner compares it with the
+## checks the case actually ran, so a case aborted by a script error is named.
+## Waits run on the game clock (accumulated process deltas).
+
+const PLAYER_SCENE := "res://scenes/player/player.tscn"
+const CONTACT_SCENE := "res://scenes/world/contact_damage.tscn"
+const WATCHDOG_SECONDS := 120.0
+const SETTLE_FRAMES := 30
+const FLOOR_RECT := Rect2(-3000.0, 0.0, 6000.0, 200.0)
+const SOURCE_LEFT := Vector2(-100.0, -30.0)
+const SOURCE_RIGHT := Vector2(100.0, -30.0)
+const CHECKPOINT := Vector2(500.0, 0.0)
+## Longer than the i-frames plus the hit-stop that precedes them.
+const IFRAMES_OVER := 1.2
+const DEATH_BEAT := 1.0
+
+const CHECKS := {
+	"case_hit_signals": 5,
+	"case_iframes_block": 3,
+	"case_knockback_sides": 4,
+	"case_control_lock": 4,
+	"case_flicker_restores": 3,
+	"case_air_actions_restored": 2,
+	"case_hit_stop": 4,
+	"case_death_signals": 4,
+	"case_respawn_at_checkpoint": 6,
+	"case_death_without_checkpoint": 3,
+	"case_contact_rehit": 4,
+	"case_untouchable_states": 3,
+}
+
+
+## Stands in for an enemy that regenerates at a rest.
+class ResetCounter:
+	extends Node
+	var count := 0
+
+	func reset_to_checkpoint_state() -> void:
+		count += 1
+
+
+var checks := 0
+var failed: Array[String] = []
+var _expected_total := 0
+var _problems: Array[String] = []
+var _clock := 0.0
+var _rig: Node2D
+var _player: Player
+var _health_events: Array[Vector2i] = []
+var _damage_events: Array[Vector2i] = []
+var _died_count := 0
+var _respawn_count := 0
+
+
+func _initialize() -> void:
+	run.call_deferred()
+
+
+func run() -> void:
+	await process_frame
+	process_frame.connect(_tick)
+	create_timer(WATCHDOG_SECONDS).timeout.connect(_on_watchdog)
+	for case_name: String in CHECKS:
+		_expected_total += CHECKS[case_name]
+		await _run_case(case_name, CHECKS[case_name])
+	finish()
+
+
+func _tick() -> void:
+	_clock += root.get_process_delta_time()
+
+
+func _run_case(case_name: String, wanted: int) -> void:
+	var before := checks
+	var failed_before := failed.size()
+	await call(case_name)
+	_release_all()
+	_free_rig()
+	_checkpoints().clear()
+	var ran := checks - before
+	print("case %s: %d checks, %d failed" % [case_name, ran, failed.size() - failed_before])
+	if ran != wanted:
+		_problems.append("%s ran %d checks, expected %d" % [case_name, ran, wanted])
+
+
+func check(condition: bool, message: String) -> void:
+	checks += 1
+	if not condition:
+		failed.append(message)
+
+
+func _on_watchdog() -> void:
+	print("FAIL watchdog: the run did not finish in %.0fs" % WATCHDOG_SECONDS)
+	quit(1)
+
+
+func finish() -> void:
+	var complete := _problems.is_empty() and checks == _expected_total
+	if complete and failed.is_empty():
+		print("PASS %d/%d" % [checks, _expected_total])
+		quit(0)
+		return
+	if not complete:
+		print("FAIL incomplete run (%d of %d checks ran)" % [checks, _expected_total])
+	else:
+		print("FAIL %d/%d" % [failed.size(), checks])
+	for line: String in _problems + failed:
+		print("  - " + line)
+	quit(1)
+
+
+# -- Rig and helpers -----------------------------------------------------------------
+
+## Builds a flat floor (top at y=0) with Luz standing at `start_x`, listening
+## to her health signals, and waits for her to settle.
+func _build_rig(start_x: float = 0.0) -> void:
+	_rig = Node2D.new()
+	root.add_child(_rig)
+	LevelGeometry.add_solid(_rig, FLOOR_RECT, Color.DIM_GRAY)
+	_player = (load(PLAYER_SCENE) as PackedScene).instantiate() as Player
+	_player.position = Vector2(start_x, 0.0)
+	_rig.add_child(_player)
+	_listen()
+	await _frames(SETTLE_FRAMES)
+
+
+func _listen() -> void:
+	_health_events.clear()
+	_damage_events.clear()
+	_died_count = 0
+	_respawn_count = 0
+	_player.health_changed.connect(func(current: int, maximum: int) -> void: _health_events.append(Vector2i(current, maximum)))
+	_player.damaged.connect(func(amount: int, current: int) -> void: _damage_events.append(Vector2i(amount, current)))
+	_player.died.connect(func() -> void: _died_count += 1)
+	_player.respawned.connect(func() -> void: _respawn_count += 1)
+
+
+func _free_rig() -> void:
+	if is_instance_valid(_rig):
+		_rig.free()
+	_player = null
+
+
+func _frames(n: int) -> void:
+	for i: int in n:
+		await process_frame
+
+
+func _secs(t: float) -> void:
+	var end := _clock + t
+	while _clock < end:
+		await process_frame
+
+
+func _release_all() -> void:
+	for action: StringName in [&"move_left", &"move_right", &"jump", &"dash"]:
+		Input.action_release(action)
+
+
+## The autoload is not a compile-time global in a --script run.
+func _checkpoints() -> Node:
+	return root.get_node("CheckpointService")
+
+
+func _alpha() -> float:
+	return _player.get_node("AnimatedSprite2D").modulate.a
+
+
+func _add_resettable() -> ResetCounter:
+	var counter := ResetCounter.new()
+	counter.add_to_group(&"checkpoint_resettable")
+	_rig.add_child(counter)
+	return counter
+
+
+# -- Cases -----------------------------------------------------------------------
+
+func case_hit_signals() -> void:
+	await _build_rig()
+	_health_events.clear()
+	var applied := _player.take_damage(1, SOURCE_LEFT)
+	check(applied, "take_damage reports the hit as applied")
+	check(_player.get_health() == 2 and _player.max_health == 3, "one hit leaves 2 of 3 masks")
+	check(_health_events == [Vector2i(2, 3)], "health_changed fires once with (2, 3): %s" % [_health_events])
+	check(_damage_events == [Vector2i(1, 2)], "damaged fires once with (1, 2): %s" % [_damage_events])
+	check(_died_count == 0, "a non-lethal hit does not emit died")
+
+
+func case_iframes_block() -> void:
+	await _build_rig()
+	_player.take_damage(1, SOURCE_LEFT)
+	var again := _player.take_damage(1, SOURCE_LEFT)
+	check(not again, "a second hit during the i-frames is refused")
+	check(_player.get_health() == 2 and _damage_events.size() == 1, "refused hit changes nothing")
+	await _secs(IFRAMES_OVER)
+	check(_player.take_damage(1, SOURCE_LEFT), "a hit lands again once the i-frames end")
+
+
+func case_knockback_sides() -> void:
+	await _build_rig()
+	_player.take_damage(1, SOURCE_LEFT)
+	check(_player.velocity.x > 0.0, "a source on the left pushes Luz right (vx %.0f)" % _player.velocity.x)
+	check(_player.velocity.y < 0.0, "the hit kicks Luz upward (vy %.0f)" % _player.velocity.y)
+	_free_rig()
+	await _build_rig()
+	_player.take_damage(1, SOURCE_RIGHT)
+	check(_player.velocity.x < 0.0, "a source on the right pushes Luz left (vx %.0f)" % _player.velocity.x)
+	check(_player.velocity.y < 0.0, "the kick is upward from this side too")
+
+
+func case_control_lock() -> void:
+	await _build_rig()
+	Input.action_press(&"move_left")
+	_player.take_damage(1, SOURCE_LEFT)
+	await _secs(0.12)
+	check(_player.velocity.x > 0.0, "holding left does not cancel the knockback (vx %.0f)" % _player.velocity.x)
+	check(_player._state == Player.State.HURT, "the player is still in the hurt state during the lock")
+	await _secs(1.0)
+	check(_player._state != Player.State.HURT, "the lock releases")
+	check(_player.velocity.x < 0.0, "movement input works again after the lock (vx %.0f)" % _player.velocity.x)
+
+
+func case_flicker_restores() -> void:
+	await _build_rig()
+	var rest_alpha := _alpha()
+	_player.take_damage(1, SOURCE_LEFT)
+	var lowest := rest_alpha
+	var end := _clock + 0.8
+	while _clock < end:
+		await process_frame
+		lowest = minf(lowest, _alpha())
+	check(lowest < rest_alpha, "the sprite blinks during the i-frames (min alpha %.2f)" % lowest)
+	await _secs(IFRAMES_OVER)
+	check(_alpha() == rest_alpha, "the alpha is restored exactly (%.3f)" % _alpha())
+	check(_player.get_node("AnimatedSprite2D").modulate == Color.WHITE, "the tint is untouched after the blink")
+
+
+func case_air_actions_restored() -> void:
+	await _build_rig()
+	_player._air_dash_used = true
+	_player._air_jumps_left = 0
+	_player.take_damage(1, SOURCE_LEFT)
+	check(not _player._air_dash_used, "a hit gives the air dash back")
+	check(_player._air_jumps_left == _player.air_jumps, "a hit gives the air jump back")
+
+
+func case_hit_stop() -> void:
+	await _build_rig()
+	var before := _player.global_position
+	_player.take_damage(1, SOURCE_LEFT)
+	check(Engine.time_scale == 1.0, "hit-stop does not touch Engine.time_scale")
+	await _frames(2)
+	check(_player.global_position == before, "Luz is frozen during the hit-stop")
+	await _secs(0.4)
+	check(_player.global_position.x > before.x, "Luz moves again after the hit-stop")
+	check(Engine.time_scale == 1.0, "the time scale is still 1.0 afterwards")
+
+
+func case_death_signals() -> void:
+	await _build_rig()
+	for i: int in 3:
+		_player.take_damage(1, SOURCE_LEFT)
+		_player._invuln_left = 0.0
+	check(_player.get_health() == 0, "three hits empty the masks")
+	check(_died_count == 1, "died fires exactly once (%d)" % _died_count)
+	check(_player.is_input_locked() and _player._state == Player.State.DEAD, "the dead player is locked in the dead state")
+	check(not _player.take_damage(1, SOURCE_LEFT), "a dead player cannot be hit")
+
+
+func case_respawn_at_checkpoint() -> void:
+	await _build_rig()
+	var enemy := _add_resettable()
+	_checkpoints().activate(&"test_desk", "", CHECKPOINT)
+	_player.apply_checkpoint(CHECKPOINT)
+	for i: int in 3:
+		_player.take_damage(1, SOURCE_LEFT)
+		await _secs(IFRAMES_OVER if i < 2 else DEATH_BEAT)
+	check(_died_count == 1, "died fired once across the three hits")
+	check(_respawn_count == 1, "respawned fired once after the death beat (%d)" % _respawn_count)
+	check(_player.global_position.distance_to(CHECKPOINT) < 4.0, "Luz wakes at the checkpoint")
+	check(_player.get_health() == 3, "Luz wakes with full health")
+	check(enemy.count == 1, "resettable enemies reset exactly once (%d)" % enemy.count)
+	check(not _player.is_input_locked() and _alpha() == 1.0, "control and opacity are back")
+
+
+func case_death_without_checkpoint() -> void:
+	await _build_rig()
+	_player.global_position.x = 200.0
+	for i: int in 3:
+		_player.take_damage(1, SOURCE_LEFT)
+		await _secs(IFRAMES_OVER if i < 2 else DEATH_BEAT)
+	check(absf(_player.global_position.x) < 4.0, "without a checkpoint Luz returns to the level start (x %.0f)" % _player.global_position.x)
+	check(_player.get_health() == 3, "full health without a checkpoint too")
+	check(_respawn_count == 1, "respawned fired once")
+
+
+func case_contact_rehit() -> void:
+	await _build_rig()
+	var hazard := (load(CONTACT_SCENE) as PackedScene).instantiate() as ContactDamage
+	_rig.add_child(hazard)
+	hazard.set_area_size(Vector2(1600.0, 400.0))
+	hazard.position = Vector2(0.0, -100.0)
+	await _secs(0.3)
+	check(_player.get_health() == 2, "standing in the hazard hurts once (%d)" % _player.get_health())
+	await _secs(0.4)
+	check(_player.get_health() == 2, "the i-frames block repeated contact")
+	await _secs(IFRAMES_OVER)
+	check(_player.get_health() == 1, "contact hurts again after the i-frames (%d)" % _player.get_health())
+	check(hazard.collision_mask == 1 and hazard.collision_layer == 0, "the hazard only watches the player layer")
+
+
+func case_untouchable_states() -> void:
+	await _build_rig()
+	_player.enter_meditation()
+	check(not _player.take_damage(1, SOURCE_LEFT) and _player.get_health() == 3, "a meditating player cannot be hurt")
+	_player.exit_meditation()
+	_player.set_input_locked(true)
+	check(not _player.take_damage(1, SOURCE_LEFT), "an input-locked player cannot be hurt")
+	_player.set_input_locked(false)
+	check(_player.take_damage(1, SOURCE_LEFT), "she can be hurt again once control returns")

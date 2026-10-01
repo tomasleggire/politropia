@@ -45,6 +45,11 @@ const SHAFT_STEPS: Array = [
 ]
 
 
+## Placeholder damage strip on the B2 floor, between the Entrada doorway and
+## the shaft foot: low enough to jump over, so it never blocks the route.
+const HAZARD_PLACEHOLDER := Rect2(1240.0, 2704.0, 96.0, 16.0)
+
+
 ## Interior (walkable air) of every room, by name. Used for backgrounds and
 ## per-room camera bounds.
 static func rooms() -> Dictionary:
@@ -132,6 +137,11 @@ static func markers() -> Dictionary:
 		"BossArena": Vector2(3380, 544),
 		"DoubleJumpGate": GATE.get_center(),
 	}
+
+
+## Damage areas (world rects). Placeholders until the hazards redesign.
+static func hazards() -> Array[Rect2]:
+	return [HAZARD_PLACEHOLDER]
 
 
 static func marker_group(marker_name: String) -> StringName:

@@ -40,6 +40,7 @@ const CHECKS := {
 	"case_room_graph": 3,
 	"case_doorway_clearances": 9,
 	"case_collision_budget": 2,
+	"case_hazard_placement": 4,
 	"case_gate_geometry": 5,
 	"case_reachability_jump_only": 7,
 	"case_reachability_double_jump": 2,
@@ -166,6 +167,15 @@ func case_collision_budget() -> void:
 	var shapes := GreeceLayout.solids().size() + GreeceLayout.one_ways().size()
 	check(shapes < MAX_SHAPES, "collision shapes %d < %d" % [shapes, MAX_SHAPES])
 	check(shapes > 0, "layout has collision")
+
+
+func case_hazard_placement() -> void:
+	var b2: Rect2 = GreeceLayout.rooms()["B2"]
+	for hazard: Rect2 in GreeceLayout.hazards():
+		check(b2.encloses(hazard), "hazard sits inside the B2 room")
+		check(is_equal_approx(hazard.end.y, b2.end.y), "hazard rests on the B2 floor")
+		check(hazard.end.x < GreeceLayout.SHAFT_X0 and hazard.position.x > 1164.0 + DOOR_MARGIN, "hazard is clear of the shaft foot and the Entrada doorway")
+		check(hazard.size.y < FULL_JUMP * 0.25, "hazard is low enough to jump over")
 
 
 func case_gate_geometry() -> void:

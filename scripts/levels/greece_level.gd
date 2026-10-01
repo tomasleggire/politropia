@@ -29,6 +29,10 @@ const MARKER_RADIUS := 14.0
 const PLAYER_COLLISION_LAYER := 1
 const PLACEHOLDER_COLOR := Color("fff2a8")
 const PLACEHOLDER_PICKUP_RADIUS := 26.0
+const CONTACT_DAMAGE_SCENE := preload("res://scenes/world/contact_damage.tscn")
+const HAZARD_COLOR := Color("c0392b")
+const HAZARD_STRIPE_COLOR := Color("1a0d0d")
+const HAZARD_STRIPE_WIDTH := 16.0
 const OUT_OF_BOUNDS_MARGIN := 200.0
 ## Centre of the standing collider, relative to the feet the player node sits on.
 const BODY_CENTER_OFFSET := Vector2(0.0, -29.0)
@@ -54,6 +58,7 @@ func _ready() -> void:
 	_build_collision()
 	_build_markers()
 	_build_double_jump_placeholder()
+	_build_hazards()
 	_player.respawned.connect(_enter_room_snapped)
 	CheckpointService.restore_player_for_scene(_player, scene_file_path)
 	_enter_room_snapped()
@@ -144,6 +149,44 @@ func _on_double_jump_placeholder_touched(body: Node2D, pickup: Area2D) -> void:
 	_player.unlock_double_jump()
 	pickup.hide()
 	pickup.set_deferred("monitoring", false)
+
+
+## Marked placeholder hazards: red striped strips that hurt on contact.
+func _build_hazards() -> void:
+	for rect: Rect2 in GreeceLayout.hazards():
+		var hazard := CONTACT_DAMAGE_SCENE.instantiate() as ContactDamage
+		hazard.name = "HazardPlaceholder"
+		hazard.position = rect.get_center()
+		hazard.add_to_group(&"greece_placeholder")
+		hazard.add_child(_make_striped_strip(rect.size))
+		_markers.add_child(hazard)
+		hazard.set_area_size(rect.size)
+
+
+func _make_striped_strip(size: Vector2) -> Node2D:
+	var strip := Node2D.new()
+	strip.z_index = 10
+	var half := size * 0.5
+	strip.add_child(_make_polygon(HAZARD_COLOR, [
+		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
+		Vector2(half.x, half.y), Vector2(-half.x, half.y),
+	]))
+	var x := -half.x
+	while x < half.x:
+		var x1 := minf(x + HAZARD_STRIPE_WIDTH * 0.5, half.x)
+		strip.add_child(_make_polygon(HAZARD_STRIPE_COLOR, [
+			Vector2(x, half.y), Vector2(x1, half.y), Vector2(minf(x1 + half.y, half.x), -half.y),
+			Vector2(minf(x + half.y, half.x), -half.y),
+		]))
+		x += HAZARD_STRIPE_WIDTH
+	return strip
+
+
+func _make_polygon(color: Color, points: Array[Vector2]) -> Polygon2D:
+	var polygon := Polygon2D.new()
+	polygon.color = color
+	polygon.polygon = PackedVector2Array(points)
+	return polygon
 
 
 func _make_diamond(color: Color) -> Polygon2D:

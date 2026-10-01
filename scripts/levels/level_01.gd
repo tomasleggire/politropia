@@ -23,6 +23,7 @@ const ONE_WAY := Color("24558a")
 func _ready() -> void:
 	# Player already adds itself to the "player" group in its own _ready().
 	_camera.target = _player
+	_player.respawned.connect(_camera.snap_to_target)
 	_build_course()
 	CheckpointService.restore_player_for_scene(_player, scene_file_path)
 	_camera.snap_to_target()

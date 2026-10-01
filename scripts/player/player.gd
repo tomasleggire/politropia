@@ -10,6 +10,10 @@ signal respawned
 ## Emitted when a gated movement ability is granted (e.g. &"double_jump").
 signal ability_unlocked(ability: StringName)
 signal health_changed(current: int, maximum: int)
+## Emitted when a hit lands: how much it took and the health left.
+signal damaged(amount: int, current: int)
+## Emitted once when health reaches zero; the respawn follows the death beat.
+signal died
 signal meditation_started
 signal meditation_finished
 ## Emitted while meditating when the player gives gameplay input (a fresh
@@ -22,6 +26,7 @@ enum State {
 	IDLE, RUN, CROUCH, JUMP, FALL, DASH,
 	WALL_CLING, LEDGE_HANG, LEDGE_CLIMB,
 	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK, PLUNGE, PLUNGE_LAND,
+	HURT, DEAD,
 }
 
 const PHASE_STARTUP := 0
@@ -33,7 +38,24 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ]
 
 @export_group("Health")
-@export var max_health := 5
+@export var max_health := 3
+
+@export_group("Damage")
+## Knockback launched away from the damage source: x is the horizontal speed
+## (signed by the side the source is on), y the upward kick.
+@export var knockback_speed := Vector2(320.0, -260.0)
+## Movement input is ignored this long after a hit; gravity still applies.
+@export var hurt_control_lock := 0.22
+## Invulnerable window after a hit, shown as a blink of the sprite's alpha.
+@export var invulnerability_time := 1.0
+@export var flicker_interval := 0.08
+@export var flicker_alpha := 0.35
+## Local freeze of the player (and the camera that follows her) on impact.
+## Never touches Engine.time_scale, so it cannot fight the desk's pause_world
+## or the tests' time scale. 0 disables it.
+@export var hit_stop_time := 0.06
+## Fade-out of the placeholder death beat before the respawn.
+@export var death_fade_time := 0.6
 
 @export_group("Run")
 @export var run_max_speed := 250.0
@@ -236,6 +258,11 @@ var _spawn_position := Vector2.ZERO
 var _health := 0
 var _input_locked := false
 var _meditating := false
+var _dead := false
+var _hurt_left := 0.0
+var _invuln_left := 0.0
+var _hit_stop_left := 0.0
+var _base_alpha := 1.0
 var _rest_animation := &""
 var _default_process_mode := Node.PROCESS_MODE_INHERIT
 
@@ -311,6 +338,7 @@ func _ready() -> void:
 	_sprite.scale = Vector2(0.175, 0.175)
 	_spawn_position = global_position
 	_health = max_health
+	_base_alpha = _sprite.modulate.a
 	_default_process_mode = process_mode
 	_recompute_jump_physics()
 	_air_jumps_left = air_jumps
@@ -336,6 +364,13 @@ func _recompute_jump_physics() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _hit_stop_left > 0.0:
+		_hit_stop_left = maxf(_hit_stop_left - delta, 0.0)
+		return
+	_update_damage_timers(delta)
+	if _dead:
+		_update_dead(delta)
+		return
 	if is_input_locked():
 		_update_locked(delta)
 		return
@@ -386,6 +421,8 @@ func _physics_process(delta: float) -> void:
 			_update_plunge(delta)
 		State.PLUNGE_LAND:
 			_update_plunge_land(delta)
+		State.HURT:
+			_update_hurt(delta)
 
 	move_and_slide()
 	_after_move(fall_speed_before_move)
@@ -435,7 +472,7 @@ func _update_facing() -> void:
 	if _is_directional_attack_state():
 		_sprite.flip_h = _attack_facing < 0
 		return
-	if _state == State.DASH or _state == State.WALL_CLING or _state == State.LEDGE_HANG or _state == State.LEDGE_CLIMB:
+	if _state in [State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB, State.HURT]:
 		return
 	var axis := _horizontal_input()
 	if not is_zero_approx(axis):
@@ -611,7 +648,7 @@ func _queue_attack(direction: int) -> void:
 			else:
 				_air_attack_buffered_left = attack_buffer_time
 			return
-		State.CROUCH_ATTACK, State.UP_ATTACK, State.PLUNGE, State.PLUNGE_LAND, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB:
+		State.CROUCH_ATTACK, State.UP_ATTACK, State.PLUNGE, State.PLUNGE_LAND, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB, State.HURT:
 			_attack_buffer_left = attack_buffer_time
 			_attack_buffer_direction = direction
 			return
@@ -1320,6 +1357,118 @@ func is_at_full_health() -> bool:
 	return _health >= max_health
 
 
+## Changes the mask count; health is clamped to it and listeners are told.
+func set_max_health(value: int) -> void:
+	max_health = maxi(value, 1)
+	_health = mini(_health, max_health)
+	health_changed.emit(_health, max_health)
+
+
+## Applies a hit coming from `source_position`. Returns false, changing
+## nothing, while invulnerable, dead, meditating or input-locked. A hit
+## knocks Luz away from the source, restores her air dash and air jump (like
+## Hollow Knight), and starts the i-frames, control lock and hit-stop.
+func take_damage(amount: int, source_position: Vector2) -> bool:
+	if amount <= 0 or _dead or _invuln_left > 0.0 or is_input_locked():
+		return false
+	_health = maxi(_health - amount, 0)
+	health_changed.emit(_health, max_health)
+	damaged.emit(amount, _health)
+	_cancel_actions_for_hit()
+	velocity = _knockback_from(source_position)
+	_invuln_left = invulnerability_time
+	_hit_stop_left = hit_stop_time
+	_sprite.speed_scale = 0.0
+	if _health == 0:
+		_begin_death()
+	else:
+		_hurt_left = hurt_control_lock
+		_enter_state(State.HURT)
+	return true
+
+
+func _knockback_from(source_position: Vector2) -> Vector2:
+	var side := signf(global_position.x - source_position.x)
+	if is_zero_approx(side):
+		side = -float(_facing)
+	return Vector2(side * knockback_speed.x, knockback_speed.y)
+
+
+func _cancel_actions_for_hit() -> void:
+	_deactivate_attack_hitbox()
+	_attack_combo_index = 0
+	_attack_buffered_left = 0.0
+	_attack_restart_buffered_left = 0.0
+	_air_attack_buffered_left = 0.0
+	_attack_buffer_left = 0.0
+	_jump_buffer_left = 0.0
+	_wall_jump_lock_left = 0.0
+	_wall_kick_lock_left = 0.0
+	_restore_air_actions()
+
+
+func _update_damage_timers(delta: float) -> void:
+	_hurt_left = maxf(_hurt_left - delta, 0.0)
+	_invuln_left = maxf(_invuln_left - delta, 0.0)
+	if _dead:
+		return
+	_set_sprite_alpha(_flicker_alpha_now() if _invuln_left > 0.0 else _base_alpha)
+
+
+func _flicker_alpha_now() -> float:
+	var phase := int(floorf(_invuln_left / flicker_interval))
+	return flicker_alpha if phase % 2 == 0 else _base_alpha
+
+
+func _set_sprite_alpha(alpha: float) -> void:
+	var tint := _sprite.modulate
+	tint.a = alpha
+	_sprite.modulate = tint
+
+
+func _update_hurt(delta: float) -> void:
+	_apply_gravity(delta)
+	if _hurt_left <= 0.0:
+		_end_generic_attack()
+
+
+func _begin_death() -> void:
+	_dead = true
+	_invuln_left = 0.0
+	_hurt_left = 0.0
+	_enter_state(State.DEAD)
+	died.emit()
+
+
+func _update_dead(delta: float) -> void:
+	_state_time += delta
+	velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
+	if is_on_floor():
+		velocity.y = 0.0
+	else:
+		_apply_gravity(delta)
+	move_and_slide()
+	_update_animation()
+	var fade := clampf(_state_time / maxf(death_fade_time, 0.001), 0.0, 1.0)
+	_set_sprite_alpha(lerpf(_base_alpha, 0.0, fade))
+	if _state_time >= death_fade_time:
+		_respawn_after_death()
+
+
+## Wakes Luz at the active checkpoint of this scene (or where the level
+## started), with full health, and lets resettable enemies regenerate.
+func _respawn_after_death() -> void:
+	# Looked up by path: a bare autoload name does not compile in --script
+	# runs, which instantiate the player without the project's autoloads.
+	var checkpoints := get_node_or_null("/root/CheckpointService")
+	var current := get_tree().current_scene
+	if checkpoints != null and current != null:
+		checkpoints.apply_to_player(self, current.scene_file_path)
+	respawn()
+	if checkpoints != null:
+		checkpoints.reset_resettable_enemies()
+
+
 func restore_full_health() -> void:
 	if _health == max_health:
 		return
@@ -1332,7 +1481,7 @@ func restore_full_health() -> void:
 ## True while gameplay input is ignored, either by an explicit lock or because
 ## the player is meditating.
 func is_input_locked() -> bool:
-	return _input_locked or _meditating
+	return _input_locked or _meditating or _dead
 
 
 func is_meditating() -> bool:
@@ -1435,9 +1584,17 @@ func clear_transient_state() -> void:
 	_air_attack_buffered_left = 0.0
 	_attack_buffer_left = 0.0
 	_attack_buffer_direction = 0
+	_clear_damage_state()
 	_set_collider_height(_standing_shape_height)
 	_deactivate_attack_hitbox()
 	_enter_state(State.IDLE)
+
+
+func _clear_damage_state() -> void:
+	_hurt_left = 0.0
+	_invuln_left = 0.0
+	_hit_stop_left = 0.0
+	_set_sprite_alpha(_base_alpha)
 
 
 func _request_rest_exit() -> void:
@@ -1493,6 +1650,7 @@ func set_checkpoint(checkpoint: Vector2) -> void:
 
 
 func respawn() -> void:
+	_dead = false
 	exit_meditation()
 	restore_full_health()
 	clear_transient_state()
@@ -1582,6 +1740,10 @@ func _update_animation() -> void:
 			_play_animation(&"plunge")
 		State.PLUNGE_LAND:
 			_play_animation(&"plunge_land")
+		State.HURT:
+			_play_animation(&"fall")
+		State.DEAD:
+			_play_animation(&"idle")
 		_:
 			if _landing_left > 0.0:
 				_play_animation(&"land")
