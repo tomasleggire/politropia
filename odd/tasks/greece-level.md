@@ -162,9 +162,6 @@ The user wants a playable Greece level as the base for the next mechanics (medal
 - 2026-10-01: T1b (alcove needs the dash, `75e24c7`) and T2 (room camera, `8ad315e`) done, review approved.
 - 2026-10-01: T3 (gated double jump, `9bbdc58`) done, review approved.
 - 2026-10-01: deployed to the iPhone and playtested; accepted as a base with many improvements pending. Branch pushed.
-- 2026-10-01: T1b (alcove needs the dash, `75e24c7`) and T2 (room camera, `8ad315e`) done, review approved.
-- 2026-10-01: T3 (gated double jump, `9bbdc58`) done, review approved.
-- 2026-10-01: deployed to the iPhone and playtested; accepted as a base with many improvements pending. Branch pushed.
 
 ## Next step
 Collect the user's concrete playtest adjustments (T5), then the T4 art pass with juani's textures (also fix the black void in doorway gaps).
