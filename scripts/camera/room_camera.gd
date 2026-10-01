@@ -25,6 +25,11 @@ extends Camera2D
 ## Seconds the clamp rect takes to blend into the next room's bounds.
 @export var bounds_transition_time := 0.35
 
+@export_group("Shake")
+## Hit feedback jitters Camera2D.offset only, so the clamped framing, room
+## bounds and desk focus are never touched.
+@export var shake_max_strength := 12.0
+
 ## 0 follows the target as usual, 1 is fully framed on the pushed focus.
 var _focus_weight := 0.0
 var _focus_position := Vector2.ZERO
@@ -42,6 +47,11 @@ var _bounds_to := Rect2()
 var _bounds_blend := 1.0
 var _bounds_tween: Tween
 
+var _shake_strength := 0.0
+var _shake_duration := 0.0
+var _shake_left := 0.0
+var _shake_rng := RandomNumberGenerator.new()
+
 
 func _ready() -> void:
 	# Keeps easing and following while a ritual pauses the tree.
@@ -53,6 +63,7 @@ func _ready() -> void:
 
 # Runs on physics ticks so physics interpolation smooths it together with the player.
 func _physics_process(delta: float) -> void:
+	_update_shake(delta)
 	if target == null:
 		return
 	var desired_look := _desired_look_ahead()
@@ -66,11 +77,47 @@ func _physics_process(delta: float) -> void:
 
 
 func snap_to_target() -> void:
+	cancel_shake()
 	_finish_bounds_blend()
 	_look_ahead = 0.0
 	_follow_position = _desired_position()
 	_apply_framing()
 	reset_physics_interpolation()
+
+
+## Jitters the view by up to `strength` pixels, fading linearly to nothing
+## over `duration` seconds. A stronger shake replaces a weaker one in progress.
+func shake(strength: float, duration: float) -> void:
+	var wanted := minf(strength, shake_max_strength)
+	if duration <= 0.0 or wanted <= 0.0 or wanted < _current_shake_amplitude():
+		return
+	_shake_strength = wanted
+	_shake_duration = duration
+	_shake_left = duration
+
+
+## Stops any shake at once, leaving the offset exactly at zero.
+func cancel_shake() -> void:
+	_shake_left = 0.0
+	_shake_strength = 0.0
+	offset = Vector2.ZERO
+
+
+func _update_shake(delta: float) -> void:
+	if _shake_left <= 0.0:
+		return
+	_shake_left -= delta
+	if _shake_left <= 0.0:
+		cancel_shake()
+		return
+	var amplitude := _current_shake_amplitude()
+	offset = Vector2(_shake_rng.randf_range(-1.0, 1.0), _shake_rng.randf_range(-1.0, 1.0)) * amplitude
+
+
+func _current_shake_amplitude() -> float:
+	if _shake_left <= 0.0:
+		return 0.0
+	return _shake_strength * _shake_left / _shake_duration
 
 
 ## Clamps the camera to `rect` (world space) instead of the whole world, like a

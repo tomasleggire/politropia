@@ -20,6 +20,8 @@ const CHECKPOINT := Vector2(500.0, 0.0)
 ## Longer than the i-frames plus the hit-stop that precedes them.
 const IFRAMES_OVER := 1.2
 const DEATH_BEAT := 1.0
+const HAZARD_RECT := Rect2(200.0, -16.0, 96.0, 16.0)
+const PLAYER_BODY := Vector2(38.0, 58.0)
 
 const CHECKS := {
 	"case_hit_signals": 5,
@@ -34,6 +36,14 @@ const CHECKS := {
 	"case_death_without_checkpoint": 3,
 	"case_contact_rehit": 4,
 	"case_untouchable_states": 3,
+	"case_hazard_returns_to_safe_ground": 5,
+	"case_hazard_never_leaves_her_inside": 2,
+	"case_hazard_fade_restores_visibility": 2,
+	"case_lethal_hazard_uses_checkpoint": 4,
+	"case_safe_ground_skips_edges": 2,
+	"case_safe_ground_skips_hazards": 2,
+	"case_camera_shake_settles_to_zero": 3,
+	"case_no_shake_during_death": 2,
 }
 
 
@@ -57,6 +67,8 @@ var _health_events: Array[Vector2i] = []
 var _damage_events: Array[Vector2i] = []
 var _died_count := 0
 var _respawn_count := 0
+var _camera: RoomCamera
+var _max_veil := 0.0
 
 
 func _initialize() -> void:
@@ -120,10 +132,10 @@ func finish() -> void:
 
 ## Builds a flat floor (top at y=0) with Luz standing at `start_x`, listening
 ## to her health signals, and waits for her to settle.
-func _build_rig(start_x: float = 0.0) -> void:
+func _build_rig(start_x: float = 0.0, floor_rect: Rect2 = FLOOR_RECT) -> void:
 	_rig = Node2D.new()
 	root.add_child(_rig)
-	LevelGeometry.add_solid(_rig, FLOOR_RECT, Color.DIM_GRAY)
+	LevelGeometry.add_solid(_rig, floor_rect, Color.DIM_GRAY)
 	_player = (load(PLAYER_SCENE) as PackedScene).instantiate() as Player
 	_player.position = Vector2(start_x, 0.0)
 	_rig.add_child(_player)
@@ -146,6 +158,8 @@ func _free_rig() -> void:
 	if is_instance_valid(_rig):
 		_rig.free()
 	_player = null
+	_camera = null
+	_max_veil = 0.0
 
 
 func _frames(n: int) -> void:
@@ -187,7 +201,7 @@ func case_hit_signals() -> void:
 	_health_events.clear()
 	var applied := _player.take_damage(1, SOURCE_LEFT)
 	check(applied, "take_damage reports the hit as applied")
-	check(_player.get_health() == 2 and _player.max_health == 3, "one hit leaves 2 of 3 masks")
+	check(_player.get_health() == 2 and _player.max_health == 3, "one hit leaves 2 of 3 health")
 	check(_health_events == [Vector2i(2, 3)], "health_changed fires once with (2, 3): %s" % [_health_events])
 	check(_damage_events == [Vector2i(1, 2)], "damaged fires once with (1, 2): %s" % [_damage_events])
 	check(_died_count == 0, "a non-lethal hit does not emit died")
@@ -268,7 +282,7 @@ func case_death_signals() -> void:
 	for i: int in 3:
 		_player.take_damage(1, SOURCE_LEFT)
 		_player._invuln_left = 0.0
-	check(_player.get_health() == 0, "three hits empty the masks")
+	check(_player.get_health() == 0, "three hits empty the health")
 	check(_died_count == 1, "died fires exactly once (%d)" % _died_count)
 	check(_player.is_input_locked() and _player._state == Player.State.DEAD, "the dead player is locked in the dead state")
 	check(not _player.take_damage(1, SOURCE_LEFT), "a dead player cannot be hit")
@@ -287,6 +301,7 @@ func case_respawn_at_checkpoint() -> void:
 	check(_player.global_position.distance_to(CHECKPOINT) < 4.0, "Luz wakes at the checkpoint")
 	check(_player.get_health() == 3, "Luz wakes with full health")
 	check(enemy.count == 1, "resettable enemies reset exactly once (%d)" % enemy.count)
+	await _secs(IFRAMES_OVER)
 	check(not _player.is_input_locked() and _alpha() == 1.0, "control and opacity are back")
 
 
@@ -325,3 +340,145 @@ func case_untouchable_states() -> void:
 	check(not _player.take_damage(1, SOURCE_LEFT), "an input-locked player cannot be hurt")
 	_player.set_input_locked(false)
 	check(_player.take_damage(1, SOURCE_LEFT), "she can be hurt again once control returns")
+
+
+# -- Hazards, safe ground and camera shake -----------------------------------------
+
+func _add_hazard(rect: Rect2) -> ContactDamage:
+	var hazard := (load(CONTACT_SCENE) as PackedScene).instantiate() as ContactDamage
+	hazard.kind = ContactDamage.Kind.HAZARD
+	_rig.add_child(hazard)
+	hazard.set_area_size(rect.size)
+	hazard.position = rect.get_center()
+	return hazard
+
+
+func _veil_alpha() -> float:
+	var veils := _player.find_children("*", "ScreenFade", true, false)
+	return 0.0 if veils.is_empty() else (veils[0] as ScreenFade).get_alpha()
+
+
+## Runs right into the hazard, releases the key on the hit and returns the
+## last safe ground at that moment. Tracks the darkest veil on the way.
+func _walk_into_hazard(settle: float) -> Vector2:
+	var health_before := _player.get_health()
+	Input.action_press(&"move_right")
+	var end := _clock + 3.0
+	while _player.get_health() == health_before and _clock < end:
+		await process_frame
+	Input.action_release(&"move_right")
+	var safe := _player.get_last_safe_ground()
+	end = _clock + settle
+	while _clock < end:
+		await process_frame
+		_max_veil = maxf(_max_veil, _veil_alpha())
+	return safe
+
+
+func _overlaps_hazard(hazard: ContactDamage) -> bool:
+	var body := Rect2(_player.global_position - Vector2(PLAYER_BODY.x * 0.5, PLAYER_BODY.y), PLAYER_BODY)
+	return hazard.get_world_rect().intersects(body)
+
+
+func case_hazard_returns_to_safe_ground() -> void:
+	await _build_rig()
+	var hazard := _add_hazard(HAZARD_RECT)
+	var safe := await _walk_into_hazard(0.8)
+	check(_player.get_health() == 2, "a hazard hit costs one pip (%d)" % _player.get_health())
+	check(_player.global_position.distance_to(safe) < 3.0, "Luz lands on the last safe ground (%s vs %s)" % [_player.global_position, safe])
+	check(safe.x < HAZARD_RECT.position.x - _player.safe_ground_margin, "that ground is clear of the hazard (x %.0f)" % safe.x)
+	check(not _player.is_input_locked(), "control is back after the return")
+	check(not _overlaps_hazard(hazard), "she is not left inside the hazard")
+
+
+func case_hazard_never_leaves_her_inside() -> void:
+	await _build_rig()
+	var hazard := _add_hazard(HAZARD_RECT)
+	await _walk_into_hazard(0.5)
+	var frames_inside := 0
+	var end := _clock + 1.0
+	while _clock < end:
+		await process_frame
+		frames_inside += 1 if _overlaps_hazard(hazard) else 0
+	check(frames_inside == 0, "after the return she spends no frame inside the hazard (%d)" % frames_inside)
+	check(_player.get_health() == 2, "and no second hit lands")
+
+
+func case_hazard_fade_restores_visibility() -> void:
+	await _build_rig()
+	_add_hazard(HAZARD_RECT)
+	await _walk_into_hazard(0.8)
+	check(_max_veil > 0.95, "the screen goes fully dark during the return (%.2f)" % _max_veil)
+	check(_veil_alpha() == 0.0, "the veil is gone afterwards (%.2f)" % _veil_alpha())
+
+
+func case_lethal_hazard_uses_checkpoint() -> void:
+	await _build_rig()
+	_add_hazard(HAZARD_RECT)
+	_checkpoints().activate(&"test_desk", "", CHECKPOINT)
+	_player.apply_checkpoint(CHECKPOINT)
+	_player._health = 1
+	await _walk_into_hazard(DEATH_BEAT)
+	check(_died_count == 1, "a lethal hazard hit kills her")
+	check(_player.global_position.distance_to(CHECKPOINT) < 4.0, "she wakes at the checkpoint, not the safe ground")
+	check(_player.get_health() == 3, "with full health")
+	check(_max_veil == 0.0, "the safe-ground fade never ran")
+
+
+func case_safe_ground_skips_edges() -> void:
+	await _build_rig(0.0, Rect2(-100.0, 0.0, 200.0, 200.0))
+	_player.global_position.x = 40.0
+	await _secs(0.4)
+	check(absf(_player.get_last_safe_ground().x - 40.0) < 2.0, "a spot well inside the floor is recorded")
+	_player.global_position.x = 85.0
+	await _secs(0.4)
+	check(absf(_player.get_last_safe_ground().x - 40.0) < 2.0, "a spot near the ledge edge is not")
+
+
+func case_safe_ground_skips_hazards() -> void:
+	await _build_rig()
+	_add_hazard(HAZARD_RECT)
+	_player._invuln_left = 99.0
+	_player.global_position.x = 190.0
+	await _secs(0.4)
+	check(_player.get_last_safe_ground().x < 100.0, "no ground is recorded next to or inside the hazard (x %.0f)" % _player.get_last_safe_ground().x)
+	_player.global_position.x = 140.0
+	await _secs(0.4)
+	check(absf(_player.get_last_safe_ground().x - 140.0) < 2.0, "ground clear of the hazard margin is recorded")
+
+
+func _add_camera() -> void:
+	_camera = RoomCamera.new()
+	_camera.target = _player
+	_camera.world_size = Vector2(6000.0, 1000.0)
+	_camera.process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
+	_rig.add_child(_camera)
+	await _frames(2)
+
+
+func case_camera_shake_settles_to_zero() -> void:
+	await _build_rig()
+	await _add_camera()
+	var bounds := _camera.get_room_bounds()
+	_player.take_damage(1, SOURCE_LEFT)
+	await _frames(3)
+	check(_camera.offset != Vector2.ZERO, "a hit shakes the camera")
+	await _secs(IFRAMES_OVER)
+	check(_camera.offset == Vector2.ZERO, "the offset is exactly zero afterwards")
+	check(_camera.get_room_bounds() == bounds, "the room bounds are untouched")
+
+
+func case_no_shake_during_death() -> void:
+	await _build_rig()
+	await _add_camera()
+	for i: int in 2:
+		_player.take_damage(1, SOURCE_LEFT)
+		await _secs(IFRAMES_OVER)
+	_player.take_damage(1, SOURCE_LEFT)
+	check(_camera.offset == Vector2.ZERO, "the lethal hit cancels any shake at once")
+	var worst := 0.0
+	var end := _clock + 0.5
+	while _clock < end:
+		await process_frame
+		worst = maxf(worst, _camera.offset.length())
+	check(worst == 0.0, "the camera stays still through the death fade (%.2f)" % worst)

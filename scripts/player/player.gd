@@ -22,6 +22,8 @@ signal rest_exit_requested
 signal rest_animation_finished(animation_name: StringName)
 signal rest_animation_frame_changed(animation_name: StringName, frame: int)
 
+enum ReturnPhase { NONE, OUT, IN }
+
 enum State {
 	IDLE, RUN, CROUCH, JUMP, FALL, DASH,
 	WALL_CLING, LEDGE_HANG, LEDGE_CLIMB,
@@ -56,6 +58,16 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var hit_stop_time := 0.06
 ## Fade-out of the placeholder death beat before the respawn.
 @export var death_fade_time := 0.6
+## A non-lethal hit nudges the room camera by this many pixels for this long.
+@export var hit_shake_strength := 3.0
+@export var hit_shake_time := 0.2
+## Hazard hit: dark fade out, move to the last safe ground, fade back in.
+@export var hazard_fade_out := 0.15
+@export var hazard_fade_in := 0.2
+## Safe ground: a floor spot she stood on this long, away from the surface's
+## edges and from every hazard by the margin.
+@export var safe_ground_time := 0.1
+@export var safe_ground_margin := 24.0
 
 @export_group("Run")
 @export var run_max_speed := 250.0
@@ -263,6 +275,13 @@ var _hurt_left := 0.0
 var _invuln_left := 0.0
 var _hit_stop_left := 0.0
 var _base_alpha := 1.0
+var _return_phase := ReturnPhase.NONE
+var _return_left := 0.0
+var _fade: ScreenFade
+var _last_safe_ground := Vector2.ZERO
+var _has_safe_ground := false
+var _ground_time := 0.0
+var _ground_collider: Object
 var _rest_animation := &""
 var _default_process_mode := Node.PROCESS_MODE_INHERIT
 
@@ -371,6 +390,9 @@ func _physics_process(delta: float) -> void:
 	if _dead:
 		_update_dead(delta)
 		return
+	if _return_phase != ReturnPhase.NONE:
+		_update_return(delta)
+		return
 	if is_input_locked():
 		_update_locked(delta)
 		return
@@ -426,6 +448,7 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	_after_move(fall_speed_before_move)
+	_track_safe_ground(delta)
 	_update_footsteps(delta)
 	_update_animation()
 
@@ -1369,6 +1392,17 @@ func set_max_health(value: int) -> void:
 ## knocks Luz away from the source, restores her air dash and air jump (like
 ## Hollow Knight), and starts the i-frames, control lock and hit-stop.
 func take_damage(amount: int, source_position: Vector2) -> bool:
+	return _apply_damage(amount, source_position, false)
+
+
+## Like take_damage, for fixed hazards: a surviving hit hit-stops, shakes the
+## camera and then fades out, moves Luz to the last safe ground and fades back
+## in, with input locked throughout. A lethal hit dies normally instead.
+func take_hazard_damage(amount: int, source_position: Vector2) -> bool:
+	return _apply_damage(amount, source_position, true)
+
+
+func _apply_damage(amount: int, source_position: Vector2, hazard: bool) -> bool:
 	if amount <= 0 or _dead or _invuln_left > 0.0 or is_input_locked():
 		return false
 	_health = maxi(_health - amount, 0)
@@ -1381,6 +1415,10 @@ func take_damage(amount: int, source_position: Vector2) -> bool:
 	_sprite.speed_scale = 0.0
 	if _health == 0:
 		_begin_death()
+		return true
+	_shake_camera()
+	if hazard:
+		_begin_safe_return()
 	else:
 		_hurt_left = hurt_control_lock
 		_enter_state(State.HURT)
@@ -1426,6 +1464,103 @@ func _set_sprite_alpha(alpha: float) -> void:
 	_sprite.modulate = tint
 
 
+func _shake_camera() -> void:
+	var camera := get_viewport().get_camera_2d()
+	if camera != null and camera.has_method(&"shake"):
+		camera.call(&"shake", hit_shake_strength, hit_shake_time)
+
+
+## -- Safe ground / hazard return --------------------------------------------------
+
+## The last floor spot judged safe to come back to (the level start until she
+## has stood anywhere safe).
+func get_last_safe_ground() -> Vector2:
+	return _last_safe_ground if _has_safe_ground else _spawn_position
+
+
+## Moves Luz to the last safe ground at once, at rest.
+func return_to_safe_ground() -> void:
+	global_position = get_last_safe_ground()
+	velocity = Vector2.ZERO
+	reset_physics_interpolation()
+
+
+func _begin_safe_return() -> void:
+	velocity = Vector2.ZERO
+	_return_phase = ReturnPhase.OUT
+	_return_left = maxf(hazard_fade_out, 0.001)
+	if _fade == null:
+		_fade = ScreenFade.new()
+		add_child(_fade)
+
+
+func _update_return(delta: float) -> void:
+	_return_left -= delta
+	if _return_phase == ReturnPhase.OUT:
+		_fade.set_alpha(1.0 - clampf(_return_left / maxf(hazard_fade_out, 0.001), 0.0, 1.0))
+		if _return_left <= 0.0:
+			return_to_safe_ground()
+			_return_phase = ReturnPhase.IN
+			_return_left = maxf(hazard_fade_in, 0.001)
+	else:
+		_fade.set_alpha(clampf(_return_left / maxf(hazard_fade_in, 0.001), 0.0, 1.0))
+		if _return_left <= 0.0:
+			_end_safe_return()
+	_update_locked(delta)
+
+
+func _end_safe_return() -> void:
+	_return_phase = ReturnPhase.NONE
+	if _fade != null:
+		_fade.set_alpha(0.0)
+
+
+func _track_safe_ground(delta: float) -> void:
+	var ground := _floor_collider() if is_on_floor() and _state != State.HURT else null
+	if ground == null:
+		_ground_time = 0.0
+		_ground_collider = null
+		return
+	if ground != _ground_collider:
+		_ground_collider = ground
+		_ground_time = 0.0
+	_ground_time += delta
+	if _ground_time >= safe_ground_time and _is_safe_spot(ground):
+		_last_safe_ground = global_position
+		_has_safe_ground = true
+
+
+## The solid (layer 1) or one-way (layer 2) body she is standing on.
+func _floor_collider() -> CollisionObject2D:
+	for index in get_slide_collision_count():
+		var collision := get_slide_collision(index)
+		var body := collision.get_collider() as CollisionObject2D
+		if body != null and collision.get_normal().y <= -0.7 and (body.get_collision_layer_value(1) or body.get_collision_layer_value(2)):
+			return body
+	return null
+
+
+func _is_safe_spot(ground: CollisionObject2D) -> bool:
+	var surface := _surface_rect(ground)
+	if surface.has_area():
+		if global_position.x < surface.position.x + safe_ground_margin or global_position.x > surface.end.x - safe_ground_margin:
+			return false
+	for node: Node in get_tree().get_nodes_in_group(ContactDamage.HAZARD_GROUP):
+		if (node as ContactDamage).get_world_rect().grow(safe_ground_margin).has_point(global_position):
+			return false
+	return true
+
+
+## World rect of the body's rectangle shape (no rotation), or an empty rect.
+func _surface_rect(body: CollisionObject2D) -> Rect2:
+	for child in body.get_children():
+		var shape_node := child as CollisionShape2D
+		if shape_node != null and shape_node.shape is RectangleShape2D:
+			var size := (shape_node.shape as RectangleShape2D).size
+			return Rect2(body.global_position + shape_node.position - size * 0.5, size)
+	return Rect2()
+
+
 func _update_hurt(delta: float) -> void:
 	_apply_gravity(delta)
 	if _hurt_left <= 0.0:
@@ -1433,6 +1568,9 @@ func _update_hurt(delta: float) -> void:
 
 
 func _begin_death() -> void:
+	var camera := get_viewport().get_camera_2d()
+	if camera != null and camera.has_method(&"cancel_shake"):
+		camera.call(&"cancel_shake")
 	_dead = true
 	_invuln_left = 0.0
 	_hurt_left = 0.0
@@ -1465,6 +1603,9 @@ func _respawn_after_death() -> void:
 	if checkpoints != null and current != null:
 		checkpoints.apply_to_player(self, current.scene_file_path)
 	respawn()
+	# A damage area she just left still lists her as inside for one physics
+	# step, so waking up needs the same grace as a hit.
+	_invuln_left = invulnerability_time
 	if checkpoints != null:
 		checkpoints.reset_resettable_enemies()
 
@@ -1481,7 +1622,7 @@ func restore_full_health() -> void:
 ## True while gameplay input is ignored, either by an explicit lock or because
 ## the player is meditating.
 func is_input_locked() -> bool:
-	return _input_locked or _meditating or _dead
+	return _input_locked or _meditating or _dead or _return_phase != ReturnPhase.NONE
 
 
 func is_meditating() -> bool:
@@ -1591,6 +1732,7 @@ func clear_transient_state() -> void:
 
 
 func _clear_damage_state() -> void:
+	_end_safe_return()
 	_hurt_left = 0.0
 	_invuln_left = 0.0
 	_hit_stop_left = 0.0
@@ -1651,6 +1793,7 @@ func set_checkpoint(checkpoint: Vector2) -> void:
 
 func respawn() -> void:
 	_dead = false
+	_has_safe_ground = false
 	exit_meditation()
 	restore_full_health()
 	clear_transient_state()

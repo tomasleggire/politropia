@@ -156,6 +156,7 @@ func _build_hazards() -> void:
 	for rect: Rect2 in GreeceLayout.hazards():
 		var hazard := CONTACT_DAMAGE_SCENE.instantiate() as ContactDamage
 		hazard.name = "HazardPlaceholder"
+		hazard.kind = ContactDamage.Kind.HAZARD
 		hazard.position = rect.get_center()
 		hazard.add_to_group(&"greece_placeholder")
 		hazard.add_child(_make_striped_strip(rect.size))
