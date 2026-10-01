@@ -85,7 +85,13 @@ This is step 1 of the plan agreed with the user on 2026-10-01: combat foundation
     - Luz overlaps the hazard during the hit-stop and fade-out (about 0.2 s).
     - No hurt or death art: HURT reuses `fall` and DEAD uses `idle`.
     - No behavioural test that the B2 strip keeps the critical path open (placement only).
-- [ ] C3 Device playtest
+- [x] C3 Device playtest (2026-10-01, iPhone, build `3ea2ed7`)
+  - User: "se siente bien, se ve bien".
+  - Bug: after resting with missing pips, the HUD refills only when Luz stands up. The heal fires at the celebration peak, but `HealthHud` inherits the pause from the desk's `pause_world`, so its tweens freeze until the unpause. Fix in C4.
+  - Change: falling out of the map must cost one pip.
+- [ ] C4 Playtest fixes (route: delegated, same writer as Greece T2b)
+  - HUD keeps processing while the tree is paused (`PROCESS_MODE_ALWAYS`), so the refill shows at the peak right after Luz sits.
+  - Out-of-bounds fall: 1 damage, then return to the last safe ground (the hazard path). A lethal fall uses the death path. Applies to Greece and level_01.
 
 ## Acceptance criteria
 - A hit removes one pip, knocks Luz away from the source and gives about 1 s of i-frames with a visible flicker. Repeated contact during i-frames does nothing.
@@ -100,4 +106,4 @@ This is step 1 of the plan agreed with the user on 2026-10-01: combat foundation
 - Acceptance addition: a hazard hit costs one pip and returns Luz to the last safe ground. She never stays standing in a hazard.
 
 ## Next step
-C3 device playtest, then Greece T2b (room transitions) and step 2 (spikes and enemies).
+C4, then Greece T2b (room transitions), then step 2 (spikes and enemies).

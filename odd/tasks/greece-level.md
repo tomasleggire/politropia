@@ -150,7 +150,7 @@ The user wants a playable Greece level as the base for the next mechanics (medal
     - This replaces the T2 blend between rooms. The camera still clamps to each room's bounds.
   - Enemy state on leaving and re-entering a room: decision pending. The user said enemies "vuelven a… sino en el último lugar donde quedaron". Ask when the enemies step starts.
   - The camera "doesn't fully convince" the user yet. Polish comes later.
-- [ ] T4 Art pass with juani's textures: NinePatch floors and walls, floating platforms, room backgrounds, decor (route TBD)
+- [ ] T4 Art pass with juani's textures: NinePatch floors and walls, floating platforms, room backgrounds, decor. REASSIGNED to Codex (user, 2026-10-01: all visual work goes to Codex; backlog in Engram `codex/visual-backlog`). Claude does no art.
 - [ ] T5 Device playtest and adjustments
   - 2026-10-01 playtest 1 (iPhone 16 Pro, build `f5a437a`, flat placeholder visuals):
     - User verdict: "por ahora sirve pero hay muchas cosas que mejorar". The layout is accepted as a base, and adjustments are still to be defined by the user.
