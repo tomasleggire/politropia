@@ -1,10 +1,10 @@
-[gd_scene load_steps=8 format=3 uid="uid://bplayer01politropia"]
+[gd_scene format=3 uid="uid://dowigi85o1a"]
 
-[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
-[ext_resource type="AudioStream" path="res://assets/audio/land_hup.wav" id="3_land"]
-[ext_resource type="AudioStream" path="res://assets/audio/footstep.wav" id="4_foot"]
-[ext_resource type="AudioStream" path="res://assets/audio/jump_launch.wav" id="5_jump"]
-[ext_resource type="Script" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
+[ext_resource type="Script" uid="uid://52lnrs7hxbfp" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="AudioStream" uid="uid://41x7pxqvi70t" path="res://assets/audio/land_hup.wav" id="3_land"]
+[ext_resource type="AudioStream" uid="uid://cyd7l8tdmkk7x" path="res://assets/audio/footstep.wav" id="4_foot"]
+[ext_resource type="AudioStream" uid="uid://bio8aegkoaanu" path="res://assets/audio/jump_launch.wav" id="5_jump"]
+[ext_resource type="Script" uid="uid://dy77m7qh61ceh" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(38, 58)
@@ -12,64 +12,59 @@ size = Vector2(38, 58)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_attack"]
 size = Vector2(10, 10)
 
-[node name="Player" type="CharacterBody2D"]
-collision_layer = 1
+[node name="Player" type="CharacterBody2D" unique_id=1062555339]
 collision_mask = 3
-floor_stop_on_slope = true
 safe_margin = 0.1
 script = ExtResource("1_player")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=343911153]
 position = Vector2(0, -29)
 shape = SubResource("RectangleShape2D_body")
 
-[node name="WallCheckHead" type="RayCast2D" parent="."]
+[node name="WallCheckHead" type="RayCast2D" parent="." unique_id=770997688]
 position = Vector2(0, -50)
 target_position = Vector2(20, 0)
-collision_mask = 1
 
-[node name="WallCheckChest" type="RayCast2D" parent="."]
+[node name="WallCheckChest" type="RayCast2D" parent="." unique_id=923204467]
 position = Vector2(0, -29)
 target_position = Vector2(20, 0)
-collision_mask = 1
 
-[node name="WallCheckFeet" type="RayCast2D" parent="."]
+[node name="WallCheckFeet" type="RayCast2D" parent="." unique_id=1066087207]
 position = Vector2(0, -8)
 target_position = Vector2(20, 0)
-collision_mask = 1
 
-[node name="LedgeCheckAbove" type="RayCast2D" parent="."]
+[node name="LedgeCheckAbove" type="RayCast2D" parent="." unique_id=304667157]
 position = Vector2(0, -60)
 target_position = Vector2(20, 0)
-collision_mask = 1
 
-[node name="HeadroomCheck" type="RayCast2D" parent="."]
+[node name="HeadroomCheck" type="RayCast2D" parent="." unique_id=340467063]
 position = Vector2(0, -29)
 target_position = Vector2(0, -29)
-collision_mask = 1
 
-[node name="AttackHitbox" type="Area2D" parent="."]
+[node name="AttackHitbox" type="Area2D" parent="." unique_id=1578403106]
 collision_layer = 4
 collision_mask = 8
 script = ExtResource("6_hitbox")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackHitbox"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackHitbox" unique_id=1680862468]
 shape = SubResource("RectangleShape2D_attack")
 disabled = true
 
-[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
-scale = Vector2(0.175, 0.175)
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1844979423]
 texture_filter = 4
+scale = Vector2(0.175, 0.175)
 
-[node name="SfxLand" type="AudioStreamPlayer" parent="."]
+[node name="SfxLand" type="AudioStreamPlayer" parent="." unique_id=156508811]
 stream = ExtResource("3_land")
 volume_db = -1.0
 
-[node name="SfxFoot" type="AudioStreamPlayer" parent="."]
+[node name="SfxFoot" type="AudioStreamPlayer" parent="." unique_id=1557657020]
 stream = ExtResource("4_foot")
 volume_db = -6.0
 max_polyphony = 2
 
-[node name="SfxJump" type="AudioStreamPlayer" parent="."]
+[node name="SfxJump" type="AudioStreamPlayer" parent="." unique_id=414600132]
 stream = ExtResource("5_jump")
 volume_db = -2.0
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1941624082]
