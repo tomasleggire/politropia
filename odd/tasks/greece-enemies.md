@@ -100,7 +100,23 @@ Enemies and pogo give jumps and rooms real pressure and options. The Greece v2 r
     - `charger.gd` hard-codes its sight offsets.
     - A flyer whose path home is walled off can get stuck.
     - Flyer and shooter spawn positions are origin-at-feet; account for this in E6 placement.
-- [ ] E5 Soul meter, focus heal, HUD meter, touch button
+- [x] E5 Soul meter, focus heal, HUD meter, touch button (route: delegated)
+  - Commit: `00ed923` (+802/-4).
+  - Soul: `max_soul` 99, `soul_per_hit` 11, `focus_cost` 33, `focus_time` 0.9 s. Only hits that damage an `enemies` group member give soul. Death resets soul to 0.
+  - Desk rest leaves soul unchanged (user decision 2026-10-01, matches Hollow Knight).
+  - Focus: `State.FOCUS`, which chains while held. Release, damage, leaving the floor, an input lock, or movement, jump, attack or dash cancels it without spending soul.
+  - Input: the `focus` action is F or joypad button 9.
+  - UI:
+    - `SoulMeter` is a 44 px vessel under the pips, with a pulsing cue at 33 or more. Textures can be exported for Codex.
+    - The touch `FocusButton` sits left of Jump and shows only when focus is available.
+  - Tests: `soul_focus_test` 52/52, 3 runs (the parent re-ran it: 52/52). All other suites green.
+  - Review:
+    - Range `3defa7f..00ed923`, 11 paths, 828 lines, `medium`. User GRANTED.
+    - Lineage `review-7b96ddfc4a244354`: APPROVED, acknowledged. Boundary `00ed923`.
+  - Open:
+    - Focus uses the `idle` clip (Codex needs a focus clip and glow).
+    - `HealthHud.bind_player` before `_ready` would fail.
+    - The joypad button choice is arbitrary.
 - [ ] E6 Place enemies and real spikes in the current Greece layout, then a device playtest
 
 ## Acceptance criteria
@@ -114,4 +130,6 @@ Enemies and pogo give jumps and rooms real pressure and options. The Greece v2 r
 - 2026-10-01: document created. Decisions are recorded in Engram.
 
 ## Next step
-E5 soul meter and focus heal.
+E6: place enemies and spikes in the current Greece rooms (user decision), then a device playtest.
+
+Delivery update (2026-10-02): staged PRs from `feat/greece-level` with merge commits. The user merges `e5c9159` now.
