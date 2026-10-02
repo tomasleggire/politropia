@@ -117,7 +117,36 @@ Enemies and pogo give jumps and rooms real pressure and options. The Greece v2 r
     - Focus uses the `idle` clip (Codex needs a focus clip and glow).
     - `HealthHud.bind_player` before `_ready` would fail.
     - The joypad button choice is arbitrary.
-- [ ] E6 Place enemies and real spikes in the current Greece layout, then a device playtest
+- [ ] E6 Place enemies and real spikes in the current Greece layout, then a device playtest (route: delegated)
+  - Commit: `f62be82` feat: populate Greece with enemies and spikes (+455/-33).
+  - Data: `GreeceLayout.enemies()` returns `{archetype, enemy_id, position, facing}`. `hazards()` returns 3 spike rows (group `greece_spikes`).
+  - Placement:
+    - B2 walker (1700,2720) and spikes (1320,2704,96,16).
+    - Shaft flyers at (1680,1641) and (1680,911).
+    - Alcove pit spikes (2040,1480,220,16).
+    - T1 flyer (485,421) and pit spikes (380,628,210,16).
+    - T2 charger (2260,544) and shooter (2290,204).
+    - Exit shooter (2330,1754).
+    - B3 walker (3300,2720) and charger (3440,2720).
+    - Entrada, Altar and T3 are empty.
+  - Fairness:
+    - Every spawn is at least 220 px from arrivals, the spawn and the desk.
+    - Reachability with spikes treated as non-standable still passes. The B3 side still needs the double jump.
+    - A running jump over the B2 spikes takes no damage.
+  - Extra changes:
+    - The T1 camera view merges the pit (`T1_PIT_VIEW`).
+    - The B2 spikes moved to x 1320 for runway.
+    - `Probe.load_level(populated := false)` strips enemies and spikes for geometry probes.
+  - Tests:
+    - `greece_population_test` 33/33, 3 runs (the parent re-ran it: 33/33). `greece_layout_test` 70/70. All suites green.
+    - The parent viewed the overview screenshot.
+  - Review:
+    - Range `00ed923..f62be82`, 8 paths, 510 lines, `medium`. User GRANTED.
+    - Lineage `review-fcb291502e38d3be`: APPROVED, acknowledged. Boundary `f62be82`.
+  - Open:
+    - The B2 walker patrols up to the arrival points.
+    - Alcove pit spikes cover its floor; the way out is the hazard return or a pogo.
+  - Pending: device playtest.
 
 ## Acceptance criteria
 - Each archetype behaves as described, damages Luz on contact, and dies to her attacks.
@@ -130,6 +159,6 @@ Enemies and pogo give jumps and rooms real pressure and options. The Greece v2 r
 - 2026-10-01: document created. Decisions are recorded in Engram.
 
 ## Next step
-E6: place enemies and spikes in the current Greece rooms (user decision), then a device playtest.
+E6 device playtest, then the next PR (E5 + E6), then Greece v2.
 
 Delivery update (2026-10-02): staged PRs from `feat/greece-level` with merge commits. The user merges `e5c9159` now.
