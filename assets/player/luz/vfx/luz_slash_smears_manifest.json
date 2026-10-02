@@ -1,0 +1,140 @@
+{
+  "cell_width": 720,
+  "cell_height": 640,
+  "frame_count": 5,
+  "display_scale": 0.175,
+  "variants": {
+    "ground_1": {
+      "row": 0,
+      "reference_hitbox_size": [
+        60.3,
+        24.0
+      ],
+      "reference_hitbox_offset": [
+        49.15,
+        -25.69
+      ],
+      "anchor": [
+        79.14285714285717,
+        409.60191409470616
+      ],
+      "description": "flat lateral cut at chest height, hit 1 (measured from ground_attack_1 art)",
+      "cut_geometry": {
+        "a_from": 205.0,
+        "a_to": 345.0,
+        "rotation_deg": 0.0,
+        "ry_world": 17.5
+      }
+    },
+    "ground_2": {
+      "row": 1,
+      "reference_hitbox_size": [
+        60.3,
+        24.0
+      ],
+      "reference_hitbox_offset": [
+        49.15,
+        -25.69
+      ],
+      "anchor": [
+        79.14285714285717,
+        528.2266573338652
+      ],
+      "description": "opposite-curvature lateral backhand cut, hit 2",
+      "cut_geometry": {
+        "a_from": 15.0,
+        "a_to": 155.0,
+        "rotation_deg": 0.0,
+        "ry_world": 17.5
+      }
+    },
+    "ground_3": {
+      "row": 2,
+      "reference_hitbox_size": [
+        60.3,
+        24.0
+      ],
+      "reference_hitbox_offset": [
+        49.15,
+        -25.69
+      ],
+      "anchor": [
+        76.66171428571425,
+        388.89775242930887
+      ],
+      "description": "flat lateral finisher cut at chest height, wider/thicker/farther reach (measured from ground_attack_3 art)",
+      "cut_geometry": {
+        "a_from": 205.0,
+        "a_to": 345.0,
+        "rotation_deg": 18.0,
+        "ry_world": 20.5
+      }
+    },
+    "crouch": {
+      "row": 3,
+      "reference_hitbox_size": [
+        60.3,
+        24.0
+      ],
+      "reference_hitbox_offset": [
+        49.15,
+        -17.02
+      ],
+      "anchor": [
+        74.22399999999999,
+        354.3161998089919
+      ],
+      "description": "low flat horizontal sweep near the ground (measured from crouch_attack art)",
+      "cut_geometry": {
+        "a_from": 205.0,
+        "a_to": 345.0,
+        "rotation_deg": 0.0,
+        "ry_world": 17.5
+      }
+    },
+    "up": {
+      "row": 4,
+      "reference_hitbox_size": [
+        26.0,
+        68.0
+      ],
+      "reference_hitbox_offset": [
+        0.0,
+        -80.0
+      ],
+      "anchor": [
+        360.0,
+        777.1428571428571
+      ],
+      "description": "vertical upward streak aligned to the measured ruler axis",
+      "cut_geometry": {
+        "a_from": null,
+        "a_to": null,
+        "rotation_deg": 0.0,
+        "ry_world": null
+      }
+    },
+    "air": {
+      "row": 5,
+      "reference_hitbox_size": [
+        60.3,
+        24.0
+      ],
+      "reference_hitbox_offset": [
+        49.15,
+        -30.66
+      ],
+      "anchor": [
+        93.94171428571428,
+        432.2876283804205
+      ],
+      "description": "lateral horizontal air sweep forward (measured from air_horizontal_attack art)",
+      "cut_geometry": {
+        "a_from": 205.0,
+        "a_to": 345.0,
+        "rotation_deg": 0.0,
+        "ry_world": 17.5
+      }
+    }
+  }
+}

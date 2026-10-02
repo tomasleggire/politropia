@@ -1,0 +1,43 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/shooter.gd" id="1_shooter"]
+[ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="2_contact"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(28, 28)
+
+[node name="Shooter" type="CharacterBody2D"]
+collision_layer = 8
+collision_mask = 3
+script = ExtResource("1_shooter")
+max_health = 2
+aggro_range = 300.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -14)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Visual" type="Node2D" parent="."]
+
+[node name="Body" type="Polygon2D" parent="Visual"]
+color = Color(0.4, 0.5, 0.38, 1)
+polygon = PackedVector2Array(-14, -14, -12.9, -19.4, -9.9, -23.9, -5.4, -26.9, 0, -28, 5.4, -26.9, 9.9, -23.9, 12.9, -19.4, 14, -14, 12.9, -8.6, 9.9, -4.1, 5.4, -1.1, 0, 0, -5.4, -1.1, -9.9, -4.1, -12.9, -8.6)
+
+[node name="Mouth" type="Polygon2D" parent="Visual"]
+position = Vector2(11, -12)
+z_index = 1
+color = Color(0.15, 0.1, 0.1, 1)
+polygon = PackedVector2Array(-3, -3, 3, -3, 3, 3, -3, 3)
+
+[node name="Glow" type="Polygon2D" parent="Visual"]
+position = Vector2(11, -12)
+z_index = 2
+color = Color(1, 0.8, 0.4, 0.85)
+polygon = PackedVector2Array(0, -8, 8, 0, 0, 8, -8, 0)
+
+[node name="SightProbe" type="RayCast2D" parent="."]
+position = Vector2(0, -14)
+target_position = Vector2(100, 0)
+collision_mask = 1
+
+[node name="ContactDamage" parent="." instance=ExtResource("2_contact")]

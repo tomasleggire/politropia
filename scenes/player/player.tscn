@@ -1,10 +1,11 @@
-[gd_scene format=3 uid="uid://dowigi85o1a"]
+[gd_scene load_steps=9 format=3 uid="uid://bplayer01politropia"]
 
-[ext_resource type="Script" uid="uid://52lnrs7hxbfp" path="res://scripts/player/player.gd" id="1_player"]
-[ext_resource type="AudioStream" uid="uid://41x7pxqvi70t" path="res://assets/audio/land_hup.wav" id="3_land"]
-[ext_resource type="AudioStream" uid="uid://cyd7l8tdmkk7x" path="res://assets/audio/footstep.wav" id="4_foot"]
-[ext_resource type="AudioStream" uid="uid://bio8aegkoaanu" path="res://assets/audio/jump_launch.wav" id="5_jump"]
-[ext_resource type="Script" uid="uid://dy77m7qh61ceh" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
+[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="AudioStream" path="res://assets/audio/land_hup.wav" id="3_land"]
+[ext_resource type="AudioStream" path="res://assets/audio/footstep.wav" id="4_foot"]
+[ext_resource type="AudioStream" path="res://assets/audio/jump_launch.wav" id="5_jump"]
+[ext_resource type="Script" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
+[ext_resource type="Script" path="res://scripts/player/player_slash_vfx.gd" id="7_slash_vfx"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(38, 58)
@@ -43,7 +44,7 @@ target_position = Vector2(0, -29)
 
 [node name="AttackHitbox" type="Area2D" parent="." unique_id=1578403106]
 collision_layer = 4
-collision_mask = 8
+collision_mask = 24
 script = ExtResource("6_hitbox")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="AttackHitbox" unique_id=1680862468]
@@ -54,7 +55,11 @@ disabled = true
 texture_filter = 4
 scale = Vector2(0.175, 0.175)
 
-[node name="SfxLand" type="AudioStreamPlayer" parent="." unique_id=156508811]
+[node name="SlashVfx" type="Node2D" parent="."]
+z_index = 1
+script = ExtResource("7_slash_vfx")
+
+[node name="SfxLand" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("3_land")
 volume_db = -1.0
 

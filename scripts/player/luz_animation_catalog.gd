@@ -2,17 +2,11 @@ class_name LuzAnimationCatalog
 extends RefCounted
 
 ## Builds Luz's SpriteFrames from assets/player/luz/animation_manifest.json.
-## The manifest describes each generated sheet as a nominal 4x4 grid of
-## 313x313 cells, but the generated art is not an exact even grid, so cells
-## are actually cut at the per-sheet "safe_cuts" pixel boundaries (with rare
-## per-frame "frame_overrides" for cells the shared grid cuts through a
-## neighbor's content). Because those cut regions vary in size/position per
-## frame, every frame is placed at a fixed offset from its *nominal* grid
-## cell inside a shared virtual canvas (via AtlasTexture.margin) so its
-## position stays comparable across frames, then nudged by a measured
-## per-frame "foot_offsets" correction so every frame's opaque bottom lands
-## on the same canvas row -- keeping Luz's feet anchored without jitter even
-## though the underlying cells are not uniform.
+## tools/process_luz_sheet.py repacks every sheet into a uniform per-sheet
+## grid (currently 4x4 512x512 cells) with each frame already placed so its
+## feet land on the same canvas row and its horizontal position matches the
+## legacy catalog math -- so this catalog only has to slice plain grid
+## regions out of the sheet; no per-frame margin/offset correction needed.
 
 const MANIFEST_PATH := "res://assets/player/luz/animation_manifest.json"
 const ASSET_ROOT := "res://assets/player/luz/"
@@ -42,13 +36,16 @@ const CLIP_SPEEDS := {
 	"air_attack": 10.0,
 	"plunge": 10.0,
 	"plunge_land": 10.0,
+	"rest_mount": 8.0,
+	"rest_sit": 2.0,
+	"rest_dismount": 10.0,
 }
 
 ## Animations that should hold/repeat while their state persists, rather
 ## than play once and freeze on the last frame.
 const LOOPING_CLIPS := [
 	"idle", "walk", "crouch", "jump", "fall",
-	"ground_dash", "air_dash", "wall_cling", "ledge_hang",
+	"ground_dash", "air_dash", "wall_cling", "ledge_hang", "rest_sit",
 ]
 
 const CLIP_SOURCE_NAMES := {
@@ -61,13 +58,33 @@ const CLIP_SOURCE_NAMES := {
 	"air_attack": "air_horizontal_attack",
 }
 
+## Animations whose manifest "contact_frames" entry (if any) should be
+## honored: their frames get stretched/compressed so the contact frame's
+## *start* time lines up exactly with that clip's own startup time, passed
+## per-animation via build_sprite_frames's startup_times (see
+## _frame_seconds). Every other animation ignores contact_frames even if
+## the manifest happened to define one for its source clip.
+const CONTACT_SYNCED_CLIPS := [
+	"attack_1", "attack_2", "attack_3", "crouch_attack", "up_attack", "air_attack",
+]
+
 
 ## clip_durations optionally maps an animation name (StringName or String) to
 ## a target total playback duration in seconds; the resulting speed is
 ## derived as frame_count / duration so the clip finishes exactly when the
 ## matching gameplay window/timer does. Animations not present keep their
 ## CLIP_SPEEDS default.
-static func build_sprite_frames(clip_durations: Dictionary = {}) -> SpriteFrames:
+##
+## startup_times optionally maps an animation name to that specific clip's
+## startup (windup) phase length in seconds -- e.g. the ground combo's
+## finisher (attack_3) can use a longer windup than hits 1/2. For a
+## CONTACT_SYNCED_CLIPS animation whose clip has a manifest "contact_frames"
+## entry and a positive entry in startup_times, frame durations are adjusted
+## so that frame starts showing at exactly that animation's own startup time
+## -- i.e. precisely when the attack's hitbox activates -- instead of every
+## frame getting an equal slice of the clip. An animation missing from
+## startup_times (or mapped to 0.0) is never contact-synced.
+static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: Dictionary = {}) -> SpriteFrames:
 	var manifest := _read_manifest()
 	var frames := SpriteFrames.new()
 	for animation_name in CLIP_SPEEDS:
@@ -77,23 +94,70 @@ static func build_sprite_frames(clip_durations: Dictionary = {}) -> SpriteFrames
 	for sheet_name in manifest["sheets"]:
 		var sheet: Dictionary = manifest["sheets"][sheet_name]
 		var atlas := _load_sheet_texture(sheet_name, sheet)
+		var grid: Dictionary = sheet["grid"]
 		var clips: Dictionary = sheet["clips"]
+		var contact_frames: Dictionary = sheet.get("contact_frames", {})
 		for clip_name in clips:
 			var animation_name := _animation_name_for(clip_name)
 			if animation_name.is_empty():
 				continue
 			var frame_indices: Array = clips[clip_name]
-			frames.set_animation_speed(animation_name, _clip_speed(animation_name, frame_indices.size(), clip_durations))
-			for frame_index in frame_indices:
-				frames.add_frame(animation_name, _build_frame_texture(atlas, sheet, int(frame_index), manifest))
+			var frame_count := frame_indices.size()
+			var speed := _clip_speed(animation_name, frame_count, clip_durations)
+			frames.set_animation_speed(animation_name, speed)
+
+			var contact_index := int(contact_frames.get(clip_name, -1))
+			var total_duration: float = clip_durations.get(animation_name, float(frame_count) / speed)
+			var startup_time: float = startup_times.get(animation_name, 0.0)
+			var seconds := _frame_seconds(
+				animation_name, frame_count, contact_index, total_duration, startup_time
+			)
+			for i in frame_count:
+				var texture := _build_frame_texture(atlas, grid, int(frame_indices[i]))
+				frames.add_frame(animation_name, texture, seconds[i] * speed)
 
 	return frames
+
+
+## Per-frame duration (seconds) for a clip: equal shares of total_duration,
+## unless this animation is contact-synced and its clip has a manifest
+## contact_frame, in which case frames 0..contact_index-1 are compressed to
+## fit exactly into startup_time and frames contact_index..end are
+## stretched to fill the remaining (total_duration - startup_time).
+static func _frame_seconds(
+	animation_name: String, frame_count: int, contact_index: int,
+	total_duration: float, startup_time: float
+) -> Array[float]:
+	var uniform: Array[float] = []
+	uniform.resize(frame_count)
+	uniform.fill(total_duration / float(frame_count))
+
+	var synced := (
+		animation_name in CONTACT_SYNCED_CLIPS
+		and contact_index > 0 and contact_index < frame_count
+		and startup_time > 0.0 and startup_time < total_duration
+	)
+	if not synced:
+		return uniform
+
+	var result: Array[float] = []
+	result.resize(frame_count)
+	var lead_frame_seconds := startup_time / float(contact_index)
+	for i in contact_index:
+		result[i] = lead_frame_seconds
+	var trail_frame_count := frame_count - contact_index
+	var trail_frame_seconds := (total_duration - startup_time) / float(trail_frame_count)
+	for i in range(contact_index, frame_count):
+		result[i] = trail_frame_seconds
+	return result
 
 
 static func _load_sheet_texture(sheet_name: String, sheet: Dictionary) -> Texture2D:
 	var atlas := load(ASSET_ROOT + sheet_name) as Texture2D
 	assert(atlas != null, "Missing Luz animation sheet: %s" % sheet_name)
-	assert(atlas.get_size() == Vector2(sheet["width"], sheet["height"]), "Unexpected Luz sheet dimensions: %s" % sheet_name)
+	var grid: Dictionary = sheet["grid"]
+	var expected_size := Vector2(int(grid["columns"]) * int(grid["cell_width"]), int(grid["rows"]) * int(grid["cell_height"]))
+	assert(atlas.get_size() == expected_size, "Unexpected Luz sheet dimensions: %s" % sheet_name)
 	return atlas
 
 
@@ -116,50 +180,19 @@ static func _animation_name_for(clip_name: String) -> String:
 	return ""
 
 
-static func _build_frame_texture(atlas: Texture2D, sheet: Dictionary, frame_index: int, manifest: Dictionary) -> AtlasTexture:
-	var region := _frame_region(sheet, frame_index)
-	var atlas_texture := AtlasTexture.new()
-	atlas_texture.atlas = atlas
-	atlas_texture.region = region
-	atlas_texture.margin = _frame_margin(sheet, region, frame_index, manifest)
-	assert(atlas_texture.get_size() == Vector2(manifest["frame_canvas"][0], manifest["frame_canvas"][1]), "Luz frame margin did not preserve its virtual canvas: %s" % atlas_texture.get_size())
-	return atlas_texture
-
-
-static func _frame_region(sheet: Dictionary, frame_index: int) -> Rect2:
-	var overrides: Dictionary = sheet.get("frame_overrides", {})
-	var override_key := str(frame_index)
-	if overrides.has(override_key):
-		var box: Dictionary = overrides[override_key]
-		return Rect2(box["x0"], box["y0"], box["x1"] - box["x0"], box["y1"] - box["y0"])
-	var columns := 4
-	var rows := 4
+static func _build_frame_texture(atlas: Texture2D, grid: Dictionary, frame_index: int) -> AtlasTexture:
+	var columns := int(grid["columns"])
+	var rows := int(grid["rows"])
+	var cell_width := int(grid["cell_width"])
+	var cell_height := int(grid["cell_height"])
 	assert(frame_index >= 0 and frame_index < columns * rows, "Invalid Luz frame index: %d" % frame_index)
-	var vertical_cuts: Array = sheet["safe_cuts"]["vertical"]
-	var horizontal_cuts: Array = sheet["safe_cuts"]["horizontal"]
-	var x_edges := [0, vertical_cuts[0], vertical_cuts[1], vertical_cuts[2], int(sheet["width"])]
-	var y_edges := [0, horizontal_cuts[0], horizontal_cuts[1], horizontal_cuts[2], int(sheet["height"])]
 	var column := frame_index % columns
 	@warning_ignore("integer_division")
 	var row := frame_index / columns
-	return Rect2(x_edges[column], y_edges[row], x_edges[column + 1] - x_edges[column], y_edges[row + 1] - y_edges[row])
-
-
-static func _frame_margin(sheet: Dictionary, region: Rect2, frame_index: int, manifest: Dictionary) -> Rect2:
-	var columns := int(manifest["columns"])
-	var cell_width := int(manifest["cell_width"])
-	var cell_height := int(manifest["cell_height"])
-	@warning_ignore("integer_division")
-	var cell_origin := Vector2((frame_index % columns) * cell_width, (frame_index / columns) * cell_height)
-	var canvas := Vector2(manifest["frame_canvas"][0], manifest["frame_canvas"][1])
-	var padding := int(manifest["frame_padding"])
-	var foot_offsets: Array = sheet.get("foot_offsets", [])
-	var foot_correction := float(foot_offsets[frame_index]) if frame_index < foot_offsets.size() else 0.0
-	var leading := Vector2(padding, padding) + region.position - cell_origin
-	leading.y += foot_correction
-	var trailing := canvas - leading - region.size
-	assert(leading.x >= 0 and leading.y >= 0 and trailing.x >= 0 and trailing.y >= 0, "Luz frame region exceeds its virtual canvas")
-	return Rect2(leading, canvas - region.size)
+	var atlas_texture := AtlasTexture.new()
+	atlas_texture.atlas = atlas
+	atlas_texture.region = Rect2(column * cell_width, row * cell_height, cell_width, cell_height)
+	return atlas_texture
 
 
 static func _read_manifest() -> Dictionary:

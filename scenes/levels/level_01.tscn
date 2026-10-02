@@ -1,8 +1,12 @@
-[gd_scene load_steps=6 format=3 uid="uid://wlsyfrpmvnhc"]
+[gd_scene load_steps=8 format=3 uid="uid://blevel01politropia"]
 
 [ext_resource type="Script" uid="uid://bvqxmx38a2wmg" path="res://scripts/levels/level_01.gd" id="1_level"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="2_player"]
 [ext_resource type="Script" uid="uid://c2yml2d2b2t1p" path="res://scripts/camera/room_camera.gd" id="3_camera"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/stillness_desk.tscn" id="4_desk"]
+[ext_resource type="PackedScene" path="res://scenes/world/altar_trail.tscn" id="5_trail"]
+[ext_resource type="PackedScene" path="res://scenes/ui/health_hud.tscn" id="6_hud"]
 
 [sub_resource type="Shader" id="Shader_gothic_grade"]
 code = "shader_type canvas_item;
@@ -29,8 +33,35 @@ script = ExtResource("1_level")
 
 [node name="Solids" type="Node2D" parent="."]
 
+[node name="StillnessDesk" parent="." instance=ExtResource("4_desk")]
+position = Vector2(420, 620)
+checkpoint_id = &"level_01_desk_a"
+
+[node name="TrailFromRight" parent="." instance=ExtResource("5_trail")]
+position = Vector2(1100, 620)
+direction = -1
+length = 586.0
+trail_seed = 7
+density = 1.0
+branch_count = 14
+show_roots = false
+firefly_count = 12
+desk_path = NodePath("../StillnessDesk")
+
+[node name="TrailFromLeft" parent="." instance=ExtResource("5_trail")]
+position = Vector2(60, 620)
+length = 256.0
+trail_seed = 19
+density = 0.9
+branch_count = 9
+show_roots = false
+firefly_count = 10
+desk_path = NodePath("../StillnessDesk")
+
 [node name="Player" parent="." instance=ExtResource("2_player")]
 position = Vector2(180, 620)
+
+[node name="HealthHud" parent="." instance=ExtResource("6_hud")]
 
 [node name="RoomCamera" type="Camera2D" parent="."]
 position = Vector2(640, 360)
