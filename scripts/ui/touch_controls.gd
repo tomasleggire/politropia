@@ -5,7 +5,7 @@ extends CanvasLayer
 ## buttons (jump, dash, attack). The attack fires the instant the finger
 ## touches down (neutral, or directional if the pad already holds up/down);
 ## a short swipe right after that can still upgrade the same attack to
-## up/plunge instead of firing a second one. Jump and dash also call the
+## up/down slash instead of firing a second one. Jump and dash also call the
 ## player directly on touch-down (in addition to Input.action_press) so a
 ## very quick tap can never be missed by is_action_just_pressed's same-frame
 ## edge (see Player.request_jump/request_dash).
@@ -23,7 +23,7 @@ extends CanvasLayer
 @export_group("Attack gesture")
 @export var attack_swipe_distance := 28.0
 ## After touch-down, a qualifying vertical swipe within this window upgrades
-## the attack that already fired to up/plunge (the player only honors the
+## the attack that already fired to up/down (the player only honors the
 ## upgrade while its own startup phase is still active, ~attack_startup_time).
 @export var attack_upgrade_window := 0.10
 

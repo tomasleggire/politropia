@@ -1,0 +1,30 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/levels/greece_level.gd" id="1_level"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2_player"]
+[ext_resource type="Script" path="res://scripts/camera/room_camera.gd" id="3_camera"]
+[ext_resource type="PackedScene" path="res://scenes/world/stillness_desk.tscn" id="4_desk"]
+[ext_resource type="PackedScene" path="res://scenes/ui/health_hud.tscn" id="5_hud"]
+
+[node name="GreeceLevel" type="Node2D"]
+script = ExtResource("1_level")
+
+[node name="Backgrounds" type="Node2D" parent="."]
+
+[node name="Solids" type="Node2D" parent="."]
+
+[node name="Markers" type="Node2D" parent="."]
+
+[node name="StillnessDesk" parent="." instance=ExtResource("4_desk")]
+position = Vector2(1050, 1200)
+checkpoint_id = &"greece_altar_a"
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(760, 2720)
+
+[node name="HealthHud" parent="." instance=ExtResource("5_hud")]
+
+[node name="RoomCamera" type="Camera2D" parent="."]
+position = Vector2(640, 360)
+process_callback = 0
+script = ExtResource("3_camera")
