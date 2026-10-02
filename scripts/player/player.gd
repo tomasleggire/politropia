@@ -13,6 +13,8 @@ signal safe_ground_returned
 ## Emitted when a gated movement ability is granted (e.g. &"double_jump").
 signal ability_unlocked(ability: StringName)
 signal health_changed(current: int, maximum: int)
+## Soul meter level; fires on every gain, spend and reset.
+signal soul_changed(current: int, maximum: int)
 ## Emitted when a hit lands: how much it took and the health left.
 signal damaged(amount: int, current: int)
 ## Emitted once when health reaches zero; the respawn follows the death beat.
@@ -31,7 +33,7 @@ enum State {
 	IDLE, RUN, CROUCH, JUMP, FALL, DASH,
 	WALL_CLING, LEDGE_HANG, LEDGE_CLIMB,
 	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK,
-	HURT, DEAD,
+	HURT, DEAD, FOCUS,
 }
 
 const PHASE_STARTUP := 0
@@ -44,6 +46,18 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 
 @export_group("Health")
 @export var max_health := 3
+
+@export_group("Soul")
+@export var max_soul := 99
+## Soul gained by each hit that damages an enemy (Hollow Knight nail: 11).
+@export var soul_per_hit := 11
+## Soul spent by one focus heal (3 hits per pip, as in Hollow Knight).
+@export var focus_cost := 33
+
+@export_group("Focus")
+## Seconds of standing still to heal one pip.
+@export var focus_time := 0.9
+@export var focus_glow_radius := 24.0
 
 @export_group("Damage")
 ## Knockback launched away from the damage source: x is the horizontal speed
@@ -363,6 +377,11 @@ var _air_attack_down := false
 var _pogo_bounced := false
 var _pogo_rising := false
 var _pogo_grace_left := 0.0
+
+var _soul := 0
+var _focus_left := 0.0
+var _focus_requested := false
+var _focus_glow: Polygon2D
 var _down_slash_mark: Polygon2D
 
 
@@ -427,6 +446,8 @@ func _physics_process(delta: float) -> void:
 	_update_facing()
 	_update_facing_rays()
 
+	_poll_focus_cancel()
+
 	if Input.is_action_just_pressed(&"attack"):
 		_queue_attack(_held_vertical_direction())
 	if _attack_buffer_left > 0.0 and _can_start_attack():
@@ -436,6 +457,8 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed(&"dash"):
 		_try_start_dash()
+
+	_try_start_focus()
 
 	var fall_speed_before_move := velocity.y
 
@@ -466,6 +489,8 @@ func _physics_process(delta: float) -> void:
 			_update_air_attack(delta)
 		State.HURT:
 			_update_hurt(delta)
+		State.FOCUS:
+			_update_focus(delta)
 
 	_apply_attack_recoil(delta)
 	move_and_slide()
@@ -957,6 +982,8 @@ func _resolve_attack_hit(target: Node2D, attack_name: StringName) -> void:
 			_pogo()
 	elif struck:
 		_start_attack_recoil(target.global_position)
+	if struck and target.is_in_group(Enemy.GROUP_ENEMIES):
+		add_soul(soul_per_hit)
 
 
 ## -- Combat: pogo down slash -----------------------------------------------------
@@ -1197,7 +1224,7 @@ func _try_start_dash() -> bool:
 
 func _can_dash_from_state() -> bool:
 	match _state:
-		State.IDLE, State.RUN, State.CROUCH, State.JUMP, State.FALL:
+		State.IDLE, State.RUN, State.CROUCH, State.JUMP, State.FALL, State.FOCUS:
 			return true
 		State.ATTACK, State.AIR_ATTACK:
 			return _attack_phase == PHASE_RECOVERY
@@ -1448,6 +1475,11 @@ func _enter_state(new_state: State) -> void:
 	if new_state == State.LEDGE_CLIMB:
 		_ledge_climb_time = 0.0
 
+	if previous == State.FOCUS and new_state != State.FOCUS:
+		_end_focus()
+	elif new_state == State.FOCUS and previous != State.FOCUS:
+		_begin_focus()
+
 	# The post-kick drift-back only applies while airborne; any other state
 	# (re-clung, landed, attacked, dashed…) clears it.
 	if new_state != State.JUMP and new_state != State.FALL:
@@ -1493,6 +1525,19 @@ func get_max_health() -> int:
 
 func is_at_full_health() -> bool:
 	return _health >= max_health
+
+
+## Restores up to `amount` pips (never past the maximum) and tells listeners.
+## Returns how many were actually restored.
+func heal(amount: int) -> int:
+	if _dead or amount <= 0:
+		return 0
+	var restored := mini(amount, max_health - _health)
+	if restored <= 0:
+		return 0
+	_health += restored
+	health_changed.emit(_health, max_health)
+	return restored
 
 
 ## Changes the mask count; health is clamped to it and listeners are told.
@@ -1568,6 +1613,8 @@ func _knockback_from(source_position: Vector2) -> Vector2:
 
 
 func _cancel_actions_for_hit() -> void:
+	if _state == State.FOCUS:
+		_enter_state(State.IDLE)
 	_deactivate_attack_hitbox()
 	_recoil_left = 0.0
 	_pogo_rising = false
@@ -1720,6 +1767,7 @@ func _begin_death() -> void:
 	_dead = true
 	_invuln_left = 0.0
 	_hurt_left = 0.0
+	_set_soul(0)
 	_enter_state(State.DEAD)
 	died.emit()
 
@@ -1761,6 +1809,128 @@ func restore_full_health() -> void:
 		return
 	_health = max_health
 	health_changed.emit(_health, max_health)
+
+
+## -- Soul and focus heal -------------------------------------------------------
+
+func get_soul() -> int:
+	return _soul
+
+
+func get_max_soul() -> int:
+	return max_soul
+
+
+## Adds soul up to the cap. Only hits that damage an enemy call this.
+func add_soul(amount: int) -> void:
+	if amount > 0:
+		_set_soul(_soul + amount)
+
+
+func _set_soul(value: int) -> void:
+	var clamped := clampi(value, 0, max_soul)
+	if clamped == _soul:
+		return
+	_soul = clamped
+	soul_changed.emit(_soul, max_soul)
+
+
+## True when a focus heal would be worth starting: enough soul and a missing
+## pip. The touch Focus button follows this.
+func is_focus_available() -> bool:
+	return not _dead and _health > 0 and _health < max_health and _soul >= focus_cost
+
+
+func is_focusing() -> bool:
+	return _state == State.FOCUS
+
+
+## Touch UI entry point: holding the Focus button means focus, same as the
+## keyboard and gamepad `focus` action.
+func request_focus(pressed: bool) -> void:
+	_focus_requested = pressed
+
+
+func _focus_held() -> bool:
+	return _focus_requested or Input.is_action_pressed(&"focus")
+
+
+func _try_start_focus() -> void:
+	if _state != State.IDLE and _state != State.RUN:
+		return
+	if not _focus_held() or not is_focus_available() or not is_on_floor():
+		return
+	if is_input_locked() or _jump_buffer_left > 0.0 or not is_zero_approx(_horizontal_input()):
+		return
+	_enter_state(State.FOCUS)
+
+
+## Acting cancels focus, like Hollow Knight: move, jump, attack or dash.
+func _poll_focus_cancel() -> void:
+	if _state != State.FOCUS:
+		return
+	var acted := (
+		_jump_pressed_now
+		or Input.is_action_just_pressed(&"attack")
+		or Input.is_action_just_pressed(&"dash")
+		or not is_zero_approx(_horizontal_input())
+	)
+	if acted:
+		_enter_state(State.IDLE)
+
+
+func _update_focus(delta: float) -> void:
+	velocity = Vector2.ZERO
+	if not is_on_floor():
+		_enter_state(State.FALL)
+		return
+	if not _focus_held() or not is_focus_available():
+		_enter_state(State.IDLE)
+		return
+	_focus_left -= delta
+	_update_focus_glow()
+	if _focus_left <= 0.0:
+		_complete_focus()
+
+
+func _complete_focus() -> void:
+	_set_soul(_soul - focus_cost)
+	heal(1)
+	if _focus_held() and is_focus_available():
+		_focus_left = focus_time
+		_state_time = 0.0
+	else:
+		_enter_state(State.IDLE)
+
+
+func _begin_focus() -> void:
+	velocity = Vector2.ZERO
+	_focus_left = focus_time
+	_update_focus_glow()
+
+
+func _end_focus() -> void:
+	_focus_left = 0.0
+	if _focus_glow != null:
+		_focus_glow.visible = false
+
+
+## Placeholder for the missing art: a soft pulsing glow that swells as the
+## channel nears completion.
+func _update_focus_glow() -> void:
+	if _focus_glow == null:
+		_focus_glow = Polygon2D.new()
+		_focus_glow.z_index = 1
+		_focus_glow.position = Vector2(0.0, -29.0)
+		var ring := PackedVector2Array()
+		for step in 24:
+			ring.append(Vector2.from_angle(TAU * float(step) / 24.0) * focus_glow_radius)
+		_focus_glow.polygon = ring
+		add_child(_focus_glow)
+	var progress := 1.0 - clampf(_focus_left / maxf(focus_time, 0.001), 0.0, 1.0)
+	_focus_glow.visible = true
+	_focus_glow.scale = Vector2.ONE * lerpf(0.6, 1.2, progress)
+	_focus_glow.color = Color(1.0, 0.95, 0.75, 0.22 + 0.12 * sin(_state_time * 14.0))
 
 
 ## -- Input lock / meditation ---------------------------------------------------
@@ -2126,7 +2296,7 @@ func _update_animation() -> void:
 			_play_animation(&"air_attack")
 		State.HURT:
 			_play_animation(&"fall")
-		State.DEAD:
+		State.DEAD, State.FOCUS:
 			_play_animation(&"idle")
 		_:
 			if _landing_left > 0.0:

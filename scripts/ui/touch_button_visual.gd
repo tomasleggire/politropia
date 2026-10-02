@@ -4,7 +4,7 @@ extends Control
 ## handling and multitouch ID tracking stay in TouchControls; this node only
 ## renders whatever state it is told to.
 
-enum Icon { JUMP, DASH, ATTACK, INTERACT }
+enum Icon { JUMP, DASH, ATTACK, INTERACT, FOCUS }
 
 @export var icon: Icon = Icon.JUMP
 
@@ -40,6 +40,8 @@ func _draw() -> void:
 			_draw_slash(center, radius * 0.5, rim)
 		Icon.INTERACT:
 			_draw_diamond(center, radius * 0.38, rim)
+		Icon.FOCUS:
+			_draw_focus(center, radius * 0.4, rim)
 
 
 func _draw_chevron(origin: Vector2, extent: float, color: Color, direction: Vector2) -> void:
@@ -71,3 +73,8 @@ func _draw_diamond(center: Vector2, extent: float, color: Color) -> void:
 	])
 	draw_polyline(points, color, 4.0, true)
 	draw_circle(center, extent * 0.22, color)
+
+
+func _draw_focus(center: Vector2, extent: float, color: Color) -> void:
+	draw_arc(center, extent, 0.0, TAU, 32, color, 4.0, true)
+	draw_circle(center, extent * 0.35, color)
