@@ -76,7 +76,7 @@ func run() -> void:
 	create_timer(WATCHDOG_SECONDS).timeout.connect(_on_watchdog)
 	_probe = Probe.new(self)
 	_trials = Trials.new(_probe)
-	_reach = Reach.new(GreeceLayout.solids(), GreeceLayout.one_ways())
+	_reach = Reach.new(GreeceLayout.solids(), GreeceLayout.one_ways(), GreeceLayout.hazards())
 	for case_name: String in CHECKS:
 		_expected_total += CHECKS[case_name]
 		await _run_case(case_name, CHECKS[case_name])
@@ -170,12 +170,13 @@ func case_collision_budget() -> void:
 
 
 func case_hazard_placement() -> void:
+	var hazards := GreeceLayout.hazards()
+	check(hazards.size() == 3, "three spike rows: B2 and the two pits")
 	var b2: Rect2 = GreeceLayout.rooms()["B2"]
-	for hazard: Rect2 in GreeceLayout.hazards():
-		check(b2.encloses(hazard), "hazard sits inside the B2 room")
-		check(is_equal_approx(hazard.end.y, b2.end.y), "hazard rests on the B2 floor")
-		check(hazard.end.x < GreeceLayout.SHAFT_X0 and hazard.position.x > 1164.0 + DOOR_MARGIN, "hazard is clear of the shaft foot and the Entrada doorway")
-		check(hazard.size.y < FULL_JUMP * 0.25, "hazard is low enough to jump over")
+	var row := GreeceLayout.B2_SPIKES
+	check(b2.encloses(row) and is_equal_approx(row.end.y, b2.end.y), "B2 spikes rest on the B2 floor")
+	check(row.end.x < GreeceLayout.SHAFT_X0 and row.position.x > 1164.0 + DOOR_MARGIN, "B2 spikes are clear of the shaft foot and the Entrada doorway")
+	check(row.size.y < FULL_JUMP * 0.25 and row.size.x < 120.0, "B2 spikes are low and short enough to jump over")
 
 
 func case_gate_geometry() -> void:

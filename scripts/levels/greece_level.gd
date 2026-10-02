@@ -30,9 +30,15 @@ const PLAYER_COLLISION_LAYER := 1
 const PLACEHOLDER_COLOR := Color("fff2a8")
 const PLACEHOLDER_PICKUP_RADIUS := 26.0
 const CONTACT_DAMAGE_SCENE := preload("res://scenes/world/contact_damage.tscn")
-const HAZARD_COLOR := Color("c0392b")
-const HAZARD_STRIPE_COLOR := Color("1a0d0d")
-const HAZARD_STRIPE_WIDTH := 16.0
+const SPIKE_COLOR := Color("c0392b")
+const SPIKE_TOOTH_WIDTH := 16.0
+const SPIKES_GROUP := &"greece_spikes"
+const ENEMY_SCENES := {
+	GreeceLayout.WALKER: preload("res://scenes/enemies/walker.tscn"),
+	GreeceLayout.FLYER: preload("res://scenes/enemies/flyer.tscn"),
+	GreeceLayout.CHARGER: preload("res://scenes/enemies/charger.tscn"),
+	GreeceLayout.SHOOTER: preload("res://scenes/enemies/shooter.tscn"),
+}
 const OUT_OF_BOUNDS_MARGIN := 200.0
 const BODY_CENTER_OFFSET := GreeceLayout.BODY_CENTER_OFFSET
 
@@ -68,6 +74,7 @@ func _ready() -> void:
 	_build_markers()
 	_build_double_jump_placeholder()
 	_build_hazards()
+	_build_enemies()
 	_transition.name = "RoomTransition"
 	_transition.setup(_player, _camera)
 	_transition.room_switched.connect(_on_room_switched)
@@ -212,36 +219,47 @@ func _on_double_jump_placeholder_touched(body: Node2D, pickup: Area2D) -> void:
 	pickup.set_deferred("monitoring", false)
 
 
-## Marked placeholder hazards: red striped strips that hurt on contact.
+## Spike rows: red teeth that hurt on contact and can be pogoed.
 func _build_hazards() -> void:
 	for rect: Rect2 in GreeceLayout.hazards():
 		var hazard := CONTACT_DAMAGE_SCENE.instantiate() as ContactDamage
-		hazard.name = "HazardPlaceholder"
+		hazard.name = "Spikes"
 		hazard.kind = ContactDamage.Kind.HAZARD
 		hazard.position = rect.get_center()
-		hazard.add_to_group(&"greece_placeholder")
-		hazard.add_child(_make_striped_strip(rect.size))
+		hazard.add_to_group(SPIKES_GROUP)
+		hazard.add_child(_make_spike_row(rect.size))
 		_markers.add_child(hazard)
 		hazard.set_area_size(rect.size)
 
 
-func _make_striped_strip(size: Vector2) -> Node2D:
-	var strip := Node2D.new()
-	strip.z_index = 10
+## Instantiates every placement of `GreeceLayout.enemies()` before the first
+## room is entered, so the registry can pause the ones outside it.
+func _build_enemies() -> void:
+	var holder := Node2D.new()
+	holder.name = "Enemies"
+	add_child(holder)
+	for entry: Dictionary in GreeceLayout.enemies():
+		var enemy := (ENEMY_SCENES[entry["archetype"]] as PackedScene).instantiate() as Enemy
+		enemy.name = entry["enemy_id"]
+		enemy.enemy_id = entry["enemy_id"]
+		enemy.start_facing = entry["facing"]
+		enemy.position = entry["position"]
+		holder.add_child(enemy)
+
+
+## A row of triangular teeth filling `size`; the last tooth is narrower.
+func _make_spike_row(size: Vector2) -> Node2D:
+	var row := Node2D.new()
+	row.z_index = 10
 	var half := size * 0.5
-	strip.add_child(_make_polygon(HAZARD_COLOR, [
-		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
-		Vector2(half.x, half.y), Vector2(-half.x, half.y),
-	]))
 	var x := -half.x
 	while x < half.x:
-		var x1 := minf(x + HAZARD_STRIPE_WIDTH * 0.5, half.x)
-		strip.add_child(_make_polygon(HAZARD_STRIPE_COLOR, [
-			Vector2(x, half.y), Vector2(x1, half.y), Vector2(minf(x1 + half.y, half.x), -half.y),
-			Vector2(minf(x + half.y, half.x), -half.y),
+		var x1 := minf(x + SPIKE_TOOTH_WIDTH, half.x)
+		row.add_child(_make_polygon(SPIKE_COLOR, [
+			Vector2(x, half.y), Vector2((x + x1) * 0.5, -half.y), Vector2(x1, half.y),
 		]))
-		x += HAZARD_STRIPE_WIDTH
-	return strip
+		x = x1
+	return row
 
 
 func _make_polygon(color: Color, points: Array[Vector2]) -> Polygon2D:

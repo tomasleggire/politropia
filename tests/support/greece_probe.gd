@@ -33,13 +33,26 @@ func secs(t: float) -> void:
 		await tree.process_frame
 
 
-func load_level() -> void:
+## Geometry probes run on the bare level (no enemies, no spikes) so nothing
+## hurts or pushes the scripted player; `populated` keeps them.
+func load_level(populated := false) -> void:
 	tree.root.get_node("CheckpointService").clear()
 	tree.change_scene_to_file(LEVEL)
 	await frames(10)
 	level = tree.current_scene
 	player = level.get_node("Player")
 	release_all()
+	if not populated:
+		await _strip_dangers()
+
+
+func _strip_dangers() -> void:
+	var dangers: Array[Node] = []
+	dangers.append_array(tree.get_nodes_in_group(&"enemies"))
+	dangers.append_array(tree.get_nodes_in_group(&"greece_spikes"))
+	for node: Node in dangers:
+		node.queue_free()
+	await frames(2)
 
 
 func place(position: Vector2) -> void:
