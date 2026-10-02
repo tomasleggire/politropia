@@ -82,8 +82,24 @@ Enemies and pogo give jumps and rooms real pressure and options. The Greece v2 r
     - Pogo off an enemy has no contact grace; landing back on it hurts.
     - The down slash has no VFX (Codex).
     - `walker.tscn` was written by hand without a uid.
-- [ ] E3 Flyer and Charger
-- [ ] E4 Shooter and projectiles
+- [x] E3 Flyer and Charger (route: delegated; the writer hit an API session limit mid-task and was resumed with its context)
+  - Commit: `8ed2217` (+947).
+  - Code structure: `FlyingEnemy` is the shared airborne base. `Charger` extends `Walker`.
+  - Flyer: aggro 220 px, 420 px/s² up to 150 px/s, lateral 0.55 (overshoot). Gives up after 2.5 s or a 420 px leash and returns at 110 px/s. Knockback 340. 2 HP.
+  - Charger: patrol 50, detect 260 px x ±60 px with sight, telegraph 0.45 s, charge 300 px/s for 1.1 s, recover 0.6 s. Telegraph hits don't stagger it; charge hits apply 0.25 recoil. 3 HP.
+- [x] E4 Shooter and projectiles
+  - Commit: `3defa7f` (+516/-5).
+  - Shooter: aggro 300, holds 170 to 230 px with its centre 60 px above Luz. Fires every 1.6 s after a 0.35 s swell: 3 shots at ±15° and 210 px/s. Needs sight. 2 HP.
+  - Projectile: 1 damage. Dies on solids, on Luz, after 3 s, or to a slash (no recoil or pogo). Pooled at 2 x volley.
+  - Projectiles are cleared on `set_ai_active(false)` (room change), on `_reset_ai`, and on the shooter's corpse.
+  - Sight checks: a single raycast against layer 1, throttled to 0.1 s.
+  - Tests: `enemy_archetypes_test` 111/111, 3 runs (the parent re-ran it: 111/111). All other suites green.
+  - Review: range `ffe60f9..3defa7f`, 18 paths, 1487 lines, `medium`. User GRANTED. Lineage `review-c70b1ea160950538`: APPROVED, acknowledged. Boundary `3defa7f`.
+  - Open:
+    - Tests use private members.
+    - `charger.gd` hard-codes its sight offsets.
+    - A flyer whose path home is walled off can get stuck.
+    - Flyer and shooter spawn positions are origin-at-feet; account for this in E6 placement.
 - [ ] E5 Soul meter, focus heal, HUD meter, touch button
 - [ ] E6 Place enemies and real spikes in the current Greece layout, then a device playtest
 
@@ -98,4 +114,4 @@ Enemies and pogo give jumps and rooms real pressure and options. The Greece v2 r
 - 2026-10-01: document created. Decisions are recorded in Engram.
 
 ## Next step
-E3 and E4.
+E5 soul meter and focus heal.
