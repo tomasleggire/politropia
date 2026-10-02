@@ -1,9 +1,10 @@
 extends SceneTree
-## Regression test for the airborne and charging archetypes on top of the enemy
-## base: the Flyer (hover, line-of-sight aggro, steered chase, walls, give-up,
-## light knockback, falling corpse) and the Charger (patrol, detection,
-## telegraph -> charge -> recovery, ledges and walls, commitment), plus the
-## persistence rules and the pogo for each of them.
+## Regression test for the airborne, charging and shooting archetypes on top of
+## the enemy base: the Flyer (hover, line-of-sight aggro, steered chase, walls,
+## give-up, light knockback, falling corpse), the Charger (patrol, detection,
+## telegraph -> charge -> recovery, ledges and walls, commitment) and the
+## Shooter with its projectiles (distance band, fire cycle, aim, walls, slash,
+## clearing), plus the persistence rules and the pogo for each of them.
 ## Run: godot --headless --path . --script res://tests/enemy_archetypes_test.gd
 ## Exits 0 when every check passes, 1 otherwise.
 ##
@@ -14,6 +15,8 @@ extends SceneTree
 const PLAYER_SCENE := "res://scenes/player/player.tscn"
 const FLYER_SCENE := "res://scenes/enemies/flyer.tscn"
 const CHARGER_SCENE := "res://scenes/enemies/charger.tscn"
+const SHOOTER_SCENE := "res://scenes/enemies/shooter.tscn"
+const PROJECTILE_SCENE := "res://scenes/enemies/enemy_projectile.tscn"
 const WATCHDOG_SECONDS := 180.0
 const SETTLE_FRAMES := 30
 const FLOOR_RECT := Rect2(-3000.0, 0.0, 6000.0, 200.0)
@@ -40,6 +43,18 @@ const CHECKS := {
 	"case_charger_commits": 5,
 	"case_charger_persistence": 7,
 	"case_charger_is_pogoable": 3,
+	"case_shooter_keeps_its_distance": 4,
+	"case_shooter_needs_line_of_sight": 2,
+	"case_shooter_fires_on_schedule": 5,
+	"case_shooter_aims_and_hits_once": 5,
+	"case_projectile_dies_on_walls": 2,
+	"case_projectile_expires": 1,
+	"case_slash_destroys_a_projectile": 3,
+	"case_projectile_is_not_pogoable": 2,
+	"case_projectiles_are_cleared": 4,
+	"case_shooter_corpse": 3,
+	"case_shooter_persistence": 7,
+	"case_shooter_is_pogoable": 3,
 }
 
 var checks := 0
@@ -473,3 +488,181 @@ func case_charger_persistence() -> void:
 
 func case_charger_is_pogoable() -> void:
 	await _pogo_off_enemy(CHARGER_SCENE, Vector2.ZERO, -110.0)
+
+
+# -- Shooter and projectiles ------------------------------------------------------------
+
+func _add_projectile(at: Vector2, direction: Vector2, speed: float) -> EnemyProjectile:
+	var shot := (load(PROJECTILE_SCENE) as PackedScene).instantiate() as EnemyProjectile
+	_rig.add_child(shot)
+	shot.launch(at, direction, speed)
+	return shot
+
+
+## Where the shooter ends up (centre to Luz's centre) after `seconds`, never firing.
+func _settled_distance(from: Vector2, seconds: float) -> float:
+	_enemy = _add_enemy(SHOOTER_SCENE, &"e1", from, -1)
+	(_enemy as Shooter).fire_interval = 100.0
+	await _secs(seconds)
+	var shooter := _enemy as Shooter
+	return shooter.get_body_center().distance_to(_player.global_position + Vector2(0.0, -29.0))
+
+
+func case_shooter_keeps_its_distance() -> void:
+	await _build_rig()
+	var too_close := await _settled_distance(Vector2(90.0, -40.0), 3.0)
+	check(too_close > 165.0 and too_close < 235.0, "too close, it backs off into the band (%.0f)" % too_close)
+	var shooter := _enemy as Shooter
+	check(shooter.get_body_center().y < _player.global_position.y - 29.0, "and hovers a little above her (y %.0f)" % shooter.get_body_center().y)
+	_enemy.free()
+	var too_far := await _settled_distance(Vector2(280.0, -80.0), 3.0)
+	check(too_far > 165.0 and too_far < 235.0, "too far (but in sight), it closes in to the band (%.0f)" % too_far)
+	check(_player.get_health() == 3, "while it does not touch her")
+
+
+func case_shooter_needs_line_of_sight() -> void:
+	await _build_rig()
+	_add_wall(Rect2(60.0, -400.0, 20.0, 400.0))
+	await _spawn(SHOOTER_SCENE, Vector2(200.0, -90.0), -1)
+	var shooter := _enemy as Shooter
+	await _secs(2.5)
+	check(not shooter.is_engaged() and not shooter.is_telegraphing(), "a wall between them keeps it idle")
+	check(shooter.active_projectile_count() == 0, "so it never fires")
+
+
+func case_shooter_fires_on_schedule() -> void:
+	await _build_rig()
+	await _spawn(SHOOTER_SCENE, Vector2(200.0, -90.0), -1)
+	var shooter := _enemy as Shooter
+	var dt := 1.0 / Engine.physics_ticks_per_second
+	var t := 0.0
+	var telegraph_at := -1.0
+	var fires: Array[float] = []
+	var first_volley := 0
+	var glow_seen := false
+	var last_count := 0
+	for i: int in int(5.0 / dt):
+		await physics_frame
+		t += dt
+		if shooter.is_telegraphing():
+			glow_seen = glow_seen or (shooter.get_node("Visual/Glow") as Node2D).visible
+			if telegraph_at < 0.0:
+				telegraph_at = t
+		var count := shooter.active_projectile_count()
+		if count > last_count:
+			fires.append(t)
+			if fires.size() == 1:
+				first_volley = count
+		last_count = count
+	check(fires.size() >= 2, "it fires repeatedly (%d volleys in 5 s)" % fires.size())
+	check(absf(fires[0] - telegraph_at - shooter.telegraph_time) < 0.08, "a volley follows the %.2f s telegraph (%.2f)" % [shooter.telegraph_time, fires[0] - telegraph_at])
+	check(first_volley == 3, "the default volley is three shots (%d)" % first_volley)
+	check(fires.size() >= 2 and absf(fires[1] - fires[0] - shooter.fire_interval) < 0.15, "volleys come every %.1f s (%.2f)" % [shooter.fire_interval, fires[1] - fires[0] if fires.size() >= 2 else -1.0])
+	check(glow_seen, "the mouth glow shows during the telegraph")
+
+
+func case_shooter_aims_and_hits_once() -> void:
+	await _build_rig()
+	await _spawn(SHOOTER_SCENE, Vector2(200.0, -90.0), -1)
+	var shooter := _enemy as Shooter
+	var shots: Array[EnemyProjectile] = []
+	for i: int in 300:
+		await physics_frame
+		shots = shooter.get_active_projectiles()
+		if not shots.is_empty():
+			break
+	var aim := (_player.global_position + Vector2(0.0, -29.0) - shots[0].global_position).normalized()
+	var directions: Array[Vector2] = []
+	for shot: EnemyProjectile in shots:
+		directions.append(shot.get_velocity().normalized())
+	var middle := directions[1] if directions.size() == 3 else Vector2.ZERO
+	check(middle.dot(aim) > 0.995, "the middle shot is aimed at where she stands (dot %.4f)" % middle.dot(aim))
+	check(absf(shots[0].get_velocity().length() - shooter.projectile_speed) < 1.0, "at the projectile speed (%.0f)" % shots[0].get_velocity().length())
+	var angle := rad_to_deg(absf(directions[0].angle_to(directions[1]))) if directions.size() == 3 else -1.0
+	check(absf(angle - shooter.spread_degrees) < 1.0, "the outer shots fan out +-%.0f degrees (%.1f)" % [shooter.spread_degrees, angle])
+	shooter._fire_wait = 100.0
+	await _secs(3.3)
+	check(_player.get_health() == 2, "the volley costs one pip in total (%d)" % _player.get_health())
+	check(shooter.active_projectile_count() == 0, "and every shot is spent or expired after its lifetime")
+
+
+func case_projectile_dies_on_walls() -> void:
+	await _build_rig(false)
+	_add_wall(Rect2(100.0, -200.0, 40.0, 200.0))
+	var shot := _add_projectile(Vector2(0.0, -40.0), Vector2.RIGHT, 210.0)
+	var max_x := 0.0
+	for i: int in 90:
+		await physics_frame
+		max_x = maxf(max_x, shot.global_position.x)
+	check(not shot.is_active(), "a shot dies on a wall")
+	check(max_x < 100.0 + 12.0, "without going through it (x %.0f)" % max_x)
+
+
+func case_projectile_expires() -> void:
+	await _build_rig(false)
+	var shot := _add_projectile(Vector2(0.0, -300.0), Vector2.UP, 20.0)
+	await _secs(shot.lifetime + 0.3)
+	check(not shot.is_active(), "a shot that hits nothing disappears after its lifetime")
+
+
+func case_slash_destroys_a_projectile() -> void:
+	await _build_rig()
+	var shot := _add_projectile(Vector2(60.0, -40.0), Vector2.RIGHT, 0.0)
+	await _steps(2)
+	_player.request_attack(0)
+	await _secs(0.5)
+	check(not shot.is_active(), "a slash cuts a shot out of the air")
+	check(_player.get_health() == 3, "without hurting her")
+	check(absf(_player.global_position.x) < 1.0, "and without recoil (x %.1f)" % _player.global_position.x)
+
+
+func case_projectile_is_not_pogoable() -> void:
+	await _build_rig()
+	var shot := _add_projectile(Vector2(0.0, -40.0), Vector2.RIGHT, 0.0)
+	await _drop_player_at(Vector2(0.0, -75.0))
+	Input.action_press(&"move_down")
+	_player.request_attack(1)
+	var bounced := false
+	for i: int in BOUNCE_STEPS:
+		await physics_frame
+		bounced = bounced or _player.velocity.y < BOUNCE_SPEED
+	check(not shot.is_active(), "a down slash also destroys it")
+	check(not bounced, "but it does not bounce her")
+	Input.action_release(&"move_down")
+
+
+func case_projectiles_are_cleared() -> void:
+	await _build_rig()
+	await _spawn(SHOOTER_SCENE, Vector2(200.0, -90.0), -1)
+	var shooter := _enemy as Shooter
+	shooter.fire_interval = 100.0
+	shooter._fire()
+	check(shooter.active_projectile_count() == 3, "a volley is in the air")
+	_registry().enter_room(ROOM_B)
+	check(shooter.active_projectile_count() == 0, "leaving the room clears the shots")
+	_registry().enter_room(ROOM_A)
+	shooter._fire()
+	_checkpoints().reset_resettable_enemies()
+	check(shooter.active_projectile_count() == 0, "a reset clears them")
+	shooter._fire()
+	shooter.receive_hit(shooter.max_health, Vector2.ZERO)
+	check(shooter.active_projectile_count() == 0, "and so does its death")
+
+
+func case_shooter_corpse() -> void:
+	await _build_rig(false)
+	await _spawn(SHOOTER_SCENE, Vector2(200.0, -100.0), -1)
+	_enemy.receive_hit(1, Vector2(150.0, -100.0))
+	check(_enemy.get_health() == 1, "2 HP: one hit leaves 1")
+	_enemy.receive_hit(1, Vector2(150.0, -100.0))
+	await _secs(1.5)
+	check(_enemy.is_dead() and absf(_enemy.global_position.y) < 2.0, "the corpse falls to the floor (y %.1f)" % _enemy.global_position.y)
+	check(not _enemy.is_physics_processing(), "and stays there")
+
+
+func case_shooter_persistence() -> void:
+	await _check_persistence(SHOOTER_SCENE, Vector2(40.0, -120.0))
+
+
+func case_shooter_is_pogoable() -> void:
+	await _pogo_off_enemy(SHOOTER_SCENE, Vector2(0.0, -100.0), -175.0)
