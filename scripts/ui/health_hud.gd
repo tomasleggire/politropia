@@ -23,12 +23,19 @@ const HUD_LAYER := 40
 @export var full_texture: Texture2D
 @export var empty_texture: Texture2D
 
+@export_group("Soul Meter")
+@export var meter_size := Vector2(44.0, 44.0)
+## Optional final art for the soul vessel; the drawn placeholder is used when unset.
+@export var meter_full_texture: Texture2D
+@export var meter_empty_texture: Texture2D
+
 @export_group("Feedback")
 ## Delay between consecutive pips when several refill at once.
 @export var refill_stagger := 0.08
 
 var _player: Player
 var _pips: Array[HealthPip] = []
+var _meter: SoulMeter
 var _shown := 0
 var _safe_override := Rect2()
 
@@ -39,6 +46,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = HUD_LAYER
 	_row.add_theme_constant_override(&"separation", int(pip_spacing))
+	_build_meter()
 	get_viewport().size_changed.connect(_place)
 	_place()
 	if _player == null:
@@ -50,10 +58,13 @@ func _ready() -> void:
 func bind_player(player: Player) -> void:
 	if _player != null and _player.health_changed.is_connected(_on_health_changed):
 		_player.health_changed.disconnect(_on_health_changed)
+		_player.soul_changed.disconnect(_on_soul_changed)
 	_player = player
 	if _player == null:
 		return
 	_player.health_changed.connect(_on_health_changed)
+	_player.soul_changed.connect(_on_soul_changed)
+	_on_soul_changed(_player.get_soul(), _player.get_max_soul())
 	_rebuild(_player.get_max_health())
 	_show_instantly(_player.get_health())
 
@@ -64,6 +75,10 @@ func is_bound() -> bool:
 
 func get_pips() -> Array[HealthPip]:
 	return _pips
+
+
+func get_meter() -> SoulMeter:
+	return _meter
 
 
 ## Rect (in viewport pixels) the HUD must stay inside. On a phone it is the
@@ -89,6 +104,21 @@ func set_safe_area(rect: Rect2) -> void:
 
 func _place() -> void:
 	_row.position = get_safe_rect().position + edge_margin
+	if _meter != null:
+		_meter.position = _row.position + Vector2(0.0, pip_size.y + pip_spacing)
+
+
+func _build_meter() -> void:
+	_meter = SoulMeter.new()
+	_meter.custom_minimum_size = meter_size
+	_meter.size = meter_size
+	_meter.full_texture = meter_full_texture
+	_meter.empty_texture = meter_empty_texture
+	$Root.add_child(_meter)
+
+
+func _on_soul_changed(current: int, maximum: int) -> void:
+	_meter.set_soul(current, maximum, current >= _player.focus_cost)
 
 
 func _on_health_changed(current: int, maximum: int) -> void:

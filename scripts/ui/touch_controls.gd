@@ -34,6 +34,8 @@ var _knob_offset := Vector2.ZERO
 var _jump_touch_id := -1
 var _dash_touch_id := -1
 var _interact_touch_id := -1
+var _focus_touch_id := -1
+var _player: Player
 var _interact_sources: Array[Object] = []
 
 var _attack_touch_id := -1
@@ -53,12 +55,14 @@ var _held_actions := {
 @onready var _dash_button: Control = $Root/DashButton
 @onready var _attack_button: Control = $Root/AttackButton
 @onready var _interact_button: Control = $Root/InteractButton
+@onready var _focus_button: Control = $Root/FocusButton
 
 
 func _ready() -> void:
 	layer = 100
 	visible = force_visible or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
 	_position_pad_at_rest()
+	_bind_found_player.call_deferred()
 
 
 func _process(delta: float) -> void:
@@ -96,6 +100,13 @@ func _handle_touch(touch: InputEventScreenTouch) -> void:
 		):
 			_begin_interact(touch.index)
 			get_viewport().set_input_as_handled()
+		elif (
+			_focus_touch_id < 0
+			and _focus_button.visible
+			and _try_begin_button(_focus_button, touch.index, touch.position)
+		):
+			_begin_focus(touch.index)
+			get_viewport().set_input_as_handled()
 	else:
 		if touch.index == _pad_touch_id:
 			_end_pad()
@@ -111,6 +122,9 @@ func _handle_touch(touch: InputEventScreenTouch) -> void:
 			get_viewport().set_input_as_handled()
 		elif touch.index == _interact_touch_id:
 			_end_interact()
+			get_viewport().set_input_as_handled()
+		elif touch.index == _focus_touch_id:
+			_end_focus()
 			get_viewport().set_input_as_handled()
 
 
@@ -291,6 +305,53 @@ func _end_interact() -> void:
 		_interact_button.call(&"set_button_state", false)
 
 
+## -- Focus button (shown only while a focus heal is possible) ------------
+
+## The button follows the player's soul and health, like the interact button
+## follows its sources.
+func bind_player(player: Player) -> void:
+	if _player != null and _player.health_changed.is_connected(_on_player_changed):
+		_player.health_changed.disconnect(_on_player_changed)
+		_player.soul_changed.disconnect(_on_player_changed)
+	_player = player
+	if _player != null:
+		_player.health_changed.connect(_on_player_changed)
+		_player.soul_changed.connect(_on_player_changed)
+	_refresh_focus_available()
+
+
+func _bind_found_player() -> void:
+	if _player == null:
+		bind_player(get_tree().get_first_node_in_group(&"player") as Player)
+
+
+func _on_player_changed(_current: int, _maximum: int) -> void:
+	_refresh_focus_available()
+
+
+func _refresh_focus_available() -> void:
+	var available := _player != null and _player.is_focus_available()
+	if is_instance_valid(_focus_button):
+		_focus_button.visible = available
+	if not available and _focus_touch_id >= 0:
+		_end_focus()
+
+
+func _begin_focus(index: int) -> void:
+	_focus_touch_id = index
+	Input.action_press(&"focus")
+	get_tree().call_group(&"player", &"request_focus", true)
+	_focus_button.call(&"set_button_state", true)
+
+
+func _end_focus() -> void:
+	_focus_touch_id = -1
+	Input.action_release(&"focus")
+	get_tree().call_group(&"player", &"request_focus", false)
+	if is_instance_valid(_focus_button):
+		_focus_button.call(&"set_button_state", false)
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		if is_node_ready():
@@ -303,3 +364,5 @@ func _notification(what: int) -> void:
 				_end_attack()
 			if _interact_touch_id >= 0:
 				_end_interact()
+			if _focus_touch_id >= 0:
+				_end_focus()

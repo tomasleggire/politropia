@@ -2,6 +2,7 @@ extends RefCounted
 ## Data-level reachability for the Greece layout. Standing surfaces are the
 ## walkable tops of solids and one-ways with player headroom; an edge exists
 ## when a jump (+ air dash) envelope connects two surfaces with a clear line.
+## Spikes are not standable: the stretch of a floor they cover is cut out.
 
 const PLAYER_HEIGHT := 58.0
 const BODY_MID := 29.0
@@ -13,11 +14,13 @@ const JUMP_HEIGHT := 130.0
 const FALL_GRAVITY := 2407.0
 
 var solids: Array[Rect2] = []
+var hazards: Array[Rect2] = []
 var surfaces: Array[Dictionary] = []   # {x0, x1, y}
 
 
-func _init(solid_rects: Array[Rect2], one_way_rects: Array[Rect2]) -> void:
+func _init(solid_rects: Array[Rect2], one_way_rects: Array[Rect2], hazard_rects: Array[Rect2] = []) -> void:
 	solids = solid_rects
+	hazards = hazard_rects
 	var tops: Array[Rect2] = []
 	tops.append_array(solid_rects)
 	tops.append_array(one_way_rects)
@@ -102,6 +105,9 @@ func _add_free_segments(rect: Rect2) -> void:
 	for blocker: Rect2 in solids:
 		if blocker.position.y < rect.position.y and blocker.end.y > rect.position.y - PLAYER_HEIGHT:
 			free = _subtract(free, blocker.position.x, blocker.end.x)
+	for hazard: Rect2 in hazards:
+		if absf(hazard.end.y - rect.position.y) < 1.5:
+			free = _subtract(free, hazard.position.x, hazard.end.x)
 	for span: Vector2 in free:
 		if span.y - span.x >= MIN_SURFACE_WIDTH:
 			surfaces.append({"x0": span.x, "x1": span.y, "y": rect.position.y})

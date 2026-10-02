@@ -51,9 +51,23 @@ const SHAFT_STEPS: Array = [
 ]
 
 
-## Placeholder damage strip on the B2 floor, between the Entrada doorway and
-## the shaft foot: low enough to jump over, so it never blocks the route.
-const HAZARD_PLACEHOLDER := Rect2(1240.0, 2704.0, 96.0, 16.0)
+## Spikes (world rects). Each rests on a floor, is 16 px tall so a jump clears
+## it, and can be pogoed. B2: a short row that invites a first pogo. The two
+## pits cost a pip when missed and send Luz back to the last safe ground.
+const B2_SPIKES := Rect2(1320.0, 2704.0, 96.0, 16.0)
+const ALCOVE_PIT_SPIKES := Rect2(2040.0, 1480.0, 220.0, 16.0)
+const T1_PIT_SPIKES := Rect2(380.0, 628.0, 210.0, 16.0)
+## The T1 pit (floor y 644) hangs below the room interior; the camera must
+## show it so its spikes are visible.
+const T1_PIT_VIEW := Rect2(380.0, 544.0, 210.0, 164.0)
+
+## Enemy archetypes the level knows how to instantiate.
+const WALKER := &"walker"
+const FLYER := &"flyer"
+const CHARGER := &"charger"
+const SHOOTER := &"shooter"
+## Nothing spawns closer than this to a place where Luz arrives.
+const ARRIVAL_CLEARANCE := 220.0
 
 
 ## Interior (walkable air) of every room, by name. Used for backgrounds and
@@ -77,6 +91,8 @@ static func rooms() -> Dictionary:
 ## so floors and walls stay in view. The medal alcove is part of the shaft.
 static func camera_bounds(room_name: String) -> Rect2:
 	var all := rooms()
+	if room_name == "T1":
+		return all[room_name].grow(WALL).merge(T1_PIT_VIEW)
 	if room_name != "Shaft" and room_name != "ShaftAlcove":
 		return all[room_name].grow(WALL)
 	var shaft: Rect2 = all["Shaft"]
@@ -216,9 +232,27 @@ static func markers() -> Dictionary:
 	}
 
 
-## Damage areas (world rects). Placeholders until the hazards redesign.
+## Spike areas (world rects).
 static func hazards() -> Array[Rect2]:
-	return [HAZARD_PLACEHOLDER]
+	return [B2_SPIKES, ALCOVE_PIT_SPIKES, T1_PIT_SPIKES]
+
+
+## Enemy placements, as {archetype, enemy_id, position, facing}. `position` is
+## the spawn with its origin at the feet; flyers and shooters hover at it, so
+## their body centre sits 11 and 14 px above. `facing` is -1 left, 1 right.
+## Current-map placement, to be redone with the Greece v2 layout.
+static func enemies() -> Array[Dictionary]:
+	return [
+		_enemy(WALKER, "greece_b2_walker_a", Vector2(1700, 2720), -1),
+		_enemy(FLYER, "greece_shaft_flyer_a", Vector2(1680, 1641), -1),
+		_enemy(FLYER, "greece_shaft_flyer_b", Vector2(1680, 911), -1),
+		_enemy(FLYER, "greece_t1_flyer_a", Vector2(485, 421), 1),
+		_enemy(CHARGER, "greece_t2_charger_a", Vector2(2260, 544), -1),
+		_enemy(SHOOTER, "greece_t2_shooter_a", Vector2(2290, 204), -1),
+		_enemy(SHOOTER, "greece_exit_shooter_a", Vector2(2330, 1754), -1),
+		_enemy(WALKER, "greece_b3_walker_a", Vector2(3300, 2720), -1),
+		_enemy(CHARGER, "greece_b3_charger_a", Vector2(3440, 2720), -1),
+	]
 
 
 static func marker_group(marker_name: String) -> StringName:
@@ -322,6 +356,10 @@ static func _nearest_room(point: Vector2, all: Dictionary) -> String:
 			best_distance = distance
 			best = room_name
 	return best
+
+
+static func _enemy(archetype: StringName, enemy_id: String, position: Vector2, facing: int) -> Dictionary:
+	return {"archetype": archetype, "enemy_id": StringName(enemy_id), "position": position, "facing": facing}
 
 
 static func _platform(x: float, top: float, width: float) -> Rect2:

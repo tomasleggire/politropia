@@ -95,3 +95,21 @@ offset_bottom = -168.0
 mouse_filter = 2
 script = ExtResource("3_button")
 icon = 3
+
+[node name="FocusButton" type="Control" parent="Root"]
+visible = false
+custom_minimum_size = Vector2(88, 88)
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 0
+grow_vertical = 0
+offset_left = -432.0
+offset_top = -124.0
+offset_right = -344.0
+offset_bottom = -36.0
+mouse_filter = 2
+script = ExtResource("3_button")
+icon = 4
