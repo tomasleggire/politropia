@@ -66,5 +66,3 @@ max_polyphony = 2
 [node name="SfxJump" type="AudioStreamPlayer" parent="." unique_id=414600132]
 stream = ExtResource("5_jump")
 volume_db = -2.0
-
-[node name="Camera2D" type="Camera2D" parent="." unique_id=1941624082]
