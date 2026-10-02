@@ -1,15 +1,25 @@
 [gd_scene load_steps=8 format=3 uid="uid://blevel01politropia"]
 
-[ext_resource type="Script" path="res://scripts/levels/level_01.gd" id="1_level"]
-[ext_resource type="PackedScene" uid="uid://bplayer01politropia" path="res://scenes/player/player.tscn" id="2_player"]
-[ext_resource type="Script" path="res://scripts/camera/room_camera.gd" id="3_camera"]
+[ext_resource type="Script" uid="uid://bvqxmx38a2wmg" path="res://scripts/levels/level_01.gd" id="1_level"]
+[ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="2_player"]
+[ext_resource type="Script" uid="uid://c2yml2d2b2t1p" path="res://scripts/camera/room_camera.gd" id="3_camera"]
 
 [ext_resource type="PackedScene" path="res://scenes/world/stillness_desk.tscn" id="4_desk"]
 [ext_resource type="PackedScene" path="res://scenes/world/altar_trail.tscn" id="5_trail"]
 [ext_resource type="PackedScene" path="res://scenes/ui/health_hud.tscn" id="6_hud"]
 
 [sub_resource type="Shader" id="Shader_gothic_grade"]
-code = "shader_type canvas_item;\n\nvoid fragment() {\n\tvec2 centered = UV - vec2(0.5);\n\tfloat edge = smoothstep(0.30, 0.76, length(centered * vec2(1.0, 1.35)));\n\tfloat top_falloff = smoothstep(0.64, 0.0, UV.y) * 0.12;\n\tfloat bottom_haze = smoothstep(0.70, 1.0, UV.y) * 0.10;\n\tfloat alpha = min(0.58, edge * 0.46 + top_falloff + bottom_haze);\n\tCOLOR = vec4(0.006, 0.010, 0.035, alpha);\n}\n"
+code = "shader_type canvas_item;
+
+void fragment() {
+	vec2 centered = UV - vec2(0.5);
+	float edge = smoothstep(0.30, 0.76, length(centered * vec2(1.0, 1.35)));
+	float top_falloff = smoothstep(0.64, 0.0, UV.y) * 0.12;
+	float bottom_haze = smoothstep(0.70, 1.0, UV.y) * 0.10;
+	float alpha = min(0.58, edge * 0.46 + top_falloff + bottom_haze);
+	COLOR = vec4(0.006, 0.010, 0.035, alpha);
+}
+"
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_gothic_grade"]
 shader = SubResource("Shader_gothic_grade")
