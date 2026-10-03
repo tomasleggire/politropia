@@ -8,10 +8,14 @@
 
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
 config/name="politropia"
-run/main_scene="res://scenes/levels/level_01.tscn"
+run/main_scene="res://scenes/levels/greece_level.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 
@@ -19,12 +23,13 @@ config/icon="res://icon.svg"
 
 TouchControls="*res://scenes/ui/touch_controls.tscn"
 CheckpointService="*res://scripts/world/checkpoint_service.gd"
+EnemyRegistry="*res://scripts/enemies/enemy_registry.gd"
 
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
-window/stretch/mode="canvas_items"
+window/stretch/mode="viewport"
 window/stretch/aspect="expand"
 window/handheld/orientation=4
 
@@ -77,12 +82,20 @@ interact={
 ]
 }
 
+focus={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":70,"key_label":0,"unicode":102,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":9,"pressure":0.0,"pressed":false,"script":null)
+]
+}
+
 [layer_names]
 
 2d_physics/layer_1="solids"
 2d_physics/layer_2="one_way"
 2d_physics/layer_3="player_attack"
 2d_physics/layer_4="enemies"
+2d_physics/layer_5="pogoable"
 
 [physics]
 

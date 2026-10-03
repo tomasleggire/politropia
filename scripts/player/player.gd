@@ -4,10 +4,21 @@ extends CharacterBody2D
 ## Blasphemous-style finite state machine: weighty ground run, a precise
 ## jump arc, crouch, a dash/slide usable on the ground or in the air (one
 ## air dash per airborne period), wall cling + climb kick, ledge grab,
-## a 3-hit ground combo, up/air/crouch attacks and a down plunge.
+## a 3-hit ground combo, up/air/crouch attacks and a pogo down slash.
 
 signal respawned
+## Emitted after a hazard return has moved her onto the last safe ground, while
+## the screen is still dark, so a level can re-frame its camera.
+signal safe_ground_returned
+## Emitted when a gated movement ability is granted (e.g. &"double_jump").
+signal ability_unlocked(ability: StringName)
 signal health_changed(current: int, maximum: int)
+## Soul meter level; fires on every gain, spend and reset.
+signal soul_changed(current: int, maximum: int)
+## Emitted when a hit lands: how much it took and the health left.
+signal damaged(amount: int, current: int)
+## Emitted once when health reaches zero; the respawn follows the death beat.
+signal died
 signal meditation_started
 signal meditation_finished
 ## Emitted while meditating when the player gives gameplay input (a fresh
@@ -16,10 +27,13 @@ signal rest_exit_requested
 signal rest_animation_finished(animation_name: StringName)
 signal rest_animation_frame_changed(animation_name: StringName, frame: int)
 
+enum ReturnPhase { NONE, OUT, IN }
+
 enum State {
 	IDLE, RUN, CROUCH, JUMP, FALL, DASH,
 	WALL_CLING, LEDGE_HANG, LEDGE_CLIMB,
-	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK, PLUNGE, PLUNGE_LAND,
+	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK,
+	HURT, DEAD, FOCUS,
 }
 
 const PHASE_STARTUP := 0
@@ -31,7 +45,46 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ]
 
 @export_group("Health")
-@export var max_health := 5
+@export var max_health := 3
+
+@export_group("Soul")
+@export var max_soul := 99
+## Soul gained by each hit that damages an enemy (Hollow Knight nail: 11).
+@export var soul_per_hit := 11
+## Soul spent by one focus heal (3 hits per pip, as in Hollow Knight).
+@export var focus_cost := 33
+
+@export_group("Focus")
+## Seconds of standing still to heal one pip.
+@export var focus_time := 0.9
+@export var focus_glow_radius := 24.0
+
+@export_group("Damage")
+## Knockback launched away from the damage source: x is the horizontal speed
+## (signed by the side the source is on), y the upward kick.
+@export var knockback_speed := Vector2(320.0, -260.0)
+## Movement input is ignored this long after a hit; gravity still applies.
+@export var hurt_control_lock := 0.22
+## Invulnerable window after a hit, shown as a blink of the sprite's alpha.
+@export var invulnerability_time := 1.0
+@export var flicker_interval := 0.08
+@export var flicker_alpha := 0.35
+## Local freeze of the player (and the camera that follows her) on impact.
+## Never touches Engine.time_scale, so it cannot fight the desk's pause_world
+## or the tests' time scale. 0 disables it.
+@export var hit_stop_time := 0.06
+## Fade-out of the placeholder death beat before the respawn.
+@export var death_fade_time := 0.6
+## A non-lethal hit nudges the room camera by this many pixels for this long.
+@export var hit_shake_strength := 3.0
+@export var hit_shake_time := 0.2
+## Hazard hit: dark fade out, move to the last safe ground, fade back in.
+@export var hazard_fade_out := 0.15
+@export var hazard_fade_in := 0.2
+## Safe ground: a floor spot she stood on this long, away from the surface's
+## edges and from every hazard by the margin.
+@export var safe_ground_time := 0.1
+@export var safe_ground_margin := 24.0
 
 @export_group("Run")
 @export var run_max_speed := 250.0
@@ -48,6 +101,14 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var max_fall_speed := 900.0
 @export var coyote_time := 0.08
 @export var jump_buffer_time := 0.10
+
+@export_group("Double Jump")
+## Gated ability, off until unlock_double_jump() (the Greece boss reward).
+@export var can_double_jump := false
+## Rise of an air jump, launched with the same rise gravity as the main jump.
+@export var double_jump_height := 130.0
+## Extra jumps available per airborne period.
+@export var air_jumps := 1
 
 @export_group("Air Control")
 @export var air_acceleration := 2600.0
@@ -139,7 +200,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var air_attack_recovery := 0.40
 ## How long ANY buffered attack press stays queued before being dropped:
 ## a press that can't start an attack right away (dash, wall cling,
-## crouch/up/plunge attack, plunge land), a press for the next combo hit
+## crouch/up attack), a press for the next combo hit
 ## (hit1->2, hit2->3), and a press during the finisher that would restart
 ## the combo -- all three share this one short window (~0.15s, matching the
 ## Blasphemous reference) so a press is consumed at most once and a press
@@ -148,11 +209,24 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## _attack_buffered_left/_attack_restart_buffered_left below).
 @export var attack_buffer_time := 0.15
 
-@export_group("Plunge")
-@export var plunge_hang_time := 0.12
-@export var plunge_fall_speed := 1300.0
-@export var plunge_land_active_time := 0.12
-@export var plunge_land_recovery_time := 0.25
+@export_group("Attack Recoil")
+## Damage one slash deals to whatever it strikes.
+@export var attack_damage := 1
+## A horizontal slash that lands pushes Luz away from the target at this speed
+## for this long. Up slashes and down slashes never recoil her.
+@export var attack_recoil_speed := 120.0
+@export var attack_recoil_time := 0.08
+
+@export_group("Pogo")
+## Rise of the bounce after a down slash lands on an enemy, a hazard or
+## anything in the `pogoable` group. Launched with the main jump's rise
+## gravity, at a fixed speed: releasing jump does not shorten it.
+@export var pogo_height := 130.0
+## Grace window after a pogo: hazard damage is ignored for this long, so the
+## frame in which her body and the slash reach the same spike cannot cost her
+## the bounce (Hollow Knight forgives it the same way). A hazard touched with
+## no slash covering it hurts as usual.
+@export var pogo_grace_time := 0.12
 
 @export_group("Attack Hitboxes")
 ## T4d item 3 (iPhone playtest: "in the 3rd hit Luz gets bigger and so does
@@ -175,10 +249,9 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var hitbox_air_offset_y := -30.66     ## air: mid-air torso height
 @export var hitbox_up_size := Vector2(26, 68)
 @export var hitbox_up_offset := Vector2(0, -80)
-@export var hitbox_plunge_size := Vector2(28.0, 18.0)
-@export var hitbox_plunge_offset := Vector2(0.0, 12.0)
-@export var hitbox_plunge_land_size := Vector2(150.0, 20.0)
-@export var hitbox_plunge_land_offset := Vector2(0.0, 6.0)
+## Down slash: a box right below her feet (the origin is at the feet).
+@export var hitbox_down_size := Vector2(36.0, 44.0)
+@export var hitbox_down_offset := Vector2(0.0, 22.0)
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
@@ -209,7 +282,6 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 	# already gone (see PlayerSlashVfx.TOTAL_DURATION).
 	"up_attack": attack_startup_time + PlayerSlashVfx.TOTAL_DURATION,
 	"air_attack": air_attack_recovery,
-	"plunge_land": plunge_land_active_time + plunge_land_recovery_time,
 }, {
 	"attack_1": attack_startup_time,
 	"attack_2": attack_startup_time,
@@ -226,16 +298,37 @@ var _spawn_position := Vector2.ZERO
 var _health := 0
 var _input_locked := false
 var _meditating := false
+var _dead := false
+var _hurt_left := 0.0
+var _invuln_left := 0.0
+var _hit_stop_left := 0.0
+var _base_alpha := 1.0
+var _return_phase := ReturnPhase.NONE
+var _return_left := 0.0
+var _fade: ScreenFade
+var _transition_locked := false
+var _auto_walk := 0
+var _keep_momentum := false
+var _last_safe_ground := Vector2.ZERO
+var _has_safe_ground := false
+var _ground_time := 0.0
+var _ground_collider: Object
 var _rest_animation := &""
 var _default_process_mode := Node.PROCESS_MODE_INHERIT
 
 var _rise_gravity := 0.0
 var _fall_gravity := 0.0
 var _jump_velocity := 0.0
+var _double_jump_velocity := 0.0
 var _standing_shape_height := 58.0
 
 var _coyote_left := 0.0
 var _jump_buffer_left := 0.0
+## True only on the physics frame a jump press arrives (keyboard edge or touch
+## request). Air jumps need a fresh press; stale buffered ones stay ground jumps.
+var _jump_pressed_now := false
+var _jump_press_pending := false
+var _air_jumps_left := 0
 var _landing_left := 0.0
 var _footstep_left := 0.0
 var _was_on_floor := false
@@ -278,6 +371,18 @@ var _attack_restart_buffered_left := 0.0
 var _air_attack_buffered_left := 0.0
 var _attack_buffer_left := 0.0
 var _attack_buffer_direction := 0
+var _recoil_left := 0.0
+var _recoil_velocity := 0.0
+var _air_attack_down := false
+var _pogo_bounced := false
+var _pogo_rising := false
+var _pogo_grace_left := 0.0
+
+var _soul := 0
+var _focus_left := 0.0
+var _focus_requested := false
+var _focus_glow: Polygon2D
+var _down_slash_mark: Polygon2D
 
 
 func _ready() -> void:
@@ -295,8 +400,11 @@ func _ready() -> void:
 	_sprite.scale = Vector2(0.175, 0.175)
 	_spawn_position = global_position
 	_health = max_health
+	_base_alpha = _sprite.modulate.a
 	_default_process_mode = process_mode
 	_recompute_jump_physics()
+	_air_jumps_left = air_jumps
+	_attack_hitbox.attack_hit.connect(_on_attack_hit)
 
 	var shape := _collision_shape.shape as RectangleShape2D
 	_standing_shape_height = shape.size.y
@@ -314,10 +422,21 @@ func _ready() -> void:
 func _recompute_jump_physics() -> void:
 	_rise_gravity = (2.0 * jump_height) / (jump_time_to_apex * jump_time_to_apex)
 	_jump_velocity = -_rise_gravity * jump_time_to_apex
+	_double_jump_velocity = -sqrt(2.0 * _rise_gravity * double_jump_height)
 	_fall_gravity = _rise_gravity * fall_gravity_multiplier
 
 
 func _physics_process(delta: float) -> void:
+	if _hit_stop_left > 0.0:
+		_hit_stop_left = maxf(_hit_stop_left - delta, 0.0)
+		return
+	_update_damage_timers(delta)
+	if _dead:
+		_update_dead(delta)
+		return
+	if _return_phase != ReturnPhase.NONE:
+		_update_return(delta)
+		return
 	if is_input_locked():
 		_update_locked(delta)
 		return
@@ -326,6 +445,8 @@ func _physics_process(delta: float) -> void:
 	_update_shared_timers(delta)
 	_update_facing()
 	_update_facing_rays()
+
+	_poll_focus_cancel()
 
 	if Input.is_action_just_pressed(&"attack"):
 		_queue_attack(_held_vertical_direction())
@@ -336,6 +457,8 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed(&"dash"):
 		_try_start_dash()
+
+	_try_start_focus()
 
 	var fall_speed_before_move := velocity.y
 
@@ -364,13 +487,15 @@ func _physics_process(delta: float) -> void:
 			_update_up_attack(delta)
 		State.AIR_ATTACK:
 			_update_air_attack(delta)
-		State.PLUNGE:
-			_update_plunge(delta)
-		State.PLUNGE_LAND:
-			_update_plunge_land(delta)
+		State.HURT:
+			_update_hurt(delta)
+		State.FOCUS:
+			_update_focus(delta)
 
+	_apply_attack_recoil(delta)
 	move_and_slide()
 	_after_move(fall_speed_before_move)
+	_track_safe_ground(delta)
 	_update_footsteps(delta)
 	_update_animation()
 
@@ -385,12 +510,15 @@ func _update_shared_timers(delta: float) -> void:
 	_attack_buffered_left = maxf(_attack_buffered_left - delta, 0.0)
 	_attack_restart_buffered_left = maxf(_attack_restart_buffered_left - delta, 0.0)
 	_air_attack_buffered_left = maxf(_air_attack_buffered_left - delta, 0.0)
+	_pogo_grace_left = maxf(_pogo_grace_left - delta, 0.0)
 
 	if _drop_left > 0.0:
 		_drop_left -= delta
 		if _drop_left <= 0.0:
 			set_collision_mask_value(2, true)
 
+	_jump_pressed_now = _jump_press_pending or Input.is_action_just_pressed(&"jump")
+	_jump_press_pending = false
 	if Input.is_action_just_pressed(&"jump"):
 		_jump_buffer_left = jump_buffer_time
 	else:
@@ -415,7 +543,7 @@ func _update_facing() -> void:
 	if _is_directional_attack_state():
 		_sprite.flip_h = _attack_facing < 0
 		return
-	if _state == State.DASH or _state == State.WALL_CLING or _state == State.LEDGE_HANG or _state == State.LEDGE_CLIMB:
+	if _state in [State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB, State.HURT]:
 		return
 	var axis := _horizontal_input()
 	if not is_zero_approx(axis):
@@ -526,7 +654,8 @@ func request_attack(direction: int) -> void:
 
 ## Touch UI: upgrades the attack that just started — while it is still in
 ## its startup phase, before any hitbox is active — to an up attack instead
-## of firing a second attack. A downward swipe leaves an air attack lateral.
+## of firing a second attack. A downward swipe turns an air attack into the
+## pogo down slash and does nothing on the ground.
 ## Used when the finger swipes after touching down on the attack button (see
 ## touch_controls.gd's attack_upgrade_window).
 func request_attack_upgrade(direction: int) -> void:
@@ -538,6 +667,8 @@ func request_attack_upgrade(direction: int) -> void:
 	)
 	if direction == -1 and upgrading_from_neutral:
 		_start_up_attack()
+	elif direction == 1 and _state == State.AIR_ATTACK and _attack_phase == PHASE_STARTUP:
+		_air_attack_down = true
 
 
 ## Touch UI entry point for the jump button, called directly instead of only
@@ -552,6 +683,7 @@ func request_jump() -> void:
 		_request_rest_exit()
 		return
 	_jump_buffer_left = jump_buffer_time
+	_jump_press_pending = true
 
 
 ## Touch UI entry point for the dash button; same same-frame-miss guard as
@@ -585,12 +717,11 @@ func _queue_attack(direction: int) -> void:
 			return
 		State.AIR_ATTACK:
 			if _attack_phase == PHASE_RECOVERY:
-				_state_time = 0.0
-				_attack_phase = PHASE_STARTUP
+				_restart_air_attack(direction == 1)
 			else:
 				_air_attack_buffered_left = attack_buffer_time
 			return
-		State.CROUCH_ATTACK, State.UP_ATTACK, State.PLUNGE, State.PLUNGE_LAND, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB:
+		State.CROUCH_ATTACK, State.UP_ATTACK, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB, State.HURT:
 			_attack_buffer_left = attack_buffer_time
 			_attack_buffer_direction = direction
 			return
@@ -601,7 +732,7 @@ func _queue_attack(direction: int) -> void:
 		if direction == -1:
 			_start_up_attack()
 		else:
-			_start_air_attack()
+			_start_air_attack(direction == 1)
 		return
 
 	if _state == State.CROUCH:
@@ -623,7 +754,7 @@ func _end_generic_attack() -> void:
 
 
 ## Invalidates a pending generic attack buffer (_attack_buffer_left/
-## _attack_buffer_direction, used by dash/wall-cling/ledge/crouch/up/plunge
+## _attack_buffer_direction, used by dash/wall-cling/ledge/crouch/up
 ## states) whenever an attack actually starts through any path. Without
 ## this, an older press already superseded by a fresher one that started an
 ## attack directly could still sit in the buffer and fire a second,
@@ -780,12 +911,22 @@ func _update_up_attack(delta: float) -> void:
 
 ## -- Combat: air attack ---------------------------------------------------------
 
-func _start_air_attack() -> void:
+## `down` turns it into the pogo down slash (down + attack in the air).
+func _start_air_attack(down := false) -> void:
 	_air_attack_buffered_left = 0.0
 	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.AIR_ATTACK)
 	_attack_phase = PHASE_STARTUP
+	_air_attack_down = down
+	_pogo_bounced = false
+
+
+func _restart_air_attack(down: bool) -> void:
+	_state_time = 0.0
+	_attack_phase = PHASE_STARTUP
+	_air_attack_down = down
+	_pogo_bounced = false
 
 
 func _update_air_attack(delta: float) -> void:
@@ -803,59 +944,135 @@ func _update_air_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
+			if _air_attack_down:
+				_activate_down_slash()
+			else:
+				_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
 			_deactivate_attack_hitbox()
 		if _air_attack_buffered_left > 0.0:
 			_air_attack_buffered_left = 0.0
-			_state_time = 0.0
-			_attack_phase = PHASE_STARTUP
+			_restart_air_attack(_held_vertical_direction() == 1)
 			return
 
 	if _state_time >= air_attack_recovery:
 		_state = State.JUMP if velocity.y < 0.0 else State.FALL
 
 
-## -- Combat: down plunge ---------------------------------------------------------
+## -- Combat: hits and recoil ---------------------------------------------------------
 
-func _start_plunge() -> void:
-	_clear_pending_attack_buffer()
-	_enter_state(State.PLUNGE)
-	_attack_phase = PHASE_STARTUP
+## Deferred: the hitbox reports from inside a physics query flush, where
+## changing areas, bodies or this state is forbidden.
+func _on_attack_hit(target: Node2D, attack_name: StringName) -> void:
+	_resolve_attack_hit.call_deferred(target, attack_name)
 
 
-func _update_plunge(_delta: float) -> void:
-	if is_on_floor():
-		_deactivate_attack_hitbox()
-		_enter_state(State.PLUNGE_LAND)
+## Any target with a `receive_hit(damage, source_position, attack_name)` method
+## can be struck (see Enemy). A landed horizontal slash recoils Luz.
+func _resolve_attack_hit(target: Node2D, attack_name: StringName) -> void:
+	if _dead or not is_instance_valid(target):
 		return
+	var struck := false
+	if target.has_method(&"receive_hit"):
+		struck = target.call(&"receive_hit", attack_damage, global_position, attack_name)
+	if attack_name == &"attack_down":
+		if struck or target.is_in_group(ContactDamage.POGO_GROUP):
+			_pogo()
+	elif struck:
+		_start_attack_recoil(target.global_position)
+	if struck and target.is_in_group(Enemy.GROUP_ENEMIES):
+		add_soul(soul_per_hit)
 
-	velocity.x = 0.0
-	if _state_time < plunge_hang_time:
-		velocity.y = 0.0
+
+## -- Combat: pogo down slash -----------------------------------------------------
+
+## Bounces her up at a fixed speed after a down slash connected, gives back her
+## air dash and double jump, and starts the hazard grace window. Once per slash.
+func _pogo() -> void:
+	if _state != State.AIR_ATTACK or not _air_attack_down or _pogo_bounced:
 		return
+	_pogo_bounced = true
+	_pogo_rising = true
+	_pogo_grace_left = pogo_grace_time
+	velocity.y = -sqrt(2.0 * _rise_gravity * pogo_height)
+	_restore_air_actions()
+	_deactivate_attack_hitbox()
+	_enter_state(State.JUMP)
 
-	if _attack_phase != PHASE_ACTIVE:
-		_attack_phase = PHASE_ACTIVE
-		_activate_attack_hitbox(&"attack_plunge")
-	velocity.y = plunge_fall_speed
+
+func _activate_down_slash() -> void:
+	var config := _activate_attack_hitbox(&"attack_down", _attack_facing)
+	_show_down_slash_mark(config.size, config.offset)
 
 
-func _update_plunge_land(_delta: float) -> void:
-	velocity = Vector2.ZERO
+## Placeholder for the missing art: a translucent box over the hitbox.
+func _show_down_slash_mark(size: Vector2, offset: Vector2) -> void:
+	if _down_slash_mark == null:
+		_down_slash_mark = Polygon2D.new()
+		_down_slash_mark.color = Color(1.0, 1.0, 1.0, 0.35)
+		_down_slash_mark.z_index = 1
+		add_child(_down_slash_mark)
+	var half := size * 0.5
+	_down_slash_mark.position = offset
+	_down_slash_mark.polygon = PackedVector2Array([
+		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
+		Vector2(half.x, half.y), Vector2(-half.x, half.y),
+	])
+	_down_slash_mark.visible = true
 
-	if _state_time < plunge_land_active_time:
-		if _attack_phase != PHASE_ACTIVE:
-			_attack_phase = PHASE_ACTIVE
-			_activate_attack_hitbox(&"attack_plunge_land")
-	else:
-		if _attack_phase != PHASE_RECOVERY:
-			_attack_phase = PHASE_RECOVERY
-			_deactivate_attack_hitbox()
-		if _state_time >= plunge_land_active_time + plunge_land_recovery_time:
-			_enter_state(State.IDLE)
+
+## True while the active down slash covers the hazard whose contact is hurting
+## her (`source_position` is the hazard's centre). The slash then wins: the
+## bounce happens at once, even if the hitbox report has not arrived yet.
+func _down_slash_covers(source_position: Vector2) -> bool:
+	if _state != State.AIR_ATTACK or not _air_attack_down or _attack_phase != PHASE_ACTIVE:
+		return false
+	var shape := _attack_hitbox.get_node("CollisionShape2D") as CollisionShape2D
+	var size := (shape.shape as RectangleShape2D).size
+	var slash := Rect2(_attack_hitbox.global_position + shape.position - size * 0.5, size)
+	for node: Node in get_tree().get_nodes_in_group(ContactDamage.HAZARD_GROUP):
+		var hazard := node as ContactDamage
+		if hazard.global_position.is_equal_approx(source_position) and hazard.get_world_rect().intersects(slash):
+			return true
+	return false
+
+
+## Hazard damage is refused right after a pogo, and while the active down
+## slash covers the hazard (which pogoes immediately).
+func _pogo_shields(source_position: Vector2) -> bool:
+	if _pogo_grace_left > 0.0:
+		return true
+	if not _down_slash_covers(source_position):
+		return false
+	_pogo()
+	return true
+
+
+## Pushes her away from `source` for a moment. Only the lateral attack states
+## apply it, and only to horizontal speed, so the double jump and the dash are
+## untouched.
+func _start_attack_recoil(source: Vector2) -> void:
+	if not _is_lateral_attack_state():
+		return
+	var side := signf(global_position.x - source.x)
+	if is_zero_approx(side):
+		side = -float(_attack_facing)
+	_recoil_velocity = side * attack_recoil_speed
+	_recoil_left = attack_recoil_time
+
+
+func _apply_attack_recoil(delta: float) -> void:
+	if _recoil_left <= 0.0:
+		return
+	_recoil_left = maxf(_recoil_left - delta, 0.0)
+	if _is_lateral_attack_state():
+		velocity.x = _recoil_velocity
+
+
+func _is_lateral_attack_state() -> bool:
+	return _state == State.ATTACK or _state == State.CROUCH_ATTACK or _state == State.AIR_ATTACK
 
 
 ## -- Combat: hitbox helpers -------------------------------------------------------
@@ -878,6 +1095,8 @@ func _activate_directional_attack(
 
 func _deactivate_attack_hitbox() -> void:
 	_attack_hitbox.deactivate()
+	if _down_slash_mark != null:
+		_down_slash_mark.visible = false
 
 
 func _hitbox_config_for(attack_name: StringName) -> Dictionary:
@@ -890,10 +1109,8 @@ func _hitbox_config_for(attack_name: StringName) -> Dictionary:
 			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_air_offset_y)}
 		&"attack_up":
 			return {size = hitbox_up_size, offset = hitbox_up_offset}
-		&"attack_plunge":
-			return {size = hitbox_plunge_size, offset = hitbox_plunge_offset}
-		&"attack_plunge_land":
-			return {size = hitbox_plunge_land_size, offset = hitbox_plunge_land_offset}
+		&"attack_down":
+			return {size = hitbox_down_size, offset = hitbox_down_offset}
 		_:
 			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_ground_offset_y)}
 
@@ -904,7 +1121,9 @@ func _update_airborne(delta: float) -> void:
 	if _wall_kick_lock_left <= 0.0:
 		_apply_air_horizontal_control(delta)
 
-	if Input.is_action_just_released(&"jump") and velocity.y < 0.0:
+	if velocity.y >= 0.0:
+		_pogo_rising = false
+	if Input.is_action_just_released(&"jump") and velocity.y < 0.0 and not _pogo_rising:
 		velocity.y *= jump_release_multiplier
 
 	_apply_gravity(delta)
@@ -914,7 +1133,7 @@ func _update_airborne(delta: float) -> void:
 			return
 		if _try_start_wall_cling():
 			return
-		if _try_launch_jump():
+		if _try_launch_jump() or _try_air_jump():
 			return
 
 	_state = State.JUMP if velocity.y < 0.0 else State.FALL
@@ -950,6 +1169,43 @@ func _try_launch_jump() -> bool:
 	return true
 
 
+## Spends one air jump on a fresh press once the ground/coyote jump is no
+## longer possible. A stale buffered press never gets here: it stays a ground
+## jump for the landing. Replaces vy, so the variable-height release applies.
+func _try_air_jump() -> bool:
+	if not can_double_jump or _air_jumps_left <= 0 or not _jump_pressed_now:
+		return false
+	if is_on_floor() or _coyote_left > 0.0:
+		return false
+	_air_jumps_left -= 1
+	velocity.y = _double_jump_velocity
+	_jump_buffer_left = 0.0
+	_sfx_jump.play()
+	_enter_state(State.JUMP)
+	_restart_jump_animation()
+	return true
+
+
+func _restart_jump_animation() -> void:
+	_sprite.stop()
+	_play_animation(&"jump")
+
+
+func _restore_air_actions() -> void:
+	_air_dash_used = false
+	_air_jumps_left = air_jumps
+
+
+func unlock_double_jump() -> void:
+	can_double_jump = true
+	_air_jumps_left = air_jumps
+	ability_unlocked.emit(&"double_jump")
+
+
+func has_double_jump() -> bool:
+	return can_double_jump
+
+
 ## -- Dash / slide -------------------------------------------------------------
 
 ## Centralized dash trigger (keyboard/gamepad "dash" just-pressed and the
@@ -968,7 +1224,7 @@ func _try_start_dash() -> bool:
 
 func _can_dash_from_state() -> bool:
 	match _state:
-		State.IDLE, State.RUN, State.CROUCH, State.JUMP, State.FALL:
+		State.IDLE, State.RUN, State.CROUCH, State.JUMP, State.FALL, State.FOCUS:
 			return true
 		State.ATTACK, State.AIR_ATTACK:
 			return _attack_phase == PHASE_RECOVERY
@@ -1087,7 +1343,7 @@ func _try_start_wall_cling() -> bool:
 	if not _is_holding_toward_wall(_facing):
 		return false
 	_wall_direction = _facing
-	_air_dash_used = false
+	_restore_air_actions()
 	_enter_state(State.WALL_CLING)
 	return true
 
@@ -1152,7 +1408,7 @@ func _try_start_ledge_hang() -> bool:
 		return false
 	if not _is_wall_ray(_wall_check_chest) or _ledge_check_above.is_colliding():
 		return false
-	_air_dash_used = false
+	_restore_air_actions()
 	_snap_to_ledge()
 	_enter_state(State.LEDGE_HANG)
 	return true
@@ -1195,6 +1451,10 @@ func _enter_state(new_state: State) -> void:
 	var previous := _state
 	_state = new_state
 	_state_time = 0.0
+	if not _is_lateral_attack_state():
+		_recoil_left = 0.0
+	if new_state != State.JUMP:
+		_pogo_rising = false
 	if not _is_directional_attack_state():
 		_slash_vfx.stop_slash()
 
@@ -1214,6 +1474,11 @@ func _enter_state(new_state: State) -> void:
 
 	if new_state == State.LEDGE_CLIMB:
 		_ledge_climb_time = 0.0
+
+	if previous == State.FOCUS and new_state != State.FOCUS:
+		_end_focus()
+	elif new_state == State.FOCUS and previous != State.FOCUS:
+		_begin_focus()
 
 	# The post-kick drift-back only applies while airborne; any other state
 	# (re-clung, landed, attacked, dashed…) clears it.
@@ -1262,6 +1527,283 @@ func is_at_full_health() -> bool:
 	return _health >= max_health
 
 
+## Restores up to `amount` pips (never past the maximum) and tells listeners.
+## Returns how many were actually restored.
+func heal(amount: int) -> int:
+	if _dead or amount <= 0:
+		return 0
+	var restored := mini(amount, max_health - _health)
+	if restored <= 0:
+		return 0
+	_health += restored
+	health_changed.emit(_health, max_health)
+	return restored
+
+
+## Changes the mask count; health is clamped to it and listeners are told.
+func set_max_health(value: int) -> void:
+	max_health = maxi(value, 1)
+	_health = mini(_health, max_health)
+	health_changed.emit(_health, max_health)
+
+
+## Applies a hit coming from `source_position`. Returns false, changing
+## nothing, while invulnerable, dead, meditating or input-locked. A hit
+## knocks Luz away from the source, restores her air dash and air jump (like
+## Hollow Knight), and starts the i-frames, control lock and hit-stop.
+func take_damage(amount: int, source_position: Vector2) -> bool:
+	return _apply_damage(amount, source_position, false)
+
+
+## Like take_damage, for fixed hazards: a surviving hit hit-stops, shakes the
+## camera and then fades out, moves Luz to the last safe ground and fades back
+## in, with input locked throughout. A lethal hit dies normally instead.
+func take_hazard_damage(amount: int, source_position: Vector2) -> bool:
+	return _apply_damage(amount, source_position, true)
+
+
+func _apply_damage(amount: int, source_position: Vector2, hazard: bool, force := false) -> bool:
+	if amount <= 0 or _dead:
+		return false
+	if not force and (_invuln_left > 0.0 or is_input_locked()):
+		return false
+	if hazard and not force and _pogo_shields(source_position):
+		return false
+	_health = maxi(_health - amount, 0)
+	health_changed.emit(_health, max_health)
+	damaged.emit(amount, _health)
+	_cancel_actions_for_hit()
+	velocity = _knockback_from(source_position)
+	_invuln_left = invulnerability_time
+	_hit_stop_left = hit_stop_time
+	_sprite.speed_scale = 0.0
+	if _health == 0:
+		_begin_death()
+		return true
+	_shake_camera()
+	if hazard:
+		_begin_safe_return()
+	else:
+		_hurt_left = hurt_control_lock
+		_enter_state(State.HURT)
+	return true
+
+
+## Falling out of the map costs one pip like a hazard hit and then returns her
+## to the last safe ground; a lethal fall dies normally instead. Unlike a hit
+## it ignores the i-frames and any control lock (Hollow Knight pits always
+## hurt), so a fall right after a hit still counts. Returns false only while
+## she is already dead or already being returned, so a level may call it on
+## every tick she stays below the map.
+func fall_out_of_bounds() -> bool:
+	if _dead or _return_phase != ReturnPhase.NONE:
+		return false
+	_end_room_transition()
+	if not _apply_damage(1, global_position, true, true):
+		return false
+	velocity = Vector2.ZERO
+	return true
+
+
+func _knockback_from(source_position: Vector2) -> Vector2:
+	var side := signf(global_position.x - source_position.x)
+	if is_zero_approx(side):
+		side = -float(_facing)
+	return Vector2(side * knockback_speed.x, knockback_speed.y)
+
+
+func _cancel_actions_for_hit() -> void:
+	if _state == State.FOCUS:
+		_enter_state(State.IDLE)
+	_deactivate_attack_hitbox()
+	_recoil_left = 0.0
+	_pogo_rising = false
+	_pogo_grace_left = 0.0
+	_attack_combo_index = 0
+	_attack_buffered_left = 0.0
+	_attack_restart_buffered_left = 0.0
+	_air_attack_buffered_left = 0.0
+	_attack_buffer_left = 0.0
+	_jump_buffer_left = 0.0
+	_wall_jump_lock_left = 0.0
+	_wall_kick_lock_left = 0.0
+	_restore_air_actions()
+
+
+func _update_damage_timers(delta: float) -> void:
+	_hurt_left = maxf(_hurt_left - delta, 0.0)
+	_invuln_left = maxf(_invuln_left - delta, 0.0)
+	if _dead:
+		return
+	_set_sprite_alpha(_flicker_alpha_now() if _invuln_left > 0.0 else _base_alpha)
+
+
+func _flicker_alpha_now() -> float:
+	var phase := int(floorf(_invuln_left / flicker_interval))
+	return flicker_alpha if phase % 2 == 0 else _base_alpha
+
+
+func _set_sprite_alpha(alpha: float) -> void:
+	var tint := _sprite.modulate
+	tint.a = alpha
+	_sprite.modulate = tint
+
+
+func _shake_camera() -> void:
+	var camera := get_viewport().get_camera_2d()
+	if camera != null and camera.has_method(&"shake"):
+		camera.call(&"shake", hit_shake_strength, hit_shake_time)
+
+
+## -- Safe ground / hazard return --------------------------------------------------
+
+## The last floor spot judged safe to come back to (the level start until she
+## has stood anywhere safe).
+func get_last_safe_ground() -> Vector2:
+	return _last_safe_ground if _has_safe_ground else _spawn_position
+
+
+## Moves Luz to the last safe ground at once, at rest.
+func return_to_safe_ground() -> void:
+	global_position = get_last_safe_ground()
+	velocity = Vector2.ZERO
+	reset_physics_interpolation()
+	safe_ground_returned.emit()
+
+
+func _begin_safe_return() -> void:
+	velocity = Vector2.ZERO
+	_return_phase = ReturnPhase.OUT
+	_return_left = maxf(hazard_fade_out, 0.001)
+	get_screen_fade()
+
+
+## The one full-screen veil the player owns. Hazard returns and room
+## transitions both drive it, and never at the same time.
+func get_screen_fade() -> ScreenFade:
+	if _fade == null:
+		_fade = ScreenFade.new()
+		add_child(_fade)
+	return _fade
+
+
+func _update_return(delta: float) -> void:
+	_return_left -= delta
+	if _return_phase == ReturnPhase.OUT:
+		_fade.set_alpha(1.0 - clampf(_return_left / maxf(hazard_fade_out, 0.001), 0.0, 1.0))
+		if _return_left <= 0.0:
+			return_to_safe_ground()
+			_return_phase = ReturnPhase.IN
+			_return_left = maxf(hazard_fade_in, 0.001)
+	else:
+		_fade.set_alpha(clampf(_return_left / maxf(hazard_fade_in, 0.001), 0.0, 1.0))
+		if _return_left <= 0.0:
+			_end_safe_return()
+	_update_locked(delta)
+
+
+func _end_safe_return() -> void:
+	_return_phase = ReturnPhase.NONE
+	if _fade != null:
+		_fade.set_alpha(0.0)
+
+
+func _track_safe_ground(delta: float) -> void:
+	var ground := _floor_collider() if is_on_floor() and _state != State.HURT else null
+	if ground == null:
+		_ground_time = 0.0
+		_ground_collider = null
+		return
+	if ground != _ground_collider:
+		_ground_collider = ground
+		_ground_time = 0.0
+	_ground_time += delta
+	if _ground_time >= safe_ground_time and _is_safe_spot(ground):
+		_last_safe_ground = global_position
+		_has_safe_ground = true
+
+
+## The solid (layer 1) or one-way (layer 2) body she is standing on.
+func _floor_collider() -> CollisionObject2D:
+	for index in get_slide_collision_count():
+		var collision := get_slide_collision(index)
+		var body := collision.get_collider() as CollisionObject2D
+		if body != null and collision.get_normal().y <= -0.7 and (body.get_collision_layer_value(1) or body.get_collision_layer_value(2)):
+			return body
+	return null
+
+
+func _is_safe_spot(ground: CollisionObject2D) -> bool:
+	var surface := _surface_rect(ground)
+	if surface.has_area():
+		if global_position.x < surface.position.x + safe_ground_margin or global_position.x > surface.end.x - safe_ground_margin:
+			return false
+	for node: Node in get_tree().get_nodes_in_group(ContactDamage.HAZARD_GROUP):
+		if (node as ContactDamage).get_world_rect().grow(safe_ground_margin).has_point(global_position):
+			return false
+	return true
+
+
+## World rect of the body's rectangle shape (no rotation), or an empty rect.
+func _surface_rect(body: CollisionObject2D) -> Rect2:
+	for child in body.get_children():
+		var shape_node := child as CollisionShape2D
+		if shape_node != null and shape_node.shape is RectangleShape2D:
+			var size := (shape_node.shape as RectangleShape2D).size
+			return Rect2(body.global_position + shape_node.position - size * 0.5, size)
+	return Rect2()
+
+
+func _update_hurt(delta: float) -> void:
+	_apply_gravity(delta)
+	if _hurt_left <= 0.0:
+		_end_generic_attack()
+
+
+func _begin_death() -> void:
+	var camera := get_viewport().get_camera_2d()
+	if camera != null and camera.has_method(&"cancel_shake"):
+		camera.call(&"cancel_shake")
+	_dead = true
+	_invuln_left = 0.0
+	_hurt_left = 0.0
+	_set_soul(0)
+	_enter_state(State.DEAD)
+	died.emit()
+
+
+func _update_dead(delta: float) -> void:
+	_state_time += delta
+	velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
+	if is_on_floor():
+		velocity.y = 0.0
+	else:
+		_apply_gravity(delta)
+	move_and_slide()
+	_update_animation()
+	var fade := clampf(_state_time / maxf(death_fade_time, 0.001), 0.0, 1.0)
+	_set_sprite_alpha(lerpf(_base_alpha, 0.0, fade))
+	if _state_time >= death_fade_time:
+		_respawn_after_death()
+
+
+## Wakes Luz at the active checkpoint of this scene (or where the level
+## started), with full health, and lets resettable enemies regenerate.
+func _respawn_after_death() -> void:
+	# Looked up by path: a bare autoload name does not compile in --script
+	# runs, which instantiate the player without the project's autoloads.
+	var checkpoints := get_node_or_null("/root/CheckpointService")
+	var current := get_tree().current_scene
+	if checkpoints != null and current != null:
+		checkpoints.apply_to_player(self, current.scene_file_path)
+	respawn()
+	# A damage area she just left still lists her as inside for one physics
+	# step, so waking up needs the same grace as a hit.
+	_invuln_left = invulnerability_time
+	if checkpoints != null:
+		checkpoints.reset_resettable_enemies()
+
+
 func restore_full_health() -> void:
 	if _health == max_health:
 		return
@@ -1269,12 +1811,134 @@ func restore_full_health() -> void:
 	health_changed.emit(_health, max_health)
 
 
+## -- Soul and focus heal -------------------------------------------------------
+
+func get_soul() -> int:
+	return _soul
+
+
+func get_max_soul() -> int:
+	return max_soul
+
+
+## Adds soul up to the cap. Only hits that damage an enemy call this.
+func add_soul(amount: int) -> void:
+	if amount > 0:
+		_set_soul(_soul + amount)
+
+
+func _set_soul(value: int) -> void:
+	var clamped := clampi(value, 0, max_soul)
+	if clamped == _soul:
+		return
+	_soul = clamped
+	soul_changed.emit(_soul, max_soul)
+
+
+## True when a focus heal would be worth starting: enough soul and a missing
+## pip. The touch Focus button follows this.
+func is_focus_available() -> bool:
+	return not _dead and _health > 0 and _health < max_health and _soul >= focus_cost
+
+
+func is_focusing() -> bool:
+	return _state == State.FOCUS
+
+
+## Touch UI entry point: holding the Focus button means focus, same as the
+## keyboard and gamepad `focus` action.
+func request_focus(pressed: bool) -> void:
+	_focus_requested = pressed
+
+
+func _focus_held() -> bool:
+	return _focus_requested or Input.is_action_pressed(&"focus")
+
+
+func _try_start_focus() -> void:
+	if _state != State.IDLE and _state != State.RUN:
+		return
+	if not _focus_held() or not is_focus_available() or not is_on_floor():
+		return
+	if is_input_locked() or _jump_buffer_left > 0.0 or not is_zero_approx(_horizontal_input()):
+		return
+	_enter_state(State.FOCUS)
+
+
+## Acting cancels focus, like Hollow Knight: move, jump, attack or dash.
+func _poll_focus_cancel() -> void:
+	if _state != State.FOCUS:
+		return
+	var acted := (
+		_jump_pressed_now
+		or Input.is_action_just_pressed(&"attack")
+		or Input.is_action_just_pressed(&"dash")
+		or not is_zero_approx(_horizontal_input())
+	)
+	if acted:
+		_enter_state(State.IDLE)
+
+
+func _update_focus(delta: float) -> void:
+	velocity = Vector2.ZERO
+	if not is_on_floor():
+		_enter_state(State.FALL)
+		return
+	if not _focus_held() or not is_focus_available():
+		_enter_state(State.IDLE)
+		return
+	_focus_left -= delta
+	_update_focus_glow()
+	if _focus_left <= 0.0:
+		_complete_focus()
+
+
+func _complete_focus() -> void:
+	_set_soul(_soul - focus_cost)
+	heal(1)
+	if _focus_held() and is_focus_available():
+		_focus_left = focus_time
+		_state_time = 0.0
+	else:
+		_enter_state(State.IDLE)
+
+
+func _begin_focus() -> void:
+	velocity = Vector2.ZERO
+	_focus_left = focus_time
+	_update_focus_glow()
+
+
+func _end_focus() -> void:
+	_focus_left = 0.0
+	if _focus_glow != null:
+		_focus_glow.visible = false
+
+
+## Placeholder for the missing art: a soft pulsing glow that swells as the
+## channel nears completion.
+func _update_focus_glow() -> void:
+	if _focus_glow == null:
+		_focus_glow = Polygon2D.new()
+		_focus_glow.z_index = 1
+		_focus_glow.position = Vector2(0.0, -29.0)
+		var ring := PackedVector2Array()
+		for step in 24:
+			ring.append(Vector2.from_angle(TAU * float(step) / 24.0) * focus_glow_radius)
+		_focus_glow.polygon = ring
+		add_child(_focus_glow)
+	var progress := 1.0 - clampf(_focus_left / maxf(focus_time, 0.001), 0.0, 1.0)
+	_focus_glow.visible = true
+	_focus_glow.scale = Vector2.ONE * lerpf(0.6, 1.2, progress)
+	_focus_glow.color = Color(1.0, 0.95, 0.75, 0.22 + 0.12 * sin(_state_time * 14.0))
+
+
 ## -- Input lock / meditation ---------------------------------------------------
 
 ## True while gameplay input is ignored, either by an explicit lock or because
 ## the player is meditating.
 func is_input_locked() -> bool:
-	return _input_locked or _meditating
+	return _input_locked or _meditating or _dead or _transition_locked or _return_phase != ReturnPhase.NONE
 
 
 func is_meditating() -> bool:
@@ -1287,6 +1951,90 @@ func set_input_locked(locked: bool) -> void:
 	_input_locked = locked
 	if locked:
 		clear_transient_state()
+
+
+## -- Room transitions ---------------------------------------------------------
+
+## Locks input for a room change. A non-zero `walk_direction` (-1 or 1) walks
+## her that way at run speed; 0 keeps her momentum instead, for vertical
+## openings. Hits are refused while it lasts, like any input lock.
+func begin_room_transition(walk_direction: int) -> void:
+	_transition_locked = true
+	_auto_walk = signi(walk_direction)
+	_keep_momentum = _auto_walk == 0
+	_cancel_inputs_for_transition()
+	if _auto_walk != 0:
+		_facing = _auto_walk
+	else:
+		velocity.x = clampf(velocity.x, -run_max_speed, run_max_speed)
+
+
+func end_room_transition() -> void:
+	_end_room_transition()
+
+
+func is_in_room_transition() -> bool:
+	return _transition_locked
+
+
+## True while the hazard return owns the screen veil.
+func is_returning_to_safe_ground() -> bool:
+	return _return_phase != ReturnPhase.NONE
+
+
+## Stops the auto-walk but keeps the lock.
+func stop_auto_walk() -> void:
+	_auto_walk = 0
+
+
+## Puts her feet at `feet`, at rest, facing `facing` (-1 or 1).
+func place_for_transition(feet: Vector2, facing: int) -> void:
+	global_position = feet
+	velocity = Vector2.ZERO
+	_facing = 1 if facing >= 0 else -1
+	_sprite.flip_h = _facing < 0
+	reset_physics_interpolation()
+
+
+## Makes sure she rises at least `height` px from here (never slows a faster
+## rise), so a transition can lift her over the lip of an opening.
+func boost_upward(height: float) -> void:
+	if height > 0.0:
+		velocity.y = minf(velocity.y, -sqrt(2.0 * _rise_gravity * height))
+
+
+func get_facing() -> int:
+	return _facing
+
+
+func _end_room_transition() -> void:
+	if not _transition_locked:
+		return
+	_transition_locked = false
+	_auto_walk = 0
+	_cancel_inputs_for_transition()
+
+
+func _cancel_inputs_for_transition() -> void:
+	set_collision_mask_value(2, true)
+	_drop_left = 0.0
+	_coyote_left = 0.0
+	_jump_buffer_left = 0.0
+	_jump_press_pending = false
+	_dash_cooldown_left = 0.0
+	_wall_jump_lock_left = 0.0
+	_wall_kick_lock_left = 0.0
+	_wall_kick_pending = false
+	_attack_combo_index = 0
+	_attack_buffered_left = 0.0
+	_attack_restart_buffered_left = 0.0
+	_air_attack_buffered_left = 0.0
+	_attack_buffer_left = 0.0
+	_attack_buffer_direction = 0
+	_recoil_left = 0.0
+	_pogo_grace_left = 0.0
+	_deactivate_attack_hitbox()
+	_set_collider_height(_standing_shape_height)
 
 
 ## Locks input and lets the player keep processing while the tree is paused,
@@ -1358,13 +2106,16 @@ func exit_meditation() -> void:
 ## handed back (or taken away) from a clean idle state.
 func clear_transient_state() -> void:
 	velocity = Vector2.ZERO
+	_transition_locked = false
+	_auto_walk = 0
 	set_collision_mask_value(2, true)
 	_drop_left = 0.0
 	_coyote_left = 0.0
 	_jump_buffer_left = 0.0
 	_landing_left = 0.0
 	_dash_cooldown_left = 0.0
-	_air_dash_used = false
+	_restore_air_actions()
+	_jump_press_pending = false
 	_wall_recling_lock = 0.0
 	_wall_jump_lock_left = 0.0
 	_wall_kick_lock_left = 0.0
@@ -1376,9 +2127,20 @@ func clear_transient_state() -> void:
 	_air_attack_buffered_left = 0.0
 	_attack_buffer_left = 0.0
 	_attack_buffer_direction = 0
+	_recoil_left = 0.0
+	_pogo_grace_left = 0.0
+	_clear_damage_state()
 	_set_collider_height(_standing_shape_height)
 	_deactivate_attack_hitbox()
 	_enter_state(State.IDLE)
+
+
+func _clear_damage_state() -> void:
+	_end_safe_return()
+	_hurt_left = 0.0
+	_invuln_left = 0.0
+	_hit_stop_left = 0.0
+	_set_sprite_alpha(_base_alpha)
 
 
 func _request_rest_exit() -> void:
@@ -1412,7 +2174,7 @@ func _update_locked(delta: float) -> void:
 		_enter_state(resting_state)
 
 	var fall_speed_before_move := velocity.y
-	velocity.x = 0.0
+	velocity.x = _locked_horizontal_velocity()
 	if is_on_floor():
 		velocity.y = 0.0
 	else:
@@ -1420,6 +2182,17 @@ func _update_locked(delta: float) -> void:
 	move_and_slide()
 	_after_move(fall_speed_before_move)
 	_update_animation()
+
+
+## Walks at run speed during a doorway transition, keeps momentum during a
+## vertical one, and stands still for every other lock.
+func _locked_horizontal_velocity() -> float:
+	if _transition_locked and _auto_walk != 0:
+		_facing = _auto_walk
+		return float(_auto_walk) * run_max_speed
+	if _transition_locked and _keep_momentum:
+		return velocity.x
+	return 0.0
 
 
 ## -- Checkpoints / respawn -----------------------------------------------------
@@ -1434,6 +2207,8 @@ func set_checkpoint(checkpoint: Vector2) -> void:
 
 
 func respawn() -> void:
+	_dead = false
+	_has_safe_ground = false
 	exit_meditation()
 	restore_full_health()
 	clear_transient_state()
@@ -1441,7 +2216,7 @@ func respawn() -> void:
 	reset_physics_interpolation()
 	_set_collider_height(_standing_shape_height)
 	_deactivate_attack_hitbox()
-	_air_dash_used = false
+	_restore_air_actions()
 	_enter_state(State.IDLE)
 	respawned.emit()
 
@@ -1453,7 +2228,7 @@ func _after_move(fall_speed_before_move: float) -> void:
 		_landing_left = landing_squash_time
 		_sfx_land.play()
 	if not _was_on_floor and is_on_floor():
-		_air_dash_used = false
+		_restore_air_actions()
 	if is_on_floor() and (_state == State.JUMP or _state == State.FALL):
 		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
 	_was_on_floor = is_on_floor()
@@ -1519,10 +2294,10 @@ func _update_animation() -> void:
 				_play_animation(&"fall" if velocity.y >= 0.0 else &"jump")
 		State.AIR_ATTACK:
 			_play_animation(&"air_attack")
-		State.PLUNGE:
-			_play_animation(&"plunge")
-		State.PLUNGE_LAND:
-			_play_animation(&"plunge_land")
+		State.HURT:
+			_play_animation(&"fall")
+		State.DEAD, State.FOCUS:
+			_play_animation(&"idle")
 		_:
 			if _landing_left > 0.0:
 				_play_animation(&"land")

@@ -5,6 +5,17 @@ Norte: jugabilidad Jump King + metáfora de dislexia (claridad visual, no lecci�
 
 ---
 
+## 0. Regla de cohesión visual (prioridad máxima)
+
+Los docentes señalaron la falta de cohesión visual como el punto más débil del proyecto: los elementos no se parecen entre sí y deberían hacerlo.
+
+- **Un solo estilo:** todo asset nuevo (personaje, enemigos, tiles, props, fondos, UI, VFX) comparte el mismo estilo artístico, la misma paleta, el mismo grosor de contorno y la misma escala de píxel.
+- **Lo que no encaja no entra:** un asset que no encaja con el resto se rehace antes de integrarlo, aunque funcione.
+- **La UI sigue el mismo estilo:** los puntos de vida (probablemente corazones; forma por definir) siguen el estilo del juego. La idea de Hollow Knight se respeta solo en el comportamiento: al recibir daño se pierde un punto, el punto tiembla y la pantalla tiembla levemente. No se copian las máscaras.
+- **Placeholders:** los placeholders dibujados en código son temporales. El arte final lo produce Codex respetando esta regla.
+
+---
+
 ## 1. Canvas del juego (no negociable)
 
 | Constante | Valor |
