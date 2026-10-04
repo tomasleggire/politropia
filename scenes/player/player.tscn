@@ -1,11 +1,12 @@
-[gd_scene load_steps=9 format=3 uid="uid://bplayer01politropia"]
+[gd_scene format=3 uid="uid://dowigi85o1a"]
 
-[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
-[ext_resource type="AudioStream" path="res://assets/audio/land_hup.wav" id="3_land"]
-[ext_resource type="AudioStream" path="res://assets/audio/footstep.wav" id="4_foot"]
-[ext_resource type="AudioStream" path="res://assets/audio/jump_launch.wav" id="5_jump"]
-[ext_resource type="Script" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
-[ext_resource type="Script" path="res://scripts/player/player_slash_vfx.gd" id="7_slash_vfx"]
+[ext_resource type="Script" uid="uid://52lnrs7hxbfp" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="AudioStream" uid="uid://41x7pxqvi70t" path="res://assets/audio/land_hup.wav" id="3_land"]
+[ext_resource type="AudioStream" uid="uid://cyd7l8tdmkk7x" path="res://assets/audio/footstep.wav" id="4_foot"]
+[ext_resource type="AudioStream" uid="uid://bio8aegkoaanu" path="res://assets/audio/jump_launch.wav" id="5_jump"]
+[ext_resource type="Script" uid="uid://dy77m7qh61ceh" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
+[ext_resource type="Script" uid="uid://cvytubfx262a6" path="res://scripts/camera/camara_jugador.gd" id="7_0owmy"]
+[ext_resource type="Script" uid="uid://crlgiaggiu2j3" path="res://scripts/player/player_slash_vfx.gd" id="7_slash_vfx"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(38, 58)
@@ -13,7 +14,7 @@ size = Vector2(38, 58)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_attack"]
 size = Vector2(10, 10)
 
-[node name="Player" type="CharacterBody2D" unique_id=1062555339]
+[node name="Player" type="CharacterBody2D" unique_id=1062555339 groups=["player"]]
 collision_mask = 3
 safe_margin = 0.1
 script = ExtResource("1_player")
@@ -55,11 +56,11 @@ disabled = true
 texture_filter = 4
 scale = Vector2(0.175, 0.175)
 
-[node name="SlashVfx" type="Node2D" parent="."]
+[node name="SlashVfx" type="Node2D" parent="." unique_id=883827761]
 z_index = 1
 script = ExtResource("7_slash_vfx")
 
-[node name="SfxLand" type="AudioStreamPlayer" parent="."]
+[node name="SfxLand" type="AudioStreamPlayer" parent="." unique_id=2107798141]
 stream = ExtResource("3_land")
 volume_db = -1.0
 
@@ -71,3 +72,8 @@ max_polyphony = 2
 [node name="SfxJump" type="AudioStreamPlayer" parent="." unique_id=414600132]
 stream = ExtResource("5_jump")
 volume_db = -2.0
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=823530656 groups=["player_camera"]]
+position_smoothing_enabled = true
+position_smoothing_speed = 6.0
+script = ExtResource("7_0owmy")
