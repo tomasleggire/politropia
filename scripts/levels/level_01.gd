@@ -164,4 +164,3 @@ func _build_ambient_decor() -> void:
 		candle.set("phase_offset", float(index) * 0.73)
 		candle.set("height", 15.0 + float(index % 3) * 4.0)
 		_decor.add_child(candle)
-
