@@ -5,7 +5,7 @@ extends CanvasLayer
 ## buttons (jump, dash, attack). The attack fires the instant the finger
 ## touches down (neutral, or directional if the pad already holds up/down);
 ## a short swipe right after that can still upgrade the same attack to
-## up/plunge instead of firing a second one. Jump and dash also call the
+## up/down slash instead of firing a second one. Jump and dash also call the
 ## player directly on touch-down (in addition to Input.action_press) so a
 ## very quick tap can never be missed by is_action_just_pressed's same-frame
 ## edge (see Player.request_jump/request_dash).
@@ -23,7 +23,7 @@ extends CanvasLayer
 @export_group("Attack gesture")
 @export var attack_swipe_distance := 28.0
 ## After touch-down, a qualifying vertical swipe within this window upgrades
-## the attack that already fired to up/plunge (the player only honors the
+## the attack that already fired to up/down (the player only honors the
 ## upgrade while its own startup phase is still active, ~attack_startup_time).
 @export var attack_upgrade_window := 0.10
 
@@ -33,6 +33,10 @@ var _knob_offset := Vector2.ZERO
 
 var _jump_touch_id := -1
 var _dash_touch_id := -1
+var _interact_touch_id := -1
+var _focus_touch_id := -1
+var _player: Player
+var _interact_sources: Array[Object] = []
 
 var _attack_touch_id := -1
 var _attack_start := Vector2.ZERO
@@ -50,12 +54,15 @@ var _held_actions := {
 @onready var _jump_button: Control = $Root/JumpButton
 @onready var _dash_button: Control = $Root/DashButton
 @onready var _attack_button: Control = $Root/AttackButton
+@onready var _interact_button: Control = $Root/InteractButton
+@onready var _focus_button: Control = $Root/FocusButton
 
 
 func _ready() -> void:
 	layer = 100
 	visible = force_visible or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
 	_position_pad_at_rest()
+	_bind_found_player.call_deferred()
 
 
 func _process(delta: float) -> void:
@@ -86,6 +93,20 @@ func _handle_touch(touch: InputEventScreenTouch) -> void:
 		elif _attack_touch_id < 0 and _try_begin_button(_attack_button, touch.index, touch.position):
 			_begin_attack(touch.index, touch.position)
 			get_viewport().set_input_as_handled()
+		elif (
+			_interact_touch_id < 0
+			and _interact_button.visible
+			and _try_begin_button(_interact_button, touch.index, touch.position)
+		):
+			_begin_interact(touch.index)
+			get_viewport().set_input_as_handled()
+		elif (
+			_focus_touch_id < 0
+			and _focus_button.visible
+			and _try_begin_button(_focus_button, touch.index, touch.position)
+		):
+			_begin_focus(touch.index)
+			get_viewport().set_input_as_handled()
 	else:
 		if touch.index == _pad_touch_id:
 			_end_pad()
@@ -98,6 +119,12 @@ func _handle_touch(touch: InputEventScreenTouch) -> void:
 			get_viewport().set_input_as_handled()
 		elif touch.index == _attack_touch_id:
 			_end_attack()
+			get_viewport().set_input_as_handled()
+		elif touch.index == _interact_touch_id:
+			_end_interact()
+			get_viewport().set_input_as_handled()
+		elif touch.index == _focus_touch_id:
+			_end_focus()
 			get_viewport().set_input_as_handled()
 
 
@@ -251,6 +278,80 @@ func _end_attack() -> void:
 		_attack_button.call(&"set_button_state", false)
 
 
+## -- Interact button (shown only while an interactable is in range) ------
+
+## Interactables report whether they can currently be used. The button is
+## visible while any registered source is available.
+func set_interact_available(source: Object, available: bool) -> void:
+	if available and not _interact_sources.has(source):
+		_interact_sources.append(source)
+	elif not available:
+		_interact_sources.erase(source)
+	if is_instance_valid(_interact_button):
+		_interact_button.visible = not _interact_sources.is_empty()
+	if _interact_sources.is_empty() and _interact_touch_id >= 0:
+		_end_interact()
+
+
+func _begin_interact(index: int) -> void:
+	_interact_touch_id = index
+	_interact_button.call(&"set_button_state", true)
+	get_tree().call_group(&"interactable", &"request_interact")
+
+
+func _end_interact() -> void:
+	_interact_touch_id = -1
+	if is_instance_valid(_interact_button):
+		_interact_button.call(&"set_button_state", false)
+
+
+## -- Focus button (shown only while a focus heal is possible) ------------
+
+## The button follows the player's soul and health, like the interact button
+## follows its sources.
+func bind_player(player: Player) -> void:
+	if _player != null and _player.health_changed.is_connected(_on_player_changed):
+		_player.health_changed.disconnect(_on_player_changed)
+		_player.soul_changed.disconnect(_on_player_changed)
+	_player = player
+	if _player != null:
+		_player.health_changed.connect(_on_player_changed)
+		_player.soul_changed.connect(_on_player_changed)
+	_refresh_focus_available()
+
+
+func _bind_found_player() -> void:
+	if _player == null:
+		bind_player(get_tree().get_first_node_in_group(&"player") as Player)
+
+
+func _on_player_changed(_current: int, _maximum: int) -> void:
+	_refresh_focus_available()
+
+
+func _refresh_focus_available() -> void:
+	var available := _player != null and _player.is_focus_available()
+	if is_instance_valid(_focus_button):
+		_focus_button.visible = available
+	if not available and _focus_touch_id >= 0:
+		_end_focus()
+
+
+func _begin_focus(index: int) -> void:
+	_focus_touch_id = index
+	Input.action_press(&"focus")
+	get_tree().call_group(&"player", &"request_focus", true)
+	_focus_button.call(&"set_button_state", true)
+
+
+func _end_focus() -> void:
+	_focus_touch_id = -1
+	Input.action_release(&"focus")
+	get_tree().call_group(&"player", &"request_focus", false)
+	if is_instance_valid(_focus_button):
+		_focus_button.call(&"set_button_state", false)
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		if is_node_ready():
@@ -261,3 +362,7 @@ func _notification(what: int) -> void:
 				_end_dash()
 			if _attack_touch_id >= 0:
 				_end_attack()
+			if _interact_touch_id >= 0:
+				_end_interact()
+			if _focus_touch_id >= 0:
+				_end_focus()

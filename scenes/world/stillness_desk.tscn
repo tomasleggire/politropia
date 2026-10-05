@@ -1,0 +1,487 @@
+[gd_scene load_steps=41 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/stillness_desk.gd" id="1_desk"]
+[ext_resource type="PackedScene" path="res://scenes/ui/interaction_prompt.tscn" id="2_prompt"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/arch_frame.png" id="t_arch"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/pendulum_bracket.png" id="t_bracket"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/pendulum.png" id="t_pendulum"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/desk_body.png" id="t_desk"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/candle_jar.png" id="t_jar"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/flame.png" id="t_flame"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/inkwell.png" id="t_ink"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/ink_box.png" id="t_box"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/paper_0.png" id="t_paper0"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/paper_1.png" id="t_paper1"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/paper_2.png" id="t_paper2"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/paper_3.png" id="t_paper3"]
+[ext_resource type="PackedScene" path="res://scenes/world/altar_trail.tscn" id="t_trail"]
+[ext_resource type="Texture2D" path="res://assets/world/stillness_desk/backpack_prop.png" id="t_pack"]
+
+[ext_resource type="Script" path="res://scripts/world/stillness_desk_fx.gd" id="fx_main"]
+[ext_resource type="Script" path="res://scripts/world/firefly_swarm.gd" id="fx_swarm"]
+[ext_resource type="Script" path="res://scripts/world/altar_motes.gd" id="fx_motes"]
+[ext_resource type="Script" path="res://scripts/world/paper_orbit.gd" id="fx_papers"]
+[ext_resource type="Script" path="res://scripts/world/halo_sigil.gd" id="fx_halo"]
+[ext_resource type="Script" path="res://scripts/world/altar_light_shaft.gd" id="fx_shaft"]
+[ext_resource type="Script" path="res://scripts/world/altar_drift_sheets.gd" id="fx_drift"]
+[ext_resource type="Script" path="res://scripts/world/gothic_candle.gd" id="fx_candle"]
+[ext_resource type="Shader" path="res://shaders/halo_sigil.gdshader" id="sh_halo"]
+[ext_resource type="Shader" path="res://shaders/light_shaft.gdshader" id="sh_shaft"]
+[ext_resource type="Shader" path="res://shaders/rim_light.gdshader" id="sh_rim"]
+[ext_resource type="Script" path="res://scripts/world/altar_sparks.gd" id="fx_sparks"]
+[ext_resource type="Script" path="res://scripts/world/altar_shockwave.gd" id="fx_shock"]
+[ext_resource type="Script" path="res://scripts/world/altar_vignette.gd" id="fx_vignette"]
+[ext_resource type="Shader" path="res://shaders/shockwave_ring.gdshader" id="sh_shock"]
+[ext_resource type="Shader" path="res://shaders/screen_vignette.gdshader" id="sh_vignette"]
+
+[sub_resource type="ShaderMaterial" id="HaloMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("sh_halo")
+
+[sub_resource type="ShaderMaterial" id="ShaftMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("sh_shaft")
+
+[sub_resource type="ShaderMaterial" id="ShockwaveMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("sh_shock")
+
+[sub_resource type="ShaderMaterial" id="VignetteMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("sh_vignette")
+
+[sub_resource type="ShaderMaterial" id="RimMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("sh_rim")
+
+[sub_resource type="Gradient" id="SolidWhite"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture2D" id="WhiteTexture"]
+gradient = SubResource("SolidWhite")
+width = 4
+height = 4
+
+[sub_resource type="CanvasItemMaterial" id="Additive"]
+blend_mode = 1
+
+[sub_resource type="Gradient" id="GlowFalloff"]
+offsets = PackedFloat32Array(0, 0.45, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.3, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="GlowTexture"]
+gradient = SubResource("GlowFalloff")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="RectangleShape2D" id="InteractionShape"]
+size = Vector2(190, 100)
+
+[sub_resource type="AtlasTexture" id="Flame0"]
+atlas = ExtResource("t_flame")
+region = Rect2(0, 0, 14, 26)
+
+[sub_resource type="AtlasTexture" id="Flame1"]
+atlas = ExtResource("t_flame")
+region = Rect2(14, 0, 14, 26)
+
+[sub_resource type="AtlasTexture" id="Flame2"]
+atlas = ExtResource("t_flame")
+region = Rect2(28, 0, 14, 26)
+
+[sub_resource type="AtlasTexture" id="Flame3"]
+atlas = ExtResource("t_flame")
+region = Rect2(42, 0, 14, 26)
+
+[sub_resource type="SpriteFrames" id="FlameFrames"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("Flame0")
+}, {
+"duration": 1.0,
+"texture": SubResource("Flame1")
+}, {
+"duration": 1.0,
+"texture": SubResource("Flame2")
+}, {
+"duration": 1.0,
+"texture": SubResource("Flame3")
+}],
+"loop": true,
+"name": &"default",
+"speed": 8.0
+}]
+
+[node name="StillnessDesk" type="Node2D"]
+process_mode = 3
+script = ExtResource("1_desk")
+
+[node name="SpawnAnchor" type="Marker2D" parent="."]
+
+[node name="InteractionArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea"]
+position = Vector2(0, -40)
+shape = SubResource("InteractionShape")
+
+[node name="Visuals" type="Node2D" parent="."]
+
+[node name="Background" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = -10
+
+[node name="ArchFrame" type="Sprite2D" parent="Visuals/Background"]
+unique_name_in_owner = true
+material = SubResource("RimMaterial")
+z_index = 0
+position = Vector2(0.0, 0.0)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_arch")
+centered = false
+offset = Vector2(-293, -720)
+modulate = Color(0.78, 0.8, 0.9, 1)
+
+[node name="PendulumBracket" type="Sprite2D" parent="Visuals/Background"]
+z_index = 1
+position = Vector2(0.0, -107.8)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_bracket")
+centered = false
+offset = Vector2(-31, 0)
+
+[node name="Pendulum" type="Node2D" parent="Visuals/Background"]
+unique_name_in_owner = true
+z_index = 2
+position = Vector2(0.0, -99.925)
+
+[node name="PendulumSprite" type="Sprite2D" parent="Visuals/Background/Pendulum"]
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_pendulum")
+centered = false
+offset = Vector2(-17, -8)
+
+[node name="Halo" type="Sprite2D" parent="Visuals/Background"]
+unique_name_in_owner = true
+material = SubResource("HaloMaterial")
+z_index = 1
+position = Vector2(0, -50)
+scale = Vector2(20, 20)
+texture_filter = 1
+texture = SubResource("WhiteTexture")
+script = ExtResource("fx_halo")
+
+[node name="LightShaft" type="Sprite2D" parent="Visuals/Background"]
+unique_name_in_owner = true
+material = SubResource("ShaftMaterial")
+z_index = 3
+position = Vector2(0, -320)
+scale = Vector2(50, 160)
+texture = SubResource("WhiteTexture")
+script = ExtResource("fx_shaft")
+
+[node name="Glow" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = -6
+position = Vector2(0, -30)
+
+[node name="Halo" type="Sprite2D" parent="Visuals/Glow"]
+self_modulate = Color(0.941, 0.682, 0.298, 0.5)
+material = SubResource("Additive")
+scale = Vector2(1.5, 1.5)
+texture = SubResource("GlowTexture")
+
+[node name="Core" type="Sprite2D" parent="Visuals/Glow"]
+self_modulate = Color(1, 0.8, 0.45, 0.55)
+material = SubResource("Additive")
+scale = Vector2(0.6, 0.6)
+texture = SubResource("GlowTexture")
+
+[node name="Desk" type="Node2D" parent="Visuals"]
+z_index = -4
+
+[node name="DeskBody" type="Sprite2D" parent="Visuals/Desk"]
+material = SubResource("RimMaterial")
+z_index = 0
+position = Vector2(0.0, 0.0)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_desk")
+centered = false
+offset = Vector2(-162, -150)
+
+[node name="Candle" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = -3
+position = Vector2(-21.875, -26.25)
+
+[node name="CandleJar" type="Sprite2D" parent="Visuals/Candle"]
+z_index = 0
+position = Vector2(0, 0)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_jar")
+centered = false
+offset = Vector2(-15, -34)
+
+[node name="CandleGlow" type="Sprite2D" parent="Visuals/Candle"]
+unique_name_in_owner = true
+self_modulate = Color(0.941, 0.682, 0.298, 0.35)
+material = SubResource("Additive")
+position = Vector2(0, -6)
+scale = Vector2(0.3, 0.3)
+texture = SubResource("GlowTexture")
+
+[node name="Flame" type="Node2D" parent="Visuals/Candle"]
+unique_name_in_owner = true
+position = Vector2(0.0, -3.5)
+
+[node name="FlameSprite" type="AnimatedSprite2D" parent="Visuals/Candle/Flame"]
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+sprite_frames = SubResource("FlameFrames")
+autoplay = &"default"
+centered = false
+offset = Vector2(-7, -26)
+
+[node name="Inkwell" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = -2
+position = Vector2(17.5, -26.25)
+
+[node name="InkBottle" type="Sprite2D" parent="Visuals/Inkwell"]
+z_index = 0
+position = Vector2(0, 0)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_ink")
+centered = false
+offset = Vector2(-17, -72)
+
+[node name="InkGlow" type="Sprite2D" parent="Visuals/Inkwell"]
+unique_name_in_owner = true
+self_modulate = Color(0.435, 0.627, 1, 0.45)
+material = SubResource("Additive")
+position = Vector2(0, -6)
+scale = Vector2(0.2, 0.2)
+texture = SubResource("GlowTexture")
+
+[node name="InkBox" type="Sprite2D" parent="Visuals"]
+z_index = -3
+position = Vector2(24.85, -26.25)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_box")
+centered = false
+offset = Vector2(-27, -54)
+
+[node name="Papers" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = -2
+
+[node name="Sheet1" type="Sprite2D" parent="Visuals/Papers"]
+z_index = 0
+position = Vector2(-15.4, -29.4)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_paper0")
+centered = false
+offset = Vector2(-18, -21)
+rotation = -0.32
+
+[node name="Sheet2" type="Sprite2D" parent="Visuals/Papers"]
+z_index = 0
+position = Vector2(-5.95, -27.3)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_paper1")
+centered = false
+offset = Vector2(-19, -23)
+rotation = 1.35
+
+[node name="Sheet3" type="Sprite2D" parent="Visuals/Papers"]
+z_index = 0
+position = Vector2(5.25, -27.3)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_paper2")
+centered = false
+offset = Vector2(-21, -23)
+rotation = -1.4
+
+[node name="Sheet4" type="Sprite2D" parent="Visuals/Papers"]
+z_index = 0
+position = Vector2(12.6, -29.75)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_paper3")
+centered = false
+offset = Vector2(-19, -23)
+rotation = 0.28
+
+[node name="CandelabraLeft" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = -3
+position = Vector2(-80, 0)
+script = ExtResource("fx_candle")
+candelabra = true
+lit_side = 1
+
+[node name="Glow" type="Sprite2D" parent="Visuals/CandelabraLeft"]
+self_modulate = Color(0.941, 0.62, 0.26, 0.5)
+material = SubResource("Additive")
+position = Vector2(0, -74)
+scale = Vector2(0.9, 0.9)
+texture = SubResource("GlowTexture")
+
+[node name="CandelabraRight" type="Node2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = -3
+position = Vector2(80, 0)
+script = ExtResource("fx_candle")
+candelabra = true
+phase_offset = 1.7
+lit_side = -1
+
+[node name="Glow" type="Sprite2D" parent="Visuals/CandelabraRight"]
+self_modulate = Color(0.941, 0.62, 0.26, 0.5)
+material = SubResource("Additive")
+position = Vector2(0, -74)
+scale = Vector2(0.9, 0.9)
+texture = SubResource("GlowTexture")
+
+[node name="Roots" type="Node2D" parent="Visuals"]
+
+[node name="RootsLeft" parent="Visuals/Roots" instance=ExtResource("t_trail")]
+z_index = 0
+position = Vector2(-66, 0)
+length = 40.0
+texel_size = 0.5
+trail_seed = 11
+density = 0.9
+branch_count = 4
+snap_to_ground = false
+root_alpha = 0.6
+max_thickness = 2
+firefly_count = 0
+desk_path = NodePath("../../..")
+
+[node name="RootsRight" parent="Visuals/Roots" instance=ExtResource("t_trail")]
+z_index = 0
+position = Vector2(66, 0)
+direction = -1
+length = 40.0
+texel_size = 0.5
+trail_seed = 23
+density = 0.9
+branch_count = 4
+snap_to_ground = false
+root_alpha = 0.6
+max_thickness = 2
+firefly_count = 0
+desk_path = NodePath("../../..")
+
+[node name="BackpackProp" type="Sprite2D" parent="Visuals"]
+unique_name_in_owner = true
+z_index = 2
+position = Vector2(-21.875, 0.0)
+scale = Vector2(0.175, 0.175)
+texture_filter = 4
+texture = ExtResource("t_pack")
+centered = false
+offset = Vector2(-47, -96)
+visible = false
+
+[node name="Fx" type="Node2D" parent="."]
+process_mode = 3
+script = ExtResource("fx_main")
+
+[node name="Fireflies" type="Node2D" parent="Fx"]
+script = ExtResource("fx_swarm")
+
+[node name="DustMotes" type="Node2D" parent="Fx"]
+script = ExtResource("fx_motes")
+
+[node name="PaperOrbit" type="Node" parent="Fx"]
+script = ExtResource("fx_papers")
+
+[node name="ShaftMotes" type="Node2D" parent="Fx"]
+z_index = -5
+script = ExtResource("fx_motes")
+count = 14
+base = Vector2(28, -330)
+half_width = 22.0
+rise = -330.0
+lean = -0.085
+idle_alpha = 0.32
+resting_alpha = 0.6
+mote_scale = 0.06
+
+[node name="DriftSheets" type="Node2D" parent="Fx"]
+z_index = -5
+script = ExtResource("fx_drift")
+
+[node name="DriftA" type="Sprite2D" parent="Fx/DriftSheets"]
+modulate = Color(1, 0.9, 0.72, 0)
+scale = Vector2(0.14, 0.14)
+texture_filter = 4
+texture = ExtResource("t_paper1")
+
+[node name="DriftB" type="Sprite2D" parent="Fx/DriftSheets"]
+modulate = Color(1, 0.9, 0.72, 0)
+scale = Vector2(0.14, 0.14)
+texture_filter = 4
+texture = ExtResource("t_paper3")
+
+[node name="FloorPool" type="Sprite2D" parent="Fx"]
+self_modulate = Color(1, 0.7, 0.32, 0.6)
+material = SubResource("Additive")
+z_index = 1
+position = Vector2(0, 0)
+scale = Vector2(1.0, 0.1)
+texture = SubResource("GlowTexture")
+
+[node name="PeakBloom" type="Sprite2D" parent="Fx"]
+modulate = Color(1, 0.78, 0.42, 0)
+material = SubResource("Additive")
+z_index = -2
+position = Vector2(0, -46)
+texture = SubResource("GlowTexture")
+
+[node name="Shockwave" type="Sprite2D" parent="Fx"]
+material = SubResource("ShockwaveMaterial")
+z_index = -2
+position = Vector2(0, -50)
+scale = Vector2(50, 50)
+texture = SubResource("WhiteTexture")
+script = ExtResource("fx_shock")
+
+[node name="Sparks" type="Node2D" parent="Fx"]
+script = ExtResource("fx_sparks")
+
+[node name="Vignette" type="CanvasLayer" parent="Fx"]
+script = ExtResource("fx_vignette")
+
+[node name="Shade" type="ColorRect" parent="Fx/Vignette"]
+material = SubResource("VignetteMaterial")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="HeadShade" type="Sprite2D" parent="Fx"]
+self_modulate = Color(0.03, 0.05, 0.12, 0.85)
+position = Vector2(0, -58)
+scale = Vector2(0.42, 0.42)
+texture = SubResource("GlowTexture")
+
+[node name="InteractionPrompt" parent="." instance=ExtResource("2_prompt")]
+position = Vector2(0, -142)

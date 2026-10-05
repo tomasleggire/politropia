@@ -2,9 +2,8 @@ class_name AttackHitbox
 extends Area2D
 
 ## Player attack hitbox. The player script positions/sizes it and toggles it
-## on for the active frames of exactly one attack at a time. In debug builds
-## it draws a faint outline of the active hitbox for gameplay debugging; it
-## is invisible in release builds now that Luz has real combat art.
+## on for the active frames of exactly one attack at a time. It is collision-
+## only and intentionally has no on-screen debug rendering.
 
 signal attack_hit(target: Node2D, attack_name: StringName)
 
@@ -28,21 +27,18 @@ func configure(size: Vector2, offset: Vector2) -> void:
 	var shape := _shape.shape as RectangleShape2D
 	shape.size = size
 	_shape.position = offset
-	queue_redraw()
 
 
 func activate(attack_name: StringName) -> void:
 	_active_name = attack_name
 	_shape.disabled = false
 	monitoring = true
-	queue_redraw()
 
 
 func deactivate() -> void:
 	_shape.disabled = true
 	monitoring = false
 	_active_name = &""
-	queue_redraw()
 
 
 func _on_body_entered(body: Node2D) -> void:
@@ -51,13 +47,3 @@ func _on_body_entered(body: Node2D) -> void:
 
 func _on_area_entered(area: Area2D) -> void:
 	attack_hit.emit(area, _active_name)
-
-
-func _draw() -> void:
-	if _shape.disabled or not OS.is_debug_build():
-		return
-	var shape := _shape.shape as RectangleShape2D
-	var half := shape.size * 0.5
-	var rect := Rect2(_shape.position - half, shape.size)
-	draw_rect(rect, Color(0.85, 0.72, 0.35, 0.12), true)
-	draw_rect(rect, Color(0.96, 0.82, 0.45, 0.35), false, 1.0)

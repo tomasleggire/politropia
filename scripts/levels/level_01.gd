@@ -13,36 +13,26 @@ const SOLID := Color("101a33")
 const SOLID_ALT := Color("182b4f")
 const ONE_WAY := Color("24558a")
 
-const CHECKPOINTS := [
-	Vector2(180, FLOOR_Y),
-	Vector2(1380, FLOOR_Y),
-	Vector2(2680, FLOOR_Y),
-	Vector2(4220, FLOOR_Y),
-	Vector2(5350, FLOOR_Y),
-]
-
 @onready var _player: Player = $Player
 @onready var _camera: RoomCamera = $RoomCamera
 @onready var _backgrounds: Node2D = $Backgrounds
 @onready var _solids: Node2D = $Solids
 @onready var _decor: Node2D = $Decor
 
-var _checkpoint_index := 0
-
 
 func _ready() -> void:
 	# Player already adds itself to the "player" group in its own _ready().
 	_camera.target = _player
+	_player.respawned.connect(_camera.snap_to_target)
+	_player.safe_ground_returned.connect(_camera.snap_to_target)
 	_build_course()
-	_player.set_checkpoint(CHECKPOINTS[0])
+	CheckpointService.restore_player_for_scene(_player, scene_file_path)
 	_camera.snap_to_target()
 
 
 func _physics_process(_delta: float) -> void:
-	_update_checkpoint()
-	if _player.global_position.y > 820.0:
-		_player.respawn()
-		_camera.snap_to_target()
+	if is_instance_valid(_player) and _player.global_position.y > 820.0:
+		_player.fall_out_of_bounds()
 
 
 func _build_course() -> void:
@@ -174,12 +164,3 @@ func _build_ambient_decor() -> void:
 		candle.set("phase_offset", float(index) * 0.73)
 		candle.set("height", 15.0 + float(index % 3) * 4.0)
 		_decor.add_child(candle)
-
-
-func _update_checkpoint() -> void:
-	var next_index := _checkpoint_index + 1
-	if next_index >= CHECKPOINTS.size():
-		return
-	if _player.global_position.x >= CHECKPOINTS[next_index].x:
-		_checkpoint_index = next_index
-		_player.set_checkpoint(CHECKPOINTS[_checkpoint_index])
