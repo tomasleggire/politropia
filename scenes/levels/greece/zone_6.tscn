@@ -15081,10 +15081,9 @@ texture = ExtResource("14_rvr3m")
 sources/0 = SubResource("TileSetAtlasSource_211o3")
 
 [node name="LevelGreece" type="Node2D" unique_id=424136144]
-position = Vector2(-1280, 3230)
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
-position = Vector2(2, 683)
+position = Vector2(-1261, 3955)
 
 [node name="Background" type="TileMapLayer" parent="TilemapLayers" unique_id=449267912]
 
@@ -15135,7 +15134,7 @@ position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("24_6hx0b")]
-position = Vector2(3518, -2484)
+position = Vector2(2409, 783)
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)
