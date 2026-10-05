@@ -1,4 +1,4 @@
-[gd_scene format=4 uid="uid://ux0uryrpi57p"]
+[gd_scene format=4 uid="uid://ci7ktamss6yp0"]
 
 [ext_resource type="Texture2D" uid="uid://b48lh7rsuif14" path="res://assets/art/greece/Backgrounds/1789865199548.jpg" id="1_fi0oj"]
 [ext_resource type="Texture2D" uid="uid://b1pt5cofar6yn" path="res://assets/art/greece/Roofs/Roof-1.png" id="2_cv0c0"]
@@ -15120,7 +15120,7 @@ scale = Vector2(1.0687267, 1.1239423)
 texture = ExtResource("19_atltt")
 
 [node name="Background6" type="Sprite2D" parent="TilemapLayers/Background" unique_id=769699099]
-position = Vector2(2546.0002, -3484)
+position = Vector2(2997.0002, -3543)
 scale = Vector2(1.1189882, 1.2375994)
 texture = ExtResource("19_atltt")
 
