@@ -15,6 +15,7 @@
 [ext_resource type="Texture2D" uid="uid://bos4jg5e0jdeu" path="res://assets/art/greece/Floor/floating_platforms_tileset.png" id="17_h2dpd"]
 [ext_resource type="Texture2D" uid="uid://cl66oh1yhyabw" path="res://assets/art/greece/Balconies/Balcony-01.png" id="18_0n2sm"]
 [ext_resource type="Texture2D" uid="uid://cpa6p5q4xmqud" path="res://assets/art/greece/Columns/Column-1.png" id="19_2xowb"]
+[ext_resource type="PackedScene" path="res://scenes/world/scene_transition_area.tscn" id="20_1ndgx"]
 [ext_resource type="Texture2D" uid="uid://b5dtp4mw8wlgs" path="res://assets/art/greece/Columns/Column-2.png" id="20_4bstp"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="21_2l1de"]
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_po34q"]
@@ -15151,3 +15152,7 @@ modulate = Color(0.07058824, 0.07058824, 0.07058824, 1)
 position = Vector2(42, 107)
 scale = Vector2(1.0685376, 1.0685376)
 tile_set = SubResource("TileSet_4nc6c")
+
+[node name="SceneTransitionArea" parent="." unique_id=51902791 instance=ExtResource("20_1ndgx")]
+position = Vector2(2529, 768)
+target_scene_path = "uid://sa4mtebqbp50"
