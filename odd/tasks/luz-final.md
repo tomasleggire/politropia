@@ -46,9 +46,28 @@ Ruler: Penitent body without the hat spike = Luz 48 px.
 - [x] M7 Rim light shader on every Luz animation (lighter cool band on the top/back silhouette edge so the navy body reads on dark backgrounds), tunable from the inspector (color, width, direction, strength). Replaces drawing the rim with Codex, so all clips stay consistent. Checks: `--check-only`, headless boot, suites, iPhone look on dark library and bright Greece backgrounds. Done 2026-10-07: route delegated direct (writer trigger: shader + scene); `shaders/luz_rim_light.gdshader` + ShaderMaterial on `Player/AnimatedSprite2D` in `scenes/player/player.tscn` (uniforms enabled, rim_color #8FA3C7, width 7 texels, light_direction (-0.5,-1) in texture space, strength 0.85); hard-edged, mixes toward the color (never additive); `flip_h` mirrors UVs with the art so the rim stays on the back; modulate/i-frame flicker untouched (applied after the shader). Checks: `--check-only` player.gd clean, headless boot clean, 13 suites pass, `git diff --check` clean, offscreen opengl3 render (idle clip, facing right and left) shows the band on top/back inside the silhouette on a dark background; other clips not rendered individually (same shader on all frames); iPhone look on dark library and bright Greece pending (parent).
 - [x] M8 Gameplay capture tool so Claude can see the game without the user recording. Done 2026-10-07: route delegated direct (writer trigger: tool + processor + scene); `tools/capture/luz_capture.tscn|gd` drives Luz in the real Greece level (flat stretch x 1250, floor y -414) with `Input.action_press/release` through idle, run, skid, run left (turn), reverse (turn), stop; `tools/capture/capture.sh <out> [Caminar.mov]` records with Movie Maker (1280x720 through a temporary `override.cfg`, since Movie Maker records the 640x360 base viewport otherwise) and `extract.py` cuts frames, a tracked close-up (MP4 + contact sheets) and Luz vs Penitent side-by-sides (mirrored, same body height) for run, stop and turn. Outputs live outside the repo.
 - [x] M9 Run polish after iPhone feedback ("saltarina", turn imperceptible, rim too white). Done 2026-10-07: route delegated direct (writer trigger: processor + catalog + scene + shader). Measured: the drawn run advances the planted foot 11.7 world px per frame (80.7 texels x 0.1448), 46.8 px per step and 93.6 px per 8-frame cycle, so 150 px/s needs 12.8 fps; `walk` 28 -> 13 fps (28 fps drew 325 px/s of feet = heavy skating and ~2.2x too many steps). Bob: hair top moved 97-137 texels (5.8 world px); `tools/process_luz_run_turn_skid.py` `bob_fix` flattens it to 100-114 (2.0 px) with at most 4 texels (0.6 px) of planted-foot float plus a vertical stretch about the sole (<= 7%). Turn: Caminar.mov shows ~8 frames (0.13 s) of visible pivot (n21-n28) before motion resumes (~n30); `turn_time` 0.06 -> 0.12 (3 frames at 25 fps). Skid clip now rocks back (frames 4,5,6,7,8,7,8,9). Rim: color #8FA3C7 -> #667594 (0.40,0.46,0.58), width 7 -> 5, strength 0.85 -> 0.45. Checks: `--check-only`, `--import`, headless boot, 13/13 suites, `git diff --check`, capture frames reviewed by Claude. iPhone check pending (parent).
-- [ ] M6 Refine ground dust to match the Luz art scale (today 1 world-unit pixels look chunkier than Luz).
-- [ ] C1 Remove the pogo down attack; air attack only horizontal.
-- [ ] C2 Ground and air combat from `Ataque.mov` and `Atacar enemigos y morir.mov`.
+- [ ] M5d close-out: run v2 and idle v2 integrated (see M5c, M9); superseded by P7 for the run.
+- [ ] M6 Refine ground dust to match the Luz art scale (today 1 world-unit pixels look chunkier than Luz). Folded into P3.
+- [ ] C1 Remove the pogo down attack; air attack only horizontal. Folded into P4.
+- [ ] C2 Ground and air combat from `Ataque.mov` and `Atacar enemigos y morir.mov`. Folded into P8.
+
+### Final Luz scope (user, 2026-10-07)
+Budget: Luz complete between this week and next, sharing time and Claude/Codex tokens with the Greece zone boss. Rule: whatever can match Blasphemous matches it; everything else stays coherent with what exists.
+- Keep: idle, run, turn, skid, crouch, drop-through, jump/fall/land, double jump (boss reward; needs its own animation), ground dash, air dash, wall cling + wall jump, ground combo x3, crouch attack, air horizontal attack, up attack, focus/heal.
+- Remove: ledge hang and ledge climb; pogo / down air attack.
+- Deferred until after the boss: hurt and death animations.
+
+### Polish plan (ordered; A = no new art, B = Codex art)
+- [ ] P1 (A) Hair darkens during the skid sway: verify the cause with the capture (suspect: rim color darker than blond hair) and make the rim lighten-only.
+- [ ] P2 (A) Turn without the "ball" crouch: drop the crouch frame, 2-frame snap pivot.
+- [ ] P3 (A) More and finer dust: visible footsteps, takeoff, landing arcs like the Penitent, bigger skid; match the dust pixel scale to Luz (absorbs M6).
+- [ ] P4 (A) Remove pogo and ledge hang/climb (code, scenes, tests, manifest clips) without breaking traversal (absorbs C1).
+- [ ] P5 (A) Jump like the Penitent (M3: ~77 px, apex 0.417 s, symmetric fall, landing crouch); keep double jump; warn the team about level heights.
+- [ ] P6 (A) Ground dash like the Penitent (M4: 4-frame startup, ~400 px/s, 0.33 s, low slide, afterimages in Luz colors); keep air dash coherent.
+- [ ] P7 (B) Run v3: 12-16 poses with the Penitent's lean and full extension (one Codex request); retune cadence so feet do not skate.
+- [ ] P8 (B) Ground combo x3 and crouch attack with the sword grip (two or three Codex requests; absorbs C2 ground part).
+- [ ] P9 (B) Jump/fall/land and a distinct double-jump animation with the sword grip (one Codex request).
+- [ ] P10 (B, if time) Air horizontal and up attacks, dash and wall clips with the sword grip.
 
 ## Acceptance criteria
 - Luz occupies 32x48 and moves with the measured Blasphemous numbers; user confirms the feel on the iPhone.
@@ -66,4 +85,4 @@ Ruler: Penitent body without the hat spike = Luz 48 px.
 Strategy: ask-on-risk. Forecast exceeds ~400 authored lines across tasks; ask for chain strategy before the slice that crosses it.
 
 ## Next step
-M7 rim light shader (Claude) while the user runs the M5 Codex prompts; then M5c integration and iPhone check. Later M3 jump, M4 dash, M6 dust, C1 remove pogo, C2 combat.
+P1-P4 (Claude, no Codex), verified with `tools/capture/capture.sh`; then P5-P6; then P7-P9 with Codex.
