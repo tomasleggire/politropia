@@ -37,7 +37,8 @@ Ruler: Penitent body without the hat spike = Luz 48 px.
   - Review follow-ups (M1/M2, non-blocking findings from the approved reliability review, 2026-10-06): R3-001 `_spawn_dust` uses a Node2D host (parent, else current scene), sets `global_position` after `add_child`, and skips with one `push_warning` when the scene is null or its root is not a GroundDust; R3-002 `_fill_placeholder_clips` creates missing `turn`/`skid` animations and checks the source `crouch` frames; R3-005 `skid_hold_time` (0.17 s) is now measured after the 0.14 s brake; R3-003/R3-004 `tests/locomotion_test.gd` bounds the slide (9-16 px), exercises the min-run-time filter and covers turn dust, skid cancel, jump out of SKID/TURN and ledge loss to FALL (26/26). Commit: `fix: robustecer el polvo y los clips provisorios de Luz y ampliar las pruebas de locomoción`.
 - [ ] M3 Jump from `Salto.mov`. Route: analysis delegated, then writer. Checks: as M1, plus level traversal re-validation.
 - [ ] M4 Dash from `Dash.mov`. Route: as M3.
-- [ ] M5 Per-animation art spec (frames, timing, poses, canvas, pivot) and a Codex pilot (run cycle) evaluated on the iPhone before producing the rest.
+- [ ] M5 Codex art in the CURRENT Luz style (same pipeline and ~6-7 texture px per world unit as the existing sheets and the Stillness Desk; dark outline, cel shading): run cycle with 8-9 poses, turn and skid clips (replace the crouch placeholders via the manifest), and a lighter rim/edge so the navy body reads on dark backgrounds. Write the per-animation spec (frames, timing, poses, canvas, pivot) from the measured videos first; check on the iPhone.
+- [ ] M6 Refine ground dust to match the Luz art scale (today 1 world-unit pixels look chunkier than Luz).
 - [ ] C1 Remove the pogo down attack; air attack only horizontal.
 - [ ] C2 Ground and air combat from `Ataque.mov` and `Atacar enemigos y morir.mov`.
 
@@ -55,4 +56,4 @@ Ruler: Penitent body without the hat spike = Luz 48 px.
 Strategy: ask-on-risk. Forecast exceeds ~400 authored lines across tasks; ask for chain strategy before the slice that crosses it.
 
 ## Next step
-M3 and M4 writers; Salto.mov and Dash.mov analysis in parallel.
+Start M5: write the Codex request (run, turn, skid, rim light) in the current style. M3 jump waits until the team is warned that the jump drops from 130 px to ~77 px (platform reachability). Then M4 dash, M6 dust, C1 remove pogo, C2 combat.
