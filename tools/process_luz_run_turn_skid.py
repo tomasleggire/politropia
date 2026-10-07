@@ -77,14 +77,17 @@ SHEETS = {
         "raw_columns": 4,
         "raw_rows": 2,
         "scale": None,
-        "clips": {"idle_breathing": list(range(8))},
+        # Slot 3 drops out: its hair silhouette pops against its neighbours.
+        "clips": {"idle_breathing": [0, 1, 2, 4, 5, 6, 7]},
     },
     "luz_turn_skid_sheet.png": {
         "raw_file": "luz_turn_skid_raw.png",
         "raw_columns": 4,
         "raw_rows": 3,
         "scale": FIXED_SCALE,
-        "clips": {"turn": [0, 1, 2, 3], "skid": [4, 5, 6, 7, 8, 9]},
+        # Turn slot 0 holds the ruler in front with both hands; it pops against
+        # the trailing sword grip of the idle and run clips, so the turn starts at slot 1.
+        "clips": {"turn": [1, 2, 3], "skid": [4, 5, 6, 7, 8, 9]},
     },
 }
 
