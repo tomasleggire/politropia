@@ -51,6 +51,7 @@ Ruler: Penitent body without the hat spike = Luz 48 px.
 - 2026-10-06: branch `feat/luz-final` from `feat/camera-framing` after merging origin/main 265fbb4 (merge adf18a4). Caminar.mov analyzed.
 - 2026-10-06: M1 implemented (run 150 px/s, turn and skid states with placeholder crouch clips, Luz 48 px tall, collider 29x46, probes and hitboxes scaled by 48/58). Pending: iPhone feel check (parent).
 - 2026-10-06: M2 implemented (`scenes/vfx/ground_dust.tscn`, `scripts/vfx/ground_dust.gd`: footstep, turn and stop kinds spawned in world space by Luz; scene swappable via `ground_dust_scene`). Pending: iPhone visual check (parent).
+- 2026-10-07: resolution aligned to the team standard (640x360, cb81aff); stretch mode `canvas_items` (650b233) after the user found Luz pixelated under `viewport`; user confirmed the iPhone look. Art direction decided: keep the current illustrated pixel-styled look (no true pixel-art conversion, time constraints); figure-ground rules: outline on interactive things, amber = interactable, red = danger, backgrounds less saturated than gameplay, grayscale test. Salto.mov and Dash.mov measured (Engram `luz/blasphemous-jump-spec`, `luz/blasphemous-dash-spec`; body ruler ~148 video px = 48 units). iPhone feel check of M1/M2 still pending from the user.
 
 ## Delivery
 Strategy: ask-on-risk. Forecast exceeds ~400 authored lines across tasks; ask for chain strategy before the slice that crosses it.
