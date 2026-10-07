@@ -20,7 +20,7 @@ const LAYOUT_FRAMES := 3
 ## Longer than the loss tween and a staggered refill of three pips.
 const LOSS_DONE := 0.6
 const REFILL_DONE := 0.9
-const SAFE_AREA := Rect2(60.0, 40.0, 1100.0, 600.0)
+const SAFE_AREA := Rect2(30.0, 20.0, 550.0, 300.0)
 
 const CHECKS := {
 	"case_pips_built": 5,

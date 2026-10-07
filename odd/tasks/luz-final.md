@@ -15,13 +15,13 @@ Final university project; the quality bar is Blasphemous: careful art, fluid ani
 
 ## Constraints
 - Reference videos on the user's Desktop: `Caminar.mov`, `Salto.mov`, `Dash.mov`, `Ataque.mov`, `Atacar enemigos y morir.mov` (60 fps). One video at a time.
-- Team standard: 16x16 tiles, Luz 32x48, player collision width 29 px, 640x360 base resolution (currently 1280x720 on this branch, decision pending).
+- Team standard: 16x16 tiles, Luz 32x48, player collision width 29 px, 640x360 base resolution (now applied: `project.godot` 640x360, UI halved, `RoomCamera.view_zoom` 0.9).
 - Everything must be a reusable scene configured through exported inspector properties.
 - All new art and animation is produced with Codex; Claude does no art. Reuse existing assets where viable.
 - Changing movement numbers can break traversal in existing levels; re-validate gaps and heights.
 
 ## TDD
-Off: no GDScript test runner is configured. Checks: Godot 4.7.2 headless boot (`--headless --path . --quit-after 120`), iPhone deploy and playtest, user feel review.
+Mode: off (configuration; TDD is not enforced). GDScript regression suites exist under `tests/` (run headless with `--script res://tests/<name>.gd`, see `tests/README.md`) and are run as functional checks. Other checks: Godot 4.7.2 headless boot (`--headless --path . --quit-after 120`), iPhone deploy and playtest, user feel review.
 
 ## Reference spec: Caminar.mov
 Ruler: Penitent body without the hat spike = Luz 48 px.

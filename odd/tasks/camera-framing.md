@@ -17,10 +17,10 @@ Visible world = base resolution / camera zoom. 640 / 1.8 ~ 355 px wide versus 12
 - Teammates' greybox scenes (`scenes/levels/greece/`, `scenes/levels/library/`) were framed at 640x360 with the player camera; unifying cameras needs a team decision.
 
 ## TDD
-Off: no GDScript test runner is configured. Checks are headless Godot export plus iPhone playtest.
+Off by configuration. GDScript regression suites exist under `tests/` (see `tests/README.md`) and run as functional checks, plus headless boot and iPhone playtest.
 
 ## Tasks
-- [x] T1 Restore base resolution to 1280x720 in `project.godot`. Route: inline (one mechanical line pair). Check: iOS export, Xcode build, install and launch on iPhone (done 2026-10-05); user confirmed framing, HUD and buttons look right on the iPhone. Commit: see git log for `fix: restaurar resolución base a 1280x720`.
+- [ ] T1 (reopened 2026-10-06) Align the base resolution with the team standard 640x360 (team normalization doc: 640x360, 16x16 tiles, Luz 32x48). Reason: the zoom problem came from `RoomCamera` zoom 1.8, not from the resolution; 1280x720 diverged from the team. Values: `project.godot` 640x360; `RoomCamera.view_zoom` 1.8 -> 0.9 (640 / 0.9 ~ 711 world px, same framing as before); touch controls, pad and button visuals, health HUD, pips and soul meter halved (fixed pixel values, no CanvasLayer scale; line widths kept >= 1 px); `tests/health_hud_test.gd` SAFE_AREA Rect2(30,20,550,300). Checks: headless boot, `--check-only`, all suites under `tests/`, `git diff --check`; iPhone playtest pending. History: first closed 2026-10-05 at 1280x720 (commit `fix: restaurar resolución base a 1280x720`).
 - [ ] T2 Choose one camera (`RoomCamera` or `camara_jugador` + `camara_region`) and remove the other. Blocked on team decision.
 - [ ] T3 Tune the zoom of the single camera to the agreed visible world width; iPhone playtest.
 
@@ -30,6 +30,8 @@ Off: no GDScript test runner is configured. Checks are headless Godot export plu
 
 ## Progress
 - 2026-10-05: branch `feat/camera-framing` from main 14465dd. T1 change applied and deployed to the iPhone.
+
+- 2026-10-06: T1 reopened and applied on `feat/luz-final`: 640x360 with halved UI and `view_zoom` 0.9. iPhone playtest pending.
 
 ## Next step
 Decide T2 with the team.

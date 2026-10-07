@@ -8,7 +8,7 @@ extends Camera2D
 
 @export_group("Framing")
 ## Punto medio entre la vista completa (1.0) y el encuadre de Blasphemous (~2.5).
-@export var view_zoom := 1.8
+@export var view_zoom := 0.9
 ## Distancia vertical desde los pies del héroe al centro de la cámara.
 @export var vertical_offset := 20.0
 
