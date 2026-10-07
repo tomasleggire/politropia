@@ -33,7 +33,7 @@ Ruler: Penitent body without the hat spike = Luz 48 px.
 
 ## Tasks
 - [x] M1 Ground locomotion: Blasphemous run speed and brake, turn crouch and skid stop states (placeholder clips from existing art), Luz at 32x48 (sprite scale, collider width 29, wall and ledge probes). Route: delegated direct (player.gd ~2300 lines; preparation trigger). Checks: headless boot, iPhone feel. Done 2026-10-06: route delegated direct (trigger: preparation/writer on player.gd ~2300 lines); headless boot clean, `--check-only` clean for player.gd and luz_animation_catalog.gd, `git diff --check` clean, regression suites pass (stillness 259/259, combat 87/87, pogo 44/44, room_transition, soul_focus 52/52, enemy 62/62, greece_layout, double_jump 30/30 after retiming one ledge-walk wait for the slower run); run speed 150 px/s (spec corrected), air_max_speed 250 kept separate; commit `feat: ajustar la locomoción de Luz al estilo Blasphemous y escalarla a 32x48`; iPhone feel check pending (parent).
-- [ ] M2 Ground dust VFX as a reusable scene (footstep, turn, stop) driven by Luz states. Route: delegated direct, same writer as M1. Checks: headless boot, iPhone visual.
+- [x] M2 Ground dust VFX as a reusable scene (footstep, turn, stop) driven by Luz states. Route: delegated direct, same writer as M1. Checks: headless boot, iPhone visual. Done 2026-10-06: route delegated direct (same writer as M1); headless boot clean, `--check-only` clean for player.gd and ground_dust.gd, `git diff --check` clean, new `tests/locomotion_test.gd` PASS 10/10 plus every existing suite passing (stillness 259/259, enemy_archetypes 111/111, combat, pogo, double_jump, room_transition, soul_focus, enemy, greece_layout); commit `feat: agregar polvo de suelo reutilizable para Luz`; iPhone visual check pending (parent).
 - [ ] M3 Jump from `Salto.mov`. Route: analysis delegated, then writer. Checks: as M1, plus level traversal re-validation.
 - [ ] M4 Dash from `Dash.mov`. Route: as M3.
 - [ ] M5 Per-animation art spec (frames, timing, poses, canvas, pivot) and a Codex pilot (run cycle) evaluated on the iPhone before producing the rest.
@@ -48,9 +48,10 @@ Ruler: Penitent body without the hat spike = Luz 48 px.
 ## Progress
 - 2026-10-06: branch `feat/luz-final` from `feat/camera-framing` after merging origin/main 265fbb4 (merge adf18a4). Caminar.mov analyzed.
 - 2026-10-06: M1 implemented (run 150 px/s, turn and skid states with placeholder crouch clips, Luz 48 px tall, collider 29x46, probes and hitboxes scaled by 48/58). Pending: iPhone feel check (parent).
+- 2026-10-06: M2 implemented (`scenes/vfx/ground_dust.tscn`, `scripts/vfx/ground_dust.gd`: footstep, turn and stop kinds spawned in world space by Luz; scene swappable via `ground_dust_scene`). Pending: iPhone visual check (parent).
 
 ## Delivery
 Strategy: ask-on-risk. Forecast exceeds ~400 authored lines across tasks; ask for chain strategy before the slice that crosses it.
 
 ## Next step
-M2 (ground dust) writer; Salto.mov and Dash.mov analysis in parallel.
+M3 and M4 writers; Salto.mov and Dash.mov analysis in parallel.

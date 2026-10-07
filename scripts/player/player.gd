@@ -94,6 +94,13 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## scale derives from it; the collider lives in player.tscn (29 x 46).
 @export var body_height := 48.0
 
+@export_group("Dust")
+## Scene spawned at her feet in world space (see GroundDust); swap it to
+## change the dust look.
+@export var ground_dust_scene: PackedScene = preload("res://scenes/vfx/ground_dust.tscn")
+## Seconds between footstep puffs while running (one per run cycle).
+@export var footstep_dust_interval := 0.29
+
 @export_group("Run")
 ## Blasphemous reference: ~150 px/s with near-instant acceleration.
 @export var run_max_speed := 150.0
@@ -361,6 +368,7 @@ var _jump_press_pending := false
 var _air_jumps_left := 0
 var _landing_left := 0.0
 var _footstep_left := 0.0
+var _dust_left := 0.0
 var _run_time := 0.0
 var _skid_deceleration := 0.0
 var _was_on_floor := false
@@ -658,6 +666,7 @@ func _begin_turn(direction: int) -> void:
 	_sprite.flip_h = _facing < 0
 	_enter_state(State.TURN)
 	velocity.x = 0.0
+	_spawn_dust(GroundDust.Kind.TURN)
 
 
 func _update_turn(delta: float) -> void:
@@ -693,6 +702,7 @@ func _try_start_skid(axis: float) -> bool:
 		return false
 	_skid_deceleration = absf(velocity.x) / maxf(skid_brake_time, 0.001)
 	_enter_state(State.SKID)
+	_spawn_dust(GroundDust.Kind.STOP)
 	return true
 
 
@@ -2360,11 +2370,28 @@ func _after_move(fall_speed_before_move: float) -> void:
 func _update_footsteps(delta: float) -> void:
 	if _state != State.RUN or not is_on_floor() or absf(velocity.x) < 70.0:
 		_footstep_left = 0.0
+		_dust_left = 0.0
 		return
-		_footstep_left -= delta
+	_dust_left -= delta
+	if _dust_left <= 0.0:
+		_dust_left = footstep_dust_interval
+		_spawn_dust(GroundDust.Kind.FOOTSTEP)
+	_footstep_left -= delta
 	if _footstep_left <= 0.0:
 		_sfx_foot.play()
 		_footstep_left = clampf(0.30 - absf(velocity.x) / 2600.0, 0.12, 0.26)
+
+
+## Drops a self-freeing dust effect at her feet, left behind in world space.
+func _spawn_dust(dust_kind: GroundDust.Kind) -> void:
+	var host := get_parent()
+	if ground_dust_scene == null or host == null:
+		return
+	var dust := ground_dust_scene.instantiate() as GroundDust
+	dust.kind = dust_kind
+	dust.direction = _facing
+	dust.position = host.to_local(global_position)
+	host.add_child(dust)
 
 
 func _update_animation() -> void:
