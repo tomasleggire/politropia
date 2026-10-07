@@ -34,8 +34,11 @@ enum State {
 	WALL_CLING, LEDGE_HANG, LEDGE_CLIMB,
 	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK,
 	HURT, DEAD, FOCUS,
+	TURN, SKID,
 }
 
+## Opaque body height (px) of the standing frames inside their 512 px cell.
+const LUZ_BODY_PIXELS := 331.5
 const PHASE_STARTUP := 0
 const PHASE_ACTIVE := 1
 const PHASE_RECOVERY := 2
@@ -57,7 +60,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export_group("Focus")
 ## Seconds of standing still to heal one pip.
 @export var focus_time := 0.9
-@export var focus_glow_radius := 24.0
+@export var focus_glow_radius := 20.0
 
 @export_group("Damage")
 ## Knockback launched away from the damage source: x is the horizontal speed
@@ -86,10 +89,32 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var safe_ground_time := 0.1
 @export var safe_ground_margin := 24.0
 
+@export_group("Body")
+## On-screen height of Luz in world pixels (team standard: 32x48). The sprite
+## scale derives from it; the collider lives in player.tscn (29 x 46).
+@export var body_height := 48.0
+
 @export_group("Run")
-@export var run_max_speed := 250.0
-@export var run_acceleration := 4000.0
+## Blasphemous reference: ~150 px/s with near-instant acceleration.
+@export var run_max_speed := 150.0
+@export var run_acceleration := 3000.0
 @export var run_deceleration := 5000.0
+
+@export_group("Turn")
+## Short crouch with no movement when starting to run opposite to the facing
+## or when reversing while running.
+@export var turn_time := 0.06
+
+@export_group("Skid")
+## Releasing the run input at (near) full speed snaps to a low skid pose,
+## brakes linearly to zero, holds the pose, then returns to idle. Any new
+## input cancels the hold immediately.
+@export var skid_brake_time := 0.14
+@export var skid_hold_time := 0.17
+## Fraction of run_max_speed needed to skid (shorter taps just stop).
+@export_range(0.0, 1.0) var skid_min_speed_ratio := 0.9
+## Seconds spent at that speed before a release skids (filters taps).
+@export var skid_min_run_time := 0.12
 
 @export_group("Jump")
 ## Apex height and time-to-apex derive rise gravity and launch velocity.
@@ -111,6 +136,9 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var air_jumps := 1
 
 @export_group("Air Control")
+## Horizontal air speed target; kept separate from run_max_speed so jumps keep
+## their original reach (the jump retune lives in a later task).
+@export var air_max_speed := 250.0
 @export var air_acceleration := 2600.0
 @export var air_deceleration := 2600.0
 
@@ -137,7 +165,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var air_dash_duration := 0.30
 
 @export_group("Wall")
-@export var wall_ray_length := 20.0
+@export var wall_ray_length := 16.5
 @export var wall_cling_apex_threshold := 60.0
 ## A collider only counts as a clingable wall when its shape is at least this
 ## tall and is not wider than it is tall — filters out horizontal platforms.
@@ -165,7 +193,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 
 @export_group("Ledge")
 @export var ledge_climb_duration := 0.25
-@export var ledge_climb_forward_offset := 40.0
+@export var ledge_climb_forward_offset := 33.0
 
 @export_group("Attack")
 ## Startup (windup) shared by hits 1/2 of the ground combo and by
@@ -241,17 +269,17 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## degrees, reaching the same distance upward. The upward box intentionally
 ## retains its previously accepted size and offset; it is not part of the
 ## shared horizontal-hitbox derivation.
-@export var hitbox_attack_size := Vector2(60.3, 24.0)
+@export var hitbox_attack_size := Vector2(49.9, 19.9)
 ## offset.x, shared by every horizontal attack (ground combo, crouch, air).
-@export var hitbox_attack_reach_x := 49.15
-@export var hitbox_ground_offset_y := -25.69  ## combo (hits 1-3): shared contact height
-@export var hitbox_crouch_offset_y := -17.02  ## crouch: low horizontal cut height
-@export var hitbox_air_offset_y := -30.66     ## air: mid-air torso height
-@export var hitbox_up_size := Vector2(26, 68)
-@export var hitbox_up_offset := Vector2(0, -80)
+@export var hitbox_attack_reach_x := 40.7
+@export var hitbox_ground_offset_y := -21.26  ## combo (hits 1-3): shared contact height
+@export var hitbox_crouch_offset_y := -14.09  ## crouch: low horizontal cut height
+@export var hitbox_air_offset_y := -25.37     ## air: mid-air torso height
+@export var hitbox_up_size := Vector2(21.5, 56.3)
+@export var hitbox_up_offset := Vector2(0, -66.2)
 ## Down slash: a box right below her feet (the origin is at the feet).
-@export var hitbox_down_size := Vector2(36.0, 44.0)
-@export var hitbox_down_offset := Vector2(0.0, 22.0)
+@export var hitbox_down_size := Vector2(29.8, 36.4)
+@export var hitbox_down_offset := Vector2(0.0, 18.2)
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
@@ -271,6 +299,8 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 	"wall_jump": wall_kick_input_lock_time,
 	"ledge_climb": ledge_climb_duration,
 	"land": landing_squash_time,
+		"turn": turn_time,
+		"skid": skid_hold_time,
 	"attack_1": attack_window_hit1,
 	"attack_2": attack_window_hit2,
 	"attack_3": attack_window_hit3,
@@ -320,7 +350,7 @@ var _rise_gravity := 0.0
 var _fall_gravity := 0.0
 var _jump_velocity := 0.0
 var _double_jump_velocity := 0.0
-var _standing_shape_height := 58.0
+var _standing_shape_height := 46.0
 
 var _coyote_left := 0.0
 var _jump_buffer_left := 0.0
@@ -331,6 +361,8 @@ var _jump_press_pending := false
 var _air_jumps_left := 0
 var _landing_left := 0.0
 var _footstep_left := 0.0
+var _run_time := 0.0
+var _skid_deceleration := 0.0
 var _was_on_floor := false
 var _drop_left := 0.0
 
@@ -395,9 +427,9 @@ func _ready() -> void:
 	# lands on canvas row 413; this offset puts that row at local y=0, so the
 	# feet-anchored origin lines up with every frame regardless of pose.
 	_sprite.offset = Vector2(0.0, -157.0)
-	# Measured from the idle standing frames' opaque pixel height (~331px)
-	# so Luz renders at roughly the CollisionShape2D's 58px standing height.
-	_sprite.scale = Vector2(0.175, 0.175)
+	# The idle standing frames' opaque body is ~331.5 px inside the 512 px
+	# cell, so this scale makes Luz exactly body_height px tall.
+	_sprite.scale = Vector2.ONE * (body_height / LUZ_BODY_PIXELS)
 	_spawn_position = global_position
 	_health = max_health
 	_base_alpha = _sprite.modulate.a
@@ -465,6 +497,10 @@ func _physics_process(delta: float) -> void:
 	match _state:
 		State.IDLE, State.RUN:
 			_update_ground_move(delta)
+		State.TURN:
+			_update_turn(delta)
+		State.SKID:
+			_update_skid(delta)
 		State.CROUCH:
 			_update_crouch(delta)
 		State.JUMP, State.FALL:
@@ -543,9 +579,12 @@ func _update_facing() -> void:
 	if _is_directional_attack_state():
 		_sprite.flip_h = _attack_facing < 0
 		return
-	if _state in [State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB, State.HURT]:
+	if _state in [State.TURN, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB, State.HURT]:
 		return
 	var axis := _horizontal_input()
+	if _wants_turn(axis):
+		_begin_turn(1 if axis > 0.0 else -1)
+		return
 	if not is_zero_approx(axis):
 		_facing = 1 if axis > 0.0 else -1
 	_sprite.flip_h = _facing < 0
@@ -580,6 +619,9 @@ func _update_ground_move(delta: float) -> void:
 		return
 
 	var axis := _horizontal_input()
+	_track_run_time(delta)
+	if _try_start_skid(axis):
+		return
 	var target_speed := axis * run_max_speed
 	var accel := run_acceleration if not is_zero_approx(axis) else run_deceleration
 	velocity.x = move_toward(velocity.x, target_speed, accel * delta)
@@ -593,6 +635,86 @@ func _update_ground_move(delta: float) -> void:
 		return
 
 	_state = State.RUN if absf(velocity.x) > 5.0 else State.IDLE
+
+
+## -- Turn / skid -------------------------------------------------------------
+
+## True when running or standing on the floor and the input points opposite to
+## the facing: the turn crouch plays before she faces and runs that way.
+func _wants_turn(axis: float) -> bool:
+	if _state != State.IDLE and _state != State.RUN:
+		return false
+	if is_zero_approx(axis) or not is_on_floor():
+		return false
+	if Input.is_action_pressed(&"move_down"):
+		return false
+	return (1 if axis > 0.0 else -1) != _facing
+
+
+## Faces the new direction at once (so attacks and dashes cancelling the turn
+## use it) and stops dead for turn_time while the crouch pose plays.
+func _begin_turn(direction: int) -> void:
+	_facing = direction
+	_sprite.flip_h = _facing < 0
+	_enter_state(State.TURN)
+	velocity.x = 0.0
+
+
+func _update_turn(delta: float) -> void:
+	if not is_on_floor():
+		_enter_state(State.FALL)
+		_update_airborne(delta)
+		return
+	velocity = Vector2.ZERO
+	if Input.is_action_pressed(&"move_down"):
+		_enter_state(State.CROUCH)
+		return
+	if _try_launch_jump():
+		return
+	if _state_time >= turn_time:
+		_enter_state(State.IDLE)
+
+
+## Accumulates the time spent running at (near) full speed on the floor.
+func _track_run_time(delta: float) -> void:
+	var threshold := run_max_speed * skid_min_speed_ratio
+	if _state == State.RUN and absf(velocity.x) >= threshold:
+		_run_time += delta
+	else:
+		_run_time = 0.0
+
+
+func _try_start_skid(axis: float) -> bool:
+	if _state != State.RUN or not is_zero_approx(axis):
+		return false
+	if _run_time < skid_min_run_time or _jump_buffer_left > 0.0:
+		return false
+	if Input.is_action_pressed(&"move_down"):
+		return false
+	_skid_deceleration = absf(velocity.x) / maxf(skid_brake_time, 0.001)
+	_enter_state(State.SKID)
+	return true
+
+
+func _update_skid(delta: float) -> void:
+	if not is_on_floor():
+		_enter_state(State.FALL)
+		_update_airborne(delta)
+		return
+	var cancelled := (
+		not is_zero_approx(_horizontal_input())
+		or Input.is_action_pressed(&"move_down")
+	)
+	if cancelled:
+		_enter_state(State.IDLE)
+		_update_ground_move(delta)
+		return
+	velocity.x = move_toward(velocity.x, 0.0, _skid_deceleration * delta)
+	velocity.y = 0.0
+	if _try_launch_jump():
+		return
+	if _state_time >= skid_hold_time:
+		_enter_state(State.IDLE)
 
 
 ## -- Crouch ------------------------------------------------------------------
@@ -892,7 +1014,7 @@ func _update_up_attack(delta: float) -> void:
 		velocity.y = 0.0
 	else:
 		var axis := _horizontal_input()
-		velocity.x = move_toward(velocity.x, axis * run_max_speed, air_acceleration * delta)
+		velocity.x = move_toward(velocity.x, axis * air_max_speed, air_acceleration * delta)
 		_apply_gravity(delta)
 
 	if _state_time < attack_startup_time:
@@ -931,7 +1053,7 @@ func _restart_air_attack(down: bool) -> void:
 
 func _update_air_attack(delta: float) -> void:
 	var axis := _horizontal_input()
-	velocity.x = move_toward(velocity.x, axis * run_max_speed, air_acceleration * delta)
+	velocity.x = move_toward(velocity.x, axis * air_max_speed, air_acceleration * delta)
 	_apply_gravity(delta)
 
 	if is_on_floor():
@@ -1145,7 +1267,7 @@ func _update_airborne(delta: float) -> void:
 func _apply_air_horizontal_control(delta: float) -> void:
 	var input_axis := _horizontal_input()
 	if not is_zero_approx(input_axis):
-		velocity.x = move_toward(velocity.x, input_axis * run_max_speed, air_acceleration * delta)
+		velocity.x = move_toward(velocity.x, input_axis * air_max_speed, air_acceleration * delta)
 		return
 	if _wall_kick_pending:
 		velocity.x = move_toward(velocity.x, float(_wall_kick_wall_direction) * wall_kick_drift_speed, air_acceleration * delta)
@@ -1224,7 +1346,7 @@ func _try_start_dash() -> bool:
 
 func _can_dash_from_state() -> bool:
 	match _state:
-		State.IDLE, State.RUN, State.CROUCH, State.JUMP, State.FALL, State.FOCUS:
+		State.IDLE, State.RUN, State.CROUCH, State.JUMP, State.FALL, State.FOCUS, State.TURN, State.SKID:
 			return true
 		State.ATTACK, State.AIR_ATTACK:
 			return _attack_phase == PHASE_RECOVERY
@@ -1451,6 +1573,7 @@ func _enter_state(new_state: State) -> void:
 	var previous := _state
 	_state = new_state
 	_state_time = 0.0
+	_run_time = 0.0
 	if not _is_lateral_attack_state():
 		_recoil_left = 0.0
 	if new_state != State.JUMP:
@@ -1921,7 +2044,7 @@ func _update_focus_glow() -> void:
 	if _focus_glow == null:
 		_focus_glow = Polygon2D.new()
 		_focus_glow.z_index = 1
-		_focus_glow.position = Vector2(0.0, -29.0)
+		_focus_glow.position = Vector2(0.0, -24.0)
 		var ring := PackedVector2Array()
 		for step in 24:
 			ring.append(Vector2.from_angle(TAU * float(step) / 24.0) * focus_glow_radius)
@@ -1966,7 +2089,7 @@ func begin_room_transition(walk_direction: int) -> void:
 	if _auto_walk != 0:
 		_facing = _auto_walk
 	else:
-		velocity.x = clampf(velocity.x, -run_max_speed, run_max_speed)
+		velocity.x = clampf(velocity.x, -air_max_speed, air_max_speed)
 
 
 func end_room_transition() -> void:
@@ -2238,7 +2361,7 @@ func _update_footsteps(delta: float) -> void:
 	if _state != State.RUN or not is_on_floor() or absf(velocity.x) < 70.0:
 		_footstep_left = 0.0
 		return
-	_footstep_left -= delta
+		_footstep_left -= delta
 	if _footstep_left <= 0.0:
 		_sfx_foot.play()
 		_footstep_left = clampf(0.30 - absf(velocity.x) / 2600.0, 0.12, 0.26)
@@ -2254,6 +2377,10 @@ func _update_animation() -> void:
 	match _state:
 		State.CROUCH:
 			_play_animation(&"crouch")
+		State.TURN:
+			_play_animation(&"turn")
+		State.SKID:
+			_play_animation(&"skid")
 		State.DASH:
 			_play_animation(&"air_dash" if _dash_is_air else &"ground_dash")
 		State.JUMP:
@@ -2302,7 +2429,7 @@ func _update_animation() -> void:
 			if _landing_left > 0.0:
 				_play_animation(&"land")
 			elif absf(velocity.x) > 35.0:
-				_play_animation(&"walk", clampf(absf(velocity.x) / 220.0, 0.7, 1.8))
+				_play_animation(&"walk", clampf(absf(velocity.x) / run_max_speed, 0.7, 1.8))
 			else:
 				_play_animation(&"idle")
 

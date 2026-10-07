@@ -282,7 +282,7 @@ func case_ledge_fall_keeps_air_jump() -> void:
 	await _build_rig(100.0, LEDGE_FLOOR_RECT)
 	_player.unlock_double_jump()
 	Input.action_press(&"move_right")
-	await _secs(0.7)
+	await _secs(1.0)
 	Input.action_release(&"move_right")
 	check(not _player.is_on_floor() and _player.velocity.y > 0.0, "the player walked off the ledge and is falling")
 	var vy := await _press_and_read_vy()

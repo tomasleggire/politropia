@@ -22,6 +22,8 @@ const CLIP_SPEEDS := {
 	"jump": 6.0,
 	"fall": 5.0,
 	"land": 8.0,
+	"turn": 16.0,
+	"skid": 6.0,
 	"ground_dash": 9.0,
 	"air_dash": 9.0,
 	"wall_cling": 4.0,
@@ -39,6 +41,17 @@ const CLIP_SPEEDS := {
 	"rest_mount": 8.0,
 	"rest_sit": 2.0,
 	"rest_dismount": 10.0,
+}
+
+## PLACEHOLDER MAPPING (no art yet): "turn" and "skid" have no clip in the
+## manifest, so each borrows frames from an existing animation. As soon as the
+## manifest gains a clip named "turn" or "skid" (see CLIP_SOURCE_NAMES), that
+## art is used automatically and this entry is ignored -- no code change.
+##   turn: both `crouch` frames (3-4 frame turn crouch stand-in).
+##   skid: the last, lowest `crouch` frame, held (wide low skid pose stand-in).
+const PLACEHOLDER_CLIPS := {
+	"turn": {"from": "crouch", "frames": [0, 1]},
+	"skid": {"from": "crouch", "frames": [1]},
 }
 
 ## Animations that should hold/repeat while their state persists, rather
@@ -116,7 +129,22 @@ static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: 
 				var texture := _build_frame_texture(atlas, grid, int(frame_indices[i]))
 				frames.add_frame(animation_name, texture, seconds[i] * speed)
 
+	_fill_placeholder_clips(frames, clip_durations)
 	return frames
+
+
+## Gives every PLACEHOLDER_CLIPS animation that the manifest did not fill its
+## stand-in frames, copied from the animation it borrows from.
+static func _fill_placeholder_clips(frames: SpriteFrames, clip_durations: Dictionary) -> void:
+	for animation_name: String in PLACEHOLDER_CLIPS:
+		if frames.get_frame_count(animation_name) > 0:
+			continue
+		var config: Dictionary = PLACEHOLDER_CLIPS[animation_name]
+		var source: String = config["from"]
+		var indices: Array = config["frames"]
+		frames.set_animation_speed(animation_name, _clip_speed(animation_name, indices.size(), clip_durations))
+		for index: int in indices:
+			frames.add_frame(animation_name, frames.get_frame_texture(source, index), 1.0)
 
 
 ## Per-frame duration (seconds) for a clip: equal shares of total_duration,

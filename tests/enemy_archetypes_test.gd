@@ -607,7 +607,7 @@ func case_projectile_expires() -> void:
 
 func case_slash_destroys_a_projectile() -> void:
 	await _build_rig()
-	var shot := _add_projectile(Vector2(60.0, -40.0), Vector2.RIGHT, 0.0)
+	var shot := _add_projectile(Vector2(50.0, -24.0), Vector2.RIGHT, 0.0)
 	await _steps(2)
 	_player.request_attack(0)
 	await _secs(0.5)

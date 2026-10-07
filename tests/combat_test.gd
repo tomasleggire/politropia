@@ -21,7 +21,7 @@ const CHECKPOINT := Vector2(500.0, 0.0)
 const IFRAMES_OVER := 1.2
 const DEATH_BEAT := 1.0
 const HAZARD_RECT := Rect2(200.0, -16.0, 96.0, 16.0)
-const PLAYER_BODY := Vector2(38.0, 58.0)
+const PLAYER_BODY := Vector2(29.0, 46.0)
 
 const CHECKS := {
 	"case_hit_signals": 5,
