@@ -110,7 +110,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export_group("Turn")
 ## Short crouch with no movement when starting to run opposite to the facing
 ## or when reversing while running.
-@export var turn_time := 0.06
+@export var turn_time := 0.12
 
 @export_group("Skid")
 ## Releasing the run input at (near) full speed snaps to a low skid pose,

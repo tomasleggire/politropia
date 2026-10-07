@@ -6,12 +6,12 @@ shader_type canvas_item;
 // art by flip_h, so "back" stays behind Luz when she faces left.
 
 uniform bool enabled = true;
-uniform vec4 rim_color : source_color = vec4(0.561, 0.639, 0.78, 1.0);
+uniform vec4 rim_color : source_color = vec4(0.4, 0.46, 0.58, 1.0);
 // Texels from the silhouette edge that get lit (about 1 world px at Luz's scale).
-uniform float width : hint_range(0.0, 16.0) = 7.0;
+uniform float width : hint_range(0.0, 16.0) = 5.0;
 // Toward the light, texture space, y down: top and behind (art faces right).
 uniform vec2 light_direction = vec2(-0.5, -1.0);
-uniform float strength : hint_range(0.0, 1.0) = 0.85;
+uniform float strength : hint_range(0.0, 1.0) = 0.45;
 
 void fragment() {
 	if (enabled && COLOR.a > 0.5) {

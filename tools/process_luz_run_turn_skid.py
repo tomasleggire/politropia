@@ -55,6 +55,8 @@ OUT_CELL = pch.OUT_CELL_SIZE
 OUT_COLUMNS = 4
 FEET_ROW = pch.FEET_ROW
 MIN_COMPONENT_PX = 400
+# Planted-foot float allowed when flattening the run bob (output texels, 0.6 world px).
+MAX_FLOAT = 4
 # Standing-idle height (hair top to sole) of the existing idle frames, in output px.
 IDLE_STANDING_HEIGHT = 331.5
 # Codex draws the run and turn/skid sheets with a standing-equivalent body of about
@@ -71,6 +73,10 @@ SHEETS = {
         "raw_rows": 2,
         "scale": FIXED_SCALE,
         "clips": {"run": list(range(8))},
+        # Hair-top row each run frame is flattened to (see bob_fix). The Codex
+        # poses bob 40 output texels (5.8 world px, rows 97-137); this keeps the
+        # bob to 14 texels (2 world px, Penitent-like) with low contact frames.
+        "head_tops": [100, 108, 114, 106, 100, 108, 114, 106],
     },
     "luz_idle_sheet.png": {
         "raw_file": "luz_idle_raw.png",
@@ -85,9 +91,10 @@ SHEETS = {
         "raw_columns": 4,
         "raw_rows": 3,
         "scale": FIXED_SCALE,
+        # Skid ends with a small rock-back (8, 7, 8) so the stop settles with a sway.
         # Turn slot 0 holds the ruler in front with both hands; it pops against
         # the trailing sword grip of the idle and run clips, so the turn starts at slot 1.
-        "clips": {"turn": [1, 2, 3], "skid": [4, 5, 6, 7, 8, 9]},
+        "clips": {"turn": [1, 2, 3], "skid": [4, 5, 6, 7, 8, 7, 8, 9]},
     },
 }
 
@@ -184,6 +191,27 @@ def place(source: Image.Image, scale: float, anchor_x: float, label: str) -> Ima
     return out
 
 
+def bob_fix(frame: Image.Image, target_top: int) -> Image.Image:
+    """Move the hair top of `frame` to `target_top` without moving the planted sole.
+
+    Frames sitting lower than the target are first lifted by at most MAX_FLOAT
+    texels (0.6 world px of planted-foot float); the remainder is a vertical
+    stretch about the sole row (at most ~7%), so feet stay on the shared row.
+    Frames above the target are squashed the same way (about 1%).
+    """
+    _, top, _, bottom = alpha_bbox(frame)
+    height = bottom - top + 1
+    lift = min(MAX_FLOAT, max(0, top - target_top))
+    new_height = (bottom - lift) - target_top + 1
+    if lift == 0 and new_height == height:
+        return frame
+    art = frame.crop((0, top, frame.width, bottom + 1))
+    resized = pch.unpremultiply(pch.premultiply(art).resize((frame.width, new_height), pch.RESAMPLE))
+    out = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+    out.alpha_composite(resized, (0, bottom - lift - (new_height - 1)))
+    return out
+
+
 def report_frame(label: str, frame: Image.Image) -> None:
     x0, y0, x1, y1 = alpha_bbox(frame)
     print(f"  {label}: height={y1 - y0 + 1:3d} feet_row={y1} x=[{x0},{x1}] centroid_x={centroid_x(frame):.1f}")
@@ -207,6 +235,8 @@ def build_sheet(sheet_name: str, config: dict, anchor_x: float) -> dict | None:
     sheet = Image.new("RGBA", (OUT_COLUMNS * OUT_CELL, rows * OUT_CELL), (0, 0, 0, 0))
     for slot in slots:
         frame = place(sources[slot], scale, anchor_x, f"{sheet_name}[{slot}]")
+        if "head_tops" in config:
+            frame = bob_fix(frame, config["head_tops"][slot])
         sheet.alpha_composite(frame, ((slot % OUT_COLUMNS) * OUT_CELL, (slot // OUT_COLUMNS) * OUT_CELL))
         report_frame(f"slot {slot}", frame)
     sheet.save(ASSET_DIR / sheet_name)
