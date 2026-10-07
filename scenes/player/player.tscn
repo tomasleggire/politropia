@@ -7,6 +7,15 @@
 [ext_resource type="Script" uid="uid://dy77m7qh61ceh" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
 [ext_resource type="Script" uid="uid://cvytubfx262a6" path="res://scripts/camera/camara_jugador.gd" id="7_0owmy"]
 [ext_resource type="Script" uid="uid://crlgiaggiu2j3" path="res://scripts/player/player_slash_vfx.gd" id="7_slash_vfx"]
+[ext_resource type="Shader" path="res://shaders/luz_rim_light.gdshader" id="8_rim"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_rim"]
+shader = ExtResource("8_rim")
+shader_parameter/enabled = true
+shader_parameter/rim_color = Color(0.561, 0.639, 0.78, 1)
+shader_parameter/width = 7.0
+shader_parameter/light_direction = Vector2(-0.5, -1)
+shader_parameter/strength = 0.85
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(29, 46)
@@ -53,6 +62,7 @@ shape = SubResource("RectangleShape2D_attack")
 disabled = true
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1844979423]
+material = SubResource("ShaderMaterial_rim")
 texture_filter = 4
 scale = Vector2(0.1448, 0.1448)
 
