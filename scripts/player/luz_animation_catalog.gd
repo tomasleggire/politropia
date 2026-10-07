@@ -137,11 +137,20 @@ static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: 
 ## stand-in frames, copied from the animation it borrows from.
 static func _fill_placeholder_clips(frames: SpriteFrames, clip_durations: Dictionary) -> void:
 	for animation_name: String in PLACEHOLDER_CLIPS:
-		if frames.get_frame_count(animation_name) > 0:
+		if frames.has_animation(animation_name) and frames.get_frame_count(animation_name) > 0:
 			continue
 		var config: Dictionary = PLACEHOLDER_CLIPS[animation_name]
 		var source: String = config["from"]
 		var indices: Array = config["frames"]
+		if not frames.has_animation(source):
+			continue
+		var source_count := frames.get_frame_count(source)
+		var usable := indices.filter(func(index: int) -> bool: return index >= 0 and index < source_count)
+		if usable.size() != indices.size():
+			push_warning("LuzAnimationCatalog: '%s' lacks the frames '%s' borrows; clip skipped." % [source, animation_name])
+			continue
+		if not frames.has_animation(animation_name):
+			frames.add_animation(animation_name)
 		frames.set_animation_speed(animation_name, _clip_speed(animation_name, indices.size(), clip_durations))
 		for index: int in indices:
 			frames.add_frame(animation_name, frames.get_frame_texture(source, index), 1.0)

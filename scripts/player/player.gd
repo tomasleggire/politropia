@@ -117,6 +117,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## brakes linearly to zero, holds the pose, then returns to idle. Any new
 ## input cancels the hold immediately.
 @export var skid_brake_time := 0.14
+## Seconds the pose is held once the brake has finished (~10 frames at 60 fps).
 @export var skid_hold_time := 0.17
 ## Fraction of run_max_speed needed to skid (shorter taps just stop).
 @export_range(0.0, 1.0) var skid_min_speed_ratio := 0.9
@@ -307,7 +308,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 	"ledge_climb": ledge_climb_duration,
 	"land": landing_squash_time,
 		"turn": turn_time,
-		"skid": skid_hold_time,
+		"skid": skid_brake_time + skid_hold_time,
 	"attack_1": attack_window_hit1,
 	"attack_2": attack_window_hit2,
 	"attack_3": attack_window_hit3,
@@ -371,6 +372,7 @@ var _footstep_left := 0.0
 var _dust_left := 0.0
 var _run_time := 0.0
 var _skid_deceleration := 0.0
+var _dust_warned := false
 var _was_on_floor := false
 var _drop_left := 0.0
 
@@ -723,7 +725,7 @@ func _update_skid(delta: float) -> void:
 	velocity.y = 0.0
 	if _try_launch_jump():
 		return
-	if _state_time >= skid_hold_time:
+	if _state_time >= skid_brake_time + skid_hold_time:
 		_enter_state(State.IDLE)
 
 
@@ -2383,15 +2385,33 @@ func _update_footsteps(delta: float) -> void:
 
 
 ## Drops a self-freeing dust effect at her feet, left behind in world space.
+## The host is the parent when it is a Node2D, otherwise the current scene;
+## the effect is skipped when neither can hold it.
 func _spawn_dust(dust_kind: GroundDust.Kind) -> void:
-	var host := get_parent()
-	if ground_dust_scene == null or host == null:
+	if ground_dust_scene == null:
+		_warn_dust_once("ground_dust_scene is not set; ground dust is skipped.")
+		return
+	var host := get_parent() as Node2D
+	if host == null:
+		host = get_tree().current_scene as Node2D
+	if host == null:
+		_warn_dust_once("no Node2D host for ground dust; it is skipped.")
 		return
 	var dust := ground_dust_scene.instantiate() as GroundDust
+	if dust == null:
+		_warn_dust_once("ground_dust_scene root is not a GroundDust; it is skipped.")
+		return
 	dust.kind = dust_kind
 	dust.direction = _facing
-	dust.position = host.to_local(global_position)
 	host.add_child(dust)
+	dust.global_position = global_position
+
+
+func _warn_dust_once(message: String) -> void:
+	if _dust_warned:
+		return
+	_dust_warned = true
+	push_warning("Player: " + message)
 
 
 func _update_animation() -> void:
