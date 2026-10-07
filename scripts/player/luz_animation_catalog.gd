@@ -16,8 +16,8 @@ const ASSET_ROOT := "res://assets/player/luz/"
 ## player's own exported durations (see build_sprite_frames); these defaults
 ## only apply when no duration override is supplied.
 const CLIP_SPEEDS := {
-	"idle": 3.0,
-	"walk": 9.0,
+	"idle": 8.0,
+	"walk": 28.0,
 	"crouch": 4.0,
 	"jump": 6.0,
 	"fall": 5.0,
