@@ -22,7 +22,7 @@ const CLIP_SPEEDS := {
 	"jump": 6.0,
 	"fall": 5.0,
 	"land": 8.0,
-	"turn": 16.0,
+	"turn": 20.0,
 	"skid": 6.0,
 	"ground_dash": 9.0,
 	"air_dash": 9.0,

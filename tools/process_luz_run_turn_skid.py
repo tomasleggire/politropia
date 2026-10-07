@@ -94,7 +94,8 @@ SHEETS = {
         # Skid ends with a small rock-back (8, 7, 8) so the stop settles with a sway.
         # Turn slot 0 holds the ruler in front with both hands; it pops against
         # the trailing sword grip of the idle and run clips, so the turn starts at slot 1.
-        "clips": {"turn": [1, 2, 3], "skid": [4, 5, 6, 7, 8, 7, 8, 9]},
+        # Slot 2 (deep ball crouch) is left out: the turn is a 2-frame snap pivot.
+        "clips": {"turn": [1, 3], "skid": [4, 5, 6, 7, 8, 7, 8, 9]},
         # The sway slots paint the hair about 7% darker (more dark-brown shading under
         # the bun) than the idle hair; lift it to the idle mean so the stop does not
         # darken the hair. Slots 4-5 are skipped: the ruler shares the hair hue.

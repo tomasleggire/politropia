@@ -56,6 +56,7 @@ Budget: Luz complete between this week and next, sharing time and Claude/Codex t
 - Keep: idle, run, turn, skid, crouch, drop-through, jump/fall/land, double jump (boss reward; needs its own animation), ground dash, air dash, wall cling + wall jump, ground combo x3, crouch attack, air horizontal attack, up attack, focus/heal.
 - Remove: ledge hang and ledge climb; pogo / down air attack.
 - Deferred until after the boss: hurt and death animations.
+- Attacks (user, 2026-10-07): every attack variant must match the Penitent's animation AND range, both visually (ruler + slash) and in the hitbox. Measure reach per variant from `Ataque.mov` and `Atacar enemigos y morir.mov` (body ruler: Penitent body ~48 game px = Luz 48) before P8.
 
 ### Polish plan (ordered; A = no new art, B = Codex art)
 - [ ] P1 (A) Hair darkens during the skid sway: verify the cause with the capture (suspect: rim color darker than blond hair) and make the rim lighten-only.
