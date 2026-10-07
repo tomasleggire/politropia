@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://b12avtcpnu4xe"]
+
+[ext_resource type="Script" uid="uid://baoqhj6wfwsci" path="res://scripts/world/thorn_bush.gd" id="1_cpdhl"]
+[ext_resource type="Texture2D" uid="uid://tnn3kanfhrl4" path="res://assets/art/greece/traps/thorn.png" id="2_821sf"]
+
+[node name="ThornBush" type="Area2D" unique_id=1155433270]
+script = ExtResource("1_cpdhl")
+hitbox_width_ratio = 0.75
+hitbox_height_ratio = 0.8
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=2101369791]
+texture_filter = 4
+texture_repeat = 2
+position = Vector2(0, -48)
+scale = Vector2(0.21428572, 0.21428572)
+texture = ExtResource("2_821sf")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 403, 448)

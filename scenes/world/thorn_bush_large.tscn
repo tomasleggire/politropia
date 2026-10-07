@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://dfe6ftrlg03hc"]
+
+[ext_resource type="PackedScene" uid="uid://b12avtcpnu4xe" path="res://scenes/world/thorn_bush.tscn" id="1_j768u"]
+[ext_resource type="Texture2D" uid="uid://yfs4ao0e5sae" path="res://assets/art/greece/traps/long_thorn.png" id="2_p8553"]
+
+[node name="ThornBush" unique_id=1155433270 instance=ExtResource("1_j768u")]
+count = 1
+hitbox_offset = Vector2(0, 0)
+
+[node name="Sprite2D" parent="." index="0" unique_id=2101369791]
+texture_repeat = 2
+position = Vector2(0, -48)
+scale = Vector2(0.51336896, 0.51336896)
+texture = ExtResource("2_p8553")
+region_enabled = true
+region_rect = Rect2(0, 0, 96, 187)

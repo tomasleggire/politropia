@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://cr1bj048cxxmk"]
+
+[ext_resource type="Script" uid="uid://bqesiboblwuuq" path="res://scripts/world/electric_cloud.gd" id="1_i7e68"]
+[ext_resource type="Texture2D" uid="uid://g3kxjulvxrqr" path="res://assets/art/greece/traps/cloud.png" id="2_i7e68"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wmed1"]
+size = Vector2(221, 58)
+
+[node name="ElectricCloud" type="Area2D" unique_id=417144711]
+script = ExtResource("1_i7e68")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=82252933]
+scale = Vector2(0.1, 0.1)
+texture = ExtResource("2_i7e68")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=434539900]
+position = Vector2(-8.5, 1)
+shape = SubResource("RectangleShape2D_wmed1")

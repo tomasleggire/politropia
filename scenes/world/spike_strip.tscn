@@ -1,0 +1,23 @@
+[gd_scene format=3 uid="uid://dbkethffhm3xr"]
+
+[ext_resource type="Texture2D" uid="uid://dlko1gw3bquh5" path="res://assets/art/greece/traps/spikes.png" id="1_o4313"]
+[ext_resource type="Script" uid="uid://cl0c186jbjajm" path="res://scripts/world/spike_strip.gd" id="1_q3w1m"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_q3w1m"]
+size = Vector2(16, 46)
+
+[node name="SpikeStrip" type="Area2D" unique_id=1823967474]
+script = ExtResource("1_q3w1m")
+edge_tolerance = null
+hitbox_top_offset = null
+rising_grace_speed = null
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=954808672]
+texture_repeat = 2
+texture = ExtResource("1_o4313")
+region_enabled = true
+region_rect = Rect2(0, 0, 16, 44)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=435587520]
+position = Vector2(0, -1)
+shape = SubResource("RectangleShape2D_q3w1m")
