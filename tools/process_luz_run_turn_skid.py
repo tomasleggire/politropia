@@ -95,6 +95,10 @@ SHEETS = {
         # Turn slot 0 holds the ruler in front with both hands; it pops against
         # the trailing sword grip of the idle and run clips, so the turn starts at slot 1.
         "clips": {"turn": [1, 2, 3], "skid": [4, 5, 6, 7, 8, 7, 8, 9]},
+        # The sway slots paint the hair about 7% darker (more dark-brown shading under
+        # the bun) than the idle hair; lift it to the idle mean so the stop does not
+        # darken the hair. Slots 4-5 are skipped: the ruler shares the hair hue.
+        "hair_match": [6, 7, 8, 9],
     },
 }
 
@@ -212,6 +216,37 @@ def bob_fix(frame: Image.Image, target_top: int) -> Image.Image:
     return out
 
 
+def hair_mask(rgba: np.ndarray) -> np.ndarray:
+    """Hair-hued opaque pixels (blond to dark brown) in the head band of a frame."""
+    r, g, b, a = (rgba[..., k].astype(np.int16) for k in range(4))
+    mask = (a > 200) & (r > b + 25) & (r > g + 8) & (g > b + 5) & (r > 90)
+    rows = np.where(a > 200)[0]
+    mask[rows.min() + 170 :] = False
+    return mask
+
+
+def hair_luminance(rgba: np.ndarray) -> float:
+    mask = hair_mask(rgba)
+    lum = 0.3 * rgba[..., 0] + 0.59 * rgba[..., 1] + 0.11 * rgba[..., 2]
+    return float(lum[mask].mean())
+
+
+def idle_hair_luminance() -> float:
+    sheet = np.array(Image.open(ASSET_DIR / "luz_idle_sheet.png").convert("RGBA"))
+    cells = [sheet[: OUT_CELL, (i % OUT_COLUMNS) * OUT_CELL : (i % OUT_COLUMNS + 1) * OUT_CELL] for i in (0, 1, 2)]
+    return statistics.mean(hair_luminance(cell) for cell in cells)
+
+
+def match_hair(frame: Image.Image, target: float) -> Image.Image:
+    """Scale the hair-hued pixels' RGB so their mean luminance equals `target`."""
+    rgba = np.array(frame)
+    gain = target / hair_luminance(rgba)
+    mask = hair_mask(rgba)
+    rgba[..., :3][mask] = np.clip(rgba[..., :3][mask].astype(float) * gain, 0, 255).astype(np.uint8)
+    print(f"    hair gain x{gain:.3f}")
+    return Image.fromarray(rgba, "RGBA")
+
+
 def report_frame(label: str, frame: Image.Image) -> None:
     x0, y0, x1, y1 = alpha_bbox(frame)
     print(f"  {label}: height={y1 - y0 + 1:3d} feet_row={y1} x=[{x0},{x1}] centroid_x={centroid_x(frame):.1f}")
@@ -237,6 +272,8 @@ def build_sheet(sheet_name: str, config: dict, anchor_x: float) -> dict | None:
         frame = place(sources[slot], scale, anchor_x, f"{sheet_name}[{slot}]")
         if "head_tops" in config:
             frame = bob_fix(frame, config["head_tops"][slot])
+        if slot in config.get("hair_match", []):
+            frame = match_hair(frame, idle_hair_luminance())
         sheet.alpha_composite(frame, ((slot % OUT_COLUMNS) * OUT_CELL, (slot // OUT_COLUMNS) * OUT_CELL))
         report_frame(f"slot {slot}", frame)
     sheet.save(ASSET_DIR / sheet_name)

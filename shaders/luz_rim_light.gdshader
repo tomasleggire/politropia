@@ -22,6 +22,9 @@ void fragment() {
 			float neighbour = textureLod(TEXTURE, UV + step_uv * float(i), 0.0).a;
 			open_air = max(open_air, 1.0 - step(0.5, neighbour));
 		}
-		COLOR.rgb = mix(COLOR.rgb, rim_color.rgb, open_air * strength * rim_color.a);
+		// Lighten-only: the rim never darkens a texel that is already brighter than
+		// the rim color (blond hair), per channel; on the navy body it equals the mix.
+		vec3 lit = mix(COLOR.rgb, rim_color.rgb, open_air * strength * rim_color.a);
+		COLOR.rgb = max(COLOR.rgb, lit);
 	}
 }
