@@ -76,7 +76,11 @@ def clip_table(manifest: dict) -> dict:
 
 
 ATTACK_CLIPS = ["ground_attack_1", "ground_attack_2", "ground_attack_3", "crouch_attack", "air_horizontal_attack", "up_attack"]
-ATTACK_CROP = (0, 0, 512, 450)
+ATTACK_CANVAS = (1024, 768)  # cells centred on it: feet row 541, body centre column 529
+ATTACK_FEET_ROW = FEET_ROW + (ATTACK_CANVAS[1] - CELL) // 2
+ATTACK_GUIDE_X = ATTACK_CANVAS[0] // 2 + 17
+ATTACK_CROP = (112, 40, 912, ATTACK_FEET_ROW + 30)
+GUIDE_X = 273
 
 
 def attack_info(manifest: dict, clip: str) -> tuple[list[int], list[str]]:
@@ -101,15 +105,23 @@ def font(size: int = 18):
         return ImageFont.load_default()
 
 
-def load_clip_frames(manifest: dict, clip: str) -> list[Image.Image]:
+def load_clip_frames(manifest: dict, clip: str, canvas: tuple[int, int] | None = None) -> list[Image.Image]:
+    """Frames of a clip. With `canvas`, every frame is centred on a canvas of that size: the sprite is
+    centred on its cell in the game, so cells of any size line up exactly like that."""
     for sheet_name, sheet in manifest["sheets"].items():
         if clip in sheet["clips"]:
             grid = sheet["grid"]
             image = Image.open(ASSET_DIR / sheet_name).convert("RGBA")
+            cw, ch = grid["cell_width"], grid["cell_height"]
             frames = []
             for index in sheet["clips"][clip]:
                 col, row = index % grid["columns"], index // grid["columns"]
-                frames.append(image.crop((col * CELL, row * CELL, (col + 1) * CELL, (row + 1) * CELL)))
+                cell = image.crop((col * cw, row * ch, (col + 1) * cw, (row + 1) * ch))
+                if canvas:
+                    full = Image.new("RGBA", canvas, (0, 0, 0, 0))
+                    full.alpha_composite(cell, ((canvas[0] - cw) // 2, (canvas[1] - ch) // 2))
+                    cell = full
+                frames.append(cell)
             return frames
     raise KeyError(f"clip '{clip}' is not in the manifest")
 
@@ -170,7 +182,7 @@ def contact_sheet(frames: list[Image.Image], dest: Path, title: str, notes: list
         draw.text((ox + 6, oy + 4), f"{title} {i}{note}", fill=(255, 255, 0, 255), font=font(15 if notes else 18))
     onion_ox, onion_oy = 0, rows * ch
     sheet.alpha_composite(onion, (onion_ox, onion_oy))
-    guide_x = 273 - CROP[0]
+    guide_x = GUIDE_X - CROP[0]
     for i in range(len(frames)):
         ox, oy = (i % columns) * cw, (i // columns) * ch
         draw.line((ox, oy + FEET_ROW - CROP[1], ox + cw, oy + FEET_ROW - CROP[1]), fill=(255, 0, 255, 200))
@@ -182,7 +194,7 @@ def contact_sheet(frames: list[Image.Image], dest: Path, title: str, notes: list
 
 
 def main() -> int:
-    global CROP
+    global CROP, FEET_ROW, GUIDE_X
     if shutil.which("ffmpeg") is None:
         print("ffmpeg is required", file=sys.stderr)
         return 1
@@ -192,9 +204,9 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = json.loads((ASSET_DIR / "animation_manifest.json").read_text())
     if attacks:
-        CROP = ATTACK_CROP
+        CROP, FEET_ROW, GUIDE_X = ATTACK_CROP, ATTACK_FEET_ROW, ATTACK_GUIDE_X
         for clip in ATTACK_CLIPS:
-            frames = load_clip_frames(manifest, clip)
+            frames = load_clip_frames(manifest, clip, ATTACK_CANVAS)
             ticks, notes = attack_info(manifest, clip)
             notes = [f"{note} {t}t" for note, t in zip(notes, ticks)]
             contact_sheet(frames, out_dir / f"{clip}_contact.png", clip, notes)

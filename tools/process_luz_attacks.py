@@ -58,14 +58,26 @@ MANIFEST_PATH = ASSET_DIR / "animation_manifest.json"
 
 RAW_CELL = 512
 RAW_COLUMNS = 3
-OUT_CELL = pch.OUT_CELL_SIZE
-OUT_COLUMNS = 4
+OUT_CELL = pch.OUT_CELL_SIZE  # height of every cell, and the width of the untouched old cells
+# Frames are built on a WORK_W wide canvas whose centre is SHIFT texels right of the old 512 cell's
+# centre column... precisely: work x = old 512-cell x + SHIFT, so the body keeps the same offset from
+# the cell centre (the sprite is centred on its cell). The final cells are cropped symmetrically to the
+# narrowest width that holds every frame, so a 215 texel ruler is never shortened to fit.
+WORK_W = 1024
+SHIFT = (WORK_W - OUT_CELL) // 2
+# Same idea vertically (up attack: a 215 ruler at 60 degrees rises above the 512 cell): frames are built
+# VSHIFT rows down inside a WORK_H canvas and cropped symmetrically, so the feet row keeps the same
+# distance (157 texels) from the cell centre and the sprite offset does not change.
+WORK_H = OUT_CELL + 256
+VSHIFT = (WORK_H - OUT_CELL) // 2
+MAX_TEXTURE = 4096
+TRACK_PATH = ASSET_DIR / "luz_ruler_track.json"
 FEET_ROW = pch.FEET_ROW
 MIN_COMPONENT_PX = 400
 # Rows (output texels) above the lowest sole used to measure the feet span.
 FEET_BAND = 26
 # Idle body centroid y (ruler excluded): the air clips anchor their body here.
-IDLE_BODY_Y = 254.8
+IDLE_BODY_Y = 254.8  # in old 512 cell rows; VSHIFT is added in place()
 
 # Per-sheet scale raw -> output. Fitted by overlaying the face of an upright-head frame
 # on the idle face (Codex's head size changes per sheet: standing hit1/up are ~425 and
@@ -257,7 +269,8 @@ def idle_reference() -> tuple[float, float, float]:
 def place(source: Image.Image, scale: float, mode: str, ref: float, label: str) -> Image.Image:
     """Scale `source`, then put it on the feet row with its front foot on the idle's front foot
     ("front", the planted foot of the Penitent's stance: the rear foot slides, the front one
-    never moves) or on the idle body centroid ("body", the air clips: the feet float)."""
+    never moves) or on the idle body centroid ("body", the air clips: the feet float). The result
+    is a WORK_W x WORK_H frame; `ref` is an x of the old 512 cell (SHIFT is added here)."""
     w, h = max(1, round(source.width * scale)), max(1, round(source.height * scale))
     scaled = pch.unpremultiply(pch.premultiply(source).resize((w, h), pch.RESAMPLE))
     x0, y0, x1, y1 = base.alpha_bbox(scaled)
@@ -273,18 +286,12 @@ def place(source: Image.Image, scale: float, mode: str, ref: float, label: str) 
         ys, xs = np.where(mask)
         left = round(ref - float(xs.mean()))
         top = round(IDLE_BODY_Y - float(ys.mean()))
-    # Art that would cross the right edge (an arm and ruler thrown forward) pushes the whole frame
-    # back by the smallest amount that keeps it inside the cell; reported as a slide.
-    slide = max(0, left + scaled.width - (OUT_CELL - 3))
-    if slide:
-        print(f"    SLIDE {label}: frame moved {slide} texels back so the drawn arm and ruler stay inside the cell")
-        left -= slide
-    canvas = Image.new("RGBA", (OUT_CELL + 2 * 200, OUT_CELL + 2 * 200), (0, 0, 0, 0))
-    canvas.alpha_composite(scaled, (left + 200, top + 200))
-    out = canvas.crop((200, 200, 200 + OUT_CELL, 200 + OUT_CELL))
-    lost = int(np.array(canvas.getchannel("A")).astype(bool).sum() - np.array(out.getchannel("A")).astype(bool).sum())
-    if lost:
-        print(f"    WARNING {label}: {lost} px of art leave the cell on placement (left={left}, top={top}, size={scaled.size})")
+    left += SHIFT
+    top += VSHIFT
+    out = Image.new("RGBA", (WORK_W, WORK_H), (0, 0, 0, 0))
+    if left < 0 or left + scaled.width > WORK_W or top < 0 or top + scaled.height > WORK_H:
+        raise ValueError(f"{label}: art leaves the work canvas (left={left}, top={top}, size={scaled.size})")
+    out.alpha_composite(scaled, (left, top))
     return out
 
 
@@ -370,9 +377,11 @@ def process_clip(name: str, config: dict, refs: tuple[float, float, float], repo
             force is None and drawn and final_now and doc_now[0] == "F" and doc_now[0] == drawn[0] == final_now[0]
             and abs(drawn[1] - doc_now[1]) <= 20 and abs(final_now[1] - doc_now[1]) > AUTO_AIM_TOLERANCE
         ):
-            force = doc_now
-            theta = theta_for(placed, force[0], float(force[1]))
-            frame, info = fit_ruler(placed, label, theta)
+            aimed_theta = theta_for(placed, doc_now[0], float(doc_now[1]))
+            aimed, aimed_info = fit_ruler(placed, label, aimed_theta)
+            # The request's angle is only taken when the tip stays above the floor line.
+            if not aimed_info.get("overflow") and (aimed_info.get("clearance") or 0) >= 0:
+                force, frame, info = doc_now, aimed, aimed_info
         info["repainted"] = force is not None
         ruler_report.append(info)
         # Hair luminance: lift only a clearly darker hair to the idle's.
@@ -401,58 +410,136 @@ def process_clip(name: str, config: dict, refs: tuple[float, float, float], repo
     return frames
 
 
-def build_sheet(sheet_key: str, clip_frames: dict[str, list[Image.Image]], manifest: dict) -> None:
-    layout = SHEET_LAYOUT[sheet_key]
-    sheet_name = layout["file"]
-    path = ASSET_DIR / sheet_name
-    previous = Image.open(path).convert("RGBA") if path.exists() else None
-    sheet = Image.new("RGBA", (OUT_COLUMNS * OUT_CELL, layout["rows"] * OUT_CELL), (0, 0, 0, 0))
-    entry = manifest["sheets"][sheet_name]
-    clips: dict[str, list[int]] = {}
-    contact: dict[str, int] = {}
-    phases = entry.get("phases", {})
-    ticks = entry.get("frame_ticks_30fps", {})
-    cursor = 0
-    for name in layout["order"]:
-        frames = clip_frames.get(name)
-        if frames is None:
-            frames = _old_frames(previous, entry["clips"][name])
-        for i, frame in enumerate(frames):
-            sheet.alpha_composite(frame, (((cursor + i) % OUT_COLUMNS) * OUT_CELL, ((cursor + i) // OUT_COLUMNS) * OUT_CELL))
-        clips[name] = list(range(cursor, cursor + len(frames)))
-        if name in clip_frames:
-            config = CLIPS[name]
-            contact[name] = config["contact"]
-            phases[name] = config["phases"]
-            ticks[name] = config["ticks"]
-        elif name in entry.get("contact_frames", {}):
-            contact[name] = entry["contact_frames"][name]
-        cursor += len(frames)
-    # Untouched clips (air sheet: plunge, plunge_land) keep their cells and indices.
-    for name, indices in entry["clips"].items():
-        if name in layout["order"]:
-            continue
-        for old_index in indices:
-            cell = _old_frames(previous, [old_index])[0]
-            sheet.alpha_composite(cell, ((old_index % OUT_COLUMNS) * OUT_CELL, (old_index // OUT_COLUMNS) * OUT_CELL))
-        clips[name] = list(indices)
-    sheet.save(path)
-    entry["grid"] = {"columns": OUT_COLUMNS, "rows": layout["rows"], "cell_width": OUT_CELL, "cell_height": OUT_CELL}
-    entry["clips"] = clips
-    entry["contact_frames"] = contact
-    entry["phases"] = phases
-    entry["frame_ticks_30fps"] = ticks
-    print(f"wrote {sheet_name}: {clips}")
+def cell_size_for(clips: dict[str, list[Image.Image]]) -> tuple[int, int]:
+    """Narrowest cell (width a multiple of 8, height 512 + 2*pad) centred on the work canvas that holds
+    every frame of the sheet's rebuilt clips."""
+    reach_x = reach_up = reach_down = 0
+    for frames in clips.values():
+        for frame in frames:
+            alpha = np.array(frame.getchannel("A")) > 0
+            xs = np.where(alpha.any(axis=0))[0]
+            ys = np.where(alpha.any(axis=1))[0]
+            reach_x = max(reach_x, WORK_W // 2 - int(xs.min()), int(xs.max()) + 1 - WORK_W // 2)
+            reach_up = max(reach_up, WORK_H // 2 - int(ys.min()) - OUT_CELL // 2)
+            reach_down = max(reach_down, int(ys.max()) + 1 - WORK_H // 2 - OUT_CELL // 2)
+    pad = max(0, reach_up + 4, reach_down + 4)
+    pad = (pad + 7) // 8 * 8 if pad else 0
+    return max(OUT_CELL, (2 * (reach_x + 4) + 7) // 8 * 8), OUT_CELL + 2 * pad
 
 
-def _old_frames(previous: Image.Image, indices: list[int]) -> list[Image.Image]:
+def centred(frame: Image.Image, width: int, height: int | None = None) -> Image.Image:
+    """Crop (or pad) a frame symmetrically about its centre to width x height."""
+    height = height or frame.height
+    out = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    out.alpha_composite(frame, ((width - frame.width) // 2, (height - frame.height) // 2)) if width >= frame.width and height >= frame.height else None
+    if width < frame.width or height < frame.height:
+        left, top = (frame.width - width) // 2, (frame.height - height) // 2
+        out = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        src = frame.crop((max(left, 0), max(top, 0), max(left, 0) + min(width, frame.width), max(top, 0) + min(height, frame.height)))
+        out.alpha_composite(src, (max(-left, 0), max(-top, 0)))
+    return out
+
+
+def old_frames(previous: Image.Image, entry: dict, indices: list[int], width: int, height: int) -> list[Image.Image]:
+    """Frames of the sheet as it was (any cell width), recentred to `width`."""
+    grid = entry["grid"]
+    cw, ch = grid["cell_width"], grid["cell_height"]
+    cols = grid["columns"]
     return [
-        previous.crop(((i % 4) * OUT_CELL, (i // 4) * OUT_CELL, (i % 4 + 1) * OUT_CELL, (i // 4 + 1) * OUT_CELL))
+        centred(previous.crop(((i % cols) * cw, (i // cols) * ch, (i % cols + 1) * cw, (i // cols + 1) * ch)), width, height)
         for i in indices
     ]
 
 
+def build_sheet(sheet_key: str, clip_frames: dict[str, list[Image.Image]], manifest: dict, width: int, height: int) -> None:
+    layout = SHEET_LAYOUT[sheet_key]
+    sheet_name = layout["file"]
+    path = ASSET_DIR / sheet_name
+    previous = Image.open(path).convert("RGBA") if path.exists() else None
+    entry = manifest["sheets"][sheet_name]
+    columns = MAX_TEXTURE // width
+    ordered: list[tuple[str, list[Image.Image]]] = []
+    for name in layout["order"]:
+        frames = clip_frames.get(name)
+        frames = [centred(f, width, height) for f in frames] if frames is not None else old_frames(previous, entry, entry["clips"][name], width, height)
+        ordered.append((name, frames))
+    # Untouched clips (air sheet: plunge, plunge_land) keep their cell indices.
+    kept = {name: old_frames(previous, entry, indices, width, height) for name, indices in entry["clips"].items() if name not in layout["order"]}
+    kept_indices = {name: list(entry["clips"][name]) for name in kept}
+    slots = sum(len(frames) for _, frames in ordered)
+    slots = max([slots] + [max(idx) + 1 for idx in kept_indices.values()])
+    rows = (slots + columns - 1) // columns
+    if rows * height > MAX_TEXTURE:
+        raise ValueError(f"{sheet_name}: {slots} cells of {width}x{height} do not fit {MAX_TEXTURE}px")
+    sheet = Image.new("RGBA", (columns * width, rows * height), (0, 0, 0, 0))
+    clips: dict[str, list[int]] = {}
+    contact: dict[str, int] = {}
+    active_end: dict[str, int] = {}
+    phases = entry.get("phases", {})
+    ticks = entry.get("frame_ticks_30fps", {})
+
+    def put(index: int, frame: Image.Image) -> None:
+        sheet.alpha_composite(frame, ((index % columns) * width, (index // columns) * height))
+
+    cursor = 0
+    for name, frames in ordered:
+        for i, frame in enumerate(frames):
+            put(cursor + i, frame)
+        clips[name] = list(range(cursor, cursor + len(frames)))
+        if name in clip_frames:
+            config = CLIPS[name]
+            contact[name] = config["contact"]
+            active_end[name] = max(config["phases"]["active"]) + 1  # first recovery frame (catalog `active_end_frames`)
+            phases[name] = config["phases"]
+            ticks[name] = config["ticks"]
+        elif name in entry.get("contact_frames", {}):
+            contact[name] = entry["contact_frames"][name]
+            if name in entry.get("active_end_frames", {}):
+                active_end[name] = entry["active_end_frames"][name]
+        cursor += len(frames)
+    for name, frames in kept.items():
+        for index, frame in zip(kept_indices[name], frames):
+            put(index, frame)
+        clips[name] = kept_indices[name]
+    sheet.save(path)
+    entry["grid"] = {"columns": columns, "rows": rows, "cell_width": width, "cell_height": height}
+    entry["clips"] = clips
+    entry["contact_frames"] = contact
+    entry["active_end_frames"] = active_end
+    entry["phases"] = phases
+    entry["frame_ticks_30fps"] = ticks
+    print(f"wrote {sheet_name}: {columns}x{rows} cells of {width}x{height}: {clips}")
+
+
+def write_track(built: dict[str, dict[str, list[Image.Image]]], width: int) -> None:
+    """Regenerate the ruler track entries of the built clips. Coordinates keep the old 512 cell
+    convention (grip_px/tip_px relative to a 512x512 cell whose centre column is the sprite
+    centre; world = (px - (256, 413)) * display_scale), so the VFX generator reads them unchanged."""
+    track = json.loads(TRACK_PATH.read_text())
+    scale, anchor = track["display_scale"], track["frame_anchor"]
+    for clips in built.values():
+        for name, frames in clips.items():
+            records = []
+            for index, frame in enumerate(frames):
+                ruler = rl.find_ruler(np.array(frame))
+                record = {"frame": index, "painted": True, "interpolated": False}
+                if ruler is not None:
+                    grip = ruler.origin + ruler.d * ruler.t_grip - np.array([SHIFT, VSHIFT])
+                    tip = ruler.origin + ruler.d * ruler.t_tip - np.array([SHIFT, VSHIFT])
+                    record.update({
+                        "grip_px": {"x": round(float(grip[0])), "y": round(float(grip[1]))},
+                        "tip_px": {"x": round(float(tip[0]), 1), "y": round(float(tip[1]), 1)},
+                        "grip": {"x": round((float(grip[0]) - anchor["x"]) * scale, 2), "y": round((float(grip[1]) - anchor["y"]) * scale, 2)},
+                        "tip": {"x": round((float(tip[0]) - anchor["x"]) * scale, 2), "y": round((float(tip[1]) - anchor["y"]) * scale, 2)},
+                        "axis_angle_deg": round(math.degrees(math.atan2(float(ruler.d[1]), float(ruler.d[0]))), 2),
+                    })
+                records.append(record)
+            track["clips"][name] = {"contact_frame": CLIPS[name]["contact"], "frames": records}
+    TRACK_PATH.write_text(json.dumps(track, indent=2) + "\n")
+
+
 def main() -> int:
+    pch.FEET_ROW = FEET_ROW + VSHIFT  # luz_ruler_length measures the floor clearance against this row
     manifest = json.loads(MANIFEST_PATH.read_text())
     refs = idle_reference()
     print(f"idle front foot x={refs[0]:.1f}, body centroid x={refs[1]:.1f}, feet midpoint x={refs[2]:.1f}")
@@ -463,9 +550,12 @@ def main() -> int:
         frames = process_clip(name, config, refs, report, ruler_report)
         if frames is not None:
             built.setdefault(config["sheet"], {})[name] = frames
-    for sheet_key, clip_frames in built.items():
-        # A partial rebuild (some raws missing) keeps the other clips of the sheet as they are.
-        build_sheet(sheet_key, clip_frames, manifest)
+    if built:
+        for sheet_key, clip_frames in built.items():
+            width, height = cell_size_for(clip_frames)
+            print(f"{sheet_key}: cell {width}x{height} (centred crop of the {WORK_W}x{WORK_H} work canvas)")
+            build_sheet(sheet_key, clip_frames, manifest, width, height)
+        write_track(built, 0)
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n")
 
     lengths = [info["after"] for info in ruler_report if info.get("after")]
@@ -474,6 +564,9 @@ def main() -> int:
     bad = [info["label"] for info in ruler_report if not info.get("found") or info.get("overflow")]
     for label in bad:
         print(f"WARNING: ruler not normalised in {label}")
+    short = [(info["label"], round(info["after"])) for info in ruler_report if info.get("after") and abs(info["after"] - rl.RULER_TARGET_LENGTH) > 3]
+    for label, length in short:
+        print(f"WARNING: ruler {length} in {label}")
     return 2 if bad else 0
 
 
