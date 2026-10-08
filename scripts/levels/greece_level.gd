@@ -30,6 +30,7 @@ const PLAYER_COLLISION_LAYER := 1
 const PLACEHOLDER_COLOR := Color("fff2a8")
 const PLACEHOLDER_PICKUP_RADIUS := 26.0
 const CONTACT_DAMAGE_SCENE := preload("res://scenes/world/contact_damage.tscn")
+const BOOK_FLYER_SCENE := preload("res://scenes/enemies/book_flyer.tscn")
 const SPIKE_COLOR := Color("c0392b")
 const SPIKE_TOOTH_WIDTH := 16.0
 const SPIKES_GROUP := &"greece_spikes"
@@ -239,7 +240,10 @@ func _build_enemies() -> void:
 	holder.name = "Enemies"
 	add_child(holder)
 	for entry: Dictionary in GreeceLayout.enemies():
-		var enemy := (ENEMY_SCENES[entry["archetype"]] as PackedScene).instantiate() as Enemy
+		var packed_scene: PackedScene = BOOK_FLYER_SCENE \
+				if entry.get("variant", &"") == &"book" \
+				else ENEMY_SCENES[entry["archetype"]]
+		var enemy := packed_scene.instantiate() as Enemy
 		enemy.name = entry["enemy_id"]
 		enemy.enemy_id = entry["enemy_id"]
 		enemy.start_facing = entry["facing"]

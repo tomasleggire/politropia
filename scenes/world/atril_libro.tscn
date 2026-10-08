@@ -1,0 +1,207 @@
+[gd_scene load_steps=19 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/world/atril_libro.png" id="1_sprite"]
+[ext_resource type="Script" path="res://scripts/world/book_fragment_pedestal.gd" id="3_script"]
+[ext_resource type="PackedScene" path="res://scenes/ui/interaction_prompt.tscn" id="4_prompt"]
+[ext_resource type="Shader" path="res://shaders/light_shaft.gdshader" id="5_light_shader"]
+[ext_resource type="Texture2D" path="res://assets/world/grimorio_completo.png" id="6_complete_book"]
+[ext_resource type="Shader" path="res://shaders/light_pulse.gdshader" id="7_pulse_shader"]
+
+[sub_resource type="Gradient" id="LightWhiteGradient"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture2D" id="LightWhiteTexture"]
+gradient = SubResource("LightWhiteGradient")
+width = 4
+height = 4
+
+[sub_resource type="ShaderMaterial" id="EmanatingLightMaterial"]
+shader = ExtResource("5_light_shader")
+shader_parameter/intensity = 1.0
+shader_parameter/phase = 0.0
+shader_parameter/strength = 0.48
+shader_parameter/top_half = 0.24
+shader_parameter/bottom_half = 0.55
+shader_parameter/swell = 0.0
+shader_parameter/swell_width = 0.9
+shader_parameter/lean = 0.0
+shader_parameter/bands = 12.0
+shader_parameter/mask_strength = 0.0
+
+[sub_resource type="Gradient" id="ActivationGlowGradient"]
+offsets = PackedFloat32Array(0, 0.48, 1)
+colors = PackedColorArray(1, 0.78, 0.38, 0.45, 1, 0.68, 0.28, 0.16, 1, 0.55, 0.18, 0)
+
+[sub_resource type="GradientTexture2D" id="ActivationGlowTexture"]
+gradient = SubResource("ActivationGlowGradient")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="CanvasItemMaterial" id="ActivationGlowAdditive"]
+blend_mode = 1
+
+[sub_resource type="ParticleProcessMaterial" id="OrbitSparkMaterial"]
+emission_shape = 3
+emission_box_extents = Vector3(28, 18, 0)
+direction = Vector3(0, -1, 0)
+spread = 180.0
+initial_velocity_min = 8.0
+initial_velocity_max = 20.0
+gravity = Vector3(0, -8, 0)
+scale_min = 0.025
+scale_max = 0.06
+color = Color(1, 0.74, 0.3, 0.9)
+
+[sub_resource type="ParticleProcessMaterial" id="JoiningSparkMaterial"]
+emission_shape = 3
+emission_box_extents = Vector3(20, 15, 0)
+direction = Vector3(0, -1, 0)
+spread = 180.0
+initial_velocity_min = 18.0
+initial_velocity_max = 42.0
+gravity = Vector3(0, -10, 0)
+scale_min = 0.035
+scale_max = 0.08
+color = Color(1, 0.82, 0.38, 1)
+
+[sub_resource type="ParticleProcessMaterial" id="RevealFlashMaterial"]
+direction = Vector3(0, -1, 0)
+spread = 180.0
+initial_velocity_min = 35.0
+initial_velocity_max = 75.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.025
+scale_max = 0.055
+color = Color(1, 0.92, 0.58, 1)
+[sub_resource type="ShaderMaterial" id="CompletionPulseMaterial"]
+shader = ExtResource("7_pulse_shader")
+shader_parameter/progress = 0.0
+shader_parameter/strength = 1.15
+shader_parameter/ring_width = 0.045
+
+[sub_resource type="RectangleShape2D" id="BaseCollision"]
+size = Vector2(99, 72.27)
+
+[sub_resource type="RectangleShape2D" id="InteractionShape"]
+size = Vector2(190, 120)
+
+[node name="AtrilLibro" type="Node2D"]
+script = ExtResource("3_script")
+
+[node name="EmanatingLight" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(0, -250)
+z_index = -1
+scale = Vector2(45, 125)
+texture_filter = 2
+material = SubResource("EmanatingLightMaterial")
+texture = SubResource("LightWhiteTexture")
+modulate = Color(1, 1, 1, 0)
+
+[node name="ActivationGlow" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(0, -48)
+z_index = -1
+scale = Vector2(0.78, 0.78)
+texture_filter = 2
+material = SubResource("ActivationGlowAdditive")
+texture = SubResource("ActivationGlowTexture")
+modulate = Color(1, 0.78, 0.42, 0)
+
+[node name="SideAuraLeft" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(-58, -50)
+z_index = -1
+scale = Vector2(0.46, 0.46)
+texture_filter = 2
+material = SubResource("ActivationGlowAdditive")
+texture = SubResource("ActivationGlowTexture")
+modulate = Color(1, 0.7, 0.28, 0)
+
+[node name="SideAuraRight" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(58, -50)
+z_index = -1
+scale = Vector2(0.46, 0.46)
+texture_filter = 2
+material = SubResource("ActivationGlowAdditive")
+texture = SubResource("ActivationGlowTexture")
+modulate = Color(1, 0.7, 0.28, 0)
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -45.9)
+scale = Vector2(0.108, 0.108)
+texture_filter = 1
+texture = ExtResource("1_sprite")
+
+[node name="StaticBody2D" type="StaticBody2D" parent="."]
+position = Vector2(0, -35.685)
+collision_layer = 1
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D"]
+shape = SubResource("BaseCollision")
+
+[node name="Marker2D" type="Marker2D" parent="."]
+position = Vector2(0, -70.2)
+
+[node name="InteractionArea" type="Area2D" parent="."]
+position = Vector2(0, -52)
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea"]
+shape = SubResource("InteractionShape")
+
+[node name="CompletedBook" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(0, -70.2)
+z_index = 3
+scale = Vector2(0.027, 0.027)
+texture_filter = 1
+texture = ExtResource("6_complete_book")
+
+[node name="OrbitSparks" type="GPUParticles2D" parent="."]
+position = Vector2(0, -88)
+z_index = 4
+emitting = false
+amount = 22
+lifetime = 1.1
+process_material = SubResource("OrbitSparkMaterial")
+texture = SubResource("ActivationGlowTexture")
+
+[node name="JoiningSparks" type="GPUParticles2D" parent="."]
+position = Vector2(0, -88)
+z_index = 4
+emitting = false
+amount = 64
+lifetime = 0.85
+one_shot = true
+explosiveness = 0.8
+process_material = SubResource("JoiningSparkMaterial")
+texture = SubResource("ActivationGlowTexture")
+
+[node name="RevealFlash" type="GPUParticles2D" parent="."]
+position = Vector2(0, -88)
+z_index = 4
+emitting = false
+amount = 36
+lifetime = 0.4
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("RevealFlashMaterial")
+texture = SubResource("ActivationGlowTexture")
+[node name="CompletionPulse" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(0, -70)
+z_index = 5
+scale = Vector2(160, 160)
+texture_filter = 2
+material = SubResource("CompletionPulseMaterial")
+texture = SubResource("LightWhiteTexture")
+[node name="InteractionPrompt" parent="." instance=ExtResource("4_prompt")]
+position = Vector2(0, -126)
+prompt_text = "Dejar fragmento"

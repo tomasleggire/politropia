@@ -1,0 +1,78 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/levels/level_01_copy.gd" id="1_level"]
+[ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="2_player"]
+[ext_resource type="Script" uid="uid://c2yml2d2b2t1p" path="res://scripts/camera/room_camera.gd" id="3_camera"]
+
+[ext_resource type="PackedScene" path="res://scenes/world/altar_trail.tscn" id="5_trail"]
+[ext_resource type="PackedScene" path="res://scenes/ui/health_hud.tscn" id="6_hud"]
+[ext_resource type="PackedScene" path="res://scenes/world/atril_libro.tscn" id="7_atril"]
+
+[sub_resource type="Shader" id="Shader_gothic_grade"]
+code = "shader_type canvas_item;
+
+void fragment() {
+	vec2 centered = UV - vec2(0.5);
+	float edge = smoothstep(0.30, 0.76, length(centered * vec2(1.0, 1.35)));
+	float top_falloff = smoothstep(0.64, 0.0, UV.y) * 0.12;
+	float bottom_haze = smoothstep(0.70, 1.0, UV.y) * 0.10;
+	float alpha = min(0.58, edge * 0.46 + top_falloff + bottom_haze);
+	COLOR = vec4(0.006, 0.010, 0.035, alpha);
+}
+"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gothic_grade"]
+shader = SubResource("Shader_gothic_grade")
+
+[node name="Level01" type="Node2D"]
+script = ExtResource("1_level")
+
+[node name="Backgrounds" type="Node2D" parent="."]
+
+[node name="Decor" type="Node2D" parent="."]
+
+[node name="Solids" type="Node2D" parent="."]
+
+[node name="TrailFromRight" parent="." instance=ExtResource("5_trail")]
+position = Vector2(1100, 620)
+direction = -1
+length = 586.0
+trail_seed = 7
+density = 1.0
+branch_count = 14
+show_roots = false
+firefly_count = 0
+
+[node name="TrailFromLeft" parent="." instance=ExtResource("5_trail")]
+position = Vector2(60, 620)
+length = 256.0
+trail_seed = 19
+density = 0.9
+branch_count = 9
+show_roots = false
+firefly_count = 0
+
+[node name="AtrilLibro" parent="." instance=ExtResource("7_atril")]
+position = Vector2(420, 620)
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(180, 620)
+
+[node name="HealthHud" parent="." instance=ExtResource("6_hud")]
+
+[node name="RoomCamera" type="Camera2D" parent="."]
+position = Vector2(640, 360)
+process_callback = 0
+script = ExtResource("3_camera")
+
+[node name="AtmosphereOverlay" type="CanvasLayer" parent="."]
+layer = 20
+
+[node name="Vignette" type="ColorRect" parent="AtmosphereOverlay"]
+material = SubResource("ShaderMaterial_gothic_grade")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
