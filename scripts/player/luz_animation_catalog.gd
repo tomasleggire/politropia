@@ -18,10 +18,12 @@ const ASSET_ROOT := "res://assets/player/luz/"
 const CLIP_SPEEDS := {
 	"idle": 8.0,
 	"walk": 13.4,
-	"crouch": 4.0,
-	"jump": 6.0,
-	"fall": 5.0,
-	"land": 8.0,
+	"crouch": 20.0,
+	"crouch_exit": 20.0,
+	"jump": 11.1,
+	"fall": 12.0,
+	"double_jump": 15.0,
+	"land": 14.3,
 	"turn": 20.0,
 	"skid": 6.0,
 	"ground_dash": 9.0,
@@ -52,8 +54,10 @@ const PLACEHOLDER_CLIPS := {
 
 ## Animations that should hold/repeat while their state persists, rather
 ## than play once and freeze on the last frame.
+## jump, fall, double_jump and crouch play once over the physics window they
+## were drawn for (rise 0.45 s, fall 0.41 s) and hold their last pose.
 const LOOPING_CLIPS := [
-	"idle", "walk", "crouch", "jump", "fall",
+	"idle", "walk",
 	"ground_dash", "air_dash", "wall_cling", "rest_sit",
 ]
 

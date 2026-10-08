@@ -413,6 +413,12 @@ var _jump_buffer_left := 0.0
 var _jump_pressed_now := false
 var _jump_press_pending := false
 var _air_jumps_left := 0
+## The current airborne rise comes from the double jump (plays its own clip).
+var _double_jumped := false
+## Seconds left of the stand-up clip after leaving the crouch (idle only).
+var _crouch_exit_left := 0.0
+## The crouch resumes the full-crouch pose (coming back from a crouch attack).
+var _crouch_resume_pose := false
 ## Time left of the hard standing landing's recovery (movement locked).
 var _landing_left := 0.0
 ## Seconds a jump release must still wait before it may cut the rise (tap minimum).
@@ -597,6 +603,7 @@ func _physics_process(delta: float) -> void:
 
 func _update_shared_timers(delta: float) -> void:
 	_landing_left = maxf(_landing_left - delta, 0.0)
+	_crouch_exit_left = maxf(_crouch_exit_left - delta, 0.0)
 	_jump_min_hold_left = maxf(_jump_min_hold_left - delta, 0.0)
 	_wall_recling_lock = maxf(_wall_recling_lock - delta, 0.0)
 	_wall_jump_lock_left = maxf(_wall_jump_lock_left - delta, 0.0)
@@ -1388,6 +1395,7 @@ func _try_launch_jump() -> bool:
 	if is_on_floor():
 		_spawn_dust(GroundDust.Kind.TAKEOFF)
 	velocity.y = _jump_velocity
+	_double_jumped = false
 	_begin_jump_rise()
 	_jump_buffer_left = 0.0
 	_coyote_left = 0.0
@@ -1406,6 +1414,7 @@ func _try_air_jump() -> bool:
 		return false
 	_air_jumps_left -= 1
 	velocity.y = _double_jump_velocity
+	_double_jumped = true
 	_begin_jump_rise()
 	_jump_buffer_left = 0.0
 	_sfx_jump.play()
@@ -1432,10 +1441,11 @@ func _landing_cancel_remaining() -> float:
 
 func _restart_jump_animation() -> void:
 	_sprite.stop()
-	_play_animation(&"jump")
+	_play_animation(&"double_jump" if _double_jumped else &"jump")
 
 
 func _restore_air_actions() -> void:
+	_double_jumped = false
 	_air_dash_used = false
 	_air_jumps_left = air_jumps
 
@@ -1705,6 +1715,12 @@ func _enter_state(new_state: State) -> void:
 	_state_time = 0.0
 	if new_state != State.IDLE and new_state != State.RUN:
 		_landing_left = 0.0
+		_crouch_exit_left = 0.0
+	# Standing up from a plain crouch plays the stand-up clip; a crouch attack
+	# hands back to the crouch holding the full-crouch pose (no pop).
+	if previous == State.CROUCH and new_state == State.IDLE:
+		_crouch_exit_left = _crouch_exit_duration()
+	_crouch_resume_pose = previous == State.CROUCH_ATTACK and new_state == State.CROUCH
 	_run_time = 0.0
 	_release_time = 0.0
 	if not _is_directional_attack_state():
@@ -2534,6 +2550,14 @@ func _warn_dust_once(message: String) -> void:
 	push_warning("Player: " + message)
 
 
+## Length of the stand-up clip (frames at the catalog speed).
+func _crouch_exit_duration() -> float:
+	var frames := _sprite.sprite_frames
+	if frames == null or not frames.has_animation(&"crouch_exit"):
+		return 0.0
+	return float(frames.get_frame_count(&"crouch_exit")) / maxf(frames.get_animation_speed(&"crouch_exit"), 0.001)
+
+
 func _update_animation() -> void:
 	var animation_facing := _attack_facing if _is_directional_attack_state() else _facing
 	_sprite.flip_h = animation_facing < 0
@@ -2544,6 +2568,8 @@ func _update_animation() -> void:
 	match _state:
 		State.CROUCH:
 			_play_animation(&"crouch")
+			if _crouch_resume_pose:
+				_sprite.set_frame_and_progress(_sprite.sprite_frames.get_frame_count(&"crouch") - 1, 0.0)
 		State.TURN:
 			_play_animation(&"turn")
 		State.SKID:
@@ -2563,7 +2589,8 @@ func _update_animation() -> void:
 			# pose for their brief lock window before falling back to the
 			# ordinary jump ascent clip.
 			var pushed_off_wall := _wall_jump_lock_left > 0.0 or _wall_kick_lock_left > 0.0
-			_play_animation(&"wall_jump" if pushed_off_wall else &"jump")
+			var rise_animation := &"double_jump" if _double_jumped else &"jump"
+			_play_animation(&"wall_jump" if pushed_off_wall else rise_animation)
 		State.FALL:
 			_play_animation(&"fall")
 		State.WALL_CLING:
@@ -2588,6 +2615,8 @@ func _update_animation() -> void:
 		_:
 			if _landing_left > 0.0:
 				_play_animation(&"land")
+			elif _crouch_exit_left > 0.0 and absf(velocity.x) <= 35.0:
+				_play_animation(&"crouch_exit")
 			elif absf(velocity.x) > 35.0:
 				_play_animation(&"walk", clampf(absf(velocity.x) / run_max_speed, 0.7, 1.8))
 			else:
