@@ -15,6 +15,9 @@ check names.
   probes (including the medal alcove); helpers in `support/greece_*.gd`.
 - `double_jump_test.gd`: the gated double jump (off by default, air jump count,
   resets, jump buffer, unlock signal) on a synthetic floor.
+- `jump_dash_test.gd`: the Penitent-matched jump (height, apex, tap minimum, air
+  speed), the standing landing recovery and its jump cancel, the ground and air
+  dash profile, ledge, afterimages and dust.
 - `room_camera_bounds_test.gd`: per-room camera clamp and blend, room selection
   and the real camera in the Greece level.
 - `combat_test.gd`: damage, i-frames, knockback, control lock, hit-stop, death,

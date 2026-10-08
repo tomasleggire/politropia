@@ -11,8 +11,11 @@ extends Node
 ## Sequence: idle 1.5 s, run right 2 s, stop (skid), idle 1 s, run left 1.5 s
 ## (turn from idle-run), reverse to right while running (turn), run 1 s,
 ## stop, idle 1 s, a standing jump and a running jump, then three reversal cases
-## (release for 3 frames, release for 6 frames, plain stop). Input goes through
-## Input.action_press/release like a player.
+## (release for 3 frames, release for 6 frames, plain stop), then the jump and dash
+## set: standing full jump, tap jump, running jump (held), the standing landing
+## recovery, a ground dash from rest, a ground dash from a run and an air dash.
+## Input goes through Input.action_press/release like a player. track.csv has a
+## `step` column (index into the sequence) to cut each action out.
 
 const LEVEL_PATH := "res://scenes/levels/greece/level_greece.tscn"
 const LEVEL_FALLBACK := "res://scenes/levels/greece_level.tscn"
@@ -44,6 +47,17 @@ func _ready() -> void:
 		# Jump from idle, then a running jump (takeoff and landing dust).
 		[0.1, &"jump"], [1.0, &""], [0.6, &"move_right"],
 		[0.1, [&"move_right", &"jump"]], [0.7, &"move_right"], [1.0, &""],
+		# Jump and dash set. It first runs left to the middle of the flat stretch and
+		# alternates directions so she never leaves it (x 1144-2048): standing full
+		# jump (held), landing recovery, tap jump, held running jump, ground dash
+		# from rest, dash from a run (left), air dash (left).
+		[3.0, &"move_left"], [1.0, &""],
+		[0.7, &"jump"], [1.2, &""],
+		[0.05, &"jump"], [1.2, &""],
+		[0.5, &"move_right"], [0.7, [&"move_right", &"jump"]], [0.6, &"move_right"], [1.0, &""],
+		[0.1, &"dash"], [1.2, &""],
+		[0.6, &"move_left"], [0.1, [&"move_left", &"dash"]], [0.5, &"move_left"], [1.0, &""],
+		[0.15, &"jump"], [0.1, &""], [0.1, &"dash"], [1.2, &""],
 	]
 	await get_tree().process_frame
 	_player = _find_player(self)
@@ -65,7 +79,7 @@ func _ready() -> void:
 	var out := OS.get_environment("LUZ_CAPTURE_OUT")
 	if out != "":
 		_log = FileAccess.open(out.path_join("track.csv"), FileAccess.WRITE)
-		_log.store_line("frame,sx,sy,wx,wy,vx,anim,aframe")
+		_log.store_line("frame,sx,sy,wx,wy,vx,anim,aframe,step")
 
 
 func _find_player(node: Node) -> Player:
@@ -84,8 +98,8 @@ func _process(_delta: float) -> void:
 	var screen := _player.get_global_transform_with_canvas().origin
 	var anim := String(_sprite.animation) if _sprite != null else ""
 	var aframe := _sprite.frame if _sprite != null else -1
-	_log.store_line("%d,%.1f,%.1f,%.1f,%.1f,%.1f,%s,%d" % [_frame, screen.x, screen.y,
-		_player.global_position.x, _player.global_position.y, _player.velocity.x, anim, aframe])
+	_log.store_line("%d,%.1f,%.1f,%.1f,%.1f,%.1f,%s,%d,%d" % [_frame, screen.x, screen.y,
+		_player.global_position.x, _player.global_position.y, _player.velocity.x, anim, aframe, _index])
 	_frame += 1
 
 

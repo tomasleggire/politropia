@@ -404,7 +404,7 @@ func case_recoil_keeps_the_air_jump() -> void:
 	await _build_rig()
 	_player.can_double_jump = true
 	await _spawn_walker(&"w1", Vector2(60.0, 0.0))
-	_player.global_position = Vector2(0.0, -30.0)
+	_player.global_position = Vector2(0.0, -14.0)
 	_player.velocity = Vector2.ZERO
 	_player.request_attack(0)
 	await _secs(0.3)

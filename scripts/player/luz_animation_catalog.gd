@@ -17,7 +17,7 @@ const ASSET_ROOT := "res://assets/player/luz/"
 ## only apply when no duration override is supplied.
 const CLIP_SPEEDS := {
 	"idle": 8.0,
-	"walk": 12.8,
+	"walk": 13.4,
 	"crouch": 4.0,
 	"jump": 6.0,
 	"fall": 5.0,

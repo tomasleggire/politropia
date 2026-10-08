@@ -102,8 +102,8 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var footstep_dust_interval := 0.29
 
 @export_group("Run")
-## Blasphemous reference: ~150 px/s with near-instant acceleration.
-@export var run_max_speed := 150.0
+## Blasphemous reference: 145-169 px/s (mean 157) with near-instant acceleration.
+@export var run_max_speed := 157.0
 @export var run_acceleration := 3000.0
 @export var run_deceleration := 5000.0
 
@@ -132,12 +132,20 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var skid_release_grace := 0.06
 
 @export_group("Jump")
-## Apex height and time-to-apex derive rise gravity and launch velocity.
-@export var jump_height := 130.0
-@export var jump_time_to_apex := 0.36
+## Apex height and time-to-apex derive rise gravity and launch velocity
+## (Penitent: 87 px of torso travel in 0.45 s, no takeoff anticipation). The
+## physics step (60 Hz, semi-implicit Euler) adds ~3.7% to the analytic apex, so
+## 84 here gives the measured 87 px in game (74 px for a tap).
+@export var jump_height := 84.0
+@export var jump_time_to_apex := 0.45
 ## Releasing jump while rising multiplies the current upward speed by this.
 @export var jump_release_multiplier := 0.45
-@export var fall_gravity_multiplier := 1.2
+## A tap keeps rising for at least this long before the release cut applies
+## (the Penitent's taps all reach ~0.85 of a full jump, cut at 0.25-0.3 s). With
+## the defaults a tap peaks at about 73 px.
+@export var jump_min_hold_time := 0.25
+## Fall gravity over rise gravity: the Penitent falls in 0.41 s after 0.45 s up.
+@export var fall_gravity_multiplier := 1.15
 @export var max_fall_speed := 900.0
 @export var coyote_time := 0.08
 @export var jump_buffer_time := 0.10
@@ -146,20 +154,32 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## Gated ability, off until unlock_double_jump() (the Greece boss reward).
 @export var can_double_jump := false
 ## Rise of an air jump, launched with the same rise gravity as the main jump.
-@export var double_jump_height := 130.0
+## Same as the main jump (the Penitent has none to copy): the pair keeps the
+## old 1:1 ratio, so two jumps climb about 174 px.
+@export var double_jump_height := 84.0
 ## Extra jumps available per airborne period.
 @export var air_jumps := 1
 
 @export_group("Air Control")
-## Horizontal air speed target; kept separate from run_max_speed so jumps keep
-## their original reach (the jump retune lives in a later task).
-@export var air_max_speed := 250.0
-@export var air_acceleration := 2600.0
+## Horizontal air speed target. The Penitent keeps its running speed through
+## the whole jump (161 +-4 px/s measured), so it equals run_max_speed.
+@export var air_max_speed := 157.0
+## High enough that a jump from a run keeps its speed with no visible ramp.
+@export var air_acceleration := 4000.0
 @export var air_deceleration := 2600.0
 
 @export_group("Landing")
-@export var landing_squash_time := 0.08
+## Recovery after a hard standing landing (21 frames of the Penitent). Movement
+## and turning are locked; a jump press cancels it from landing_jump_cancel_time.
+@export var landing_squash_time := 0.35
+@export var landing_jump_cancel_time := 0.18
+## Fall speed that plays the landing feedback (dust, sound, short squash).
 @export var landing_impact_speed := 150.0
+## Fall speed that costs the recovery above (a ~45 px drop or a normal jump).
+@export var hard_landing_speed := 300.0
+## Landing faster than this fraction of run_max_speed counts as running: no
+## recovery, she keeps running.
+@export_range(0.0, 1.0) var landing_run_speed_ratio := 0.5
 
 @export_group("Crouch")
 @export var crouch_collider_scale := 0.5
@@ -169,15 +189,38 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var drop_through_time := 0.20
 
 @export_group("Dash")
-@export var dash_duration := 0.45
-@export var dash_speed := 480.0
-## Fraction of dash_duration spent at full dash_speed before easing to run speed.
-@export var dash_full_speed_ratio := 0.70
+## Penitent profile (Dash.mov): plateau ~395 px/s. A ground dash is a lean-back
+## startup (from rest only, no forward motion), a ramp, a plateau and an
+## ease-out; from rest it slides ~129 px, from a run ~138 px.
+## Ramp, ease-out and length were fitted to the measured x(t) of Dash.mov (max
+## deviation ~7.5 px), not copied from the noisy per-frame speeds.
+@export var dash_speed := 395.0
+## Slide length: ramp + plateau + ease-out (the plateau is what is left). The
+## Penitent's slide pose lasts 0.43-0.47 s.
+@export var dash_duration := 0.43
+## Lean-back before the slide when starting from (near) rest; no forward motion.
+@export var dash_startup_time := 0.08
+## Time to go from the speed she had to dash_speed (about 6 frames).
+@export var dash_ramp_time := 0.10
+## Time spent easing from dash_speed down to dash_end_speed at the end.
+@export var dash_ease_time := 0.14
+## Speed at the end of the slide; from there she brakes, or keeps running if held.
+@export var dash_end_speed := 100.0
+## Starting slower than this fraction of run_max_speed counts as "from rest".
+@export_range(0.0, 1.0) var dash_rest_speed_ratio := 0.5
 @export var dash_cooldown := 0.35
-## Air dash: horizontal only, gravity suspended for its duration, standing
-## collider kept (unlike the ground dash's low slide collider). One per
-## airborne period — resets on landing or wall cling.
+## Air dash: horizontal only, constant dash_speed, gravity suspended for its
+## duration, standing collider kept (unlike the ground dash's low slide
+## collider). One per airborne period — resets on landing or wall cling. At
+## 0.30 s it covers ~118 px (+~12 px of speed bleed), the ground slide's range.
 @export var air_dash_duration := 0.30
+
+@export_group("Dash Afterimage")
+## Translucent copies of the pose left behind during a dash (see DashAfterimage:
+## its scene sets the color, life and alpha). Null disables them.
+@export var dash_afterimage_scene: PackedScene = preload("res://scenes/vfx/dash_afterimage.tscn")
+## One ghost every ~2 frames (the Penitent shows 4-5 alive at ~0.14 s of life).
+@export var afterimage_interval := 0.033
 
 @export_group("Wall")
 @export var wall_ray_length := 16.5
@@ -191,18 +234,21 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var wall_slide_acceleration := 600.0
 @export var wall_slide_max_speed := 140.0
 @export var wall_kick_outward_speed := 220.0
-## Raised from 560 -> 630 for a modestly faster climb: ~+26.6% peak height
-## per kick (v^2/(2*rise_gravity), rise_gravity derived from Jump/jump_height
-## and jump_time_to_apex — unchanged), within the requested 25-35% range.
-@export var wall_kick_vertical_speed := 630.0
+## Retuned for the Penitent jump (rise gravity 2006 -> 859 px/s^2): 412 keeps the
+## climb of a kick at ~99 px (v^2/(2*rise_gravity)), the same as the old 630 px/s
+## under the old gravity, so wall climbs keep their height (but take longer).
+@export var wall_kick_vertical_speed := 412.0
 ## Horizontal input is ignored for this long right after a kick, so the
 ## outward push reads as a real impulse instead of a vertical hop.
 @export var wall_kick_input_lock_time := 0.12
 ## Air-control target speed used to drift back toward the wall after a kick,
 ## once the input lock above ends, unless the player holds away from it.
 @export var wall_kick_drift_speed := 160.0
-@export var wall_jump_horizontal_speed := 300.0
-@export var wall_jump_vertical_speed := 560.0
+## Burst away from the wall, then air_max_speed takes over. Old 300 was tuned
+## for a 250 px/s air speed; 220 matches wall_kick_outward_speed.
+@export var wall_jump_horizontal_speed := 220.0
+## Retuned with the kick above: ~78 px of rise, as the old 560 under the old gravity.
+@export var wall_jump_vertical_speed := 366.0
 @export var wall_jump_lock_time := 0.15
 @export var wall_recling_lockout := 0.2
 
@@ -354,7 +400,11 @@ var _jump_buffer_left := 0.0
 var _jump_pressed_now := false
 var _jump_press_pending := false
 var _air_jumps_left := 0
+## Time left of the hard standing landing's recovery (movement locked).
 var _landing_left := 0.0
+## Seconds a jump release must still wait before it may cut the rise (tap minimum).
+var _jump_min_hold_left := 0.0
+var _jump_cut_pending := false
 var _footstep_left := 0.0
 var _dust_left := 0.0
 var _run_time := 0.0
@@ -366,6 +416,10 @@ var _was_on_floor := false
 var _drop_left := 0.0
 
 var _dash_direction := 1
+var _dash_from_rest := false
+var _dash_start_speed := 0.0
+var _dash_slide_started := false
+var _afterimage_left := 0.0
 var _dash_cooldown_left := 0.0
 var _dash_is_air := false
 var _air_dash_used := false
@@ -517,10 +571,12 @@ func _physics_process(delta: float) -> void:
 	_track_safe_ground(delta)
 	_update_footsteps(delta)
 	_update_animation()
+	_update_afterimages(delta)
 
 
 func _update_shared_timers(delta: float) -> void:
 	_landing_left = maxf(_landing_left - delta, 0.0)
+	_jump_min_hold_left = maxf(_jump_min_hold_left - delta, 0.0)
 	_wall_recling_lock = maxf(_wall_recling_lock - delta, 0.0)
 	_wall_jump_lock_left = maxf(_wall_jump_lock_left - delta, 0.0)
 	_wall_kick_lock_left = maxf(_wall_kick_lock_left - delta, 0.0)
@@ -538,7 +594,7 @@ func _update_shared_timers(delta: float) -> void:
 	_jump_pressed_now = _jump_press_pending or Input.is_action_just_pressed(&"jump")
 	_jump_press_pending = false
 	if Input.is_action_just_pressed(&"jump"):
-		_jump_buffer_left = jump_buffer_time
+		_jump_buffer_left = jump_buffer_time + _landing_cancel_remaining()
 	else:
 		_jump_buffer_left = maxf(_jump_buffer_left - delta, 0.0)
 
@@ -600,6 +656,10 @@ func _update_ground_move(delta: float) -> void:
 		return
 
 	var axis := _horizontal_input()
+	if _landing_left > 0.0:
+		# Hard standing landing: planted until the recovery ends (a jump may cancel it).
+		axis = 0.0
+		velocity.x = 0.0
 	_track_run_time(delta)
 	if _try_start_skid(axis, delta):
 		return
@@ -627,7 +687,7 @@ func _update_ground_move(delta: float) -> void:
 func _wants_turn(axis: float) -> bool:
 	if _state != State.IDLE and _state != State.RUN:
 		return false
-	if is_zero_approx(axis) or not is_on_floor():
+	if is_zero_approx(axis) or not is_on_floor() or _landing_left > 0.0:
 		return false
 	if Input.is_action_pressed(&"move_down"):
 		return false
@@ -804,7 +864,7 @@ func request_jump() -> void:
 	if is_input_locked():
 		_request_rest_exit()
 		return
-	_jump_buffer_left = jump_buffer_time
+	_jump_buffer_left = jump_buffer_time + _landing_cancel_remaining()
 	_jump_press_pending = true
 
 
@@ -1164,9 +1224,7 @@ func _update_airborne(delta: float) -> void:
 	if _wall_kick_lock_left <= 0.0:
 		_apply_air_horizontal_control(delta)
 
-	if Input.is_action_just_released(&"jump") and velocity.y < 0.0:
-		velocity.y *= jump_release_multiplier
-
+	_update_jump_release()
 	_apply_gravity(delta)
 
 	if not is_on_floor():
@@ -1176,6 +1234,20 @@ func _update_airborne(delta: float) -> void:
 			return
 
 	_state = State.JUMP if velocity.y < 0.0 else State.FALL
+
+
+## Variable jump height: releasing the button while rising cuts the climb, but
+## never before jump_min_hold_time (a tap still reaches the Penitent's ~0.85 of a
+## full jump); an earlier release is applied once the minimum has elapsed.
+func _update_jump_release() -> void:
+	if velocity.y >= 0.0:
+		_jump_cut_pending = false
+		return
+	if Input.is_action_just_released(&"jump"):
+		_jump_cut_pending = true
+	if _jump_cut_pending and _jump_min_hold_left <= 0.0:
+		_jump_cut_pending = false
+		velocity.y *= jump_release_multiplier
 
 
 ## Normal air control, except right after a wall kick: with no horizontal
@@ -1200,9 +1272,12 @@ func _apply_gravity(delta: float) -> void:
 func _try_launch_jump() -> bool:
 	if _jump_buffer_left <= 0.0 or not (is_on_floor() or _coyote_left > 0.0):
 		return false
+	if _landing_cancel_remaining() > 0.0:
+		return false
 	if is_on_floor():
 		_spawn_dust(GroundDust.Kind.TAKEOFF)
 	velocity.y = _jump_velocity
+	_begin_jump_rise()
 	_jump_buffer_left = 0.0
 	_coyote_left = 0.0
 	_sfx_jump.play()
@@ -1220,11 +1295,28 @@ func _try_air_jump() -> bool:
 		return false
 	_air_jumps_left -= 1
 	velocity.y = _double_jump_velocity
+	_begin_jump_rise()
 	_jump_buffer_left = 0.0
 	_sfx_jump.play()
 	_enter_state(State.JUMP)
 	_restart_jump_animation()
 	return true
+
+
+## Starts the tap-minimum window of a ground or air jump (wall kicks keep their
+## own fixed impulses, so they never wait).
+func _begin_jump_rise() -> void:
+	_jump_min_hold_left = jump_min_hold_time
+	_jump_cut_pending = false
+
+
+## Seconds until a jump press may cancel the standing landing recovery (0 when
+## there is no recovery or it can already be cancelled).
+func _landing_cancel_remaining() -> float:
+	if _landing_left <= 0.0:
+		return 0.0
+	var elapsed := landing_squash_time - _landing_left
+	return maxf(landing_jump_cancel_time - elapsed, 0.0)
 
 
 func _restart_jump_animation() -> void:
@@ -1278,9 +1370,36 @@ func _start_dash() -> void:
 	_dash_is_air = not is_on_floor()
 	if _dash_is_air:
 		_air_dash_used = true
+	var carried := absf(velocity.x) if signf(velocity.x) == float(_dash_direction) else 0.0
+	_dash_from_rest = not _dash_is_air and carried < run_max_speed * dash_rest_speed_ratio
+	_dash_start_speed = 0.0 if _dash_from_rest else minf(carried, dash_speed)
+	_dash_slide_started = false
+	_afterimage_left = 0.0
 	_enter_state(State.DASH)
-	velocity.x = float(_dash_direction) * dash_speed
+	velocity.x = float(_dash_direction) * (dash_speed if _dash_is_air else _dash_start_speed)
 	velocity.y = 0.0
+
+
+## Seconds of lean-back before the slide moves (only when dashing from rest).
+func _dash_startup() -> float:
+	return dash_startup_time if _dash_from_rest else 0.0
+
+
+## True from the first frame of the slide (after the lean-back).
+func _dash_sliding() -> bool:
+	return _state == State.DASH and not _dash_is_air and _state_time >= _dash_startup()
+
+
+## Ground slide speed `t` seconds after the slide started: ramp, plateau, ease-out.
+func _dash_speed_at(t: float) -> float:
+	var ramp := maxf(dash_ramp_time, 0.001)
+	var ease_time := maxf(dash_ease_time, 0.001)
+	var ease_start := maxf(dash_duration - ease_time, ramp)
+	if t < ramp:
+		return lerpf(_dash_start_speed, dash_speed, t / ramp)
+	if t < ease_start:
+		return dash_speed
+	return lerpf(dash_speed, dash_end_speed, clampf((t - ease_start) / ease_time, 0.0, 1.0))
 
 
 func _update_dash(delta: float) -> void:
@@ -1293,18 +1412,21 @@ func _update_dash(delta: float) -> void:
 		_update_airborne(delta)
 		return
 
-	var t := clampf(_state_time / dash_duration, 0.0, 1.0)
-	var target_speed := dash_speed
-	if t >= dash_full_speed_ratio:
-		var ease_t := (t - dash_full_speed_ratio) / maxf(1.0 - dash_full_speed_ratio, 0.0001)
-		target_speed = lerpf(dash_speed, run_max_speed, ease_t)
-	velocity.x = float(_dash_direction) * target_speed
-	velocity.y = 0.0
-
 	if Input.is_action_just_pressed(&"jump") and _try_launch_jump():
 		return
 
-	if _state_time >= dash_duration:
+	velocity.y = 0.0
+	var slide_t := _state_time - _dash_startup()
+	if slide_t < 0.0:
+		velocity.x = 0.0
+		return
+	if not _dash_slide_started:
+		_dash_slide_started = true
+		_spawn_dust(GroundDust.Kind.DASH_START)
+	velocity.x = float(_dash_direction) * _dash_speed_at(slide_t)
+
+	if slide_t >= dash_duration:
+		_spawn_dust(GroundDust.Kind.DASH_END)
 		if _has_standing_headroom():
 			_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
 		else:
@@ -1314,7 +1436,7 @@ func _update_dash(delta: float) -> void:
 ## Air dash: horizontal only, no gravity for its duration, standing collider
 ## kept (see _enter_state's low-collider check, which only lowers for a
 ## ground dash).
-func _update_air_dash(delta: float) -> void:
+func _update_air_dash(_delta: float) -> void:
 	if is_on_floor():
 		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
 		return
@@ -1327,6 +1449,29 @@ func _update_air_dash(delta: float) -> void:
 
 	if _state_time >= air_dash_duration:
 		_enter_state(State.JUMP if velocity.y < 0.0 else State.FALL)
+
+
+## One translucent copy of the current pose every afterimage_interval while she
+## slides or air dashes, added right behind her in the same parent.
+func _update_afterimages(delta: float) -> void:
+	var dashing := _state == State.DASH and (_dash_is_air or _dash_sliding())
+	if not dashing or dash_afterimage_scene == null:
+		_afterimage_left = 0.0
+		return
+	_afterimage_left -= delta
+	if _afterimage_left > 0.0:
+		return
+	_afterimage_left += afterimage_interval
+	var host := get_parent() as Node2D
+	var ghost := dash_afterimage_scene.instantiate() as DashAfterimage
+	if host == null or ghost == null:
+		if ghost != null:
+			ghost.free()
+		return
+	var texture := _sprite.sprite_frames.get_frame_texture(_sprite.animation, _sprite.frame)
+	host.add_child(ghost)
+	host.move_child(ghost, get_index())
+	ghost.setup(_sprite, texture)
 
 
 ## -- Wall cling / climb --------------------------------------------------------
@@ -1424,6 +1569,7 @@ func _update_wall_cling(delta: float) -> void:
 			_wall_kick_lock_left = wall_kick_input_lock_time
 			_wall_kick_pending = true
 			_wall_kick_wall_direction = _wall_direction
+		_jump_min_hold_left = 0.0
 		_sfx_jump.play()
 		_enter_state(State.JUMP)
 		return
@@ -1446,6 +1592,8 @@ func _enter_state(new_state: State) -> void:
 	var previous := _state
 	_state = new_state
 	_state_time = 0.0
+	if new_state != State.IDLE and new_state != State.RUN:
+		_landing_left = 0.0
 	_run_time = 0.0
 	_release_time = 0.0
 	if not _is_lateral_attack_state():
@@ -2210,15 +2358,25 @@ func respawn() -> void:
 ## -- Post-move / feedback -------------------------------------------------------
 
 func _after_move(fall_speed_before_move: float) -> void:
-	if not _was_on_floor and is_on_floor() and fall_speed_before_move > landing_impact_speed:
-		_landing_left = landing_squash_time
+	var landed := not _was_on_floor and is_on_floor()
+	if landed and fall_speed_before_move > landing_impact_speed:
 		_sfx_land.play()
 		_spawn_dust(GroundDust.Kind.LANDING)
-	if not _was_on_floor and is_on_floor():
+	if landed:
 		_restore_air_actions()
 	if is_on_floor() and (_state == State.JUMP or _state == State.FALL):
 		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+	if landed and _is_hard_standing_landing(fall_speed_before_move):
+		# Standing landing: planted for the recovery. A running landing keeps running.
+		_landing_left = landing_squash_time
+		velocity.x = 0.0
 	_was_on_floor = is_on_floor()
+
+
+func _is_hard_standing_landing(fall_speed: float) -> bool:
+	if fall_speed < hard_landing_speed or _state == State.HURT:
+		return false
+	return absf(velocity.x) < run_max_speed * landing_run_speed_ratio
 
 
 func _update_footsteps(delta: float) -> void:
@@ -2286,7 +2444,11 @@ func _update_animation() -> void:
 			# standing slots drew a puffier, darker hair than the idle).
 			_play_animation(&"skid" if _state_time < _skid_brake_duration() else &"idle")
 		State.DASH:
-			_play_animation(&"air_dash" if _dash_is_air else &"ground_dash")
+			if _dash_is_air:
+				_play_animation(&"air_dash")
+			else:
+				# Frozen on the first pose during the lean-back, then it plays.
+				_play_animation(&"ground_dash", 1.0 if _dash_sliding() else 0.0)
 		State.JUMP:
 			# Both wall-exit branches (jumping away and the climb-by-kicking
 			# wall kick) enter State.JUMP; either lockout means this jump
