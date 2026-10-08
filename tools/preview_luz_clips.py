@@ -13,6 +13,12 @@ outside the repo):
     <clip>_large.gif / .mp4  body ~200 px tall
     <clip>_contact.png       numbered frames with feet/centre guides + onion skin
 
+With `--attacks` it previews the six attack clips instead (ground_attack_1/2/3,
+crouch_attack, air_horizontal_attack, up_attack): every pose is held for the ticks of
+the manifest `frame_ticks_30fps` table (1 tick = 1/30 s), the contact sheet labels each
+frame with its tick count and phase (windup / active / hold / recovery), and the crop
+keeps the top of the cell because raised rulers reach it.
+
 Run also gets a scrolling floor at the real run speed so foot sliding is visible.
 Frame times follow player.gd: run 28 fps, idle 8 fps, turn 4 frames in turn_time,
 skid frames in skid_brake_time + skid_hold_time; the run fps, turn_time and skid
@@ -67,6 +73,25 @@ def clip_table(manifest: dict) -> dict:
         "turn_0.12s": ("turn", counts.get("turn", 2) / 0.12, False, 0.0),
         "skid": ("skid", counts.get("skid", 8) / SKID_TIME, False, 0.0),
     }
+
+
+ATTACK_CLIPS = ["ground_attack_1", "ground_attack_2", "ground_attack_3", "crouch_attack", "air_horizontal_attack", "up_attack"]
+ATTACK_CROP = (0, 0, 512, 450)
+
+
+def attack_info(manifest: dict, clip: str) -> tuple[list[int], list[str]]:
+    """(ticks per frame, phase label per frame) of an attack clip from its sheet entry."""
+    for sheet in manifest["sheets"].values():
+        if clip in sheet["clips"]:
+            count = len(sheet["clips"][clip])
+            ticks = sheet.get("frame_ticks_30fps", {}).get(clip, [1] * count)
+            labels = [""] * count
+            for phase, indices in sheet.get("phases", {}).get(clip, {}).items():
+                for i in indices:
+                    labels[i] = phase
+            contact = sheet.get("contact_frames", {}).get(clip, -1)
+            return ticks, [f"{label}{' *' if i == contact else ''}" for i, label in enumerate(labels)]
+    raise KeyError(clip)
 
 
 def font(size: int = 18):
@@ -127,7 +152,7 @@ def encode(frames: list[Image.Image], fps: float, stem: Path) -> None:
         subprocess.run(src + ["-i", palette, "-lavfi", "paletteuse", "-loop", "0", f"{stem}.gif"], check=True)
 
 
-def contact_sheet(frames: list[Image.Image], dest: Path, title: str) -> None:
+def contact_sheet(frames: list[Image.Image], dest: Path, title: str, notes: list[str] | None = None) -> None:
     cw, ch = CROP[2] - CROP[0], CROP[3] - CROP[1]
     columns = 4
     rows = (len(frames) + columns - 1) // columns
@@ -141,7 +166,8 @@ def contact_sheet(frames: list[Image.Image], dest: Path, title: str) -> None:
         ghost = cell.copy()
         ghost.putalpha(ghost.getchannel("A").point(lambda v: v * 45 // 100))
         onion.alpha_composite(ghost)
-        draw.text((ox + 6, oy + 4), f"{title} {i}", fill=(255, 255, 0, 255), font=font())
+        note = f" {notes[i]}" if notes else ""
+        draw.text((ox + 6, oy + 4), f"{title} {i}{note}", fill=(255, 255, 0, 255), font=font(15 if notes else 18))
     onion_ox, onion_oy = 0, rows * ch
     sheet.alpha_composite(onion, (onion_ox, onion_oy))
     guide_x = 273 - CROP[0]
@@ -156,12 +182,29 @@ def contact_sheet(frames: list[Image.Image], dest: Path, title: str) -> None:
 
 
 def main() -> int:
+    global CROP
     if shutil.which("ffmpeg") is None:
         print("ffmpeg is required", file=sys.stderr)
         return 1
-    out_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd() / "luz_previews"
+    args = [a for a in sys.argv[1:] if a != "--attacks"]
+    attacks = len(args) != len(sys.argv) - 1
+    out_dir = Path(args[0]) if args else Path.cwd() / "luz_previews"
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = json.loads((ASSET_DIR / "animation_manifest.json").read_text())
+    if attacks:
+        CROP = ATTACK_CROP
+        for clip in ATTACK_CLIPS:
+            frames = load_clip_frames(manifest, clip)
+            ticks, notes = attack_info(manifest, clip)
+            notes = [f"{note} {t}t" for note, t in zip(notes, ticks)]
+            contact_sheet(frames, out_dir / f"{clip}_contact.png", clip, notes)
+            held = [frame for frame, t in zip(frames, ticks) for _ in range(t)]
+            for label, body_px, upscale in (("game", 48, 3), ("large", 200, 1)):
+                video = render_video_frames(held, 30.0, False, 0.0, body_px, upscale, 3.0)
+                encode(video, 30.0, out_dir / f"{clip}_{label}")
+            print(f"{clip}: {len(frames)} frames, {sum(ticks)} ticks ({sum(ticks) / 30:.3f} s)")
+        print(f"Previews in {out_dir}")
+        return 0
     for name, (clip, fps, loop, floor_speed) in clip_table(manifest).items():
         frames = load_clip_frames(manifest, clip)
         contact_sheet(frames, out_dir / f"{name}_contact.png", name)

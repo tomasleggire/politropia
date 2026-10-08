@@ -151,3 +151,8 @@ Each prompt is ready to paste after the global style block (section 2). The Peni
 - New processor cloned from `process_luz_run_turn_skid.py` (raw cell 512x512, `RAW_CELL_W` configurable), magenta key (`clean_key`), `place()` with fixed scale (standing 331.5 / raw standing, measured per sheet), anchor at the idle centroid x 273, feet row 413, `luz_ruler_length.normalize_ruler` as the last step of every frame.
 - Per-frame ruler overflow (forward at x > 512) is relaxed by the swing up to `MAX_TILT`, reported if it fails; the paint fallback applies to those frames.
 - Hit holds (hit-stop) and tick durations come from the tables, not from the art; hit 3 lunge translation and the combo-advances-on-hit rule belong to `player.gd`.
+
+### Integration result (2026-10-08, `tools/process_luz_attacks.py`)
+- Sheets: `luz_ground_combat_sheet.png` (ground_attack_1 0-8, ground_attack_2 9-16, ground_attack_3 17-25, crouch_attack 26-33) and `luz_air_combat_sheet.png` (up_attack 0-7, air_horizontal_attack 8-15, plunge 16-23 unchanged).
+- Anchor: front foot on the idle's front foot (ground and up), body centroid on the idle's (air). Scales per sheet: hit1 0.77, hit2 0.67, hit3 0.90, crouch 0.72, air 0.74, up 0.79.
+- Ruler: 215 texels wherever it fits the 512 cell; forward-thrown frames carry the longest ruler that fits (110-160 texels), re-aimed at the angles of section 3 (see the P8a entry in `odd/tasks/luz-final.md`). The manifest sheet entries hold `contact_frames`, `phases` and `frame_ticks_30fps` per clip for the combat timing.

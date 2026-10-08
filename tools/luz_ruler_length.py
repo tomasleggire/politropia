@@ -206,13 +206,17 @@ def _source_u(u: np.ndarray, length: float, delta: float, period: float) -> np.n
     return np.where(u >= cap + delta, u - delta, u)
 
 
-def _normalize_once(frame: Image.Image, target: float, label: str) -> tuple[Image.Image, dict]:
+def _normalize_once(frame: Image.Image, target: float, label: str, force_theta: float | None = None) -> tuple[Image.Image, dict]:
     """Return (frame with the ruler at `target` texels, info).
 
     The free end is rebuilt along the ruler's own axis. Only when that would leave the
     cell, or come closer than FLOOR_CLEARANCE to the floor line, the whole ruler is swung about the
     grip by the smallest angle that fits (info["tilt"], degrees); a ruler that still
-    cannot fit within MAX_TILT leaves the frame unchanged with info["overflow"] set."""
+    cannot fit within MAX_TILT leaves the frame unchanged with info["overflow"] set.
+    `force_theta` (degrees, same sign convention as info["tilt"]) skips the search and
+    swings the ruler by exactly that angle (used to repaint an attack pose at the angle
+    the art request asks for); the cell bounds still apply and the floor clearance is
+    only reported."""
     rgba = np.array(frame.convert("RGBA"))
     ruler = find_ruler(rgba)
     if ruler is None:
@@ -252,6 +256,18 @@ def _normalize_once(frame: Image.Image, target: float, label: str) -> tuple[Imag
     clearance = FLOOR_CLEARANCE
     # Cell bounds are hard. If no angle gives the full clearance, the clearance is
     # relaxed in 2 texel steps (down to MIN_CLEARANCE) and reported in info["clearance"].
+    if force_theta is not None:
+        d2 = _rotate(ruler.d, force_theta)
+        n2 = np.array([-d2[1], d2[0]])
+        corners = _rect(grip, d2, n2, target, s_lo, s_hi)
+        if (
+            corners[:, 0].min() >= pad + EDGE_MARGIN and corners[:, 0].max() <= pad + w - EDGE_MARGIN
+            and corners[:, 1].min() >= pad + EDGE_MARGIN and corners[:, 1].max() <= pad + h - EDGE_MARGIN
+        ):
+            best = (force_theta, d2, n2)
+            clearance = pch.FEET_ROW + pad - corners[:, 1].max()
+        else:
+            clearance = MIN_CLEARANCE - 1.0
     while best is None and clearance >= MIN_CLEARANCE:
         floor_limit = pch.FEET_ROW + pad - clearance
         for step in range(int(MAX_TILT / TILT_STEP) + 1):
@@ -324,14 +340,16 @@ def _normalize_once(frame: Image.Image, target: float, label: str) -> tuple[Imag
     return Image.fromarray(cell, "RGBA"), info
 
 
-def normalize_ruler(frame: Image.Image, target: float = RULER_TARGET_LENGTH, label: str = "") -> tuple[Image.Image, dict]:
+def normalize_ruler(
+    frame: Image.Image, target: float = RULER_TARGET_LENGTH, label: str = "", force_theta: float | None = None
+) -> tuple[Image.Image, dict]:
     """Lengthen or trim the ruler to `target` visible texels (see _normalize_once). The
     visible length depends on how the fist covers the grip, so one corrective pass
     re-aims at the measured error."""
-    result, info = _normalize_once(frame, target, label)
+    result, info = _normalize_once(frame, target, label, force_theta)
     after = info.get("after")
     if after is not None and abs(after - target) > 1.0 and not info.get("overflow"):
-        retry, retry_info = _normalize_once(frame, target + (target - after), label)
+        retry, retry_info = _normalize_once(frame, target + (target - after), label, force_theta)
         if retry_info.get("after") is not None and abs(retry_info["after"] - target) < abs(after - target):
             return retry, retry_info
     return result, info
