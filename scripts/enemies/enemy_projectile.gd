@@ -77,6 +77,9 @@ func _on_body_entered(body: Node2D) -> void:
 	if not _active:
 		return
 	var player := body as Player
+	if player != null and player.is_dash_invulnerable():
+		# Dash i-frames: the shot passes through her.
+		return
 	if player != null:
 		# Deferred: hurting her touches her own areas, which physics forbids
 		# while it is still flushing the query that raised this signal.

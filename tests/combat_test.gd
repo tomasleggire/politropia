@@ -49,6 +49,12 @@ const CHECKS := {
 	"case_lethal_fall_uses_checkpoint": 5,
 	"case_fall_during_iframes_still_hurts": 4,
 	"case_levels_fall_costs_a_pip": 6,
+	"case_combo_rules": 11,
+	"case_whiff_repeats_hit1": 4,
+	"case_no_recoil_and_camera_kick": 5,
+	"case_other_attack_boxes": 6,
+	"case_dash_invulnerable": 5,
+	"case_dash_hazards_and_grace": 4,
 }
 const LEVELS := {
 	"level_01": "res://scenes/levels/level_01.tscn",
@@ -65,6 +71,21 @@ class ResetCounter:
 
 	func reset_to_checkpoint_state() -> void:
 		count += 1
+
+
+## Stands in for an enemy: counts the slashes that strike it and records the
+## freezes the player asks for.
+class Dummy:
+	extends CharacterBody2D
+	var names: Array[StringName] = []
+	var freezes: Array[float] = []
+
+	func receive_hit(_damage: int, _source: Vector2, attack_name: StringName = &"") -> bool:
+		names.append(attack_name)
+		return true
+
+	func freeze(duration: float) -> void:
+		freezes.append(duration)
 
 
 var checks := 0
@@ -579,3 +600,226 @@ func case_levels_fall_costs_a_pip() -> void:
 		check(player.get_health() == 2, "%s: falling out of the map costs one pip (%d)" % [level_name, player.get_health()])
 		check(player.global_position.distance_to(safe) < 4.0, "%s: she is back on the last safe ground" % level_name)
 		check(not player.is_input_locked(), "%s: control is back" % level_name)
+
+
+# -- Attacks: combo rule, timings, hitboxes, hit-stop, lunge, camera, dash i-frames ----
+
+func _add_dummy(x: float) -> Dummy:
+	var dummy := Dummy.new()
+	dummy.collision_layer = 8
+	dummy.collision_mask = 0
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(20.0, 40.0)
+	shape.shape = rect
+	shape.position = Vector2(0.0, -20.0)
+	dummy.add_child(shape)
+	dummy.position = Vector2(x, 0.0)
+	_rig.add_child(dummy)
+	return dummy
+
+
+func _hitbox_shape() -> CollisionShape2D:
+	return _player.get_node("AttackHitbox/CollisionShape2D") as CollisionShape2D
+
+
+func _box_of_hitbox() -> Dictionary:
+	var shape := _hitbox_shape()
+	return {"size": (shape.shape as RectangleShape2D).size, "center": shape.position}
+
+
+func _box_matches(box: Dictionary, rect: Rect2, facing := 1) -> bool:
+	var want_center := Vector2(rect.get_center().x * float(facing), rect.get_center().y)
+	return (box["size"] as Vector2).is_equal_approx(rect.size) and (box["center"] as Vector2).distance_to(want_center) < 0.01
+
+
+## Waits until the attack is in `segment` of its active phase and returns the live hitbox.
+func _box_at_segment(segment: int, limit := 1.0) -> Dictionary:
+	var end := _clock + limit
+	while _clock < end:
+		await _frames(1)
+		if _player._attack_phase == Player.PHASE_ACTIVE and _player._attack_segment == segment:
+			return _box_of_hitbox()
+	return {"size": Vector2.ZERO, "center": Vector2(9999.0, 9999.0)}
+
+
+func case_combo_rules() -> void:
+	await _build_rig()
+	var dummy := _add_dummy(50.0)
+	var boxes := {}
+	var stops := {}
+	var seen := 0
+	var start_x := _player.global_position.x
+	var max_advance := 0.0
+	var end := _clock + 3.0
+	while _clock < end and not dummy.names.has(&"attack_ground_3"):
+		_player.request_attack(0)
+		await _frames(1)
+		if _player._attack_phase == Player.PHASE_ACTIVE and _player._state == Player.State.ATTACK:
+			var key := "%d_%d" % [_player._attack_combo_index, _player._attack_segment]
+			if not boxes.has(key):
+				boxes[key] = _box_of_hitbox()
+		if _player._state == Player.State.ATTACK and _player._attack_combo_index == 2:
+			max_advance = maxf(max_advance, _player.global_position.x - start_x)
+		while seen < dummy.names.size():
+			stops[dummy.names[seen]] = maxf(float(stops.get(dummy.names[seen], 0.0)), _player._hit_stop_left)
+			seen += 1
+	# Keep tracking the finisher's lunge without pressing again.
+	var tail := _clock + 0.5
+	while _clock < tail:
+		await _frames(1)
+		if _player._state == Player.State.ATTACK and _player._attack_combo_index == 2:
+			max_advance = maxf(max_advance, _player.global_position.x - start_x)
+	var first_of := func(attack_name: StringName) -> int: return dummy.names.find(attack_name)
+	check(
+		first_of.call(&"attack_ground_1") == 0 and first_of.call(&"attack_ground_2") > 0
+		and first_of.call(&"attack_ground_3") > first_of.call(&"attack_ground_2"),
+		"with a target the combo goes hit 1, 2, 3 in order (%s)" % [dummy.names]
+	)
+	check(boxes.has("0_0") and _box_matches(boxes["0_0"], _player.hitbox_hit1_a), "hit 1 phase A box")
+	check(boxes.has("0_1") and _box_matches(boxes["0_1"], _player.hitbox_hit1_b), "hit 1 phase B box")
+	check(boxes.has("1_0") and _box_matches(boxes["1_0"], _player.hitbox_hit2_a), "hit 2 phase A' box")
+	check(boxes.has("1_1") and _box_matches(boxes["1_1"], _player.hitbox_hit2_b), "hit 2 phase B' box")
+	check(boxes.has("2_0") and _box_matches(boxes["2_0"], _player.hitbox_hit3), "hit 3 finisher box")
+	check(absf(float(stops.get(&"attack_ground_1", 0.0)) - 0.09) < 0.02, "hit 1 hit-stop ~0.09 s (%.3f)" % float(stops.get(&"attack_ground_1", 0.0)))
+	check(absf(float(stops.get(&"attack_ground_2", 0.0)) - 0.10) < 0.02, "hit 2 hit-stop ~0.10 s (%.3f)" % float(stops.get(&"attack_ground_2", 0.0)))
+	check(absf(float(stops.get(&"attack_ground_3", 0.0)) - 0.20) < 0.02, "hit 3 hit-stop ~0.20 s (%.3f)" % float(stops.get(&"attack_ground_3", 0.0)))
+	check(absf(max_advance - 40.0) < 8.0, "the finisher lunges ~40 px (%.1f)" % max_advance)
+	await _secs(1.0)
+	check(absf(_player.global_position.x - start_x) < 6.0, "and slides back to where it started (%.1f)" % (_player.global_position.x - start_x))
+
+
+func case_whiff_repeats_hit1() -> void:
+	await _build_rig()
+	var starts: Array[float] = []
+	var max_index := 0
+	var last_segment := -2
+	var first_press := _clock
+	var first_active := -1.0
+	var end := _clock + 2.2
+	while _clock < end:
+		_player.request_attack(0)
+		await _frames(1)
+		if _player._state == Player.State.ATTACK:
+			max_index = maxi(max_index, _player._attack_combo_index)
+			if _player._attack_segment == 0 and last_segment != 0:
+				starts.append(_clock)
+				if first_active < 0.0:
+					first_active = _clock - first_press
+		last_segment = _player._attack_segment if _player._state == Player.State.ATTACK else -2
+	var gaps: Array[float] = []
+	for i in range(2, starts.size()):
+		gaps.append(starts[i] - starts[i - 1])
+	var mean := 0.0
+	for gap in gaps:
+		mean += gap
+	mean = mean / maxf(float(gaps.size()), 1.0)
+	check(max_index == 0, "whiffing never advances the combo (max index %d)" % max_index)
+	check(starts.size() >= 5, "hit 1 repeats while mashing (%d starts)" % starts.size())
+	check(absf(mean - 0.305) < 0.03, "whiff cadence ~0.305 s (%.3f)" % mean)
+	check(absf(first_active - 0.117) < 0.04, "hit 1 from rest reaches its active frame after ~0.117 s (%.3f)" % first_active)
+
+
+func case_no_recoil_and_camera_kick() -> void:
+	await _build_rig()
+	await _add_camera()
+	var dummy := _add_dummy(50.0)
+	_player.request_attack(0)
+	var peak := 0.0
+	var end := _clock + 0.5
+	while _clock < end:
+		await _frames(1)
+		peak = maxf(peak, _camera.offset.x)
+	check(dummy.names.size() >= 1, "the slash landed")
+	check(absf(_player.global_position.x) < 0.5, "no recoil: Luz stays put (x %.2f)" % _player.global_position.x)
+	check(peak > 3.0 and peak <= _player.attack_kick_hit1.x + 0.01, "the RoomCamera is jolted toward the hit (%.1f)" % peak)
+	_camera.queue_free()
+	await _frames(2)
+	var player_camera := Camera2D.new()
+	player_camera.set_script(load("res://scripts/camera/camara_jugador.gd"))
+	_player.add_child(player_camera)
+	player_camera.make_current()
+	await _secs(0.5)
+	_player.request_attack(0)
+	var peak2 := 0.0
+	end = _clock + 0.5
+	while _clock < end:
+		await _frames(1)
+		peak2 = maxf(peak2, player_camera.offset.x)
+	check(peak2 > 3.0, "the player Camera2D is jolted too (%.1f)" % peak2)
+	check(player_camera.offset == Vector2.ZERO, "and settles back to zero")
+
+
+func case_other_attack_boxes() -> void:
+	await _build_rig()
+	Input.action_press(&"move_down")
+	await _secs(0.4)
+	_player.request_attack(0)
+	var crouch_a := await _box_at_segment(0)
+	var crouch_b := await _box_at_segment(1)
+	Input.action_release(&"move_down")
+	await _secs(1.0)
+	_player.request_attack(-1)
+	var up_a := await _box_at_segment(0)
+	var up_b := await _box_at_segment(1)
+	await _secs(1.0)
+	_player.global_position = Vector2(0.0, -200.0)
+	_player.velocity = Vector2.ZERO
+	await _frames(2)
+	_player.request_attack(0)
+	var air_a := await _box_at_segment(0)
+	var air_b := await _box_at_segment(1)
+	check(_box_matches(crouch_a, _player.hitbox_crouch_a), "crouch sweep 1 box")
+	check(_box_matches(crouch_b, _player.hitbox_crouch_b), "crouch sweep 2 box")
+	check(_box_matches(up_a, _player.hitbox_up_a), "up attack back arc box")
+	check(_box_matches(up_b, _player.hitbox_up_b), "up attack front arc box")
+	check(_box_matches(air_a, _player.hitbox_air_a), "air crescent box")
+	check(_box_matches(air_b, _player.hitbox_air_b), "air low backhand box")
+
+
+func case_dash_invulnerable() -> void:
+	await _build_rig()
+	_player.request_dash()
+	await _secs(0.05)
+	var contact := (load(CONTACT_SCENE) as PackedScene).instantiate() as ContactDamage
+	_rig.add_child(contact)
+	contact.set_area_size(Vector2(1600.0, 400.0))
+	contact.position = Vector2(0.0, -100.0)
+	var shot := (load("res://scenes/enemies/enemy_projectile.tscn") as PackedScene).instantiate() as EnemyProjectile
+	_rig.add_child(shot)
+	shot.launch(_player.global_position + Vector2(-40.0, -20.0), Vector2.RIGHT, 250.0)
+	await _secs(0.3)
+	check(_player.is_dash_invulnerable(), "she is invulnerable during the dash")
+	check(_player.get_health() == 3, "enemy contact and a projectile do nothing during the dash (%d)" % _player.get_health())
+	check(shot.is_active(), "the projectile passes through her instead of vanishing")
+	check(_player._state == Player.State.DASH, "and the dash was not interrupted")
+	await _secs(0.9)
+	check(_player.get_health() == 2, "the same contact hurts right after the dash (%d)" % _player.get_health())
+
+
+func case_dash_hazards_and_grace() -> void:
+	await _build_rig()
+	_player.request_dash()
+	await _secs(0.1)
+	check(_player.take_hazard_damage(1, SOURCE_LEFT), "fixed hazards still hurt during the dash")
+	await _free_and_rebuild()
+	_player.dash_invulnerable = false
+	_player.request_dash()
+	await _secs(0.1)
+	check(_player.take_damage(1, SOURCE_LEFT), "with dash_invulnerable off the dash does not protect")
+	await _free_and_rebuild()
+	_player.dash_invulnerable_grace = 0.3
+	_player.request_dash()
+	var end := _clock + 1.5
+	while _player._state == Player.State.DASH and _clock < end:
+		await _frames(1)
+	check(not _player.take_damage(1, SOURCE_LEFT), "the grace after the dash still blocks hits")
+	await _secs(0.4)
+	check(_player.take_damage(1, SOURCE_LEFT), "and expires")
+
+
+func _free_and_rebuild() -> void:
+	_release_all()
+	_free_rig()
+	_checkpoints().clear()
+	await _build_rig()

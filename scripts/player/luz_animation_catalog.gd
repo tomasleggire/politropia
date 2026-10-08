@@ -93,7 +93,15 @@ const CONTACT_SYNCED_CLIPS := [
 ## -- i.e. precisely when the attack's hitbox activates -- instead of every
 ## frame getting an equal slice of the clip. An animation missing from
 ## startup_times (or mapped to 0.0) is never contact-synced.
-static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: Dictionary = {}) -> SpriteFrames:
+##
+## active_times optionally maps an animation name to the length of its active
+## (hitbox) phase. With a manifest "active_end_frames" entry (index of the first
+## recovery frame of that clip) the frames from the contact frame up to it share
+## exactly that time and the recovery frames share the rest, so the art's
+## active frames line up with the hitbox window.
+static func build_sprite_frames(
+	clip_durations: Dictionary = {}, startup_times: Dictionary = {}, active_times: Dictionary = {}
+) -> SpriteFrames:
 	var manifest := _read_manifest()
 	var frames := SpriteFrames.new()
 	for animation_name in CLIP_SPEEDS:
@@ -106,6 +114,7 @@ static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: 
 		var grid: Dictionary = sheet["grid"]
 		var clips: Dictionary = sheet["clips"]
 		var contact_frames: Dictionary = sheet.get("contact_frames", {})
+		var active_end_frames: Dictionary = sheet.get("active_end_frames", {})
 		for clip_name in clips:
 			var animation_name := _animation_name_for(clip_name)
 			if animation_name.is_empty():
@@ -119,7 +128,8 @@ static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: 
 			var total_duration: float = clip_durations.get(animation_name, float(frame_count) / speed)
 			var startup_time: float = startup_times.get(animation_name, 0.0)
 			var seconds := _frame_seconds(
-				animation_name, frame_count, contact_index, total_duration, startup_time
+				animation_name, frame_count, contact_index, total_duration, startup_time,
+				int(active_end_frames.get(clip_name, -1)), float(active_times.get(animation_name, 0.0))
 			)
 			for i in frame_count:
 				var texture := _build_frame_texture(atlas, grid, int(frame_indices[i]))
@@ -159,7 +169,7 @@ static func _fill_placeholder_clips(frames: SpriteFrames, clip_durations: Dictio
 ## stretched to fill the remaining (total_duration - startup_time).
 static func _frame_seconds(
 	animation_name: String, frame_count: int, contact_index: int,
-	total_duration: float, startup_time: float
+	total_duration: float, startup_time: float, active_end_index := -1, active_time := 0.0
 ) -> Array[float]:
 	var uniform: Array[float] = []
 	uniform.resize(frame_count)
@@ -178,6 +188,17 @@ static func _frame_seconds(
 	var lead_frame_seconds := startup_time / float(contact_index)
 	for i in contact_index:
 		result[i] = lead_frame_seconds
+	if (
+		active_end_index > contact_index and active_end_index < frame_count
+		and active_time > 0.0 and startup_time + active_time < total_duration
+	):
+		var active_frames := active_end_index - contact_index
+		for i in range(contact_index, active_end_index):
+			result[i] = active_time / float(active_frames)
+		var recovery_frames := frame_count - active_end_index
+		for i in range(active_end_index, frame_count):
+			result[i] = (total_duration - startup_time - active_time) / float(recovery_frames)
+		return result
 	var trail_frame_count := frame_count - contact_index
 	var trail_frame_seconds := (total_duration - startup_time) / float(trail_frame_count)
 	for i in range(contact_index, frame_count):

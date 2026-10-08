@@ -215,6 +215,15 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## 0.30 s it covers ~118 px (+~12 px of speed bleed), the ground slide's range.
 @export var air_dash_duration := 0.30
 
+@export_group("Dash Invulnerability")
+## Blasphemous-style i-frames: for the whole dash (lean-back, slide and ease,
+## ground and air) enemy contact, enemy projectiles and other non-hazard hits do
+## nothing and projectiles pass through her. Fixed hazards (spikes, pits, falling
+## out of the map) are NOT blocked: in Blasphemous the dash does not protect from them.
+@export var dash_invulnerable := true
+## Extra seconds of immunity after the dash ends (0 = none).
+@export var dash_invulnerable_grace := 0.0
+
 @export_group("Dash Afterimage")
 ## Translucent copies of the pose left behind during a dash (see DashAfterimage:
 ## its scene sets the color, life and alpha). Null disables them.
@@ -253,76 +262,83 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var wall_recling_lockout := 0.2
 
 @export_group("Attack")
-## Startup (windup) shared by hits 1/2 of the ground combo and by
-## crouch/up/air attacks. The finisher (hit 3) uses its own, longer
-## attack_finisher_startup_time instead -- see _attack_startup_for.
-@export var attack_startup_time := 0.08
-@export var attack_active_time := 0.12
-## Combo cadence, measured from a 60fps Blasphemous ground-combo reference:
-## hit1->hit2 contact-to-contact ~0.35s, hit2->hit3 ~0.42s. This is also each
-## hit's own minimum interval -- the next combo hit cannot start (even with a
-## buffered input) before this much time has passed since THIS hit started,
-## so the combo cannot be spammed faster than a readable cut-per-cut
-## cadence. Recovery frames (never startup/active frames) are what
-## stretches to fill the extra time -- see LuzAnimationCatalog._frame_seconds.
-@export var attack_window_hit1 := 0.35
-@export var attack_window_hit2 := 0.42
-## Finisher (hit 3) total window: also the minimum interval before the combo
-## can loop back to hit 1 -- a press during the finisher restarts the combo
-## here only if it is still within attack_buffer_time of this mark (see
-## _queue_attack's State.ATTACK branch and _attack_restart_buffered_left);
-## an earlier press is dropped.
-@export var attack_window_hit3 := 0.42
-## Finisher-only windup before its active (contact) frame -- longer than
-## attack_startup_time, matching the reference's more telegraphed last hit.
-@export var attack_finisher_startup_time := 0.15
-## Crouch/up attack total window -- kept independent of the ground
-## finisher's attack_window_hit3 so retuning the ground combo doesn't also
-## change these.
-@export var crouch_up_attack_window := 0.60
-@export var attack_forward_step_speed := 60.0
-## Air attack total cycle (startup + active + recovery); re-attack allowed once recovery starts.
-@export var air_attack_recovery := 0.40
-## How long ANY buffered attack press stays queued before being dropped:
-## a press that can't start an attack right away (dash, wall cling,
-## crouch/up attack), a press for the next combo hit
-## (hit1->2, hit2->3), and a press during the finisher that would restart
-## the combo -- all three share this one short window (~0.15s, matching the
-## Blasphemous reference) so a press is consumed at most once and a press
-## older than this window is dropped instead of firing an unexpected attack
-## later ("one attack too many" from a burst of taps -- see
-## _attack_buffered_left/_attack_restart_buffered_left below).
+## Penitent-matched timings (60 fps reference, seconds, hit-stop excluded).
+## Windup of hit 1 from rest (7 frames); after any attack it is the shorter
+## chained windup (4 frames).
+@export var attack_startup_time := 0.117
+@export var attack_chain_startup_time := 0.067
+## Finisher (hit 3) windup: sword raised above the head (9-13 frames).
+@export var attack_finisher_startup_time := 0.19
+## Active phases then recovery of each ground hit, as (first slash, second
+## slash, recovery). Hit 1: flat crescent A 4 f, high backhand B 5 f; hit 2:
+## A' 4 f, low backhand B' ~3.5 f; hit 3: lunge 3 f then the crescent hold.
+## Recovery ends when the next press is accepted: whiffing hit 1 repeats it
+## every ~0.305 s (windup 0.067 + 0.067 + 0.083 + 0.088).
+@export var attack_hit1_phases := Vector3(0.067, 0.083, 0.088)
+@export var attack_hit2_phases := Vector3(0.067, 0.06, 0.093)
+@export var attack_hit3_phases := Vector3(0.05, 0.05, 0.30)
+## Crouch attack: windup 4 f, sweep 1 (4 f), sweep 2 (3 f), recovery (cycle 28 f).
+@export var crouch_attack_startup_time := 0.067
+@export var crouch_attack_phases := Vector3(0.067, 0.05, 0.283)
+## Up attack: windup 7 f, thick arc rising back (4 f), thin arc to the front (6 f).
+@export var up_attack_startup_time := 0.117
+@export var up_attack_phases := Vector3(0.067, 0.10, 0.051)
+## Air attack: windup 3-4 f, diagonal crescent A (5 f), low backhand B (5 f).
+@export var air_attack_startup_time := 0.06
+@export var air_attack_phases := Vector3(0.083, 0.083, 0.173)
+## Time after a LANDED hit during which the next press still continues the
+## combo, even once the hit's own recovery is over (reference: >= 0.55 s).
+@export var attack_chain_window := 0.55
+## Hit 3 moves her forward by this many pixels in `attack_lunge_time`, then
+## she slides back to where she started over `attack_lunge_return_time`.
+## Enemies are not pushed; she may overlap them.
+@export var attack_lunge_distance := 40.0
+@export var attack_lunge_time := 0.05
+@export var attack_lunge_return_time := 0.30
+## How long ANY buffered attack press stays queued before being dropped
+## (a press accepted up to ~9 frames before recovery ends). One window shared by
+## every buffered press so a burst of taps never fires "one attack too many".
 @export var attack_buffer_time := 0.15
 
-@export_group("Attack Recoil")
+@export_group("Attack Feedback")
 ## Damage one slash deals to whatever it strikes.
 @export var attack_damage := 1
-## A horizontal slash that lands pushes Luz away from the target at this speed
-## for this long. Up slashes never recoil her.
-@export var attack_recoil_speed := 120.0
-@export var attack_recoil_time := 0.08
+## Freeze of Luz, the target and the slash on a landed hit, for ground hits
+## 1, 2 and 3 (Penitent: 5-8 f, 6-9 f, ~12 f). Never touches Engine.time_scale.
+@export var attack_hit_stop_times := Vector3(0.09, 0.10, 0.20)
+## Hit-stop of the crouch, up and air attacks.
+@export var attack_other_hit_stop_time := 0.09
+## Camera jolt (pixels, toward the attack; negative y is up) for ground hits
+## 1, 2, 3 and for the other attacks. It holds for `attack_kick_hold` and then
+## snaps back over `attack_kick_decay`.
+@export var attack_kick_hit1 := Vector2(9.0, 0.0)
+@export var attack_kick_hit2 := Vector2(13.0, -13.0)
+@export var attack_kick_hit3 := Vector2(36.0, -18.0)
+@export var attack_kick_other := Vector2(9.0, 0.0)
+@export var attack_kick_up := Vector2(0.0, -9.0)
+@export var attack_kick_hold := Vector3(0.033, 0.05, 0.12)
+@export var attack_kick_decay := 0.05
+## Spark scene spawned on the struck target (see HitSpark), at this height above its origin.
+@export var hit_spark_scene: PackedScene = preload("res://scenes/vfx/hit_spark.tscn")
+@export var hit_spark_height := 24.0
 
 @export_group("Attack Hitboxes")
-## T4d item 3 (iPhone playtest: "in the 3rd hit Luz gets bigger and so does
-## the attack hitbox; that must not happen. All hits must have the same
-## hitbox, vertical or horizontal"). ONE shared hitbox size/reach for every
-## horizontal attack (ground combo hits 1-3, crouch, air): same length
-## (reach from the player's own local origin) and same thickness -- only
-## the vertical placement (offset.y) differs, taken from each attack's own
-## measured ruler height at contact (the ground combo's three hits share
-## ONE "chest" placement, averaged across all three; crouch is low; air is
-## mid-air torso height). hitbox_up_size/offset is the same size rotated 90
-## degrees, reaching the same distance upward. The upward box intentionally
-## retains its previously accepted size and offset; it is not part of the
-## shared horizontal-hitbox derivation.
-@export var hitbox_attack_size := Vector2(49.9, 19.9)
-## offset.x, shared by every horizontal attack (ground combo, crouch, air).
-@export var hitbox_attack_reach_x := 40.7
-@export var hitbox_ground_offset_y := -21.26  ## combo (hits 1-3): shared contact height
-@export var hitbox_crouch_offset_y := -14.09  ## crouch: low horizontal cut height
-@export var hitbox_air_offset_y := -25.37     ## air: mid-air torso height
-@export var hitbox_up_size := Vector2(21.5, 56.3)
-@export var hitbox_up_offset := Vector2(0, -66.2)
+## Penitent-measured reach per phase, as a Rect2 in right-facing local pixels
+## (position = top-left corner, x forward, y negative = above the feet; it is
+## mirrored by her facing). The matching slash stroke is fitted to the same
+## rectangle, so the visible reach equals the hitbox reach. The finisher's box
+## stays where the lunge started (it does not travel with her).
+@export var hitbox_hit1_a := Rect2(8, -52, 70, 32)
+@export var hitbox_hit1_b := Rect2(-27, -59.5, 92, 18)
+@export var hitbox_hit2_a := Rect2(8, -40, 64, 25)
+@export var hitbox_hit2_b := Rect2(-55, -36, 105, 28)
+@export var hitbox_hit3 := Rect2(30, -88, 75, 83)
+@export var hitbox_crouch_a := Rect2(4, -36, 68, 36)
+@export var hitbox_crouch_b := Rect2(-32, -18, 94, 18)
+@export var hitbox_up_a := Rect2(-42, -115, 34, 82)
+@export var hitbox_up_b := Rect2(-8, -125, 36, 55)
+@export var hitbox_air_a := Rect2(-8, -63, 88, 39)
+@export var hitbox_air_b := Rect2(-15, -20, 62, 16)
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
@@ -342,24 +358,26 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 	"land": landing_squash_time,
 	"turn": turn_time,
 	"skid": _skid_brake_duration(),
-	"attack_1": attack_window_hit1,
-	"attack_2": attack_window_hit2,
-	"attack_3": attack_window_hit3,
-	"crouch_attack": crouch_up_attack_window,
-	# Ends together with the slash VFX (attack_startup_time + its fixed
-	# TOTAL_DURATION), not with the whole up-attack state's recovery
-	# (crouch_up_attack_window) -- otherwise the body clip freezes on a
-	# still-extended pose for the rest of the state after the slash is
-	# already gone (see PlayerSlashVfx.TOTAL_DURATION).
-	"up_attack": attack_startup_time + PlayerSlashVfx.TOTAL_DURATION,
-	"air_attack": air_attack_recovery,
+	"attack_1": attack_startup_time + _phase_total(attack_hit1_phases),
+	"attack_2": attack_chain_startup_time + _phase_total(attack_hit2_phases),
+	"attack_3": attack_finisher_startup_time + _phase_total(attack_hit3_phases),
+	"crouch_attack": crouch_attack_startup_time + _phase_total(crouch_attack_phases),
+	"up_attack": up_attack_startup_time + _phase_total(up_attack_phases),
+	"air_attack": air_attack_startup_time + _phase_total(air_attack_phases),
 }, {
 	"attack_1": attack_startup_time,
-	"attack_2": attack_startup_time,
+	"attack_2": attack_chain_startup_time,
 	"attack_3": attack_finisher_startup_time,
-	"crouch_attack": attack_startup_time,
-	"up_attack": attack_startup_time,
-	"air_attack": attack_startup_time,
+	"crouch_attack": crouch_attack_startup_time,
+	"up_attack": up_attack_startup_time,
+	"air_attack": air_attack_startup_time,
+}, {
+	"attack_1": attack_hit1_phases.x + attack_hit1_phases.y,
+	"attack_2": attack_hit2_phases.x + attack_hit2_phases.y,
+	"attack_3": attack_hit3_phases.x + attack_hit3_phases.y,
+	"crouch_attack": crouch_attack_phases.x + crouch_attack_phases.y,
+	"up_attack": up_attack_phases.x + up_attack_phases.y,
+	"air_attack": air_attack_phases.x + air_attack_phases.y,
 })
 
 var _state := State.IDLE
@@ -372,6 +390,7 @@ var _meditating := false
 var _dead := false
 var _hurt_left := 0.0
 var _invuln_left := 0.0
+var _dash_grace_left := 0.0
 var _hit_stop_left := 0.0
 var _base_alpha := 1.0
 var _return_phase := ReturnPhase.NONE
@@ -452,8 +471,24 @@ var _attack_restart_buffered_left := 0.0
 var _air_attack_buffered_left := 0.0
 var _attack_buffer_left := 0.0
 var _attack_buffer_direction := 0
-var _recoil_left := 0.0
-var _recoil_velocity := 0.0
+## Phase bookkeeping of the current attack: index of the active segment
+## (-1 = windup, segment count = recovery) and the windup it started with.
+var _attack_segment := -1
+var _attack_startup_current := 0.0
+## True when this hit began right after another one (shorter windup).
+var _attack_chained := false
+## Whether the current ground hit struck something: only a landed hit lets the
+## combo advance; a whiff repeats hit 1.
+var _attack_landed := false
+## After a landed hit: combo index a fresh press continues with, and how long
+## that is still possible (attack_chain_window).
+var _chain_next_index := 0
+var _chain_time_left := 0.0
+## Position at which the current attack started (the finisher's box and slash
+## stay there) and the lunge bookkeeping.
+var _attack_origin := Vector2.ZERO
+var _attack_segment_rect := Rect2()
+var _attack_segment_anchored := false
 
 var _soul := 0
 var _focus_left := 0.0
@@ -504,6 +539,9 @@ func _recompute_jump_physics() -> void:
 func _physics_process(delta: float) -> void:
 	if _hit_stop_left > 0.0:
 		_hit_stop_left = maxf(_hit_stop_left - delta, 0.0)
+		# A press during the freeze is not lost: it is buffered for the combo.
+		if _is_directional_attack_state() and Input.is_action_just_pressed(&"attack"):
+			_queue_attack(_held_vertical_direction())
 		return
 	_update_damage_timers(delta)
 	if _dead:
@@ -565,7 +603,6 @@ func _physics_process(delta: float) -> void:
 		State.FOCUS:
 			_update_focus(delta)
 
-	_apply_attack_recoil(delta)
 	move_and_slide()
 	_after_move(fall_speed_before_move)
 	_track_safe_ground(delta)
@@ -584,6 +621,7 @@ func _update_shared_timers(delta: float) -> void:
 	_attack_buffer_left = maxf(_attack_buffer_left - delta, 0.0)
 	_attack_buffered_left = maxf(_attack_buffered_left - delta, 0.0)
 	_attack_restart_buffered_left = maxf(_attack_restart_buffered_left - delta, 0.0)
+	_chain_time_left = maxf(_chain_time_left - delta, 0.0)
 	_air_attack_buffered_left = maxf(_air_attack_buffered_left - delta, 0.0)
 
 	if _drop_left > 0.0:
@@ -893,8 +931,7 @@ func _queue_attack(direction: int) -> void:
 				_attack_buffered_left = attack_buffer_time
 			else:
 				# Playing the finisher: buffer a combo restart (loop back to
-				# hit 1) the same short, timed way -- see
-				# _attack_restart_buffered_left.
+				# hit 1) the same short, timed way.
 				_attack_restart_buffered_left = attack_buffer_time
 			return
 		State.AIR_ATTACK:
@@ -947,16 +984,163 @@ func _clear_pending_attack_buffer() -> void:
 	_attack_buffer_left = 0.0
 
 
+static func _phase_total(phases: Vector3) -> float:
+	return phases.x + phases.y + phases.z
+
+
+## One hitbox phase of an attack: which hitbox rectangle is live, which slash
+## stroke is cast with it, how long the phase lasts and whether it stays where
+## the attack started (the finisher) instead of travelling with her.
+func _segment(
+	attack_name: StringName, rect: Rect2, shape: StringName, time: float,
+	stroke_time := -1.0, anchored := false
+) -> Dictionary:
+	return {
+		"name": attack_name, "rect": rect, "shape": shape, "time": time,
+		"stroke": time if stroke_time < 0.0 else stroke_time, "anchored": anchored,
+	}
+
+
+## Hitbox phases of a ground combo hit (index 0..2).
+func get_ground_segments(index: int) -> Array:
+	match index:
+		0:
+			return [
+				_segment(&"attack_ground_1", hitbox_hit1_a, &"slash_a", attack_hit1_phases.x),
+				_segment(&"attack_ground_1", hitbox_hit1_b, &"slash_b_high", attack_hit1_phases.y),
+			]
+		1:
+			return [
+				_segment(&"attack_ground_2", hitbox_hit2_a, &"slash_a", attack_hit2_phases.x),
+				_segment(&"attack_ground_2", hitbox_hit2_b, &"slash_b_low", attack_hit2_phases.y),
+			]
+		_:
+			var total := attack_hit3_phases.x + attack_hit3_phases.y
+			return [
+				_segment(&"attack_ground_3", hitbox_hit3, &"slash_finisher", attack_hit3_phases.x, total, true),
+				_segment(&"attack_ground_3", hitbox_hit3, &"", attack_hit3_phases.y, 0.0, true),
+			]
+
+
+func get_crouch_segments() -> Array:
+	return [
+		_segment(&"attack_crouch", hitbox_crouch_a, &"slash_crouch_a", crouch_attack_phases.x),
+		_segment(&"attack_crouch", hitbox_crouch_b, &"slash_crouch_b", crouch_attack_phases.y),
+	]
+
+
+func get_up_segments() -> Array:
+	return [
+		_segment(&"attack_up", hitbox_up_a, &"slash_up_rise", up_attack_phases.x),
+		_segment(&"attack_up", hitbox_up_b, &"slash_up_fall", up_attack_phases.y),
+	]
+
+
+func get_air_segments() -> Array:
+	return [
+		_segment(&"attack_air", hitbox_air_a, &"slash_air_a", air_attack_phases.x),
+		_segment(&"attack_air", hitbox_air_b, &"slash_air_b", air_attack_phases.y),
+	]
+
+
+func get_ground_phases(index: int) -> Vector3:
+	match index:
+		0:
+			return attack_hit1_phases
+		1:
+			return attack_hit2_phases
+		_:
+			return attack_hit3_phases
+
+
+## Windup of a ground hit: hit 1 from rest is longer than a chained one.
+func get_ground_startup(index: int, chained: bool) -> float:
+	if index >= 2:
+		return attack_finisher_startup_time
+	if index == 1 or chained:
+		return attack_chain_startup_time
+	return attack_startup_time
+
+
+## Moves through the windup, the active segments and the recovery of the
+## current attack from `_state_time`, switching the hitbox and slash on every
+## segment change.
+func _apply_attack_segments(segments: Array, startup: float) -> void:
+	var index := -1
+	if _state_time >= startup:
+		index = segments.size()
+		var cursor := startup
+		for i in segments.size():
+			cursor += float(segments[i]["time"])
+			if _state_time < cursor:
+				index = i
+				break
+	if index == _attack_segment:
+		return
+	_attack_segment = index
+	if index < 0:
+		_attack_phase = PHASE_STARTUP
+	elif index >= segments.size():
+		_attack_phase = PHASE_RECOVERY
+		_deactivate_attack_hitbox()
+	else:
+		_attack_phase = PHASE_ACTIVE
+		_enter_attack_segment(segments[index])
+
+
+func _enter_attack_segment(segment: Dictionary) -> void:
+	var rect: Rect2 = segment["rect"]
+	_attack_segment_rect = rect
+	_attack_segment_anchored = segment["anchored"]
+	_place_attack_hitbox()
+	_attack_hitbox.activate(segment["name"])
+	if segment["shape"] != &"" and float(segment["stroke"]) > 0.0:
+		_slash_vfx.play_stroke(segment["shape"], _attack_facing, rect, float(segment["stroke"]))
+
+
+## Puts the live hitbox on the segment rectangle. An anchored segment keeps
+## its world position while she lunges.
+func _place_attack_hitbox() -> void:
+	var center := _attack_segment_rect.get_center()
+	var x := center.x * float(_attack_facing)
+	if _attack_segment_anchored:
+		x -= global_position.x - _attack_origin.x
+	_attack_hitbox.configure(_attack_segment_rect.size, Vector2(x, center.y))
+
+
+func _reset_attack_progress(startup: float) -> void:
+	_attack_segment = -1
+	_attack_phase = PHASE_STARTUP
+	_attack_startup_current = startup
+	_attack_origin = global_position
+	_attack_segment_anchored = false
+	_deactivate_attack_hitbox()
+
+
 ## -- Combat: ground combo -----------------------------------------------------
 
-func _start_ground_attack() -> void:
-	_attack_combo_index = 0
+## Starts the combo. A fresh press continues a combo whose last hit landed
+## within attack_chain_window, otherwise it starts at hit 1 from rest.
+func _start_ground_attack(index := -1, chained := false) -> void:
+	if index < 0:
+		var resumes := _chain_time_left > 0.0
+		index = _chain_next_index if resumes else 0
+		chained = resumes
 	_attack_buffered_left = 0.0
 	_attack_restart_buffered_left = 0.0
 	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.ATTACK)
-	_attack_phase = PHASE_STARTUP
+	_begin_ground_hit(index, chained)
+
+
+func _begin_ground_hit(index: int, chained: bool) -> void:
+	_attack_combo_index = index
+	_attack_chained = chained
+	_attack_landed = false
+	_chain_time_left = 0.0
+	_state_time = 0.0
+	_reset_attack_progress(get_ground_startup(index, chained))
 
 
 func _update_attack(delta: float) -> void:
@@ -967,63 +1151,42 @@ func _update_attack(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
 		_apply_gravity(delta)
 
-	var window := _attack_window_for(_attack_combo_index)
-	var startup := _attack_startup_for(_attack_combo_index)
-	var t := _state_time
+	var phases := get_ground_phases(_attack_combo_index)
+	_apply_attack_segments(get_ground_segments(_attack_combo_index), _attack_startup_current)
+	if _attack_combo_index >= 2 and is_on_floor():
+		_apply_lunge(delta)
+	if _attack_segment_anchored and _attack_phase == PHASE_ACTIVE:
+		_place_attack_hitbox()
+	if _attack_phase == PHASE_RECOVERY and _try_launch_jump():
+		return
 
-	if t < startup:
-		_attack_phase = PHASE_STARTUP
-	elif t < startup + attack_active_time:
-		if _attack_phase != PHASE_ACTIVE:
-			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(
-				_ground_attack_name(_attack_combo_index), _attack_facing, _attack_combo_index, &"ground"
-			)
-		if not is_on_floor():
-			velocity.x = float(_attack_facing) * attack_forward_step_speed
-	else:
-		if _attack_phase != PHASE_RECOVERY:
-			_attack_phase = PHASE_RECOVERY
-			_deactivate_attack_hitbox()
-		if _try_launch_jump():
-			return
-
-	if t >= window:
+	if _state_time >= _attack_startup_current + _phase_total(phases):
 		if _attack_buffered_left > 0.0 and _attack_combo_index < 2:
-			_attack_combo_index += 1
+			# Only a landed hit lets the combo advance; a whiff repeats hit 1.
+			var next := _attack_combo_index + 1 if _attack_landed else 0
 			_attack_buffered_left = 0.0
-			_state_time = 0.0
-			_attack_phase = PHASE_STARTUP
+			_begin_ground_hit(next, true)
 		elif _attack_restart_buffered_left > 0.0 and _attack_combo_index >= 2:
-			_start_ground_attack()
+			_start_ground_attack(0, true)
 		else:
 			_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
 
 
-func _attack_window_for(index: int) -> float:
-	match index:
-		0:
-			return attack_window_hit1
-		1:
-			return attack_window_hit2
-		_:
-			return attack_window_hit3
-
-
-## The finisher (hit 3) has its own, longer windup than hits 1/2 -- see
-## attack_finisher_startup_time.
-func _attack_startup_for(index: int) -> float:
-	return attack_finisher_startup_time if index >= 2 else attack_startup_time
-
-
-func _ground_attack_name(index: int) -> StringName:
-	match index:
-		0:
-			return &"attack_ground_1"
-		1:
-			return &"attack_ground_2"
-		_:
-			return &"attack_ground_3"
+## Finisher lunge: forward by attack_lunge_distance over attack_lunge_time from
+## the first active frame, then back to where she started. Nothing is pushed.
+func _apply_lunge(delta: float) -> void:
+	var since := _state_time - _attack_startup_current
+	if since < 0.0:
+		return
+	var facing := float(_attack_facing)
+	if since < attack_lunge_time:
+		velocity.x = facing * attack_lunge_distance / maxf(attack_lunge_time, 0.001)
+		return
+	var advanced := (global_position.x - _attack_origin.x) * facing
+	if advanced <= 0.5:
+		return
+	var speed := minf(attack_lunge_distance / maxf(attack_lunge_return_time, 0.001), advanced / maxf(delta, 0.001))
+	velocity.x = -facing * speed
 
 
 ## -- Combat: crouch attack -----------------------------------------------------
@@ -1032,7 +1195,7 @@ func _start_crouch_attack() -> void:
 	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.CROUCH_ATTACK)
-	_attack_phase = PHASE_STARTUP
+	_reset_attack_progress(crouch_attack_startup_time)
 
 
 func _update_crouch_attack(delta: float) -> void:
@@ -1042,21 +1205,12 @@ func _update_crouch_attack(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, run_deceleration * delta)
 	velocity.y = 0.0
 
-	if _state_time < attack_startup_time:
-		pass
-	elif _state_time < attack_startup_time + attack_active_time:
-		if _attack_phase != PHASE_ACTIVE:
-			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_crouch", _attack_facing, 0, &"crouch")
-	else:
-		if _attack_phase != PHASE_RECOVERY:
-			_attack_phase = PHASE_RECOVERY
-			_deactivate_attack_hitbox()
-		if _state_time >= crouch_up_attack_window:
-			if Input.is_action_pressed(&"move_down") or not _has_standing_headroom():
-				_enter_state(State.CROUCH)
-			else:
-				_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
+	_apply_attack_segments(get_crouch_segments(), crouch_attack_startup_time)
+	if _state_time >= crouch_attack_startup_time + _phase_total(crouch_attack_phases):
+		if Input.is_action_pressed(&"move_down") or not _has_standing_headroom():
+			_enter_state(State.CROUCH)
+		else:
+			_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
 
 
 ## -- Combat: up attack (ground or air) -----------------------------------------
@@ -1065,7 +1219,7 @@ func _start_up_attack() -> void:
 	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.UP_ATTACK)
-	_attack_phase = PHASE_STARTUP
+	_reset_attack_progress(up_attack_startup_time)
 
 
 func _update_up_attack(delta: float) -> void:
@@ -1077,18 +1231,9 @@ func _update_up_attack(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, axis * air_max_speed, air_acceleration * delta)
 		_apply_gravity(delta)
 
-	if _state_time < attack_startup_time:
-		pass
-	elif _state_time < attack_startup_time + attack_active_time:
-		if _attack_phase != PHASE_ACTIVE:
-			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_up", _attack_facing, 0, &"up")
-	else:
-		if _attack_phase != PHASE_RECOVERY:
-			_attack_phase = PHASE_RECOVERY
-			_deactivate_attack_hitbox()
-		if _state_time >= crouch_up_attack_window:
-			_end_generic_attack()
+	_apply_attack_segments(get_up_segments(), up_attack_startup_time)
+	if _state_time >= up_attack_startup_time + _phase_total(up_attack_phases):
+		_end_generic_attack()
 
 
 ## -- Combat: air attack ---------------------------------------------------------
@@ -1098,12 +1243,12 @@ func _start_air_attack() -> void:
 	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.AIR_ATTACK)
-	_attack_phase = PHASE_STARTUP
+	_reset_attack_progress(air_attack_startup_time)
 
 
 func _restart_air_attack() -> void:
 	_state_time = 0.0
-	_attack_phase = PHASE_STARTUP
+	_reset_attack_progress(air_attack_startup_time)
 
 
 func _update_air_attack(delta: float) -> void:
@@ -1116,26 +1261,17 @@ func _update_air_attack(delta: float) -> void:
 		_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
 		return
 
-	if _state_time < attack_startup_time:
-		_attack_phase = PHASE_STARTUP
-	elif _state_time < attack_startup_time + attack_active_time:
-		if _attack_phase != PHASE_ACTIVE:
-			_attack_phase = PHASE_ACTIVE
-			_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
-	else:
-		if _attack_phase != PHASE_RECOVERY:
-			_attack_phase = PHASE_RECOVERY
-			_deactivate_attack_hitbox()
-		if _air_attack_buffered_left > 0.0:
-			_air_attack_buffered_left = 0.0
-			_restart_air_attack()
-			return
+	_apply_attack_segments(get_air_segments(), air_attack_startup_time)
+	if _attack_phase == PHASE_RECOVERY and _air_attack_buffered_left > 0.0:
+		_air_attack_buffered_left = 0.0
+		_restart_air_attack()
+		return
 
-	if _state_time >= air_attack_recovery:
+	if _state_time >= air_attack_startup_time + _phase_total(air_attack_phases):
 		_state = State.JUMP if velocity.y < 0.0 else State.FALL
 
 
-## -- Combat: hits and recoil ---------------------------------------------------------
+## -- Combat: hits and feedback ---------------------------------------------------
 
 ## Deferred: the hitbox reports from inside a physics query flush, where
 ## changing areas, bodies or this state is forbidden.
@@ -1144,7 +1280,8 @@ func _on_attack_hit(target: Node2D, attack_name: StringName) -> void:
 
 
 ## Any target with a `receive_hit(damage, source_position, attack_name)` method
-## can be struck (see Enemy). A landed horizontal slash recoils Luz.
+## can be struck (see Enemy). A landed slash freezes the exchange, jolts the
+## camera and throws sparks; it never pushes her or the target.
 func _resolve_attack_hit(target: Node2D, attack_name: StringName) -> void:
 	if _dead or not is_instance_valid(target):
 		return
@@ -1152,70 +1289,97 @@ func _resolve_attack_hit(target: Node2D, attack_name: StringName) -> void:
 	if target.has_method(&"receive_hit"):
 		struck = target.call(&"receive_hit", attack_damage, global_position, attack_name)
 	if struck:
-		_start_attack_recoil(target.global_position)
+		_on_attack_landed(target, attack_name)
 	if struck and target.is_in_group(Enemy.GROUP_ENEMIES):
 		add_soul(soul_per_hit)
 
 
-## Pushes her away from `source` for a moment. Only the lateral attack states
-## apply it, and only to horizontal speed, so the double jump and the dash are
-## untouched.
-func _start_attack_recoil(source: Vector2) -> void:
-	if not _is_lateral_attack_state():
+## Tier of a landed attack: 0..2 ground hits 1-3, 3 crouch/air, 4 up.
+func _attack_tier(attack_name: StringName) -> int:
+	match attack_name:
+		&"attack_ground_1":
+			return 0
+		&"attack_ground_2":
+			return 1
+		&"attack_ground_3":
+			return 2
+		&"attack_up":
+			return 4
+		_:
+			return 3
+
+
+func get_hit_stop_for(tier: int) -> float:
+	match tier:
+		0:
+			return attack_hit_stop_times.x
+		1:
+			return attack_hit_stop_times.y
+		2:
+			return attack_hit_stop_times.z
+		_:
+			return attack_other_hit_stop_time
+
+
+func _on_attack_landed(target: Node2D, attack_name: StringName) -> void:
+	var tier := _attack_tier(attack_name)
+	if tier <= 2 and _state == State.ATTACK:
+		_attack_landed = true
+		if _attack_combo_index < 2:
+			_chain_next_index = _attack_combo_index + 1
+			_chain_time_left = attack_chain_window
+	var stop := get_hit_stop_for(tier)
+	if stop > 0.0:
+		_hit_stop_left = maxf(_hit_stop_left, stop)
+		_sprite.speed_scale = 0.0
+		_slash_vfx.freeze(stop)
+		if target.has_method(&"freeze"):
+			target.call(&"freeze", stop)
+	_spawn_hit_spark(target, tier, stop)
+	_kick_cameras(tier)
+
+
+func _spawn_hit_spark(target: Node2D, tier: int, stop: float) -> void:
+	if hit_spark_scene == null:
 		return
-	var side := signf(global_position.x - source.x)
-	if is_zero_approx(side):
-		side = -float(_attack_facing)
-	_recoil_velocity = side * attack_recoil_speed
-	_recoil_left = attack_recoil_time
-
-
-func _apply_attack_recoil(delta: float) -> void:
-	if _recoil_left <= 0.0:
+	var host := get_parent() as Node2D
+	if host == null:
+		host = get_tree().current_scene as Node2D
+	if host == null:
 		return
-	_recoil_left = maxf(_recoil_left - delta, 0.0)
-	if _is_lateral_attack_state():
-		velocity.x = _recoil_velocity
+	var spark := hit_spark_scene.instantiate() as HitSpark
+	if spark == null:
+		return
+	spark.direction = _attack_facing
+	spark.intensity = (tier + 1) if tier <= 2 else 1
+	host.add_child(spark)
+	spark.global_position = target.global_position + Vector2(0.0, -hit_spark_height)
+	spark.freeze(stop)
 
 
-func _is_lateral_attack_state() -> bool:
-	return _state == State.ATTACK or _state == State.CROUCH_ATTACK or _state == State.AIR_ATTACK
-
-
-## -- Combat: hitbox helpers -------------------------------------------------------
-
-func _activate_attack_hitbox(attack_name: StringName, facing: int = 0) -> Dictionary:
-	var config := _hitbox_config_for(attack_name)
-	var offset: Vector2 = config.offset
-	var attack_direction := _facing if facing == 0 else facing
-	_attack_hitbox.configure(config.size, Vector2(offset.x * float(attack_direction), offset.y))
-	_attack_hitbox.activate(attack_name)
-	return config
-
-
-func _activate_directional_attack(
-	attack_name: StringName, facing: int, variant: int, slash_kind: StringName
-) -> void:
-	var config := _activate_attack_hitbox(attack_name, facing)
-	_slash_vfx.play_slash(slash_kind, variant, facing, config.size, config.offset)
+## Jolts whichever camera is current (the player Camera2D or the RoomCamera).
+func _kick_cameras(tier: int) -> void:
+	var camera := get_viewport().get_camera_2d()
+	if camera == null or not camera.has_method(&"kick"):
+		return
+	var amplitude := attack_kick_other
+	var hold := attack_kick_hold.x
+	match tier:
+		0:
+			amplitude = attack_kick_hit1
+		1:
+			amplitude = attack_kick_hit2
+			hold = attack_kick_hold.y
+		2:
+			amplitude = attack_kick_hit3
+			hold = attack_kick_hold.z
+		4:
+			amplitude = attack_kick_up
+	camera.call(&"kick", Vector2(amplitude.x * float(_attack_facing), amplitude.y), hold, attack_kick_decay)
 
 
 func _deactivate_attack_hitbox() -> void:
 	_attack_hitbox.deactivate()
-
-
-func _hitbox_config_for(attack_name: StringName) -> Dictionary:
-	match attack_name:
-		&"attack_ground_1", &"attack_ground_2", &"attack_ground_3":
-			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_ground_offset_y)}
-		&"attack_crouch":
-			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_crouch_offset_y)}
-		&"attack_air":
-			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_air_offset_y)}
-		&"attack_up":
-			return {size = hitbox_up_size, offset = hitbox_up_offset}
-		_:
-			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_ground_offset_y)}
 
 
 ## -- Airborne: jump / fall ----------------------------------------------------
@@ -1596,13 +1760,12 @@ func _enter_state(new_state: State) -> void:
 		_landing_left = 0.0
 	_run_time = 0.0
 	_release_time = 0.0
-	if not _is_lateral_attack_state():
-		_recoil_left = 0.0
 	if not _is_directional_attack_state():
 		_slash_vfx.stop_slash()
 
 	if previous == State.DASH and new_state != State.DASH:
 		_dash_cooldown_left = dash_cooldown
+		_dash_grace_left = dash_invulnerable_grace
 
 	# A dash only keeps the low slide collider on the ground; an air dash
 	# keeps the standing collider. _dash_is_air still reflects the dash that
@@ -1702,8 +1865,15 @@ func take_hazard_damage(amount: int, source_position: Vector2) -> bool:
 	return _apply_damage(amount, source_position, true)
 
 
+## True during the whole dash (and its grace): non-hazard hits are ignored.
+func is_dash_invulnerable() -> bool:
+	return dash_invulnerable and (_state == State.DASH or _dash_grace_left > 0.0)
+
+
 func _apply_damage(amount: int, source_position: Vector2, hazard: bool, force := false) -> bool:
 	if amount <= 0 or _dead:
+		return false
+	if not hazard and not force and is_dash_invulnerable():
 		return false
 	if not force and (_invuln_left > 0.0 or is_input_locked()):
 		return false
@@ -1754,7 +1924,6 @@ func _cancel_actions_for_hit() -> void:
 	if _state == State.FOCUS:
 		_enter_state(State.IDLE)
 	_deactivate_attack_hitbox()
-	_recoil_left = 0.0
 	_attack_combo_index = 0
 	_attack_buffered_left = 0.0
 	_attack_restart_buffered_left = 0.0
@@ -1769,6 +1938,7 @@ func _cancel_actions_for_hit() -> void:
 func _update_damage_timers(delta: float) -> void:
 	_hurt_left = maxf(_hurt_left - delta, 0.0)
 	_invuln_left = maxf(_invuln_left - delta, 0.0)
+	_dash_grace_left = maxf(_dash_grace_left - delta, 0.0)
 	if _dead:
 		return
 	_set_sprite_alpha(_flicker_alpha_now() if _invuln_left > 0.0 else _base_alpha)
@@ -2167,7 +2337,6 @@ func _cancel_inputs_for_transition() -> void:
 	_air_attack_buffered_left = 0.0
 	_attack_buffer_left = 0.0
 	_attack_buffer_direction = 0
-	_recoil_left = 0.0
 	_deactivate_attack_hitbox()
 	_set_collider_height(_standing_shape_height)
 
@@ -2262,7 +2431,6 @@ func clear_transient_state() -> void:
 	_air_attack_buffered_left = 0.0
 	_attack_buffer_left = 0.0
 	_attack_buffer_direction = 0
-	_recoil_left = 0.0
 	_clear_damage_state()
 	_set_collider_height(_standing_shape_height)
 	_deactivate_attack_hitbox()
@@ -2270,6 +2438,7 @@ func clear_transient_state() -> void:
 
 
 func _clear_damage_state() -> void:
+	_dash_grace_left = 0.0
 	_end_safe_return()
 	_hurt_left = 0.0
 	_invuln_left = 0.0
@@ -2463,24 +2632,15 @@ func _update_animation() -> void:
 			_play_animation(&"wall_cling")
 		State.ATTACK:
 			var attack_animation: StringName = [&"attack_1", &"attack_2", &"attack_3"][clampi(_attack_combo_index, 0, 2)]
-			_play_animation(attack_animation)
+			# A chained hit 1 has a shorter windup than the clip was timed for.
+			var windup_speed := 1.0
+			if _attack_combo_index == 0 and _attack_chained and _attack_phase == PHASE_STARTUP:
+				windup_speed = attack_startup_time / maxf(attack_chain_startup_time, 0.001)
+			_play_animation(attack_animation, windup_speed)
 		State.CROUCH_ATTACK:
 			_play_animation(&"crouch_attack")
 		State.UP_ATTACK:
-			# T4d item 4 (iPhone playtest: the up-attack body pose now ends
-			# together with its slash -- commit 126d6ff -- but was still
-			# DISPLAYED for the rest of the state's recovery: the up_attack
-			# clip freezes on its last frame, which is a pointing-up pose,
-			# for crouch_up_attack_window - slash_end (~0.38s). Switch to the
-			# appropriate airborne/idle animation the instant the slash ends
-			# instead of holding that pose.
-			var up_attack_slash_end := attack_startup_time + PlayerSlashVfx.TOTAL_DURATION
-			if _state_time < up_attack_slash_end:
-				_play_animation(&"up_attack")
-			elif is_on_floor():
-				_play_animation(&"idle")
-			else:
-				_play_animation(&"fall" if velocity.y >= 0.0 else &"jump")
+			_play_animation(&"up_attack")
 		State.AIR_ATTACK:
 			_play_animation(&"air_attack")
 		State.HURT:

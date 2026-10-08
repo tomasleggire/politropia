@@ -14,6 +14,8 @@ extends Node
 ## (release for 3 frames, release for 6 frames, plain stop), then the jump and dash
 ## set: standing full jump, tap jump, running jump (held), the standing landing
 ## recovery, a ground dash from rest, a ground dash from a run and an air dash.
+## LUZ_CAPTURE_MODE=attacks records an attack sequence instead (see _attack_steps):
+## whiffs, a full 3-hit combo on a dummy walker, crouch, up and air attacks.
 ## Input goes through Input.action_press/release like a player. track.csv has a
 ## `step` column (index into the sequence) to cut each action out.
 
@@ -30,12 +32,81 @@ var _player: Player
 var _sprite: AnimatedSprite2D
 var _log: FileAccess
 var _frame := 0
+var _attack_mode := false
+var _target: Node2D
+var _tag := ""
 
 
 func _ready() -> void:
 	var path := LEVEL_PATH if ResourceLoader.exists(LEVEL_PATH) else LEVEL_FALLBACK
 	add_child((load(path) as PackedScene).instantiate())
-	_steps = [
+	_attack_mode = OS.get_environment("LUZ_CAPTURE_MODE") == "attacks"
+	_steps = _attack_steps() if _attack_mode else _locomotion_steps()
+	await get_tree().process_frame
+	_player = _find_player(self)
+	if _player == null:
+		push_error("luz_capture: no Player in the level")
+		get_tree().quit(1)
+		return
+	_sprite = _player.get_node_or_null("AnimatedSprite2D")
+	if path == LEVEL_PATH:
+		_player.global_position = START_POSITION
+		_player.velocity = Vector2.ZERO
+		_player.reset_physics_interpolation()
+		var camera := get_tree().get_first_node_in_group(&"player_camera") as Camera2D
+		if camera != null:
+			camera.reset_smoothing()
+			camera.reset_physics_interpolation()
+	if _attack_mode:
+		_spawn_target()
+	# Per-frame track (frame, screen x/y, world x/y, velocity x, animation, frame
+	# index) so extract.py can follow Luz with the close-up crop.
+	var out := OS.get_environment("LUZ_CAPTURE_OUT")
+	if out != "":
+		_log = FileAccess.open(out.path_join("track.csv"), FileAccess.WRITE)
+		_log.store_line("frame,sx,sy,wx,wy,vx,anim,aframe,step,tag")
+
+
+## Attack sequence: whiffs (mashed), a landed combo on the dummy (the dummy moves
+## in front of her at the "target" step), crouch, up and air attacks. Entries may
+## carry a tag (third item); a tag is also the callback name for "target".
+func _attack_steps() -> Array:
+	return [
+		[1.0, &""],
+		# Whiffs: hit 1 repeats.
+		[0.05, &"attack", "whiff"], [0.25, &"", "whiff"], [0.05, &"attack", "whiff"], [0.25, &"", "whiff"],
+		[0.05, &"attack", "whiff"], [0.25, &"", "whiff"], [0.05, &"attack", "whiff"], [0.9, &"", "whiff"],
+		[0.2, &"", "target"],
+		# A landed 3-hit combo: taps spaced so each press continues the chain.
+		[0.05, &"attack", "combo"], [0.30, &"", "combo"], [0.05, &"attack", "combo"], [0.38, &"", "combo"],
+		[0.05, &"attack", "combo"], [1.0, &"", "combo"],
+		[0.6, &"", ""],
+		[0.5, &"move_down", ""], [0.05, [&"move_down", &"attack"], "crouch"], [0.9, &"move_down", "crouch"], [0.6, &"", ""],
+		[0.05, [&"move_up", &"attack"], "up"], [0.9, &"", "up"],
+		[0.1, &"jump", "air"], [0.3, &"", "air"], [0.05, &"attack", "air"], [1.2, &"", "air"],
+	]
+
+
+func _spawn_target() -> void:
+	var walker := (load("res://scenes/enemies/walker.tscn") as PackedScene).instantiate()
+	walker.set("enemy_id", &"capture_dummy")
+	walker.set("max_health", 999)
+	walker.set("contact_damage", 0)
+	walker.set("walk_speed", 0.0)
+	walker.set("start_facing", -1)
+	add_child(walker)
+	walker.global_position = START_POSITION + Vector2(-600.0, 0.0)
+	_target = walker
+
+
+func _on_step_start(tag: String) -> void:
+	_tag = tag
+	if tag == "target" and _target != null:
+		_target.global_position = _player.global_position + Vector2(62.0, 0.0)
+
+
+func _locomotion_steps() -> Array:
+	return [
 		[1.5, &""], [2.0, &"move_right"], [1.0, &""],
 		[1.5, &"move_left"], [1.5, &"move_right"], [0.2, &""],
 		[1.0, &"move_right"], [1.0, &""],
@@ -59,27 +130,6 @@ func _ready() -> void:
 		[0.6, &"move_left"], [0.1, [&"move_left", &"dash"]], [0.5, &"move_left"], [1.0, &""],
 		[0.15, &"jump"], [0.1, &""], [0.1, &"dash"], [1.2, &""],
 	]
-	await get_tree().process_frame
-	_player = _find_player(self)
-	if _player == null:
-		push_error("luz_capture: no Player in the level")
-		get_tree().quit(1)
-		return
-	_sprite = _player.get_node_or_null("AnimatedSprite2D")
-	if path == LEVEL_PATH:
-		_player.global_position = START_POSITION
-		_player.velocity = Vector2.ZERO
-		_player.reset_physics_interpolation()
-		var camera := get_tree().get_first_node_in_group(&"player_camera") as Camera2D
-		if camera != null:
-			camera.reset_smoothing()
-			camera.reset_physics_interpolation()
-	# Per-frame track (frame, screen x/y, world x/y, velocity x, animation, frame
-	# index) so extract.py can follow Luz with the close-up crop.
-	var out := OS.get_environment("LUZ_CAPTURE_OUT")
-	if out != "":
-		_log = FileAccess.open(out.path_join("track.csv"), FileAccess.WRITE)
-		_log.store_line("frame,sx,sy,wx,wy,vx,anim,aframe,step")
 
 
 func _find_player(node: Node) -> Player:
@@ -98,8 +148,8 @@ func _process(_delta: float) -> void:
 	var screen := _player.get_global_transform_with_canvas().origin
 	var anim := String(_sprite.animation) if _sprite != null else ""
 	var aframe := _sprite.frame if _sprite != null else -1
-	_log.store_line("%d,%.1f,%.1f,%.1f,%.1f,%.1f,%s,%d,%d" % [_frame, screen.x, screen.y,
-		_player.global_position.x, _player.global_position.y, _player.velocity.x, anim, aframe, _index])
+	_log.store_line("%d,%.1f,%.1f,%.1f,%.1f,%.1f,%s,%d,%d,%s" % [_frame, screen.x, screen.y,
+		_player.global_position.x, _player.global_position.y, _player.velocity.x, anim, aframe, _index, _tag])
 	_frame += 1
 
 
@@ -115,6 +165,9 @@ func _physics_process(delta: float) -> void:
 		return
 	_time += delta
 	var step: Array = _steps[_index]
+	var step_tag: String = step[2] if step.size() > 2 else ""
+	if step_tag != _tag:
+		_on_step_start(step_tag)
 	var wanted: Array = step[1] if step[1] is Array else ([] if step[1] == &"" else [step[1]])
 	if _held != wanted:
 		_release()

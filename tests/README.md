@@ -21,8 +21,10 @@ check names.
 - `room_camera_bounds_test.gd`: per-room camera clamp and blend, room selection
   and the real camera in the Greece level.
 - `combat_test.gd`: damage, i-frames, knockback, control lock, hit-stop, death,
-  respawn, the `ContactDamage` component on a synthetic floor and the absence of
-  the pogo and ledge states.
+  respawn, the `ContactDamage` component on a synthetic floor, the absence of
+  the pogo and ledge states, and the attacks (combo advances only on a landed
+  hit, whiff cadence, hitbox rectangles per phase, hit-stop, finisher lunge,
+  no recoil, camera kick) plus the dash i-frames.
 - `enemy_test.gd`: the enemy base and the walker (patrol, ledges and walls,
   contact damage, hits, corpses), the three room persistence rules, off-room
   pausing and the player's hit recoil.

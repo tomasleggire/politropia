@@ -18,6 +18,7 @@ is the thing to look at: feet must not skate.
 from __future__ import annotations
 
 import csv
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -26,7 +27,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 OUT_W, OUT_H = 720, 540
-LUZ_WIN = (120, 90)  # world px; 6x nearest => 720x540 (Luz 48 px = 288 px)
+LUZ_WIN = (180, 135) if os.environ.get("LUZ_CAPTURE_MODE") == "attacks" else (120, 90)  # world px, 4x or 6x nearest => 720x540
 FEET_FRAC = 0.78
 PENITENT_BODY_VIDEO_PX = 148.0  # Penitent body = 48 world px (3.0 video px per art px)
 LUZ_FEET_OFFSET = 23.0  # collider half height below the node origin
@@ -95,6 +96,21 @@ def contact_sheet(images: list[Image.Image], path: Path, columns: int = 6) -> No
     sheet.save(path)
 
 
+def attack_sheets(track: list[dict], images: list[Image.Image], out: Path) -> None:
+    """Contact sheets per tagged attack group (every 2nd frame, 24 per sheet)."""
+    tags: dict[str, list[int]] = {}
+    for index, row in enumerate(track[: len(images)]):
+        tag = row.get("tag", "")
+        if tag:
+            tags.setdefault(tag, []).append(index)
+    for tag, indices in tags.items():
+        sampled = indices[::2]
+        for part in range(0, len(sampled), 24):
+            picked = [images[i] for i in sampled[part:part + 24]]
+            contact_sheet(picked, out / f"attack_{tag}_{part // 24 + 1}.png")
+        print(f"attack_{tag}: frames {indices[0]}..{indices[-1]}")
+
+
 def encode(frames_dir: Path, pattern: str, out: Path) -> None:
     run("ffmpeg", "-v", "error", "-y", "-framerate", "60", "-i", str(frames_dir / pattern),
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16", str(out))
@@ -121,6 +137,9 @@ def main() -> int:
         crop.save(out / "closeup" / f"c_{index:04d}.png")
         luz_images.append(crop)
     encode(out / "closeup", "c_%04d.png", out / "closeup.mp4")
+    if os.environ.get("LUZ_CAPTURE_MODE") == "attacks":
+        attack_sheets(track, luz_images, out)
+        return 0
     contact_sheet(luz_images[100:160:2], out / "contact_run.png")
     contact_sheet(luz_images[204:264:2], out / "contact_skid.png")
     contact_sheet(luz_images[264:324:2], out / "contact_turn.png")
