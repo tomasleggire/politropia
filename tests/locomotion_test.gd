@@ -37,6 +37,9 @@ func run() -> void:
 	await _case_skid_cancelled_by_input()
 	await _case_jump_out_of_skid_and_turn()
 	await _case_ledge_during_turn_and_skid()
+	await _case_jump_and_landing_dust()
+	await _case_every_dust_kind_draws_and_frees()
+	await _case_bad_dust_scene_does_not_leak()
 	_rig.free()
 	print("PASS %d/%d" % [checks - failed.size(), checks] if failed.is_empty() else "FAIL %d/%d" % [failed.size(), checks])
 	for message in failed:
@@ -168,6 +171,57 @@ func _case_ledge_during_turn_and_skid() -> void:
 	await _secs(0.1)
 	check(_player._state == Player.State.FALL, "losing the ground during the turn goes to fall")
 	Input.action_release(&"move_left")
+
+
+func _case_jump_and_landing_dust() -> void:
+	await _fresh_rig()
+	_spawned.clear()
+	check(_dust_count(GroundDust.Kind.TAKEOFF) == 0 and _dust_count(GroundDust.Kind.LANDING) == 0, "setup: no jump dust yet")
+	Input.action_press(&"jump")
+	await _secs(0.05)
+	Input.action_release(&"jump")
+	check(_dust_count(GroundDust.Kind.TAKEOFF) == 1, "a ground jump spawns takeoff dust")
+	await _secs(1.5)
+	check(_player.is_on_floor(), "setup: landed again")
+	check(_dust_count(GroundDust.Kind.LANDING) == 1, "landing from a jump spawns landing dust")
+	check(_dust_count(GroundDust.Kind.TAKEOFF) == 1, "an air landing spawns no extra takeoff dust")
+
+
+## Each kind draws without errors, scales its footprint by the dust pixel and frees itself.
+func _case_every_dust_kind_draws_and_frees() -> void:
+	await _fresh_rig()
+	var scene := load("res://scenes/vfx/ground_dust.tscn") as PackedScene
+	var dusts: Array[GroundDust] = []
+	for kind in GroundDust.Kind.values():
+		var dust := scene.instantiate() as GroundDust
+		dust.kind = kind
+		_rig.add_child(dust)
+		dusts.append(dust)
+	await _secs(0.05)
+	for dust in dusts:
+		check(is_instance_valid(dust) and dust.is_visible_in_tree(), "kind %d is alive and drawn" % dust.kind)
+	var landing := dusts[GroundDust.Kind.LANDING]
+	check(landing.landing_size.x >= 36.0 and landing.pixel_size <= 0.5, "landing arcs are wide and fine-grained")
+	await _secs(0.6)
+	var freed := true
+	for dust in dusts:
+		freed = freed and not is_instance_valid(dust)
+	check(freed, "every kind frees itself after its lifetime")
+
+
+## A ground_dust_scene whose root is not a GroundDust is skipped and freed.
+func _case_bad_dust_scene_does_not_leak() -> void:
+	await _fresh_rig()
+	var bad := PackedScene.new()
+	var node := Node2D.new()
+	bad.pack(node)
+	node.free()
+	_player.ground_dust_scene = bad
+	var children_before := _rig.get_child_count()
+	var orphans_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	_player._spawn_dust(GroundDust.Kind.FOOTSTEP)
+	check(_rig.get_child_count() == children_before, "a bad dust scene adds nothing")
+	check(int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)) <= orphans_before, "and leaves no orphan instance behind")
 
 
 ## Runs at full speed, releases and waits until the player is in `state`.

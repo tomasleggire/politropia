@@ -98,7 +98,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## Scene spawned at her feet in world space (see GroundDust); swap it to
 ## change the dust look.
 @export var ground_dust_scene: PackedScene = preload("res://scenes/vfx/ground_dust.tscn")
-## Seconds between footstep puffs while running (one per run cycle).
+## Seconds between footstep puffs while running (one per step: two per run cycle).
 @export var footstep_dust_interval := 0.29
 
 @export_group("Run")
@@ -1170,6 +1170,8 @@ func _apply_gravity(delta: float) -> void:
 func _try_launch_jump() -> bool:
 	if _jump_buffer_left <= 0.0 or not (is_on_floor() or _coyote_left > 0.0):
 		return false
+	if is_on_floor():
+		_spawn_dust(GroundDust.Kind.TAKEOFF)
 	velocity.y = _jump_velocity
 	_jump_buffer_left = 0.0
 	_coyote_left = 0.0
@@ -2180,6 +2182,7 @@ func _after_move(fall_speed_before_move: float) -> void:
 	if not _was_on_floor and is_on_floor() and fall_speed_before_move > landing_impact_speed:
 		_landing_left = landing_squash_time
 		_sfx_land.play()
+		_spawn_dust(GroundDust.Kind.LANDING)
 	if not _was_on_floor and is_on_floor():
 		_restore_air_actions()
 	if is_on_floor() and (_state == State.JUMP or _state == State.FALL):
@@ -2215,8 +2218,11 @@ func _spawn_dust(dust_kind: GroundDust.Kind) -> void:
 	if host == null:
 		_warn_dust_once("no Node2D host for ground dust; it is skipped.")
 		return
-	var dust := ground_dust_scene.instantiate() as GroundDust
+	var instance := ground_dust_scene.instantiate()
+	var dust := instance as GroundDust
 	if dust == null:
+		# Not a GroundDust root: free the instance so it does not leak.
+		instance.free()
 		_warn_dust_once("ground_dust_scene root is not a GroundDust; it is skipped.")
 		return
 	dust.kind = dust_kind

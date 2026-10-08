@@ -10,7 +10,7 @@ extends Node
 ##
 ## Sequence: idle 1.5 s, run right 2 s, stop (skid), idle 1 s, run left 1.5 s
 ## (turn from idle-run), reverse to right while running (turn), run 1 s,
-## stop, idle 1 s. Input goes through Input.action_press/release like a player.
+## stop, idle 1 s, a standing jump and a running jump. Input goes through Input.action_press/release like a player.
 
 const LEVEL_PATH := "res://scenes/levels/greece/level_greece.tscn"
 const LEVEL_FALLBACK := "res://scenes/levels/greece_level.tscn"
@@ -20,7 +20,7 @@ const START_POSITION := Vector2(1250.0, -440.0)
 var _steps: Array = []
 var _time := 0.0
 var _index := 0
-var _held: StringName = &""
+var _held: Array = []
 var _player: Player
 var _sprite: AnimatedSprite2D
 var _log: FileAccess
@@ -34,6 +34,9 @@ func _ready() -> void:
 		[1.5, &""], [2.0, &"move_right"], [1.0, &""],
 		[1.5, &"move_left"], [1.5, &"move_right"], [0.2, &""],
 		[1.0, &"move_right"], [1.0, &""],
+		# Jump from idle, then a running jump (takeoff and landing dust).
+		[0.1, &"jump"], [1.0, &""], [0.6, &"move_right"],
+		[0.1, [&"move_right", &"jump"]], [0.7, &"move_right"], [1.0, &""],
 	]
 	await get_tree().process_frame
 	_player = _find_player(self)
@@ -91,17 +94,18 @@ func _physics_process(delta: float) -> void:
 		return
 	_time += delta
 	var step: Array = _steps[_index]
-	if _held != step[1]:
+	var wanted: Array = step[1] if step[1] is Array else ([] if step[1] == &"" else [step[1]])
+	if _held != wanted:
 		_release()
-		_held = step[1]
-		if _held != &"":
-			Input.action_press(_held)
+		_held = wanted
+		for action: StringName in _held:
+			Input.action_press(action)
 	if _time >= float(step[0]):
 		_time = 0.0
 		_index += 1
 
 
 func _release() -> void:
-	if _held != &"":
-		Input.action_release(_held)
-	_held = &""
+	for action: StringName in _held:
+		Input.action_release(action)
+	_held = []
