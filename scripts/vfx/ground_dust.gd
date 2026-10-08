@@ -12,7 +12,7 @@ extends Node2D
 ## twice the detail. Sizes are in world units, so changing the pixel size
 ## changes the detail and never the footprint.
 
-enum Kind { FOOTSTEP, TURN, STOP, TAKEOFF, LANDING }
+enum Kind { FOOTSTEP, TURN, STOP, TAKEOFF, LANDING, DASH_START, DASH_END }
 
 @export var kind := Kind.FOOTSTEP
 @export var color := Color(0.93, 0.91, 0.86)
@@ -68,6 +68,27 @@ enum Kind { FOOTSTEP, TURN, STOP, TAKEOFF, LANDING }
 @export var landing_specks := 8
 @export var landing_speck_spread := 22.0
 
+@export_group("Dash Start")
+## Puff kicked up behind her feet when the slide starts.
+@export var dash_start_size := Vector2(12.0, 8.0)
+@export var dash_start_lifetime := 0.25
+@export var dash_start_steps := 3
+@export var dash_start_specks := 4
+@export var dash_start_speck_spread := 12.0
+## How far behind the feet (against `direction`) the puff sits.
+@export var dash_start_behind := 10.0
+
+@export_group("Dash End")
+## Skid fan in front of her feet when the slide ends: a wedge that rises away
+## from her, width along the ground and height at its far end.
+@export var dash_end_size := Vector2(18.0, 14.0)
+@export var dash_end_lifetime := 0.3
+@export var dash_end_steps := 4
+@export var dash_end_specks := 3
+@export var dash_end_speck_spread := 14.0
+## How far ahead of the feet (along `direction`) the fan starts.
+@export var dash_end_ahead := 4.0
+
 var _elapsed := 0.0
 var _step := -1
 var _size := Vector2.ZERO
@@ -122,6 +143,18 @@ func _load_kind_settings() -> void:
 			_steps = landing_steps
 			speck_count = landing_specks
 			spread = landing_speck_spread
+		Kind.DASH_START:
+			_size = dash_start_size
+			_lifetime = dash_start_lifetime
+			_steps = dash_start_steps
+			speck_count = dash_start_specks
+			spread = dash_start_speck_spread
+		Kind.DASH_END:
+			_size = dash_end_size
+			_lifetime = dash_end_lifetime
+			_steps = dash_end_steps
+			speck_count = dash_end_specks
+			spread = dash_end_speck_spread
 		_:
 			_size = footstep_size
 			_lifetime = footstep_lifetime
@@ -163,6 +196,10 @@ func _draw() -> void:
 			_draw_landing_arcs(width, height)
 		Kind.TAKEOFF:
 			_draw_takeoff_puffs(width, height)
+		Kind.DASH_START:
+			_draw_shifted_puff(width, height, -direction * roundi(dash_start_behind / pixel_size))
+		Kind.DASH_END:
+			_draw_skid_fan(width, height)
 		_:
 			_draw_puff(width, height)
 	_draw_specks(step_scale)
@@ -218,6 +255,26 @@ func _draw_takeoff_puffs(width: int, height: int) -> void:
 			var row_width := maxi(roundi(float(puff_width) * fill), 1)
 			var x: int = gap if side > 0 else -gap - row_width
 			_pixels(x, row, row_width, 1)
+
+
+## A puff centered `shift` dust pixels from the origin.
+func _draw_shifted_puff(width: int, height: int, shift: int) -> void:
+	for row in height:
+		var fill := sqrt(1.0 - pow(float(row) / float(height), 2.0))
+		var row_width := maxi(roundi(float(width) * fill), 1)
+		_pixels(shift - int(row_width * 0.5), row, row_width, 1)
+
+
+## Wedge ahead of the feet that rises with the distance, cut by two gaps so it
+## reads as a fan of scratches instead of a solid triangle.
+func _draw_skid_fan(width: int, height: int) -> void:
+	var start := roundi(dash_end_ahead / pixel_size)
+	for column in width:
+		if column % 5 == 4:
+			continue
+		var column_height := maxi(roundi(float(height) * float(column + 1) / float(width)), 1)
+		var x := start + column if direction > 0 else -start - column - 1
+		_pixels(x, 0, 1, column_height)
 
 
 ## Loose specks: the later ones drop out first as the effect shrinks.
