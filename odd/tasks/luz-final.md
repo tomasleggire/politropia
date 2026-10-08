@@ -72,6 +72,7 @@ Budget: Luz complete between this week and next, sharing time and Claude/Codex t
 - [ ] P8 (B) Ground combo x3 and crouch attack with the sword grip (two or three Codex requests; absorbs C2 ground part).
 - [ ] P9 (B) Jump/fall/land and a distinct double-jump animation with the sword grip (one Codex request).
 - [ ] P10 (B, if time) Air horizontal and up attacks, dash and wall clips with the sword grip.
+- [ ] P11 (B, later, remind the user) Better skid animation: the current brake (arm out, then idle) does not read as braking (user, 2026-10-08). Needs new Codex frames showing the stop (weight thrown back, sliding feet, a clear recovery) with in-betweens into idle.
 
 ## Acceptance criteria
 - Luz occupies 32x48 and moves with the measured Blasphemous numbers; user confirms the feel on the iPhone.
