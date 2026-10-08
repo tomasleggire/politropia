@@ -229,7 +229,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## its scene sets the color, life and alpha). Null disables them.
 @export var dash_afterimage_scene: PackedScene = preload("res://scenes/vfx/dash_afterimage.tscn")
 ## One ghost every ~2 frames (the Penitent shows 4-5 alive at ~0.14 s of life).
-@export var afterimage_interval := 0.033
+@export var afterimage_interval := 0.028
 
 @export_group("Wall")
 @export var wall_ray_length := 16.5
@@ -331,7 +331,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var hitbox_hit2 := Rect2(2, -56, 78, 40)
 @export var hitbox_hit3 := Rect2(2, -65, 105, 59)
 @export var hitbox_crouch := Rect2(2, -32, 70, 34)
-@export var hitbox_up := Rect2(-46, -131, 79, 98)
+@export var hitbox_up := Rect2(-46, -110, 79, 77)
 @export var hitbox_air := Rect2(2, -56, 79, 38)
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D

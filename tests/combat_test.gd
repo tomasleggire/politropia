@@ -792,7 +792,7 @@ func case_one_slash_per_attack() -> void:
 		if reach.has(key):
 			check(absf(bounds.end.x - float(reach[key])) <= float(reach[key]) * 0.10, "%s: reach %.1f within 10%% of %s" % [key, bounds.end.x, reach[key]])
 		else:
-			check(bounds.position.x > -52.0 and bounds.end.x < 38.0 and bounds.position.y < -115.0, "%s: overhead arc x %.0f..%.0f apex %.0f" % [key, bounds.position.x, bounds.end.x, -bounds.position.y])
+			check(bounds.position.x > -52.0 and bounds.end.x < 38.0 and bounds.position.y < -100.0, "%s: overhead arc x %.0f..%.0f apex %.0f" % [key, bounds.position.x, bounds.end.x, -bounds.position.y])
 	await _build_rig()
 	var slash := _player.get_node("SlashVfx") as PlayerSlashVfx
 	var strokes := {}

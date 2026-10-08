@@ -34,7 +34,7 @@ const SLASHES := {
 	&"attack_2": {"pts": [Vector2(12, -22), Vector2(86, -22), Vector2(88, -44), Vector2(48, -50)], "active_frames": 4, "frames": 2, "width": 12.0, "peak": 0.70},
 	&"attack_3": {"pts": [Vector2(14, -14), Vector2(116, -12), Vector2(118, -50), Vector2(68, -58)], "active_frames": 2, "frames": 2, "width": 14.0, "peak": 0.70},
 	&"crouch_attack": {"pts": [Vector2(10, -4), Vector2(78, -4), Vector2(78, -22), Vector2(42, -26)], "active_frames": 2, "frames": 2, "width": 12.0, "peak": 0.70},
-	&"up_attack": {"pts": [Vector2(-40, -38), Vector2(-46, -120), Vector2(25, -175), Vector2(28, -62)], "active_frames": 3, "frames": 3, "width": 10.0, "peak": 0.30},
+	&"up_attack": {"pts": [Vector2(-40, -34), Vector2(-46, -100), Vector2(25, -142), Vector2(28, -56)], "active_frames": 3, "frames": 3, "width": 10.0, "peak": 0.30},
 	&"air_attack": {"pts": [Vector2(12, -22), Vector2(86, -22), Vector2(88, -44), Vector2(50, -50)], "active_frames": 3, "frames": 2, "width": 12.0, "peak": 0.70},
 }
 
