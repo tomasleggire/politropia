@@ -1,10 +1,11 @@
 class_name PlayerSlashVfx
 extends Node2D
 
-## Procedural Penitent-style slash strokes for Luz's attacks. Every stroke is a
-## tapered curve fitted to the rectangle of the hitbox that is active with it,
-## so the visual reach equals the hitbox reach by construction. Presentation
-## only: this node never touches collision, damage or gameplay state.
+## Procedural Penitent-style slash for Luz's attacks: ONE tapered crescent per
+## attack that follows the ruler's own sweep (grip and tip measured on the
+## attack frames), grows with the animation's active window and then erodes from
+## its tail. Presentation only: this node never touches collision, damage or
+## gameplay state.
 ##
 ## Colours follow the measured reference (cream tip, mint-grey tail); the
 ## stroke erodes from its tail instead of fading its alpha. A stroke stays in
@@ -13,25 +14,33 @@ extends Node2D
 ## Seconds a stroke keeps eroding after its active phase ends (measured: 3
 ## faint frames after the 4-5 bright ones).
 const TAIL_TIME := 0.05
+## Share of the slash time the crescent takes to reach its full length: it is
+## cast at the first active frame, while the ruler is still out in front.
+const GROW_SHARE := 0.35
+## Share of the slash time it stays whole before it erodes from its tail (the
+## ruler is back by then).
+const HOLD_SHARE := 0.65
 ## Points along each stroke's centre line.
 const SEGMENTS := 18
-## Gap kept between the curve's extremes and the hitbox edge, in pixels.
-const FIT_INSET := 1.0
 
-## Normalised control points (x right, y down, 0..1 across the hitbox) of a
-## quadratic curve, the stroke's maximum width in pixels and where along the
-## curve (0..1) the stroke is at its widest.
-const SHAPES := {
-	&"slash_a": {"pts": [Vector2(0.0, 0.85), Vector2(0.65, 1.0), Vector2(1.0, 0.0)], "width": 9.0, "peak": 0.9},
-	&"slash_b_high": {"pts": [Vector2(0.0, 0.75), Vector2(0.45, 0.1), Vector2(1.0, 0.6)], "width": 6.0, "peak": 0.3},
-	&"slash_b_low": {"pts": [Vector2(0.0, 0.1), Vector2(0.35, 1.25), Vector2(1.0, 0.85)], "width": 6.0, "peak": 0.4},
-	&"slash_finisher": {"pts": [Vector2(0.1, 0.0), Vector2(1.9, 0.5), Vector2(0.1, 1.0)], "width": 10.0, "peak": 0.5},
-	&"slash_crouch_a": {"pts": [Vector2(0.0, 0.0), Vector2(0.75, 0.1), Vector2(1.0, 1.0)], "width": 9.0, "peak": 0.8},
-	&"slash_crouch_b": {"pts": [Vector2(0.0, 0.2), Vector2(0.35, 1.0), Vector2(1.0, 0.8)], "width": 6.0, "peak": 0.35},
-	&"slash_up_rise": {"pts": [Vector2(0.0, 1.0), Vector2(0.05, 0.0), Vector2(1.0, 0.0)], "width": 8.0, "peak": 0.8},
-	&"slash_up_fall": {"pts": [Vector2(0.0, 0.0), Vector2(0.95, 0.0), Vector2(1.0, 1.0)], "width": 8.0, "peak": 0.3},
-	&"slash_air_a": {"pts": [Vector2(0.0, 0.0), Vector2(0.7, 0.05), Vector2(1.0, 0.85)], "width": 9.0, "peak": 0.8},
-	&"slash_air_b": {"pts": [Vector2(0.0, 0.75), Vector2(0.5, 0.65), Vector2(1.0, 0.2)], "width": 6.0, "peak": 0.3},
+## Measured grip and tip of Luz's ruler on every attack frame, in right-facing
+## local pixels (tools/luz_ruler_tip_track.py): clip -> frame -> [gx, gy, tx, ty].
+const TIPS_PATH := "res://assets/player/luz/luz_ruler_tips.json"
+
+## One slash per attack, shaped by the ruler itself. The path starts at `start`
+## (0 grip .. 1 tip) of the ruler on the first listed frame, passes through the
+## tip of every listed frame and ends `extend` pixels past the last tip along
+## the sweep; `bow` bulges the middle of a path that has no other curvature.
+## `active_frames` is how many animation frames the attack's active window spans:
+## the slash is drawn only over the share of the window the listed frames take.
+## `width` is the stroke's maximum width and `peak` where along it it is widest.
+const SLASHES := {
+	&"attack_1": {"clip": "ground_attack_1", "active_frames": 3, "frames": [4, 5], "start": 0.1, "extend": 14.0, "bow": -4.0, "width": 9.0, "peak": 0.85},
+	&"attack_2": {"clip": "ground_attack_2", "active_frames": 4, "frames": [2, 3], "start": 0.1, "extend": 14.0, "bow": -4.0, "width": 9.0, "peak": 0.85},
+	&"attack_3": {"clip": "ground_attack_3", "active_frames": 2, "frames": [5], "start": 0.0, "extend": 22.0, "bow": -9.0, "width": 11.0, "peak": 0.8},
+	&"crouch_attack": {"clip": "crouch_attack", "active_frames": 2, "frames": [4], "start": 0.0, "extend": 22.0, "bow": -8.0, "width": 9.0, "peak": 0.8},
+	&"up_attack": {"clip": "up_attack", "active_frames": 3, "frames": [3, 4, 5], "start": 0.2, "extend": 32.0, "bow": 0.0, "width": 9.0, "peak": 0.8},
+	&"air_attack": {"clip": "air_horizontal_attack", "active_frames": 3, "frames": [3], "start": 0.0, "extend": 22.0, "bow": -8.0, "width": 9.0, "peak": 0.8},
 }
 
 @export_group("Colours")
@@ -49,20 +58,22 @@ func _ready() -> void:
 	set_process(false)
 
 
-## `rect` is the active hitbox in right-facing local pixels (x forward, y down
-## from the feet); `duration` is how long that phase is active.
-func play_stroke(shape: StringName, facing: int, rect: Rect2, duration: float) -> void:
-	if not SHAPES.has(shape):
+## Casts the slash of `attack` (a SLASHES key); `duration` is the animation's
+## active window, over which the crescent is drawn from tail to head.
+func play_slash(attack: StringName, facing: int, duration: float) -> void:
+	if not SLASHES.has(attack):
 		return
-	var points := stroke_points(shape, facing, rect)
+	# One slash per attack: a new one replaces whatever is left of the last.
+	_strokes.clear()
 	_strokes.append({
-		"shape": shape,
-		"points": points,
-		"width": float(SHAPES[shape]["width"]) * width_scale,
-		"peak": float(SHAPES[shape]["peak"]),
+		"attack": attack,
+		"points": slash_points(attack, facing),
+		"width": float(SLASHES[attack]["width"]) * width_scale,
+		"peak": float(SLASHES[attack]["peak"]),
 		"age": 0.0,
-		"life": duration + TAIL_TIME,
-		"active": duration,
+		"life": duration * HOLD_SHARE + TAIL_TIME,
+		"active": maxf(duration * HOLD_SHARE, 0.001),
+		"grow": maxf(duration * GROW_SHARE, 0.001),
 		"origin": global_position,
 	})
 	visible = true
@@ -91,39 +102,65 @@ func stroke_count() -> int:
 	return _strokes.size()
 
 
-## Centre line of a stroke after fitting it into `rect` (mirrored by facing).
-static func stroke_points(shape: StringName, facing: int, rect: Rect2) -> PackedVector2Array:
-	var pts: Array = SHAPES[shape]["pts"]
-	var raw := PackedVector2Array()
-	for i in SEGMENTS + 1:
-		var t := float(i) / float(SEGMENTS)
-		var a: Vector2 = (pts[0] as Vector2).lerp(pts[1], t)
-		var b: Vector2 = (pts[1] as Vector2).lerp(pts[2], t)
-		raw.append(a.lerp(b, t))
-	var low := raw[0]
-	var high := raw[0]
-	for p in raw:
-		low = Vector2(minf(low.x, p.x), minf(low.y, p.y))
-		high = Vector2(maxf(high.x, p.x), maxf(high.y, p.y))
-	var span := (high - low).max(Vector2(0.0001, 0.0001))
-	var inner := rect.grow(-FIT_INSET)
+## Seconds the slash is drawn for an active window of `active_time`.
+static func slash_time(attack: StringName, active_time: float) -> float:
+	var config: Dictionary = SLASHES[attack]
+	var share := float((config["frames"] as Array).size()) / float(config["active_frames"])
+	return maxf(active_time * minf(share, 1.0), 0.06)
+
+
+## Centre line of a slash (mirrored by facing), from the ruler track.
+static func slash_points(attack: StringName, facing: int) -> PackedVector2Array:
+	var config: Dictionary = SLASHES[attack]
+	var track: Array = _tips()[config["clip"]]
+	var frames: Array = config["frames"]
+	var first: Array = track[int(frames[0])]
+	var grip := Vector2(first[0], first[1])
+	var tip := Vector2(first[2], first[3])
+	var waypoints: Array[Vector2] = [grip.lerp(tip, float(config["start"]))]
+	for frame in frames:
+		var row: Array = track[int(frame)]
+		waypoints.append(Vector2(row[2], row[3]))
+	var last := waypoints[waypoints.size() - 1]
+	var previous := waypoints[waypoints.size() - 2]
+	var last_row: Array = track[int(frames[frames.size() - 1])]
+	var axis := (Vector2(last_row[2], last_row[3]) - Vector2(last_row[0], last_row[1])).normalized()
+	var end := last + axis * float(config["extend"])
+	var begin := waypoints[0]
+	@warning_ignore("integer_division")
+	var middle := waypoints[waypoints.size() / 2]
+	if waypoints.size() == 2:
+		middle = begin.lerp(end, 0.5) + Vector2(axis.y, -axis.x) * float(config["bow"])
+	# Quadratic curve that passes through `middle` halfway along.
+	var control := 2.0 * middle - 0.5 * (begin + end)
 	var sign_x := 1.0 if facing >= 0 else -1.0
 	var out := PackedVector2Array()
-	for p in raw:
-		var n := (p - low) / span
-		var local := inner.position + n * inner.size
-		out.append(Vector2(local.x * sign_x, local.y))
+	for i in SEGMENTS + 1:
+		var u := float(i) / float(SEGMENTS)
+		var point := begin.lerp(control, u).lerp(control.lerp(end, u), u)
+		out.append(Vector2(point.x * sign_x, point.y))
 	return out
 
 
-## Bounding rectangle of the drawn polygon of a stroke (for tests and tuning).
-static func stroke_bounds(shape: StringName, facing: int, rect: Rect2) -> Rect2:
-	var points := stroke_points(shape, facing, rect)
-	var half := float(SHAPES[shape]["width"]) * 0.5
+## Rectangle (right-facing local pixels) that holds the drawn slash.
+static func slash_bounds(attack: StringName, facing: int = 1) -> Rect2:
+	var points := slash_points(attack, facing)
+	var half := float(SLASHES[attack]["width"]) * 0.5
 	var bounds := Rect2(points[0], Vector2.ZERO)
 	for p in points:
 		bounds = bounds.expand(p)
 	return bounds.grow(half)
+
+
+static var _tips_cache: Dictionary = {}
+
+
+static func _tips() -> Dictionary:
+	if _tips_cache.is_empty():
+		var file := FileAccess.open(TIPS_PATH, FileAccess.READ)
+		assert(file != null, "Cannot read Luz ruler tip track")
+		_tips_cache = JSON.parse_string(file.get_as_text())
+	return _tips_cache
 
 
 func _process(delta: float) -> void:
@@ -152,9 +189,12 @@ func _draw_stroke(stroke: Dictionary) -> void:
 	var erode := clampf((age - active) / TAIL_TIME, 0.0, 1.0)
 	var shift: Vector2 = (stroke["origin"] as Vector2) - global_position
 	var first := int(round(erode * float(points.size() - 2)))
+	# The crescent is drawn from its tail to its head over the first part of its time.
+	var grown := clampf(age / float(stroke["grow"]), 0.0, 1.0)
+	var last := maxi(int(ceil(grown * float(points.size() - 1))), 2)
 	var width_now := float(stroke["width"]) * (1.0 - 0.5 * erode)
 	var peak := float(stroke["peak"])
-	for i in range(first, points.size() - 1):
+	for i in range(first, mini(last, points.size() - 1)):
 		var u0 := float(i) / float(points.size() - 1)
 		var u1 := float(i + 1) / float(points.size() - 1)
 		var w0 := width_now * _profile(u0, peak)

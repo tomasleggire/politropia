@@ -15,7 +15,7 @@ extends Node
 ## set: standing full jump, tap jump, running jump (held), the standing landing
 ## recovery, a ground dash from rest, a ground dash from a run and an air dash.
 ## LUZ_CAPTURE_MODE=attacks records an attack sequence instead (see _attack_steps):
-## whiffs, a full 3-hit combo on a dummy walker, crouch, up and air attacks.
+## whiffs, a full 3-hit combo on a dummy walker, crouch, up, a fast mash and air attacks.
 ## Input goes through Input.action_press/release like a player. track.csv has a
 ## `step` column (index into the sequence) to cut each action out.
 
@@ -83,6 +83,16 @@ func _attack_steps() -> Array:
 		[0.6, &"", ""],
 		[0.5, &"move_down", ""], [0.05, [&"move_down", &"attack"], "crouch"], [0.9, &"move_down", "crouch"], [0.6, &"", ""],
 		[0.05, [&"move_up", &"attack"], "up"], [0.9, &"", "up"],
+		# Fast mash: a press every ~4 frames for 1 s (no target, so every hit whiffs).
+		[0.03, &"attack", "mash"], [0.03, &"", "mash"], [0.03, &"attack", "mash"], [0.03, &"", "mash"],
+		[0.03, &"attack", "mash"], [0.03, &"", "mash"], [0.03, &"attack", "mash"], [0.03, &"", "mash"],
+		[0.03, &"attack", "mash"], [0.03, &"", "mash"], [0.03, &"attack", "mash"], [0.03, &"", "mash"],
+		[0.03, &"attack", "mash"], [0.03, &"", "mash"], [0.03, &"attack", "mash"], [0.03, &"", "mash"],
+		[0.03, &"attack", "mash"], [0.03, &"", "mash"], [0.03, &"attack", "mash"], [0.03, &"", "mash"],
+		[0.03, &"attack", "mash"], [0.03, &"", "mash"], [0.03, &"attack", "mash"], [0.03, &"", "mash"],
+		[0.03, &"attack", "mash"], [0.03, &"", "mash"], [0.03, &"attack", "mash"], [0.03, &"", "mash"],
+		[0.03, &"attack", "mash"], [0.03, &"", "mash"], [0.03, &"attack", "mash"], [0.03, &"", "mash"],
+		[0.8, &"", "mash"],
 		[0.1, &"jump", "air"], [0.3, &"", "air"], [0.05, &"attack", "air"], [1.2, &"", "air"],
 	]
 
