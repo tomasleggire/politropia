@@ -43,6 +43,7 @@ func run() -> void:
 	await _case_jump_and_landing_dust()
 	await _case_every_dust_kind_draws_and_frees()
 	await _case_bad_dust_scene_does_not_leak()
+	await _case_wall_cling_and_wall_jump()
 	_rig.free()
 	print("PASS %d/%d" % [checks - failed.size(), checks] if failed.is_empty() else "FAIL %d/%d" % [failed.size(), checks])
 	for message in failed:
@@ -311,6 +312,27 @@ func _case_bad_dust_scene_does_not_leak() -> void:
 	_player._spawn_dust(GroundDust.Kind.FOOTSTEP)
 	check(_rig.get_child_count() == children_before, "a bad dust scene adds nothing")
 	check(int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)) <= orphans_before, "and leaves no orphan instance behind")
+
+
+## Uses the real Player scene and CharacterBody2D physics against a solid wall.
+func _case_wall_cling_and_wall_jump() -> void:
+	await _fresh_rig()
+	LevelGeometry.add_solid(_rig, Rect2(48.0, -160.0, 24.0, 320.0), Color.DIM_GRAY)
+	Input.action_press(&"move_right")
+	Input.action_press(&"jump")
+	await _secs(0.9)
+	check(_player._state == Player.State.WALL_CLING, "holding into a tall solid wall enters wall cling (%s)" % Player.State.keys()[_player._state])
+	var cling_y := _player.global_position.y
+	await _secs(0.15)
+	check(_player._state == Player.State.WALL_CLING and _player.global_position.y > cling_y, "wall cling slides down slowly while held")
+	Input.action_release(&"jump")
+	Input.action_release(&"move_right")
+	Input.action_press(&"move_left")
+	Input.action_press(&"jump")
+	await _secs(0.05)
+	check(_player._state == Player.State.JUMP and _player.velocity.x < 0.0 and _player.velocity.y < 0.0, "jumping away from the wall launches a wall jump")
+	Input.action_release(&"jump")
+	Input.action_release(&"move_left")
 
 
 ## Runs at full speed, releases and waits until the player is in `state`.

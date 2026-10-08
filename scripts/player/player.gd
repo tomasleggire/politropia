@@ -1604,10 +1604,40 @@ func _update_afterimages(delta: float) -> void:
 func _is_wall_ray(ray: RayCast2D) -> bool:
 	if not ray.is_colliding():
 		return false
-	var size := _collider_shape_size(ray.get_collider())
+	var collider := ray.get_collider()
+	# TileMapLayer owns its collision bodies internally, so it has no child
+	# CollisionShape2D from which to measure a wall.
+	if collider is TileMapLayer:
+		return _is_tall_tilemap_wall(ray, collider as TileMapLayer)
+	var size := _collider_shape_size(collider)
 	if size == Vector2.ZERO:
 		return false
 	return size.y >= min_wall_height and size.y >= size.x
+
+
+func _is_tall_tilemap_wall(ray: RayCast2D, tilemap: TileMapLayer) -> bool:
+	if tilemap.tile_set == null:
+		return false
+	var cell := tilemap.get_coords_for_body_rid(ray.get_collider_rid())
+	if cell == Vector2i(-1, -1):
+		return false
+	var contiguous_cells := 1
+	for step: int in [-1, 1]:
+		var offset := step
+		while _tile_cell_has_collision(tilemap, cell + Vector2i(0, offset)):
+			contiguous_cells += 1
+			offset += step
+	return float(contiguous_cells * tilemap.tile_set.tile_size.y) >= min_wall_height
+
+
+func _tile_cell_has_collision(tilemap: TileMapLayer, cell: Vector2i) -> bool:
+	var data := tilemap.get_cell_tile_data(cell)
+	if data == null:
+		return false
+	for physics_layer: int in tilemap.tile_set.get_physics_layers_count():
+		if data.get_collision_polygons_count(physics_layer) > 0:
+			return true
+	return false
 
 
 func _collider_shape_size(collider: Object) -> Vector2:
