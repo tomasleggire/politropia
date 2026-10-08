@@ -2,32 +2,6 @@
   "index_origin": 0,
   "ordering": "row-major",
   "sheets": {
-    "luz_locomotion_sheet.png": {
-      "grid": {
-        "columns": 4,
-        "rows": 4,
-        "cell_width": 512,
-        "cell_height": 512
-      },
-      "clips": {
-        "jump_ascent": [
-          8,
-          9
-        ],
-        "fall": [
-          10,
-          11
-        ],
-        "crouch": [
-          12,
-          13
-        ],
-        "land": [
-          14,
-          15
-        ]
-      }
-    },
     "luz_mobility_sheet.png": {
       "grid": {
         "columns": 4,
@@ -500,6 +474,67 @@
           1,
           2,
           4,
+          5,
+          6,
+          7
+        ]
+      }
+    },
+    "luz_jump_sheet.png": {
+      "grid": {
+        "columns": 6,
+        "rows": 4,
+        "cell_width": 608,
+        "cell_height": 528
+      },
+      "clips": {
+        "jump_ascent": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "fall": [
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "land": [
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "double_jump": [
+          15,
+          16,
+          17,
+          18,
+          19,
+          20
+        ]
+      }
+    },
+    "luz_crouch_sheet.png": {
+      "grid": {
+        "columns": 8,
+        "rows": 1,
+        "cell_width": 512,
+        "cell_height": 528
+      },
+      "clips": {
+        "crouch": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "crouch_exit": [
           5,
           6,
           7
