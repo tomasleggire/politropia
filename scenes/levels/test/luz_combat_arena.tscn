@@ -1,10 +1,8 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/levels/greece/zone_1.tscn" id="1_zone"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/walker.tscn" id="2_walker"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/charger.tscn" id="3_charger"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/shooter.tscn" id="4_shooter"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/flyer.tscn" id="5_flyer"]
 
 [node name="LuzCombatArena" type="Node2D"]
 
@@ -15,34 +13,21 @@
 [node name="Walker1" parent="TestEnemies" instance=ExtResource("2_walker")]
 enemy_id = &"arena_Walker1"
 position = Vector2(380, 418)
-max_health = 8
+max_health = 3
+walk_speed = 35.0
 
 [node name="Walker2" parent="TestEnemies" instance=ExtResource("2_walker")]
 enemy_id = &"arena_Walker2"
 position = Vector2(600, 538)
-max_health = 8
-
-[node name="Walker3" parent="TestEnemies" instance=ExtResource("2_walker")]
-enemy_id = &"arena_Walker3"
-position = Vector2(820, 650)
-max_health = 8
-
-[node name="Walker4" parent="TestEnemies" instance=ExtResource("2_walker")]
-enemy_id = &"arena_Walker4"
-position = Vector2(1150, 650)
-max_health = 8
+max_health = 3
+walk_speed = 35.0
 
 [node name="Charger" parent="TestEnemies" instance=ExtResource("3_charger")]
 enemy_id = &"arena_Charger"
 position = Vector2(1270, 650)
-max_health = 8
-
-[node name="Shooter" parent="TestEnemies" instance=ExtResource("4_shooter")]
-enemy_id = &"arena_Shooter"
-position = Vector2(700, 470)
-max_health = 8
-
-[node name="Flyer" parent="TestEnemies" instance=ExtResource("5_flyer")]
-enemy_id = &"arena_Flyer"
-position = Vector2(520, 380)
-max_health = 8
+max_health = 3
+detect_range = 200.0
+telegraph_time = 0.7
+charge_speed = 220.0
+charge_time = 0.8
+recover_time = 1.0
