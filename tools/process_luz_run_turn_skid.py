@@ -104,19 +104,20 @@ SHEETS = {
         "raw_rows": 3,
         "scale": TURN_SKID_SCALE,
         # Turn: slot 0 (standing, one-hand trailing grip), slot 2 (low pivot, no ball
-        # crouch), slot 3 (standing, trailing grip). Skid: slots 4-9, ending with a
-        # small rock-back (8, 7, 8) so the stop settles with a sway. Slots 10-11 are
-        # unused (Codex filled them anyway).
-        "clips": {"turn": [1, 3], "skid": [4, 5, 6, 7, 8, 7, 8, 9]},
+        # crouch), slot 3 (standing, trailing grip). Skid: only the braking slots 4-5
+        # (5 held twice, so the arm pulls in softly); the hold part is the real idle
+        # because Codex drew the standing slots 6-9 with puffier, darker hair. Slots
+        # 2 and 6-11 are unused.
+        "clips": {"turn": [1, 3], "skid": [4, 5, 5]},
         # Codex paints the hair 4-7% darker than the idle in the sway slots (and 8-10%
         # in the run sheet); lift it to the idle mean so the clips do not pop.
-        "hair_match": [1, 3, 4, 5, 6, 7, 8, 9],
+        "hair_match": [1, 3, 4, 5],
         "body_anchor": True,
         # Codex draws the standing slots with the same head but wider clothes and legs
         # than the idle (lower-body width +17% at the same height), so the stop looked
         # like a size pop into the idle: squeeze their body below the head to the idle
         # width (see squeeze_body). Slots 4-5 are the wide braking stance and stay as drawn.
-        "body_match": [1, 3, 6, 7, 8, 9],
+        "body_match": [1, 3],
     },
 }
 

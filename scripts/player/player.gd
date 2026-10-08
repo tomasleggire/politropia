@@ -295,7 +295,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 	"wall_jump": wall_kick_input_lock_time,
 	"land": landing_squash_time,
 	"turn": turn_time,
-	"skid": _skid_brake_duration() + skid_hold_time,
+	"skid": _skid_brake_duration(),
 	"attack_1": attack_window_hit1,
 	"attack_2": attack_window_hit2,
 	"attack_3": attack_window_hit3,
@@ -2282,7 +2282,9 @@ func _update_animation() -> void:
 		State.TURN:
 			_play_animation(&"turn")
 		State.SKID:
-			_play_animation(&"skid")
+			# Braking frames first; the hold part is the real idle (the skid sheet's
+			# standing slots drew a puffier, darker hair than the idle).
+			_play_animation(&"skid" if _state_time < _skid_brake_duration() else &"idle")
 		State.DASH:
 			_play_animation(&"air_dash" if _dash_is_air else &"ground_dash")
 		State.JUMP:
