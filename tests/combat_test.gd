@@ -52,7 +52,7 @@ const CHECKS := {
 	"case_combo_rules": 9,
 	"case_whiff_repeats_hit1": 7,
 	"case_mash_is_one_buffered_press": 5,
-	"case_one_slash_per_attack": 14,
+	"case_one_slash_per_attack": 20,
 	"case_no_recoil_and_camera_kick": 5,
 	"case_other_attack_boxes": 6,
 	"case_dash_invulnerable": 5,
@@ -788,6 +788,11 @@ func case_one_slash_per_attack() -> void:
 			"%s: the hitbox covers its slash (%s vs %s)" % [key, rect, bounds]
 		)
 		check(rect.end.x - bounds.end.x < 4.0 and rect.end.y - bounds.end.y < 4.0 + 3.0, "%s: no reach beyond the visible slash" % key)
+		var reach := {&"attack_1": 78.0, &"attack_2": 78.0, &"attack_3": 105.0, &"crouch_attack": 72.0, &"air_attack": 80.0}
+		if reach.has(key):
+			check(absf(bounds.end.x - float(reach[key])) <= float(reach[key]) * 0.10, "%s: reach %.1f within 10%% of %s" % [key, bounds.end.x, reach[key]])
+		else:
+			check(bounds.position.x > -52.0 and bounds.end.x < 38.0 and bounds.position.y < -115.0, "%s: overhead arc x %.0f..%.0f apex %.0f" % [key, bounds.position.x, bounds.end.x, -bounds.position.y])
 	await _build_rig()
 	var slash := _player.get_node("SlashVfx") as PlayerSlashVfx
 	var strokes := {}

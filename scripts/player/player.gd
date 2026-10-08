@@ -327,12 +327,12 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## mirrored by her facing). One box per attack, the bounds of its slash
 ## (PlayerSlashVfx.slash_bounds) plus a few pixels toward her body, so the visible reach equals the hitbox reach. The finisher's box
 ## stays where the lunge started (it does not travel with her).
-@export var hitbox_hit1 := Rect2(2, -40, 62, 25)
-@export var hitbox_hit2 := Rect2(2, -33, 68, 33)
-@export var hitbox_hit3 := Rect2(2, -22, 76, 22)
-@export var hitbox_crouch := Rect2(2, -18, 75, 18)
-@export var hitbox_up := Rect2(2, -102, 41, 64)
-@export var hitbox_air := Rect2(2, -22, 73, 22)
+@export var hitbox_hit1 := Rect2(2, -50, 78, 38)
+@export var hitbox_hit2 := Rect2(2, -56, 78, 40)
+@export var hitbox_hit3 := Rect2(2, -65, 105, 59)
+@export var hitbox_crouch := Rect2(2, -32, 70, 34)
+@export var hitbox_up := Rect2(-46, -131, 79, 98)
+@export var hitbox_air := Rect2(2, -56, 79, 38)
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
