@@ -35,6 +35,8 @@ enum Kind { FOOTSTEP, TURN, STOP, TAKEOFF, LANDING, DASH_START, DASH_END }
 @export var footstep_specks := 3
 ## How far the specks scatter from the center, in world units.
 @export var footstep_speck_spread := 9.0
+## A footstep this many physics ticks after another effect is dropped.
+@export var footstep_cover_ticks := 12
 
 @export_group("Turn")
 @export var turn_size := Vector2(14.0, 5.0)
@@ -87,7 +89,12 @@ enum Kind { FOOTSTEP, TURN, STOP, TAKEOFF, LANDING, DASH_START, DASH_END }
 @export var dash_end_specks := 3
 @export var dash_end_speck_spread := 14.0
 ## How far ahead of the feet (along `direction`) the fan starts.
-@export var dash_end_ahead := 4.0
+@export var dash_end_ahead := 10.0
+
+## Physics tick of the last non-footstep dust: a footstep that Luz spawns on
+## the very same frame (dash end, landing, turn into a run) would sit on top of
+## it as a stray puff, so it is skipped.
+static var _last_effect_tick := -100000
 
 var _elapsed := 0.0
 var _step := -1
@@ -99,12 +106,23 @@ var _specks: Array[Vector2i] = []
 
 
 func _ready() -> void:
+	if _is_covered_footstep():
+		queue_free()
+		return
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	# Spawned between physics ticks and never moved again: no interpolation.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	global_position = (global_position / pixel_size).round() * pixel_size
 	_load_kind_settings()
 	_show_step(0)
+
+
+func _is_covered_footstep() -> bool:
+	var now := Engine.get_physics_frames()
+	if kind != Kind.FOOTSTEP:
+		_last_effect_tick = now
+		return false
+	return now - _last_effect_tick < footstep_cover_ticks
 
 
 func _process(delta: float) -> void:
@@ -265,16 +283,20 @@ func _draw_shifted_puff(width: int, height: int, shift: int) -> void:
 		_pixels(shift - int(row_width * 0.5), row, row_width, 1)
 
 
-## Wedge ahead of the feet that rises with the distance, cut by two gaps so it
-## reads as a fan of scratches instead of a solid triangle.
+## Spray kicked forward by braking: a few spikes ahead of the front foot, the
+## tallest nearest to her, each one leaning back toward her as it rises (dirt
+## thrown forward and up that falls back). Mirrored by `direction`.
 func _draw_skid_fan(width: int, height: int) -> void:
 	var start := roundi(dash_end_ahead / pixel_size)
-	for column in width:
-		if column % 5 == 4:
-			continue
-		var column_height := maxi(roundi(float(height) * float(column + 1) / float(width)), 1)
-		var x := start + column if direction > 0 else -start - column - 1
-		_pixels(x, 0, 1, column_height)
+	var count := 5
+	var spacing := maxi(roundi(float(width - 3) / float(count - 1)), 2)
+	for k in count:
+		var base := start + 3 + k * spacing
+		var spike := maxi(roundi(float(height) * (1.0 - 0.5 * float(k) / float(count - 1))), 1)
+		for row in spike:
+			var x := maxi(base - roundi(float(row) * 0.4), start)
+			var w := 3 if float(row) < float(spike) * 0.35 else (2 if float(row) < float(spike) * 0.7 else 1)
+			_pixels(x if direction > 0 else -x - w, row, w, 1)
 
 
 ## Loose specks: the later ones drop out first as the effect shrinks.
