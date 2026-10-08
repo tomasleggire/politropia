@@ -267,7 +267,7 @@
     "luz_run_sheet.png": {
       "grid": {
         "columns": 4,
-        "rows": 3,
+        "rows": 2,
         "cell_width": 512,
         "cell_height": 512
       },
@@ -280,11 +280,7 @@
           4,
           5,
           6,
-          7,
-          8,
-          9,
-          10,
-          11
+          7
         ]
       }
     },

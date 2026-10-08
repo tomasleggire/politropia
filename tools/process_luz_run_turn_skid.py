@@ -68,7 +68,10 @@ IDLE_STANDING_HEIGHT = 331.5
 # sheets: skid slots 6-9 (standing) have a median of 383.5 raw px; the run frames
 # (lean, ~92% of standing) have a median of 303 raw px, i.e. ~329 standing.
 TURN_SKID_STANDING_HEIGHT = 383.5
-RUN_STANDING_HEIGHT = 329.0
+# Run v2 (8 frames, the sheet the user accepted): Codex draws its standing-equivalent
+# body at ~380 raw px (frame heights 315-363, median 339.5), so the same fixed scale
+# as the first accepted integration (0.8724) is kept.
+RUN_STANDING_HEIGHT = 380.0
 TURN_SKID_SCALE = IDLE_STANDING_HEIGHT / TURN_SKID_STANDING_HEIGHT
 RUN_SCALE = IDLE_STANDING_HEIGHT / RUN_STANDING_HEIGHT
 # Head bob allowed in the run (output texels, 2 world px).
@@ -85,15 +88,15 @@ SHEETS = {
         "clips": {"idle_breathing": [0, 1, 2, 4, 5, 6, 7]},
     },
     "luz_run_sheet.png": {
-        "raw_file": "luz_run_raw.png",
+        "raw_file": "luz_run_raw_v2.png",
         "raw_columns": 4,
-        "raw_rows": 3,
+        "raw_rows": 2,
         "scale": RUN_SCALE,
-        "clips": {"run": list(range(12))},
+        "clips": {"run": list(range(8))},
         # The Codex poses bob more than a Penitent-like run; bob_fix limits the
         # hair-top travel of the cycle to RUN_BOB_RANGE texels around its middle.
         "bob_range": RUN_BOB_RANGE,
-        "hair_match": list(range(12)),
+        "body_anchor": True,
     },
     "luz_turn_skid_sheet.png": {
         "raw_file": "luz_turn_skid_raw.png",
@@ -108,6 +111,12 @@ SHEETS = {
         # Codex paints the hair 4-7% darker than the idle in the sway slots (and 8-10%
         # in the run sheet); lift it to the idle mean so the clips do not pop.
         "hair_match": [1, 3, 4, 5, 6, 7, 8, 9],
+        "body_anchor": True,
+        # Codex draws the standing slots with the same head but wider clothes and legs
+        # than the idle (lower-body width +17% at the same height), so the stop looked
+        # like a size pop into the idle: squeeze their body below the head to the idle
+        # width (see squeeze_body). Slots 4-5 are the wide braking stance and stay as drawn.
+        "body_match": [1, 3, 6, 7, 8, 9],
     },
 }
 
@@ -258,6 +267,73 @@ def match_hair(frame: Image.Image, target: float) -> Image.Image:
     return Image.fromarray(rgba, "RGBA")
 
 
+def body_mask(frame: Image.Image) -> np.ndarray:
+    """Opaque pixels of the figure without the ruler."""
+    return (np.array(frame.getchannel("A")) > 16) & ~rl.band_mask(frame)
+
+
+def lower_body_width(mask: np.ndarray) -> float:
+    """Mean row width of the body below the head and shoulders (rows from 30% of its height)."""
+    rows = np.where(mask.any(axis=1))[0]
+    top, bottom = int(rows.min()), int(rows.max())
+    start = top + round(0.3 * (bottom - top))
+    return float(mask[start : bottom + 1].sum() / (bottom - start + 1))
+
+
+def idle_reference() -> tuple[float, float]:
+    """(lower-body width, body centroid x) averaged over the idle clip's frames."""
+    sheet = Image.open(ASSET_DIR / "luz_idle_sheet.png").convert("RGBA")
+    widths, centres = [], []
+    for slot in SHEETS["luz_idle_sheet.png"]["clips"]["idle_breathing"]:
+        cell = sheet.crop(((slot % OUT_COLUMNS) * OUT_CELL, (slot // OUT_COLUMNS) * OUT_CELL, (slot % OUT_COLUMNS + 1) * OUT_CELL, (slot // OUT_COLUMNS + 1) * OUT_CELL))
+        mask = body_mask(cell)
+        widths.append(lower_body_width(mask))
+        centres.append(float(np.where(mask)[1].mean()))
+    return statistics.mean(widths), statistics.mean(centres)
+
+
+def squeeze_body(frame: Image.Image, target_width: float) -> tuple[Image.Image, float]:
+    """Squeeze the body below the head horizontally until its lower width is `target_width`.
+
+    It only narrows: the factor is clamped to [0.8, 1]. The factor eases in from
+    1 at 12% of the figure height (hair and face) to the full value at 30%
+    (shoulders), about the body's own centre line, so the head keeps its size and
+    the height and feet row stay exactly where they were.
+    """
+    mask = body_mask(frame)
+    factor = min(1.0, max(0.8, target_width / lower_body_width(mask)))
+    if factor >= 0.999:
+        return frame, 1.0
+    rgba = pch.premultiply(frame)
+    arr = np.array(rgba).astype(np.float64)
+    rows = np.where(mask.any(axis=1))[0]
+    top, bottom = int(rows.min()), int(rows.max())
+    height = bottom - top
+    centre = float(np.where(mask)[1].mean())
+    xs = np.arange(frame.width, dtype=np.float64)
+    out = np.zeros_like(arr)
+    for y in range(top, bottom + 1):
+        t = min(1.0, max(0.0, ((y - top) / height - 0.12) / 0.18))
+        k = 1.0 + (factor - 1.0) * t
+        source = centre + (xs - centre) / k
+        for channel in range(4):
+            out[y, :, channel] = np.interp(source, xs, arr[y, :, channel], left=0.0, right=0.0)
+    squeezed = pch.unpremultiply(Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGBA"))
+    return squeezed, factor
+
+
+def anchor_body(frame: Image.Image, target_centre: float) -> Image.Image:
+    """Shift the frame sideways so the body (ruler excluded) centres on `target_centre`."""
+    shift = round(target_centre - float(np.where(body_mask(frame))[1].mean()))
+    if shift == 0:
+        return frame
+    out = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+    out.alpha_composite(frame, (shift, 0))
+    if np.array(out.getchannel("A")).sum() != np.array(frame.getchannel("A")).sum():
+        raise ValueError(f"body anchor shift {shift} leaves the cell")
+    return out
+
+
 def report_frame(label: str, frame: Image.Image) -> None:
     x0, y0, x1, y1 = alpha_bbox(frame)
     print(f"  {label}: height={y1 - y0 + 1:3d} feet_row={y1} x=[{x0},{x1}] centroid_x={centroid_x(frame):.1f}")
@@ -291,6 +367,15 @@ def build_sheet(sheet_name: str, config: dict, anchor_x: float, ruler_report: li
     rows = config["raw_rows"]
     sheet = Image.new("RGBA", (OUT_COLUMNS * OUT_CELL, rows * OUT_CELL), (0, 0, 0, 0))
     placed = {slot: place(sources[slot], scale, anchor_x, f"{sheet_name}[{slot}]") for slot in slots}
+    if config.get("body_match") or config.get("body_anchor"):
+        idle_width, idle_centre = idle_reference()
+    for slot in config.get("body_match", []):
+        placed[slot], factor = squeeze_body(placed[slot], idle_width)
+        print(f"    slot {slot}: body squeezed x{factor:.3f} to the idle lower width {idle_width:.1f}")
+    if config.get("body_anchor"):
+        # The alpha centroid used by place() includes the ruler, which differs per
+        # sheet: centre the body itself on the idle's so clips never jump sideways.
+        placed = {slot: anchor_body(frame, idle_centre) for slot, frame in placed.items()}
     if "bob_range" in config:
         tops = {slot: alpha_bbox(frame)[1] for slot, frame in placed.items()}
         middle = (min(tops.values()) + max(tops.values())) / 2
