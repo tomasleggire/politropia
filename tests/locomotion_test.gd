@@ -1,7 +1,7 @@
 extends SceneTree
-## Regression test for ground locomotion: run speed, turn crouch, skid stop,
-## tap stop without skid, skid cancel/jump/ledge exits and the ground dust
-## spawned by each.
+## Regression test for ground locomotion: run speed, turn pivot, skid stop,
+## tap stop without skid, reversal rules (straight to the turn, never a half
+## skid), skid cancel/jump/ledge exits and the ground dust spawned by each.
 ## Run: godot --headless --path . --script res://tests/locomotion_test.gd
 ## Exits 0 when every check passes, 1 otherwise.
 
@@ -35,6 +35,9 @@ func run() -> void:
 	await _case_turn()
 	await _case_tap()
 	await _case_skid_cancelled_by_input()
+	await _case_reversal_while_running()
+	await _case_reversal_through_neutral()
+	await _case_reversal_during_skid()
 	await _case_jump_out_of_skid_and_turn()
 	await _case_ledge_during_turn_and_skid()
 	await _case_jump_and_landing_dust()
@@ -60,7 +63,7 @@ func _case_run_and_skid() -> void:
 	check(_dust_count(GroundDust.Kind.FOOTSTEP) >= 1, "running spawns footstep dust")
 	var release_x := _player.global_position.x
 	Input.action_release(&"move_right")
-	await _secs(0.05)
+	await _secs(_player.skid_release_grace + 0.05)
 	check(_player._state == Player.State.SKID, "releasing at speed enters the skid")
 	check(_dust_count(GroundDust.Kind.STOP) == 1, "the skid spawns stop dust")
 	await _secs(0.3)
@@ -110,7 +113,7 @@ func _case_tap() -> void:
 		guard += 1
 	Input.action_release(&"move_right")
 	check(_player._run_time < _player.skid_min_run_time, "the tap releases before the min run time (%.3f)" % _player._run_time)
-	await _secs(0.03)
+	await _secs(_player.skid_release_grace + 0.03)
 	check(_player._state != Player.State.SKID, "reaching speed for less than the min run time does not skid")
 	check(absf(_player.velocity.x) < threshold, "a filtered tap still brakes normally")
 	await _secs(0.4)
@@ -125,6 +128,92 @@ func _case_skid_cancelled_by_input() -> void:
 	check(_player.velocity.x > 0.0, "the player moves again after the cancelled skid")
 	Input.action_release(&"move_right")
 	await _secs(0.6)
+
+
+## Reversing while running (the other key pressed as this one is released) goes
+## straight to the turn pivot: no skid frame, no dust of the stop.
+func _case_reversal_while_running() -> void:
+	await _fresh_rig()
+	Input.action_press(&"move_right")
+	await _secs(0.5)
+	var stops_before := _dust_count(GroundDust.Kind.STOP)
+	Input.action_release(&"move_right")
+	Input.action_press(&"move_left")
+	await _secs(0.03)
+	check(_player._state == Player.State.TURN, "reversing while running pivots at once")
+	check(is_zero_approx(_player.velocity.x), "the pivot stops dead")
+	var skidded := false
+	for i in 12:
+		await process_frame
+		skidded = skidded or _player._state == Player.State.SKID
+	check(not skidded, "a reversal never plays a skid")
+	check(_dust_count(GroundDust.Kind.STOP) == stops_before, "a reversal spawns no stop dust")
+	await _secs(0.3)
+	check(_player.velocity.x < 0.0, "runs the other way after the pivot")
+	Input.action_release(&"move_left")
+	await _secs(0.5)
+
+
+## A stick that crosses neutral for a few frames while reversing must not flash
+## a skid; a release that stays released still skids with the full slide.
+func _case_reversal_through_neutral() -> void:
+	await _fresh_rig()
+	Input.action_press(&"move_right")
+	await _secs(0.5)
+	Input.action_release(&"move_right")
+	await _secs(_player.skid_release_grace * 0.5)
+	check(_player._state == Player.State.RUN and is_equal_approx(_player.velocity.x, _player.run_max_speed), "inside the release grace the run keeps its speed")
+	Input.action_press(&"move_left")
+	var skidded := false
+	for i in 12:
+		await process_frame
+		skidded = skidded or _player._state == Player.State.SKID
+	check(not skidded, "a reversal through neutral never flashes a skid")
+	check(_player._state == Player.State.TURN or _player._state == Player.State.IDLE or _player.velocity.x < 0.0, "the pivot takes over after the neutral gap")
+	await _secs(0.4)
+	check(_player.velocity.x < 0.0, "runs the other way after the neutral gap")
+	Input.action_release(&"move_left")
+	await _secs(0.5)
+
+	# Same direction pressed again inside the grace keeps running, no skid.
+	await _fresh_rig()
+	Input.action_press(&"move_right")
+	await _secs(0.5)
+	Input.action_release(&"move_right")
+	await _secs(_player.skid_release_grace * 0.5)
+	Input.action_press(&"move_right")
+	await _secs(0.2)
+	check(_player._state == Player.State.RUN and is_equal_approx(_player.velocity.x, _player.run_max_speed), "a re-press inside the grace keeps running")
+	Input.action_release(&"move_right")
+	await _secs(0.6)
+
+
+## A reversal pressed once the skid has started waits for the brake to finish and
+## pivots from the planted pose; the skid is never cut short.
+func _case_reversal_during_skid() -> void:
+	await _fresh_rig()
+	await _run_then_release(Player.State.SKID)
+	Input.action_press(&"move_left")
+	await _secs(0.02)
+	check(_player._state == Player.State.SKID, "a reversal does not cut the skid brake short")
+	check(_player.velocity.x > 0.0, "the skid still slides")
+	await _secs(_player._skid_brake_duration())
+	check(_player._state == Player.State.TURN, "the pivot takes over when the brake ends")
+	check(is_zero_approx(_player.velocity.x), "the skid ended planted before the pivot")
+	await _secs(0.4)
+	check(_player.velocity.x < 0.0, "runs the other way after the skid and pivot")
+	Input.action_release(&"move_left")
+	await _secs(0.5)
+
+	# Reversing and releasing again before the brake ends leaves the skid intact.
+	await _fresh_rig()
+	await _run_then_release(Player.State.SKID)
+	Input.action_press(&"move_left")
+	await _secs(0.01)
+	Input.action_release(&"move_left")
+	await _secs(_player._skid_brake_duration() + _player.skid_hold_time * 0.3)
+	check(_player._state == Player.State.SKID, "a reversal released inside the brake leaves the skid playing")
+	await _secs(0.4)
 
 
 func _case_jump_out_of_skid_and_turn() -> void:
@@ -229,7 +318,7 @@ func _run_then_release(state: Player.State) -> void:
 	Input.action_press(&"move_right")
 	await _secs(0.5)
 	Input.action_release(&"move_right")
-	await _secs(0.05)
+	await _secs(_player.skid_release_grace + 0.05)
 	check(_player._state == state, "setup: reached state %d" % state)
 
 

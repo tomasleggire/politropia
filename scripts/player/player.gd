@@ -114,8 +114,10 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 
 @export_group("Skid")
 ## Releasing the run input at (near) full speed snaps to a low skid pose,
-## brakes linearly to zero, holds the pose, then returns to idle. Any new
-## input cancels the hold immediately.
+## brakes linearly to zero, holds the pose, then returns to idle. Input in
+## the same direction cancels the skid at once. Input opposite to the facing
+## waits for the brake to finish and then pivots (TURN), so the skid is
+## never cut short by a reversal.
 @export var skid_brake_time := 0.14
 ## Seconds the pose is held once the brake has finished (~10 frames at 60 fps).
 @export var skid_hold_time := 0.17
@@ -123,6 +125,11 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export_range(0.0, 1.0) var skid_min_speed_ratio := 0.9
 ## Seconds spent at that speed before a release skids (filters taps).
 @export var skid_min_run_time := 0.12
+## Seconds the run input must stay released before the skid starts. The run
+## keeps its speed meanwhile, so a stick or two keys that pass through neutral
+## while reversing (or a re-press) go straight to the turn or keep running
+## instead of flashing the first frames of a skid. Counts toward skid_brake_time.
+@export var skid_release_grace := 0.06
 
 @export_group("Jump")
 ## Apex height and time-to-apex derive rise gravity and launch velocity.
@@ -288,7 +295,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 	"wall_jump": wall_kick_input_lock_time,
 	"land": landing_squash_time,
 	"turn": turn_time,
-	"skid": skid_brake_time + skid_hold_time,
+	"skid": _skid_brake_duration() + skid_hold_time,
 	"attack_1": attack_window_hit1,
 	"attack_2": attack_window_hit2,
 	"attack_3": attack_window_hit3,
@@ -352,6 +359,8 @@ var _footstep_left := 0.0
 var _dust_left := 0.0
 var _run_time := 0.0
 var _skid_deceleration := 0.0
+## Time the run input has been released while a skid is possible (see skid_release_grace).
+var _release_time := 0.0
 var _dust_warned := false
 var _was_on_floor := false
 var _drop_left := 0.0
@@ -552,7 +561,8 @@ func _update_facing() -> void:
 	if _is_directional_attack_state():
 		_sprite.flip_h = _attack_facing < 0
 		return
-	if _state in [State.TURN, State.DASH, State.WALL_CLING, State.HURT]:
+	# SKID keeps its facing: _update_skid decides between cancel and pivot.
+	if _state in [State.TURN, State.SKID, State.DASH, State.WALL_CLING, State.HURT]:
 		return
 	var axis := _horizontal_input()
 	if _wants_turn(axis):
@@ -591,11 +601,13 @@ func _update_ground_move(delta: float) -> void:
 
 	var axis := _horizontal_input()
 	_track_run_time(delta)
-	if _try_start_skid(axis):
+	if _try_start_skid(axis, delta):
 		return
-	var target_speed := axis * run_max_speed
-	var accel := run_acceleration if not is_zero_approx(axis) else run_deceleration
-	velocity.x = move_toward(velocity.x, target_speed, accel * delta)
+	# Inside the release grace the run keeps its speed (the skid or the turn decides next).
+	if _release_time <= 0.0:
+		var target_speed := axis * run_max_speed
+		var accel := run_acceleration if not is_zero_approx(axis) else run_deceleration
+		velocity.x = move_toward(velocity.x, target_speed, accel * delta)
 	velocity.y = 0.0
 
 	if Input.is_action_pressed(&"move_down"):
@@ -656,17 +668,30 @@ func _track_run_time(delta: float) -> void:
 		_run_time = 0.0
 
 
-func _try_start_skid(axis: float) -> bool:
-	if _state != State.RUN or not is_zero_approx(axis):
+func _try_start_skid(axis: float, delta: float) -> bool:
+	var can_skid := (
+		_state == State.RUN
+		and is_zero_approx(axis)
+		and _run_time >= skid_min_run_time
+		and _jump_buffer_left <= 0.0
+		and not Input.is_action_pressed(&"move_down")
+	)
+	if not can_skid:
+		_release_time = 0.0
 		return false
-	if _run_time < skid_min_run_time or _jump_buffer_left > 0.0:
+	_release_time += delta
+	if _release_time < skid_release_grace:
 		return false
-	if Input.is_action_pressed(&"move_down"):
-		return false
-	_skid_deceleration = absf(velocity.x) / maxf(skid_brake_time, 0.001)
+	_skid_deceleration = absf(velocity.x) / _skid_brake_duration()
 	_enter_state(State.SKID)
 	_spawn_dust(GroundDust.Kind.STOP)
 	return true
+
+
+## The release grace counts toward skid_brake_time, so the slide from the release
+## (grace at full speed, then the linear brake) keeps the same total time.
+func _skid_brake_duration() -> float:
+	return maxf(skid_brake_time - skid_release_grace, 0.001)
 
 
 func _update_skid(delta: float) -> void:
@@ -674,11 +699,16 @@ func _update_skid(delta: float) -> void:
 		_enter_state(State.FALL)
 		_update_airborne(delta)
 		return
-	var cancelled := (
-		not is_zero_approx(_horizontal_input())
-		or Input.is_action_pressed(&"move_down")
-	)
-	if cancelled:
+	var axis := _horizontal_input()
+	var crouching := Input.is_action_pressed(&"move_down")
+	var reversing := not is_zero_approx(axis) and (1 if axis > 0.0 else -1) != _facing
+	if reversing and not crouching:
+		# A reversal never cuts the brake short: the skid slides to a stop and the
+		# pivot takes over from the planted pose (no half skid).
+		if _state_time >= _skid_brake_duration():
+			_begin_turn(1 if axis > 0.0 else -1)
+			return
+	elif not is_zero_approx(axis) or crouching:
 		_enter_state(State.IDLE)
 		_update_ground_move(delta)
 		return
@@ -686,7 +716,7 @@ func _update_skid(delta: float) -> void:
 	velocity.y = 0.0
 	if _try_launch_jump():
 		return
-	if _state_time >= skid_brake_time + skid_hold_time:
+	if _state_time >= _skid_brake_duration() + skid_hold_time:
 		_enter_state(State.IDLE)
 
 
@@ -1417,6 +1447,7 @@ func _enter_state(new_state: State) -> void:
 	_state = new_state
 	_state_time = 0.0
 	_run_time = 0.0
+	_release_time = 0.0
 	if not _is_lateral_attack_state():
 		_recoil_left = 0.0
 	if not _is_directional_attack_state():

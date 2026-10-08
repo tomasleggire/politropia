@@ -10,7 +10,9 @@ extends Node
 ##
 ## Sequence: idle 1.5 s, run right 2 s, stop (skid), idle 1 s, run left 1.5 s
 ## (turn from idle-run), reverse to right while running (turn), run 1 s,
-## stop, idle 1 s, a standing jump and a running jump. Input goes through Input.action_press/release like a player.
+## stop, idle 1 s, a standing jump and a running jump, then three reversal cases
+## (release for 3 frames, release for 6 frames, plain stop). Input goes through
+## Input.action_press/release like a player.
 
 const LEVEL_PATH := "res://scenes/levels/greece/level_greece.tscn"
 const LEVEL_FALLBACK := "res://scenes/levels/greece_level.tscn"
@@ -34,6 +36,11 @@ func _ready() -> void:
 		[1.5, &""], [2.0, &"move_right"], [1.0, &""],
 		[1.5, &"move_left"], [1.5, &"move_right"], [0.2, &""],
 		[1.0, &"move_right"], [1.0, &""],
+		# Reversal while running: a stick that crosses zero (3 frames), a reversal
+		# pressed while the skid has already started, and a plain stop.
+		[1.0, &"move_left"], [0.05, &""], [1.0, &"move_right"], [0.8, &""],
+		[1.0, &"move_right"], [0.1, &""], [0.8, &"move_left"], [1.0, &""],
+		[1.0, &"move_left"], [1.5, &""],
 		# Jump from idle, then a running jump (takeoff and landing dust).
 		[0.1, &"jump"], [1.0, &""], [0.6, &"move_right"],
 		[0.1, [&"move_right", &"jump"]], [0.7, &"move_right"], [1.0, &""],
