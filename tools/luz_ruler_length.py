@@ -44,7 +44,8 @@ MAX_TILT = 40.0
 TILT_STEP = 0.5
 EDGE_MARGIN = 2.0
 GRIP_ZONE = 12.0  # texels from the grip where only ruler-coloured pixels are erased
-FLOOR_SLACK = 6.0  # texels the ruler tip may sit below the feet row (~1 world px)
+MIN_CLEARANCE = -10.0  # lowest clearance the relaxation may reach (negative = below the feet row)
+FLOOR_CLEARANCE = 28.0  # texels the whole ruler must stay above the feet row (~4 world px)
 # Working canvas margin around the cell, so an overflow is measured, not clipped.
 CANVAS_MARGIN = 400
 
@@ -209,7 +210,7 @@ def _normalize_once(frame: Image.Image, target: float, label: str) -> tuple[Imag
     """Return (frame with the ruler at `target` texels, info).
 
     The free end is rebuilt along the ruler's own axis. Only when that would leave the
-    cell, or sink the tip below the floor line, the whole ruler is swung about the
+    cell, or come closer than FLOOR_CLEARANCE to the floor line, the whole ruler is swung about the
     grip by the smallest angle that fits (info["tilt"], degrees); a ruler that still
     cannot fit within MAX_TILT leaves the frame unchanged with info["overflow"] set."""
     rgba = np.array(frame.convert("RGBA"))
@@ -247,24 +248,32 @@ def _normalize_once(frame: Image.Image, target: float, label: str) -> tuple[Imag
     )
 
     src = _to_premult(canvas)
-    floor_limit = pch.FEET_ROW + pad + FLOOR_SLACK
     best = None
-    for step in range(int(MAX_TILT / TILT_STEP) + 1):
-        for sign in ((0,) if step == 0 else (1, -1)):
-            theta = sign * step * TILT_STEP
-            d2 = _rotate(ruler.d, theta)
-            n2 = np.array([-d2[1], d2[0]])
-            corners = _rect(grip, d2, n2, target, s_lo, s_hi)
-            if corners[:, 0].min() < pad + EDGE_MARGIN or corners[:, 0].max() > pad + w - EDGE_MARGIN:
-                continue
-            if corners[:, 1].min() < pad + EDGE_MARGIN or corners[:, 1].max() > floor_limit:
-                continue
-            best = (theta, d2, n2)
-            break
-        if best:
-            break
+    clearance = FLOOR_CLEARANCE
+    # Cell bounds are hard. If no angle gives the full clearance, the clearance is
+    # relaxed in 2 texel steps (down to MIN_CLEARANCE) and reported in info["clearance"].
+    while best is None and clearance >= MIN_CLEARANCE:
+        floor_limit = pch.FEET_ROW + pad - clearance
+        for step in range(int(MAX_TILT / TILT_STEP) + 1):
+            for sign in ((0,) if step == 0 else (1, -1)):
+                theta = sign * step * TILT_STEP
+                d2 = _rotate(ruler.d, theta)
+                n2 = np.array([-d2[1], d2[0]])
+                corners = _rect(grip, d2, n2, target, s_lo, s_hi)
+                if corners[:, 0].min() < pad + EDGE_MARGIN or corners[:, 0].max() > pad + w - EDGE_MARGIN:
+                    continue
+                if corners[:, 1].min() < pad + EDGE_MARGIN or corners[:, 1].max() > floor_limit:
+                    continue
+                best = (theta, d2, n2)
+                break
+            if best:
+                break
+        if best is None:
+            clearance -= 2.0
+    info["clearance"] = clearance if best else None
     if best is None:
         # Report the unconstrained overflow measured on the straight extension.
+        floor_limit = pch.FEET_ROW + pad - MIN_CLEARANCE
         corners = _rect(grip, ruler.d, ruler.n, target, s_lo, s_hi)
         info["overflow"] = int(max(0, pad + EDGE_MARGIN - corners[:, 0].min()) + max(0, corners[:, 0].max() - (pad + w - EDGE_MARGIN)) + max(0, corners[:, 1].max() - floor_limit))
         info["overflow"] = max(info["overflow"], 1)

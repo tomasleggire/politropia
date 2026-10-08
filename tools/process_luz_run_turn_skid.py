@@ -269,6 +269,8 @@ def describe_ruler(info: dict) -> str:
     if info.get("overflow"):
         return f"OVERFLOW ({info['overflow']} texels leave the cell; kept at {info['before']:.1f})"
     tilt = f", tilt {info['tilt']:+.1f} deg" if info.get("tilt") else ""
+    if info.get("clearance") is not None and info["clearance"] < rl.FLOOR_CLEARANCE:
+        tilt += f", CLEARANCE ONLY {info['clearance']:.0f}"
     return f"{info['before']:.1f} -> {info['after']:.1f} (period {info['period']:.1f}{tilt})"
 
 
