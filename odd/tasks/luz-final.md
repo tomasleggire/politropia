@@ -112,5 +112,10 @@ Strategy: `single-pr` with maintainer-approved `size:exception`. Keep all work o
 - The next major feature after this branch is the Greece level boss.
 - Delivery stays `single-pr` with maintainer-approved `size:exception` on this branch.
 
+## Final iPhone feedback and main integration (2026-10-08)
+- User approved wall cling on the iPhone and the new Luz animations.
+- HUD work is explicitly deferred; P11 skid remains deferred. Greece geometry debt remains with the team.
+- Prepare this branch for one push and one PR; do not push or open the PR as part of the local merge.
+
 ## Next step
 Parent/user owns push/PR and the single final iPhone build/playtest once the whole branch is ready. Keep Greece geometry debt with the team; do not address P11 in this branch. Greece level boss is next major feature.

@@ -1,0 +1,58 @@
+[gd_scene format=3 uid="uid://bgcrqvw5wnk6x"]
+
+[ext_resource type="Script" uid="uid://4a8j2xq5tbqg" path="res://scenes/ui/HUD.gd" id="1_0mwgc"]
+[ext_resource type="Texture2D" uid="uid://u1hfkd38jbj" path="res://assets/ui/portrait_luz.png" id="2_8qguk"]
+[ext_resource type="Texture2D" uid="uid://chob7py1tcflm" path="res://assets/ui/heart_full.png" id="2_oj5la"]
+[ext_resource type="Texture2D" uid="uid://buaghjvb74jbi" path="res://assets/ui/energy_under.png" id="3_136eg"]
+[ext_resource type="Texture2D" uid="uid://bml14s7ddhnls" path="res://assets/ui/heart_empty.png" id="3_gss2c"]
+[ext_resource type="Texture2D" uid="uid://dghb8tgyy5sjr" path="res://assets/ui/energy_progress.png" id="4_oj5la"]
+
+[node name="HUD" type="CanvasLayer" unique_id=835378023]
+script = ExtResource("1_0mwgc")
+heart_full_texture = ExtResource("2_oj5la")
+heart_empty_texture = ExtResource("3_gss2c")
+
+[node name="PlayerUI" type="Control" parent="." unique_id=818668834]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Portrait" type="TextureRect" parent="PlayerUI" unique_id=1790400001]
+texture_filter = 1
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 0
+offset_left = -18.0
+offset_top = -35.0
+offset_right = 82.0
+offset_bottom = 65.0
+scale = Vector2(2, 2)
+texture = ExtResource("2_8qguk")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HeartsContainer" type="HBoxContainer" parent="PlayerUI" unique_id=1453801795]
+custom_minimum_size = Vector2(150, 32)
+layout_mode = 0
+offset_left = 127.0
+offset_top = 24.0
+offset_right = 277.0
+offset_bottom = 56.0
+
+[node name="EnergyBar" type="TextureProgressBar" parent="PlayerUI" unique_id=461525524]
+texture_filter = 1
+custom_minimum_size = Vector2(240, 32)
+layout_mode = 0
+offset_left = 120.0
+offset_top = 54.0
+offset_right = 2178.3333
+offset_bottom = 354.0
+scale = Vector2(0.12, 0.12)
+value = 100.0
+nine_patch_stretch = true
+stretch_margin_left = 15
+stretch_margin_top = 5
+stretch_margin_right = 15
+stretch_margin_bottom = 5
+texture_under = ExtResource("3_136eg")
+texture_progress = ExtResource("4_oj5la")

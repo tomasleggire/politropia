@@ -330,7 +330,7 @@ func _on_player_changed(_current: int, _maximum: int) -> void:
 
 
 func _refresh_focus_available() -> void:
-	var available := _player != null and _player.is_focus_available()
+	var available : bool = _player != null and _player.is_focus_available()
 	if is_instance_valid(_focus_button):
 		_focus_button.visible = available
 	if not available and _focus_touch_id >= 0:

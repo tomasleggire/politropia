@@ -2,6 +2,7 @@
 
 [ext_resource type="Texture2D" uid="uid://3u8ygwfxl5vr" path="res://assets/art/library/Backgrounds/background1.png" id="1_i878q"]
 [ext_resource type="Texture2D" uid="uid://b43xtbmb01bux" path="res://assets/art/library/Floor/floors_library.png" id="3_248ka"]
+[ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro.tscn" id="6_ts0jf"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="10_0j26h"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_6keu4"]
 
@@ -14135,6 +14136,11 @@ tile_set = SubResource("TileSet_7wplu")
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("19_6keu4")]
 position = Vector2(82, 693)
+
+[node name="Enemies" type="Node2D" parent="." unique_id=923529168]
+
+[node name="FragmentoLibro" parent="Enemies" unique_id=1920754797 instance=ExtResource("6_ts0jf")]
+position = Vector2(825, 544)
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)

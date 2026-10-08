@@ -13,6 +13,7 @@ signal safe_ground_returned
 ## Emitted when a gated movement ability is granted (e.g. &"double_jump").
 signal ability_unlocked(ability: StringName)
 signal health_changed(current: int, maximum: int)
+signal energy_changed(current: float, maximum: float)
 ## Soul meter level; fires on every gain, spend and reset.
 signal soul_changed(current: int, maximum: int)
 ## Emitted when a hit lands: how much it took and the health left.
@@ -49,6 +50,14 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 
 @export_group("Health")
 @export var max_health := 3
+
+@export_group("Energy")
+@export var max_energy := 100.0
+var current_energy := 100.0
+
+var current_health: int:
+	get:
+		return _health
 
 @export_group("Soul")
 @export var max_soul := 99
@@ -501,6 +510,7 @@ func _ready() -> void:
 	# cell, so this scale makes Luz exactly body_height px tall.
 	_sprite.scale = Vector2.ONE * (body_height / LUZ_BODY_PIXELS)
 	_spawn_position = global_position
+	current_energy = max_energy
 	_health = max_health
 	_base_alpha = _sprite.modulate.a
 	_default_process_mode = process_mode
@@ -2106,6 +2116,23 @@ func restore_full_health() -> void:
 		return
 	_health = max_health
 	health_changed.emit(_health, max_health)
+
+
+## -- Library energy -----------------------------------------------------------
+
+func use_energy(amount: float) -> bool:
+	if amount < 0.0 or current_energy < amount:
+		return false
+	current_energy = clampf(current_energy - amount, 0.0, max_energy)
+	energy_changed.emit(current_energy, max_energy)
+	return true
+
+
+func gain_energy(amount: float) -> void:
+	if amount <= 0.0:
+		return
+	current_energy = clampf(current_energy + amount, 0.0, max_energy)
+	energy_changed.emit(current_energy, max_energy)
 
 
 ## -- Soul and focus heal -------------------------------------------------------
