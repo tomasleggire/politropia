@@ -161,6 +161,8 @@ func _draw() -> void:
 			_draw_skid_lines(width, height)
 		Kind.LANDING:
 			_draw_landing_arcs(width, height)
+		Kind.TAKEOFF:
+			_draw_takeoff_puffs(width, height)
 		_:
 			_draw_puff(width, height)
 	_draw_specks(step_scale)
@@ -203,6 +205,19 @@ func _draw_landing_arcs(width: int, height: int) -> void:
 			# Fill the vertical gap to the previous column so the curve stays connected.
 			_pixels(x, mini(rise, previous), 1, absi(rise - previous) + 1)
 			previous = rise
+
+
+## Two small puffs, one under each foot, with a gap between them; reads as the
+## ground kicked up on push-off instead of one smooth dome.
+func _draw_takeoff_puffs(width: int, height: int) -> void:
+	var puff_width := maxi(int(width * 0.4), 2)
+	var gap := maxi(int(width * 0.1), 1)
+	for side in [-1, 1]:
+		for row in height:
+			var fill := sqrt(1.0 - pow(float(row) / float(height), 2.0))
+			var row_width := maxi(roundi(float(puff_width) * fill), 1)
+			var x: int = gap if side > 0 else -gap - row_width
+			_pixels(x, row, row_width, 1)
 
 
 ## Loose specks: the later ones drop out first as the effect shrinks.

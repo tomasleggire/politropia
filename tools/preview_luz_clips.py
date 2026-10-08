@@ -15,13 +15,15 @@ outside the repo):
 
 Run also gets a scrolling floor at the real run speed so foot sliding is visible.
 Frame times follow player.gd: run 28 fps, idle 8 fps, turn 4 frames in turn_time,
-skid 6 frames in skid_brake_time + skid_hold_time. Turn is also rendered at the
-0.12 s the art request recommends (`turn_0.12s`).
+skid frames in skid_brake_time + skid_hold_time; the run fps, turn_time and skid
+times are read from luz_animation_catalog.gd and player.gd so the previews follow
+the game. Turn is also rendered at the 0.12 s the art request recommends (`turn_0.12s`).
 """
 
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -35,18 +37,36 @@ ASSET_DIR = ROOT / "assets" / "player" / "luz"
 CELL = 512
 FEET_ROW = 413
 BODY_SRC_HEIGHT = 331.5  # standing idle height in source px = 48 world px
-CROP = (60, 60, 452, 430)  # x0, y0, x1, y1 of the cell region worth showing
+CROP = (0, 60, 512, 440)  # x0, y0, x1, y1 of the cell region worth showing (the long ruler reaches x ~ 0)
 BG = (22, 22, 28, 255)
 RUN_SPEED = 150.0  # px/s, player.gd run_max_speed
 
-# name -> (manifest clip, fps, looping, scrolling floor speed in world px/s)
-CLIPS = {
-    "run": ("run", 28.0, True, RUN_SPEED),
-    "idle": ("idle_breathing", 8.0, True, 0.0),
-    "turn": ("turn", 4 / 0.06, False, 0.0),
-    "turn_0.12s": ("turn", 4 / 0.12, False, 0.0),
-    "skid": ("skid", 6 / 0.31, False, 0.0),
-}
+def source_value(path: str, pattern: str, default: float) -> float:
+    """First regex group of `pattern` in a project file, as a float."""
+    match = re.search(pattern, (ROOT / path).read_text())
+    return float(match.group(1)) if match else default
+
+
+RUN_FPS = source_value("scripts/player/luz_animation_catalog.gd", r'"walk":\s*([0-9.]+)', 28.0)
+TURN_TIME = source_value("scripts/player/player.gd", r"var turn_time\s*:?=\s*([0-9.]+)", 0.1)
+SKID_TIME = source_value("scripts/player/player.gd", r"var skid_brake_time\s*:?=\s*([0-9.]+)", 0.14) + source_value(
+    "scripts/player/player.gd", r"var skid_hold_time\s*:?=\s*([0-9.]+)", 0.17
+)
+
+
+def clip_table(manifest: dict) -> dict:
+    """name -> (manifest clip, fps, looping, scrolling floor speed in world px/s)."""
+    counts = {}
+    for sheet in manifest["sheets"].values():
+        for clip, indices in sheet["clips"].items():
+            counts[clip] = len(indices)
+    return {
+        "run": ("run", RUN_FPS, True, RUN_SPEED),
+        "idle": ("idle_breathing", 8.0, True, 0.0),
+        "turn": ("turn", counts.get("turn", 2) / TURN_TIME, False, 0.0),
+        "turn_0.12s": ("turn", counts.get("turn", 2) / 0.12, False, 0.0),
+        "skid": ("skid", counts.get("skid", 8) / SKID_TIME, False, 0.0),
+    }
 
 
 def font(size: int = 18):
@@ -142,7 +162,7 @@ def main() -> int:
     out_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd() / "luz_previews"
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = json.loads((ASSET_DIR / "animation_manifest.json").read_text())
-    for name, (clip, fps, loop, floor_speed) in CLIPS.items():
+    for name, (clip, fps, loop, floor_speed) in clip_table(manifest).items():
         frames = load_clip_frames(manifest, clip)
         contact_sheet(frames, out_dir / f"{name}_contact.png", name)
         for label, body_px, upscale in (("game", 48, 3), ("large", 200, 1)):

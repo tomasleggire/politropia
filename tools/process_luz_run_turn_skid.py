@@ -12,7 +12,7 @@ available here, so use a venv):
 Raw sheets live in tools/art_sources/luz/raw/ (gitignored), cells of 384x512,
 facing right, see tools/art_sources/luz/prompts/run_turn_skid.md:
 
-    luz_run_raw.png        1536x1024 (4x2)  -> run            (8 frames)
+    luz_run_raw.png        1536x1536 (4x3)  -> run            (12 frames)
     luz_idle_raw.png       1536x1024 (4x2)  -> idle_breathing (8 frames)
     luz_turn_skid_raw.png  1536x1536 (4x3)  -> turn (slots 0-3), skid (slots 4-9)
 
@@ -23,6 +23,10 @@ Pipeline per sheet (cloned from process_luz_rest_ritual.py): clean the key
 most of its pixels, scale, put the lowest opaque row on the shared feet row (413)
 and anchor the alpha centroid to the existing idle frame, so feet and scale match
 the untouched sheets (frame cell 512x512, on-screen scale body_height/331.5).
+The last step of every frame is luz_ruler_length.normalize_ruler: Codex draws the
+ruler (her sword) at a different length per sheet, so it is lengthened by script to
+one length (RULER_TARGET_LENGTH) in every clip. A frame whose ruler would leave the
+512x512 cell is kept as drawn and reported (exit code 2).
 Writes assets/player/luz/luz_{run,idle,turn_skid}_sheet.png and the matching
 sections of animation_manifest.json; it drops the superseded `run` (and, once the
 new idle exists, `idle_breathing`) clips from luz_locomotion_sheet.png. Never run
@@ -41,6 +45,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import luz_ruler_length as rl  # noqa: E402
 import process_luz_combat_hits as pch  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,50 +64,52 @@ MIN_COMPONENT_PX = 400
 MAX_FLOAT = 4
 # Standing-idle height (hair top to sole) of the existing idle frames, in output px.
 IDLE_STANDING_HEIGHT = 331.5
-# Codex draws the run and turn/skid sheets with a standing-equivalent body of about
-# 380 raw px (measured: run frames are 345-362 tall = ~92% of standing), larger than
-# the 340 px the prompt asked for, so they need a smaller scale than 331.5/340.
-CODEX_STANDING_HEIGHT = 380.0
-FIXED_SCALE = IDLE_STANDING_HEIGHT / CODEX_STANDING_HEIGHT
+# Raw standing-equivalent heights (hair top to sole) per sheet, measured on the v3
+# sheets: skid slots 6-9 (standing) have a median of 383.5 raw px; the run frames
+# (lean, ~92% of standing) have a median of 303 raw px, i.e. ~329 standing.
+TURN_SKID_STANDING_HEIGHT = 383.5
+RUN_STANDING_HEIGHT = 329.0
+TURN_SKID_SCALE = IDLE_STANDING_HEIGHT / TURN_SKID_STANDING_HEIGHT
+RUN_SCALE = IDLE_STANDING_HEIGHT / RUN_STANDING_HEIGHT
+# Head bob allowed in the run (output texels, 2 world px).
+RUN_BOB_RANGE = 14
 
 # scale None = measured from the sheet: IDLE_STANDING_HEIGHT / median frame height.
+# The idle sheet is built first: hair_match reads its hair luminance.
 SHEETS = {
-    "luz_run_sheet.png": {
-        "raw_file": "luz_run_raw.png",
-        "raw_columns": 4,
-        "raw_rows": 2,
-        "scale": FIXED_SCALE,
-        "clips": {"run": list(range(8))},
-        # Hair-top row each run frame is flattened to (see bob_fix). The Codex
-        # poses bob 40 output texels (5.8 world px, rows 97-137); this keeps the
-        # bob to 14 texels (2 world px, Penitent-like) with low contact frames.
-        "head_tops": [100, 108, 114, 106, 100, 108, 114, 106],
-    },
     "luz_idle_sheet.png": {
         "raw_file": "luz_idle_raw.png",
         "raw_columns": 4,
         "raw_rows": 2,
         "scale": None,
-        # Slot 3 drops out: its hair silhouette pops against its neighbours.
         "clips": {"idle_breathing": [0, 1, 2, 4, 5, 6, 7]},
+    },
+    "luz_run_sheet.png": {
+        "raw_file": "luz_run_raw.png",
+        "raw_columns": 4,
+        "raw_rows": 3,
+        "scale": RUN_SCALE,
+        "clips": {"run": list(range(12))},
+        # The Codex poses bob more than a Penitent-like run; bob_fix limits the
+        # hair-top travel of the cycle to RUN_BOB_RANGE texels around its middle.
+        "bob_range": RUN_BOB_RANGE,
+        "hair_match": list(range(12)),
     },
     "luz_turn_skid_sheet.png": {
         "raw_file": "luz_turn_skid_raw.png",
         "raw_columns": 4,
         "raw_rows": 3,
-        "scale": FIXED_SCALE,
-        # Skid ends with a small rock-back (8, 7, 8) so the stop settles with a sway.
-        # Turn slot 0 holds the ruler in front with both hands; it pops against
-        # the trailing sword grip of the idle and run clips, so the turn starts at slot 1.
-        # Slot 2 (deep ball crouch) is left out: the turn is a 2-frame snap pivot.
+        "scale": TURN_SKID_SCALE,
+        # Turn: slot 0 (standing, one-hand trailing grip), slot 2 (low pivot, no ball
+        # crouch), slot 3 (standing, trailing grip). Skid: slots 4-9, ending with a
+        # small rock-back (8, 7, 8) so the stop settles with a sway. Slots 10-11 are
+        # unused (Codex filled them anyway).
         "clips": {"turn": [1, 3], "skid": [4, 5, 6, 7, 8, 7, 8, 9]},
-        # The sway slots paint the hair about 7% darker (more dark-brown shading under
-        # the bun) than the idle hair; lift it to the idle mean so the stop does not
-        # darken the hair. Slots 4-5 are skipped: the ruler shares the hair hue.
-        "hair_match": [6, 7, 8, 9],
+        # Codex paints the hair 4-7% darker than the idle in the sway slots (and 8-10%
+        # in the run sheet); lift it to the idle mean so the clips do not pop.
+        "hair_match": [1, 3, 4, 5, 6, 7, 8, 9],
     },
 }
-
 
 def clean_key(raw: Image.Image) -> Image.Image:
     """Real alpha from a raw sheet: key flat magenta and peel red/magenta fringes."""
@@ -217,17 +224,19 @@ def bob_fix(frame: Image.Image, target_top: int) -> Image.Image:
     return out
 
 
-def hair_mask(rgba: np.ndarray) -> np.ndarray:
+def hair_mask(rgba: np.ndarray, exclude: np.ndarray | None = None) -> np.ndarray:
     """Hair-hued opaque pixels (blond to dark brown) in the head band of a frame."""
     r, g, b, a = (rgba[..., k].astype(np.int16) for k in range(4))
     mask = (a > 200) & (r > b + 25) & (r > g + 8) & (g > b + 5) & (r > 90)
+    if exclude is not None:
+        mask &= ~exclude
     rows = np.where(a > 200)[0]
     mask[rows.min() + 170 :] = False
     return mask
 
 
-def hair_luminance(rgba: np.ndarray) -> float:
-    mask = hair_mask(rgba)
+def hair_luminance(rgba: np.ndarray, exclude: np.ndarray | None = None) -> float:
+    mask = hair_mask(rgba, exclude)
     lum = 0.3 * rgba[..., 0] + 0.59 * rgba[..., 1] + 0.11 * rgba[..., 2]
     return float(lum[mask].mean())
 
@@ -241,8 +250,9 @@ def idle_hair_luminance() -> float:
 def match_hair(frame: Image.Image, target: float) -> Image.Image:
     """Scale the hair-hued pixels' RGB so their mean luminance equals `target`."""
     rgba = np.array(frame)
-    gain = target / hair_luminance(rgba)
-    mask = hair_mask(rgba)
+    ruler = rl.band_mask(frame)  # the ruler shares the hair hue; never lift it
+    gain = target / hair_luminance(rgba, ruler)
+    mask = hair_mask(rgba, ruler)
     rgba[..., :3][mask] = np.clip(rgba[..., :3][mask].astype(float) * gain, 0, 255).astype(np.uint8)
     print(f"    hair gain x{gain:.3f}")
     return Image.fromarray(rgba, "RGBA")
@@ -253,7 +263,16 @@ def report_frame(label: str, frame: Image.Image) -> None:
     print(f"  {label}: height={y1 - y0 + 1:3d} feet_row={y1} x=[{x0},{x1}] centroid_x={centroid_x(frame):.1f}")
 
 
-def build_sheet(sheet_name: str, config: dict, anchor_x: float) -> dict | None:
+def describe_ruler(info: dict) -> str:
+    if not info.get("found"):
+        return "NOT FOUND"
+    if info.get("overflow"):
+        return f"OVERFLOW ({info['overflow']} texels leave the cell; kept at {info['before']:.1f})"
+    tilt = f", tilt {info['tilt']:+.1f} deg" if info.get("tilt") else ""
+    return f"{info['before']:.1f} -> {info['after']:.1f} (period {info['period']:.1f}{tilt})"
+
+
+def build_sheet(sheet_name: str, config: dict, anchor_x: float, ruler_report: list[dict]) -> dict | None:
     raw_path = RAW_DIR / config["raw_file"]
     if not raw_path.exists():
         print(f"{sheet_name}: {raw_path.name} not found, skipped (previous output kept)")
@@ -269,14 +288,24 @@ def build_sheet(sheet_name: str, config: dict, anchor_x: float) -> dict | None:
 
     rows = config["raw_rows"]
     sheet = Image.new("RGBA", (OUT_COLUMNS * OUT_CELL, rows * OUT_CELL), (0, 0, 0, 0))
+    placed = {slot: place(sources[slot], scale, anchor_x, f"{sheet_name}[{slot}]") for slot in slots}
+    if "bob_range" in config:
+        tops = {slot: alpha_bbox(frame)[1] for slot, frame in placed.items()}
+        middle = (min(tops.values()) + max(tops.values())) / 2
+        half = config["bob_range"] / 2
+        placed = {
+            slot: bob_fix(frame, round(min(max(tops[slot], middle - half), middle + half)))
+            for slot, frame in placed.items()
+        }
     for slot in slots:
-        frame = place(sources[slot], scale, anchor_x, f"{sheet_name}[{slot}]")
-        if "head_tops" in config:
-            frame = bob_fix(frame, config["head_tops"][slot])
+        frame = placed[slot]
+        frame, info = rl.normalize_ruler(frame, rl.RULER_TARGET_LENGTH, f"{sheet_name}[{slot}]")
+        ruler_report.append(info)
         if slot in config.get("hair_match", []):
             frame = match_hair(frame, idle_hair_luminance())
         sheet.alpha_composite(frame, ((slot % OUT_COLUMNS) * OUT_CELL, (slot // OUT_COLUMNS) * OUT_CELL))
         report_frame(f"slot {slot}", frame)
+        print(f"    ruler {describe_ruler(info)}")
     sheet.save(ASSET_DIR / sheet_name)
     return {
         "grid": {"columns": OUT_COLUMNS, "rows": rows, "cell_width": OUT_CELL, "cell_height": OUT_CELL},
@@ -290,8 +319,9 @@ def main() -> int:
     manifest = json.loads(MANIFEST_PATH.read_text())
     sheets = manifest["sheets"]
     built = []
+    ruler_report: list[dict] = []
     for sheet_name, config in SHEETS.items():
-        entry = build_sheet(sheet_name, config, anchor_x)
+        entry = build_sheet(sheet_name, config, anchor_x, ruler_report)
         if entry is None:
             continue
         sheets[sheet_name] = {"grid": entry["grid"], "clips": entry["clips"]}
@@ -307,7 +337,13 @@ def main() -> int:
 
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Built {built or 'nothing'}; anchor_x={anchor_x:.1f}")
-    return 0
+    lengths = [info["after"] for info in ruler_report if info.get("after")]
+    if lengths:
+        print(f"ruler target {rl.RULER_TARGET_LENGTH:.0f} texels: final min {min(lengths):.1f} max {max(lengths):.1f}")
+    bad = [info["label"] for info in ruler_report if not info.get("found") or info.get("overflow")]
+    for label in bad:
+        print(f"WARNING: ruler not normalised in {label}")
+    return 2 if bad else 0
 
 
 if __name__ == "__main__":
