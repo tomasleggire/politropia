@@ -3,8 +3,8 @@ extends CharacterBody2D
 
 ## Blasphemous-style finite state machine: weighty ground run, a precise
 ## jump arc, crouch, a dash/slide usable on the ground or in the air (one
-## air dash per airborne period), wall cling + climb kick, ledge grab,
-## a 3-hit ground combo, up/air/crouch attacks and a pogo down slash.
+## air dash per airborne period), wall cling + climb kick,
+## a 3-hit ground combo, up/air/crouch attacks.
 
 signal respawned
 ## Emitted after a hazard return has moved her onto the last safe ground, while
@@ -31,7 +31,7 @@ enum ReturnPhase { NONE, OUT, IN }
 
 enum State {
 	IDLE, RUN, CROUCH, JUMP, FALL, DASH,
-	WALL_CLING, LEDGE_HANG, LEDGE_CLIMB,
+	WALL_CLING,
 	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK,
 	HURT, DEAD, FOCUS,
 	TURN, SKID,
@@ -169,7 +169,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var dash_cooldown := 0.35
 ## Air dash: horizontal only, gravity suspended for its duration, standing
 ## collider kept (unlike the ground dash's low slide collider). One per
-## airborne period — resets on landing, wall cling or ledge hang.
+## airborne period — resets on landing or wall cling.
 @export var air_dash_duration := 0.30
 
 @export_group("Wall")
@@ -198,10 +198,6 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var wall_jump_vertical_speed := 560.0
 @export var wall_jump_lock_time := 0.15
 @export var wall_recling_lockout := 0.2
-
-@export_group("Ledge")
-@export var ledge_climb_duration := 0.25
-@export var ledge_climb_forward_offset := 33.0
 
 @export_group("Attack")
 ## Startup (windup) shared by hits 1/2 of the ground combo and by
@@ -249,20 +245,9 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ## Damage one slash deals to whatever it strikes.
 @export var attack_damage := 1
 ## A horizontal slash that lands pushes Luz away from the target at this speed
-## for this long. Up slashes and down slashes never recoil her.
+## for this long. Up slashes never recoil her.
 @export var attack_recoil_speed := 120.0
 @export var attack_recoil_time := 0.08
-
-@export_group("Pogo")
-## Rise of the bounce after a down slash lands on an enemy, a hazard or
-## anything in the `pogoable` group. Launched with the main jump's rise
-## gravity, at a fixed speed: releasing jump does not shorten it.
-@export var pogo_height := 130.0
-## Grace window after a pogo: hazard damage is ignored for this long, so the
-## frame in which her body and the slash reach the same spike cannot cost her
-## the bounce (Hollow Knight forgives it the same way). A hazard touched with
-## no slash covering it hurts as usual.
-@export var pogo_grace_time := 0.12
 
 @export_group("Attack Hitboxes")
 ## T4d item 3 (iPhone playtest: "in the 3rd hit Luz gets bigger and so does
@@ -285,9 +270,6 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var hitbox_air_offset_y := -25.37     ## air: mid-air torso height
 @export var hitbox_up_size := Vector2(21.5, 56.3)
 @export var hitbox_up_offset := Vector2(0, -66.2)
-## Down slash: a box right below her feet (the origin is at the feet).
-@export var hitbox_down_size := Vector2(29.8, 36.4)
-@export var hitbox_down_offset := Vector2(0.0, 18.2)
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
@@ -297,7 +279,6 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @onready var _wall_check_head: RayCast2D = $WallCheckHead
 @onready var _wall_check_chest: RayCast2D = $WallCheckChest
 @onready var _wall_check_feet: RayCast2D = $WallCheckFeet
-@onready var _ledge_check_above: RayCast2D = $LedgeCheckAbove
 @onready var _headroom_check: RayCast2D = $HeadroomCheck
 @onready var _attack_hitbox: AttackHitbox = $AttackHitbox
 @onready var _slash_vfx: PlayerSlashVfx = $SlashVfx
@@ -305,10 +286,9 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 	"ground_dash": dash_duration,
 	"air_dash": air_dash_duration,
 	"wall_jump": wall_kick_input_lock_time,
-	"ledge_climb": ledge_climb_duration,
 	"land": landing_squash_time,
-		"turn": turn_time,
-		"skid": skid_brake_time + skid_hold_time,
+	"turn": turn_time,
+	"skid": skid_brake_time + skid_hold_time,
 	"attack_1": attack_window_hit1,
 	"attack_2": attack_window_hit2,
 	"attack_3": attack_window_hit3,
@@ -388,10 +368,6 @@ var _wall_kick_lock_left := 0.0
 var _wall_kick_pending := false
 var _wall_kick_wall_direction := 0
 
-var _ledge_snap_from := Vector2.ZERO
-var _ledge_snap_to := Vector2.ZERO
-var _ledge_climb_time := 0.0
-
 var _attack_phase := PHASE_STARTUP
 var _attack_combo_index := 0
 var _attack_facing := 1
@@ -415,16 +391,11 @@ var _attack_buffer_left := 0.0
 var _attack_buffer_direction := 0
 var _recoil_left := 0.0
 var _recoil_velocity := 0.0
-var _air_attack_down := false
-var _pogo_bounced := false
-var _pogo_rising := false
-var _pogo_grace_left := 0.0
 
 var _soul := 0
 var _focus_left := 0.0
 var _focus_requested := false
 var _focus_glow: Polygon2D
-var _down_slash_mark: Polygon2D
 
 
 func _ready() -> void:
@@ -455,7 +426,6 @@ func _ready() -> void:
 	_wall_check_head.collision_mask = 1
 	_wall_check_chest.collision_mask = 1
 	_wall_check_feet.collision_mask = 1
-	_ledge_check_above.collision_mask = 1
 	_headroom_check.collision_mask = 1
 
 	_enter_state(State.IDLE)
@@ -519,12 +489,6 @@ func _physics_process(delta: float) -> void:
 			_update_dash(delta)
 		State.WALL_CLING:
 			_update_wall_cling(delta)
-		State.LEDGE_HANG:
-			_update_ledge_hang(delta)
-		State.LEDGE_CLIMB:
-			_update_ledge_climb(delta)
-			_update_animation()
-			return
 		State.ATTACK:
 			_update_attack(delta)
 		State.CROUCH_ATTACK:
@@ -556,7 +520,6 @@ func _update_shared_timers(delta: float) -> void:
 	_attack_buffered_left = maxf(_attack_buffered_left - delta, 0.0)
 	_attack_restart_buffered_left = maxf(_attack_restart_buffered_left - delta, 0.0)
 	_air_attack_buffered_left = maxf(_air_attack_buffered_left - delta, 0.0)
-	_pogo_grace_left = maxf(_pogo_grace_left - delta, 0.0)
 
 	if _drop_left > 0.0:
 		_drop_left -= delta
@@ -570,7 +533,7 @@ func _update_shared_timers(delta: float) -> void:
 	else:
 		_jump_buffer_left = maxf(_jump_buffer_left - delta, 0.0)
 
-	var grounded_state := _state != State.WALL_CLING and _state != State.LEDGE_HANG and _state != State.LEDGE_CLIMB
+	var grounded_state := _state != State.WALL_CLING
 	if is_on_floor() and grounded_state:
 		_coyote_left = coyote_time
 	else:
@@ -589,7 +552,7 @@ func _update_facing() -> void:
 	if _is_directional_attack_state():
 		_sprite.flip_h = _attack_facing < 0
 		return
-	if _state in [State.TURN, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB, State.HURT]:
+	if _state in [State.TURN, State.DASH, State.WALL_CLING, State.HURT]:
 		return
 	var axis := _horizontal_input()
 	if _wants_turn(axis):
@@ -613,11 +576,9 @@ func _update_facing_rays() -> void:
 	_wall_check_head.target_position.x = wall_ray_length * _facing
 	_wall_check_chest.target_position.x = wall_ray_length * _facing
 	_wall_check_feet.target_position.x = wall_ray_length * _facing
-	_ledge_check_above.target_position.x = wall_ray_length * _facing
 	_wall_check_head.force_raycast_update()
 	_wall_check_chest.force_raycast_update()
 	_wall_check_feet.force_raycast_update()
-	_ledge_check_above.force_raycast_update()
 
 
 ## -- Ground: idle / run -----------------------------------------------------
@@ -788,8 +749,7 @@ func request_attack(direction: int) -> void:
 
 ## Touch UI: upgrades the attack that just started — while it is still in
 ## its startup phase, before any hitbox is active — to an up attack instead
-## of firing a second attack. A downward swipe turns an air attack into the
-## pogo down slash and does nothing on the ground.
+## of firing a second attack. A downward swipe does nothing.
 ## Used when the finger swipes after touching down on the attack button (see
 ## touch_controls.gd's attack_upgrade_window).
 func request_attack_upgrade(direction: int) -> void:
@@ -801,8 +761,6 @@ func request_attack_upgrade(direction: int) -> void:
 	)
 	if direction == -1 and upgrading_from_neutral:
 		_start_up_attack()
-	elif direction == 1 and _state == State.AIR_ATTACK and _attack_phase == PHASE_STARTUP:
-		_air_attack_down = true
 
 
 ## Touch UI entry point for the jump button, called directly instead of only
@@ -851,11 +809,11 @@ func _queue_attack(direction: int) -> void:
 			return
 		State.AIR_ATTACK:
 			if _attack_phase == PHASE_RECOVERY:
-				_restart_air_attack(direction == 1)
+				_restart_air_attack()
 			else:
 				_air_attack_buffered_left = attack_buffer_time
 			return
-		State.CROUCH_ATTACK, State.UP_ATTACK, State.DASH, State.WALL_CLING, State.LEDGE_HANG, State.LEDGE_CLIMB, State.HURT:
+		State.CROUCH_ATTACK, State.UP_ATTACK, State.DASH, State.WALL_CLING, State.HURT:
 			_attack_buffer_left = attack_buffer_time
 			_attack_buffer_direction = direction
 			return
@@ -866,7 +824,7 @@ func _queue_attack(direction: int) -> void:
 		if direction == -1:
 			_start_up_attack()
 		else:
-			_start_air_attack(direction == 1)
+			_start_air_attack()
 		return
 
 	if _state == State.CROUCH:
@@ -888,7 +846,7 @@ func _end_generic_attack() -> void:
 
 
 ## Invalidates a pending generic attack buffer (_attack_buffer_left/
-## _attack_buffer_direction, used by dash/wall-cling/ledge/crouch/up
+## _attack_buffer_direction, used by dash/wall-cling/crouch/up
 ## states) whenever an attack actually starts through any path. Without
 ## this, an older press already superseded by a fresher one that started an
 ## attack directly could still sit in the buffer and fire a second,
@@ -1045,22 +1003,17 @@ func _update_up_attack(delta: float) -> void:
 
 ## -- Combat: air attack ---------------------------------------------------------
 
-## `down` turns it into the pogo down slash (down + attack in the air).
-func _start_air_attack(down := false) -> void:
+func _start_air_attack() -> void:
 	_air_attack_buffered_left = 0.0
 	_clear_pending_attack_buffer()
 	_capture_attack_facing()
 	_enter_state(State.AIR_ATTACK)
 	_attack_phase = PHASE_STARTUP
-	_air_attack_down = down
-	_pogo_bounced = false
 
 
-func _restart_air_attack(down: bool) -> void:
+func _restart_air_attack() -> void:
 	_state_time = 0.0
 	_attack_phase = PHASE_STARTUP
-	_air_attack_down = down
-	_pogo_bounced = false
 
 
 func _update_air_attack(delta: float) -> void:
@@ -1078,17 +1031,14 @@ func _update_air_attack(delta: float) -> void:
 	elif _state_time < attack_startup_time + attack_active_time:
 		if _attack_phase != PHASE_ACTIVE:
 			_attack_phase = PHASE_ACTIVE
-			if _air_attack_down:
-				_activate_down_slash()
-			else:
-				_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
+			_activate_directional_attack(&"attack_air", _attack_facing, 0, &"air")
 	else:
 		if _attack_phase != PHASE_RECOVERY:
 			_attack_phase = PHASE_RECOVERY
 			_deactivate_attack_hitbox()
 		if _air_attack_buffered_left > 0.0:
 			_air_attack_buffered_left = 0.0
-			_restart_air_attack(_held_vertical_direction() == 1)
+			_restart_air_attack()
 			return
 
 	if _state_time >= air_attack_recovery:
@@ -1111,77 +1061,10 @@ func _resolve_attack_hit(target: Node2D, attack_name: StringName) -> void:
 	var struck := false
 	if target.has_method(&"receive_hit"):
 		struck = target.call(&"receive_hit", attack_damage, global_position, attack_name)
-	if attack_name == &"attack_down":
-		if struck or target.is_in_group(ContactDamage.POGO_GROUP):
-			_pogo()
-	elif struck:
+	if struck:
 		_start_attack_recoil(target.global_position)
 	if struck and target.is_in_group(Enemy.GROUP_ENEMIES):
 		add_soul(soul_per_hit)
-
-
-## -- Combat: pogo down slash -----------------------------------------------------
-
-## Bounces her up at a fixed speed after a down slash connected, gives back her
-## air dash and double jump, and starts the hazard grace window. Once per slash.
-func _pogo() -> void:
-	if _state != State.AIR_ATTACK or not _air_attack_down or _pogo_bounced:
-		return
-	_pogo_bounced = true
-	_pogo_rising = true
-	_pogo_grace_left = pogo_grace_time
-	velocity.y = -sqrt(2.0 * _rise_gravity * pogo_height)
-	_restore_air_actions()
-	_deactivate_attack_hitbox()
-	_enter_state(State.JUMP)
-
-
-func _activate_down_slash() -> void:
-	var config := _activate_attack_hitbox(&"attack_down", _attack_facing)
-	_show_down_slash_mark(config.size, config.offset)
-
-
-## Placeholder for the missing art: a translucent box over the hitbox.
-func _show_down_slash_mark(size: Vector2, offset: Vector2) -> void:
-	if _down_slash_mark == null:
-		_down_slash_mark = Polygon2D.new()
-		_down_slash_mark.color = Color(1.0, 1.0, 1.0, 0.35)
-		_down_slash_mark.z_index = 1
-		add_child(_down_slash_mark)
-	var half := size * 0.5
-	_down_slash_mark.position = offset
-	_down_slash_mark.polygon = PackedVector2Array([
-		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
-		Vector2(half.x, half.y), Vector2(-half.x, half.y),
-	])
-	_down_slash_mark.visible = true
-
-
-## True while the active down slash covers the hazard whose contact is hurting
-## her (`source_position` is the hazard's centre). The slash then wins: the
-## bounce happens at once, even if the hitbox report has not arrived yet.
-func _down_slash_covers(source_position: Vector2) -> bool:
-	if _state != State.AIR_ATTACK or not _air_attack_down or _attack_phase != PHASE_ACTIVE:
-		return false
-	var shape := _attack_hitbox.get_node("CollisionShape2D") as CollisionShape2D
-	var size := (shape.shape as RectangleShape2D).size
-	var slash := Rect2(_attack_hitbox.global_position + shape.position - size * 0.5, size)
-	for node: Node in get_tree().get_nodes_in_group(ContactDamage.HAZARD_GROUP):
-		var hazard := node as ContactDamage
-		if hazard.global_position.is_equal_approx(source_position) and hazard.get_world_rect().intersects(slash):
-			return true
-	return false
-
-
-## Hazard damage is refused right after a pogo, and while the active down
-## slash covers the hazard (which pogoes immediately).
-func _pogo_shields(source_position: Vector2) -> bool:
-	if _pogo_grace_left > 0.0:
-		return true
-	if not _down_slash_covers(source_position):
-		return false
-	_pogo()
-	return true
 
 
 ## Pushes her away from `source` for a moment. Only the lateral attack states
@@ -1229,8 +1112,6 @@ func _activate_directional_attack(
 
 func _deactivate_attack_hitbox() -> void:
 	_attack_hitbox.deactivate()
-	if _down_slash_mark != null:
-		_down_slash_mark.visible = false
 
 
 func _hitbox_config_for(attack_name: StringName) -> Dictionary:
@@ -1243,8 +1124,6 @@ func _hitbox_config_for(attack_name: StringName) -> Dictionary:
 			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_air_offset_y)}
 		&"attack_up":
 			return {size = hitbox_up_size, offset = hitbox_up_offset}
-		&"attack_down":
-			return {size = hitbox_down_size, offset = hitbox_down_offset}
 		_:
 			return {size = hitbox_attack_size, offset = Vector2(hitbox_attack_reach_x, hitbox_ground_offset_y)}
 
@@ -1255,16 +1134,12 @@ func _update_airborne(delta: float) -> void:
 	if _wall_kick_lock_left <= 0.0:
 		_apply_air_horizontal_control(delta)
 
-	if velocity.y >= 0.0:
-		_pogo_rising = false
-	if Input.is_action_just_released(&"jump") and velocity.y < 0.0 and not _pogo_rising:
+	if Input.is_action_just_released(&"jump") and velocity.y < 0.0:
 		velocity.y *= jump_release_multiplier
 
 	_apply_gravity(delta)
 
 	if not is_on_floor():
-		if velocity.y >= 0.0 and _try_start_ledge_hang():
-			return
 		if _try_start_wall_cling():
 			return
 		if _try_launch_jump() or _try_air_jump():
@@ -1533,52 +1408,6 @@ func _update_wall_cling(delta: float) -> void:
 		_enter_state(State.FALL)
 
 
-## -- Ledge grab -----------------------------------------------------------------
-
-func _try_start_ledge_hang() -> bool:
-	if _wall_recling_lock > 0.0:
-		return false
-	if velocity.y < 0.0:
-		return false
-	if not _is_wall_ray(_wall_check_chest) or _ledge_check_above.is_colliding():
-		return false
-	_restore_air_actions()
-	_snap_to_ledge()
-	_enter_state(State.LEDGE_HANG)
-	return true
-
-
-func _snap_to_ledge() -> void:
-	if _wall_check_chest.is_colliding():
-		var hit_x: float = _wall_check_chest.get_collision_point().x
-		var half_width := (_collision_shape.shape as RectangleShape2D).size.x * 0.5
-		global_position.x = hit_x - float(_facing) * (half_width + 2.0)
-	velocity = Vector2.ZERO
-
-
-func _update_ledge_hang(_delta: float) -> void:
-	velocity = Vector2.ZERO
-
-	if Input.is_action_just_pressed(&"move_up") or Input.is_action_just_pressed(&"jump"):
-		_ledge_snap_from = global_position
-		_ledge_snap_to = global_position + Vector2(float(_facing) * ledge_climb_forward_offset, -_standing_shape_height)
-		_enter_state(State.LEDGE_CLIMB)
-		return
-
-	if Input.is_action_pressed(&"move_down"):
-		_wall_recling_lock = wall_recling_lockout
-		_enter_state(State.FALL)
-
-
-func _update_ledge_climb(delta: float) -> void:
-	_ledge_climb_time += delta
-	var t := clampf(_ledge_climb_time / ledge_climb_duration, 0.0, 1.0)
-	global_position = _ledge_snap_from.lerp(_ledge_snap_to, ease(t, 0.3))
-	velocity = Vector2.ZERO
-	if t >= 1.0:
-		_enter_state(State.RUN if not is_zero_approx(_horizontal_input()) else State.IDLE)
-
-
 ## -- State transitions -------------------------------------------------------
 
 func _enter_state(new_state: State) -> void:
@@ -1588,8 +1417,6 @@ func _enter_state(new_state: State) -> void:
 	_run_time = 0.0
 	if not _is_lateral_attack_state():
 		_recoil_left = 0.0
-	if new_state != State.JUMP:
-		_pogo_rising = false
 	if not _is_directional_attack_state():
 		_slash_vfx.stop_slash()
 
@@ -1606,9 +1433,6 @@ func _enter_state(new_state: State) -> void:
 		_set_collider_height(_standing_shape_height * crouch_collider_scale)
 	elif was_low and not is_low:
 		_set_collider_height(_standing_shape_height)
-
-	if new_state == State.LEDGE_CLIMB:
-		_ledge_climb_time = 0.0
 
 	if previous == State.FOCUS and new_state != State.FOCUS:
 		_end_focus()
@@ -1702,8 +1526,6 @@ func _apply_damage(amount: int, source_position: Vector2, hazard: bool, force :=
 		return false
 	if not force and (_invuln_left > 0.0 or is_input_locked()):
 		return false
-	if hazard and not force and _pogo_shields(source_position):
-		return false
 	_health = maxi(_health - amount, 0)
 	health_changed.emit(_health, max_health)
 	damaged.emit(amount, _health)
@@ -1752,8 +1574,6 @@ func _cancel_actions_for_hit() -> void:
 		_enter_state(State.IDLE)
 	_deactivate_attack_hitbox()
 	_recoil_left = 0.0
-	_pogo_rising = false
-	_pogo_grace_left = 0.0
 	_attack_combo_index = 0
 	_attack_buffered_left = 0.0
 	_attack_restart_buffered_left = 0.0
@@ -2167,7 +1987,6 @@ func _cancel_inputs_for_transition() -> void:
 	_attack_buffer_left = 0.0
 	_attack_buffer_direction = 0
 	_recoil_left = 0.0
-	_pogo_grace_left = 0.0
 	_deactivate_attack_hitbox()
 	_set_collider_height(_standing_shape_height)
 
@@ -2263,7 +2082,6 @@ func clear_transient_state() -> void:
 	_attack_buffer_left = 0.0
 	_attack_buffer_direction = 0
 	_recoil_left = 0.0
-	_pogo_grace_left = 0.0
 	_clear_damage_state()
 	_set_collider_height(_standing_shape_height)
 	_deactivate_attack_hitbox()
@@ -2442,10 +2260,6 @@ func _update_animation() -> void:
 			_play_animation(&"fall")
 		State.WALL_CLING:
 			_play_animation(&"wall_cling")
-		State.LEDGE_HANG:
-			_play_animation(&"ledge_hang")
-		State.LEDGE_CLIMB:
-			_play_animation(&"ledge_climb")
 		State.ATTACK:
 			var attack_animation: StringName = [&"attack_1", &"attack_2", &"attack_3"][clampi(_attack_combo_index, 0, 2)]
 			_play_animation(attack_animation)

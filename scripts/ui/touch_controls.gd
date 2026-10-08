@@ -3,9 +3,9 @@ extends CanvasLayer
 ## Blasphemous-style mobile layout: a floating left-thumb joystick that drives
 ## the same move_* input actions as the keyboard, plus three right-side
 ## buttons (jump, dash, attack). The attack fires the instant the finger
-## touches down (neutral, or directional if the pad already holds up/down);
+## touches down (neutral, or directional if the pad already holds up);
 ## a short swipe right after that can still upgrade the same attack to
-## up/down slash instead of firing a second one. Jump and dash also call the
+## up slash instead of firing a second one (a downward swipe does nothing). Jump and dash also call the
 ## player directly on touch-down (in addition to Input.action_press) so a
 ## very quick tap can never be missed by is_action_just_pressed's same-frame
 ## edge (see Player.request_jump/request_dash).

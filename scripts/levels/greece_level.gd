@@ -219,7 +219,7 @@ func _on_double_jump_placeholder_touched(body: Node2D, pickup: Area2D) -> void:
 	pickup.set_deferred("monitoring", false)
 
 
-## Spike rows: red teeth that hurt on contact and can be pogoed.
+## Spike rows: red teeth that hurt on contact.
 func _build_hazards() -> void:
 	for rect: Rect2 in GreeceLayout.hazards():
 		var hazard := CONTACT_DAMAGE_SCENE.instantiate() as ContactDamage

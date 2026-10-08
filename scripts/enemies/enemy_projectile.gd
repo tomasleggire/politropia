@@ -3,8 +3,8 @@ extends Area2D
 
 ## A shot fired by the Shooter. It flies straight, costs Luz one pip when it
 ## touches her and dies on solids, on her, after `lifetime` seconds, or when
-## her slash cuts it. It is never pogoable: `receive_hit` destroys it but
-## returns false, so a down slash on it does not bounce Luz.
+## her slash cuts it. `receive_hit` destroys it and returns false, so cutting it
+## gives no soul.
 ##
 ## Instances are pooled by their shooter: `launch()` revives one and
 ## `deactivate()` parks it, so nothing is allocated while enemies fight.

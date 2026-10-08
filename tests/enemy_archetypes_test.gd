@@ -4,7 +4,7 @@ extends SceneTree
 ## give-up, light knockback, falling corpse), the Charger (patrol, detection,
 ## telegraph -> charge -> recovery, ledges and walls, commitment) and the
 ## Shooter with its projectiles (distance band, fire cycle, aim, walls, slash,
-## clearing), plus the persistence rules and the pogo for each of them.
+## clearing), plus the persistence rules for each of them.
 ## Run: godot --headless --path . --script res://tests/enemy_archetypes_test.gd
 ## Exits 0 when every check passes, 1 otherwise.
 ##
@@ -23,8 +23,6 @@ const FLOOR_RECT := Rect2(-3000.0, 0.0, 6000.0, 200.0)
 const LEDGE_FLOOR := Rect2(-100.0, 0.0, 200.0, 200.0)
 const ROOM_A := &"A"
 const ROOM_B := &"B"
-const BOUNCE_SPEED := -300.0
-const BOUNCE_STEPS := 32
 
 const CHECKS := {
 	"case_flyer_hovers_near_its_spawn": 3,
@@ -34,7 +32,6 @@ const CHECKS := {
 	"case_flyer_leash": 1,
 	"case_flyer_light_knockback_and_corpse": 6,
 	"case_flyer_persistence": 7,
-	"case_flyer_is_pogoable": 3,
 	"case_charger_patrols": 3,
 	"case_charger_detection": 4,
 	"case_charger_sequence": 8,
@@ -42,7 +39,6 @@ const CHECKS := {
 	"case_charger_stops_at_a_wall": 3,
 	"case_charger_commits": 5,
 	"case_charger_persistence": 7,
-	"case_charger_is_pogoable": 3,
 	"case_shooter_keeps_its_distance": 4,
 	"case_shooter_needs_line_of_sight": 2,
 	"case_shooter_fires_on_schedule": 5,
@@ -50,11 +46,9 @@ const CHECKS := {
 	"case_projectile_dies_on_walls": 2,
 	"case_projectile_expires": 1,
 	"case_slash_destroys_a_projectile": 3,
-	"case_projectile_is_not_pogoable": 2,
 	"case_projectiles_are_cleared": 4,
 	"case_shooter_corpse": 3,
 	"case_shooter_persistence": 7,
-	"case_shooter_is_pogoable": 3,
 }
 
 var checks := 0
@@ -226,27 +220,6 @@ func _drop_player_at(at: Vector2) -> void:
 	await _steps(3)
 
 
-## Down slash from above a frozen enemy; reports whether Luz bounced.
-func _pogo_off_enemy(scene_path: String, enemy_at: Vector2, luz_y: float) -> void:
-	await _build_rig()
-	_place_player(Vector2(-300.0, 0.0))
-	await _steps(3)
-	await _spawn(scene_path, enemy_at)
-	_enemy.set_ai_active(false)
-	var health_before := _enemy.get_health()
-	await _drop_player_at(Vector2(enemy_at.x, luz_y))
-	Input.action_press(&"move_down")
-	_player.request_attack(1)
-	var bounced := false
-	for i: int in BOUNCE_STEPS:
-		await physics_frame
-		bounced = bounced or _player.velocity.y < BOUNCE_SPEED
-	check(bounced, "the down slash bounces Luz off it")
-	check(_enemy.get_health() == health_before - 1, "and it took the hit (%d)" % _enemy.get_health())
-	check(_player.get_health() == 3, "she took no damage (%d)" % _player.get_health())
-	Input.action_release(&"move_down")
-
-
 ## Rules 1 to 3 for whichever archetype is in `_enemy`, spawned at `spawn`.
 func _check_persistence(scene_path: String, spawn: Vector2) -> void:
 	await _build_rig(false)
@@ -366,10 +339,6 @@ func case_flyer_persistence() -> void:
 	await _check_persistence(FLYER_SCENE, Vector2(40.0, -120.0))
 
 
-func case_flyer_is_pogoable() -> void:
-	await _pogo_off_enemy(FLYER_SCENE, Vector2(0.0, -100.0), -175.0)
-
-
 # -- Charger -------------------------------------------------------------------------
 
 func case_charger_patrols() -> void:
@@ -484,10 +453,6 @@ func case_charger_commits() -> void:
 
 func case_charger_persistence() -> void:
 	await _check_persistence(CHARGER_SCENE, Vector2(40.0, 0.0))
-
-
-func case_charger_is_pogoable() -> void:
-	await _pogo_off_enemy(CHARGER_SCENE, Vector2.ZERO, -110.0)
 
 
 # -- Shooter and projectiles ------------------------------------------------------------
@@ -616,21 +581,6 @@ func case_slash_destroys_a_projectile() -> void:
 	check(absf(_player.global_position.x) < 1.0, "and without recoil (x %.1f)" % _player.global_position.x)
 
 
-func case_projectile_is_not_pogoable() -> void:
-	await _build_rig()
-	var shot := _add_projectile(Vector2(0.0, -40.0), Vector2.RIGHT, 0.0)
-	await _drop_player_at(Vector2(0.0, -75.0))
-	Input.action_press(&"move_down")
-	_player.request_attack(1)
-	var bounced := false
-	for i: int in BOUNCE_STEPS:
-		await physics_frame
-		bounced = bounced or _player.velocity.y < BOUNCE_SPEED
-	check(not shot.is_active(), "a down slash also destroys it")
-	check(not bounced, "but it does not bounce her")
-	Input.action_release(&"move_down")
-
-
 func case_projectiles_are_cleared() -> void:
 	await _build_rig()
 	await _spawn(SHOOTER_SCENE, Vector2(200.0, -90.0), -1)
@@ -662,7 +612,3 @@ func case_shooter_corpse() -> void:
 
 func case_shooter_persistence() -> void:
 	await _check_persistence(SHOOTER_SCENE, Vector2(40.0, -120.0))
-
-
-func case_shooter_is_pogoable() -> void:
-	await _pogo_off_enemy(SHOOTER_SCENE, Vector2(0.0, -100.0), -175.0)

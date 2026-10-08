@@ -30,6 +30,7 @@ const CHECKS := {
 	"case_control_lock": 4,
 	"case_flicker_restores": 3,
 	"case_air_actions_restored": 2,
+	"case_no_pogo_or_ledge": 5,
 	"case_hit_stop": 4,
 	"case_death_signals": 4,
 	"case_respawn_at_checkpoint": 6,
@@ -273,6 +274,28 @@ func case_air_actions_restored() -> void:
 	_player.take_damage(1, SOURCE_LEFT)
 	check(not _player._air_dash_used, "a hit gives the air dash back")
 	check(_player._air_jumps_left == _player.air_jumps, "a hit gives the air jump back")
+
+
+func case_no_pogo_or_ledge() -> void:
+	await _build_rig()
+	var states := Player.State.keys()
+	check(not states.has("LEDGE_HANG") and not states.has("LEDGE_CLIMB"), "no ledge state exists")
+	check(not ("pogo_height" in _player) and not ("ledge_climb_duration" in _player), "no pogo or ledge tunables exist")
+	check(_player.get_node_or_null("LedgeCheckAbove") == null, "the ledge probe is gone")
+	_player.global_position = Vector2(0.0, -150.0)
+	_player.velocity = Vector2.ZERO
+	await _frames(2)
+	Input.action_press(&"move_down")
+	_player.request_attack(1)
+	var swung := false
+	var bounced := false
+	for i: int in 24:
+		await _frames(1)
+		swung = swung or _player._state == Player.State.AIR_ATTACK
+		bounced = bounced or _player.velocity.y < -50.0
+	Input.action_release(&"move_down")
+	check(swung, "down + attack in the air swings the horizontal air attack")
+	check(not bounced, "and never bounces her upward")
 
 
 func case_hit_stop() -> void:

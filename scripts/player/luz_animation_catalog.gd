@@ -28,16 +28,12 @@ const CLIP_SPEEDS := {
 	"air_dash": 9.0,
 	"wall_cling": 4.0,
 	"wall_jump": 7.0,
-	"ledge_hang": 4.0,
-	"ledge_climb": 8.0,
 	"attack_1": 10.0,
 	"attack_2": 10.0,
 	"attack_3": 10.0,
 	"crouch_attack": 9.0,
 	"up_attack": 10.0,
 	"air_attack": 10.0,
-	"plunge": 10.0,
-	"plunge_land": 10.0,
 	"rest_mount": 8.0,
 	"rest_sit": 2.0,
 	"rest_dismount": 10.0,
@@ -58,7 +54,7 @@ const PLACEHOLDER_CLIPS := {
 ## than play once and freeze on the last frame.
 const LOOPING_CLIPS := [
 	"idle", "walk", "crouch", "jump", "fall",
-	"ground_dash", "air_dash", "wall_cling", "ledge_hang", "rest_sit",
+	"ground_dash", "air_dash", "wall_cling", "rest_sit",
 ]
 
 const CLIP_SOURCE_NAMES := {

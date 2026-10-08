@@ -18,15 +18,13 @@ check names.
 - `room_camera_bounds_test.gd`: per-room camera clamp and blend, room selection
   and the real camera in the Greece level.
 - `combat_test.gd`: damage, i-frames, knockback, control lock, hit-stop, death,
-  respawn and the `ContactDamage` component on a synthetic floor.
+  respawn, the `ContactDamage` component on a synthetic floor and the absence of
+  the pogo and ledge states.
 - `enemy_test.gd`: the enemy base and the walker (patrol, ledges and walls,
   contact damage, hits, corpses), the three room persistence rules, off-room
   pausing and the player's hit recoil.
 - `enemy_archetypes_test.gd`: the airborne and charging archetypes (flyer,
-  charger) plus their persistence rules and pogo.
-- `pogo_test.gd`: the down slash pogo (bounce height, restored air actions,
-  hazard grace, missed slash, crouch attack on the ground, touch paths) and the
-  removal of the plunge.
+  charger, shooter) plus their persistence rules.
 - `health_hud_test.gd`: the mask HUD (pips, loss and refill feedback, rebuild,
   safe area, presence in both levels).
 - `support/ritual_harness.gd`: shared state, game-clock waits, event recording.

@@ -18,19 +18,13 @@ const TOUCH_SCENE := "res://scenes/ui/touch_controls.tscn"
 const WATCHDOG_SECONDS := 120.0
 const SETTLE_FRAMES := 30
 const FLOOR_RECT := Rect2(-3000.0, 0.0, 6000.0, 200.0)
-const HAZARD_RECT := Rect2(-48.0, -16.0, 96.0, 16.0)
 const START_X := -300.0
-const ABOVE_WALKER := Vector2(0.0, -75.0)
-const ABOVE_HAZARD := Vector2(0.0, -50.0)
-const BOUNCE_SPEED := -300.0
-const BOUNCE_STEPS := 32
 const FOCUS_SECONDS := 0.9
 const LAYOUT_FRAMES := 3
 
 const CHECKS := {
 	"case_enemy_hit_adds_soul": 4,
-	"case_other_hits_add_nothing": 4,
-	"case_enemy_pogo_adds_soul": 3,
+	"case_other_hits_add_nothing": 1,
 	"case_focus_heals_one": 6,
 	"case_release_cancels": 3,
 	"case_damage_cancels": 4,
@@ -136,14 +130,6 @@ func _add_walker(health: int) -> void:
 	_rig.add_child(_walker)
 
 
-func _add_hazard() -> void:
-	var hazard := (load(CONTACT_SCENE) as PackedScene).instantiate() as ContactDamage
-	hazard.kind = ContactDamage.Kind.HAZARD
-	_rig.add_child(hazard)
-	hazard.set_area_size(HAZARD_RECT.size)
-	hazard.position = HAZARD_RECT.get_center()
-
-
 func _free_rig() -> void:
 	if is_instance_valid(_rig):
 		_rig.free()
@@ -180,17 +166,6 @@ func _drop_player_at(at: Vector2) -> void:
 		await physics_frame
 
 
-## Slashes down onto whatever is below and waits out the bounce.
-func _pogo_down() -> bool:
-	Input.action_press(&"move_down")
-	_player.request_attack(1)
-	var bounced := false
-	for i: int in BOUNCE_STEPS:
-		await physics_frame
-		bounced = bounced or _player.velocity.y < BOUNCE_SPEED
-	return bounced
-
-
 func _hit_player() -> void:
 	_player._invuln_left = 0.0
 	_player.take_damage(1, Vector2(-100.0, 0.0))
@@ -219,23 +194,6 @@ func case_other_hits_add_nothing() -> void:
 	shot.launch(Vector2(60.0, -40.0), Vector2.RIGHT, 0.0)
 	_player._resolve_attack_hit(shot, &"attack_1")
 	check(not shot.is_active() and _player.get_soul() == 0, "cutting a projectile gives no soul (%d)" % _player.get_soul())
-	_add_hazard()
-	await _drop_player_at(Vector2(0.0, ABOVE_HAZARD.y))
-	var bounced := await _pogo_down()
-	check(bounced, "the down slash bounces off the spike")
-	check(_player.get_soul() == 0, "a spike pogo gives no soul (%d)" % _player.get_soul())
-	check(_player.get_health() == 3, "and she took no damage")
-
-
-func case_enemy_pogo_adds_soul() -> void:
-	await _build_rig()
-	_add_walker(5)
-	await _frames(SETTLE_FRAMES)
-	await _drop_player_at(Vector2(0.0, ABOVE_WALKER.y))
-	var bounced := await _pogo_down()
-	check(bounced, "the down slash bounces off the walker")
-	check(_walker.get_health() == 4, "and damages it (%d)" % _walker.get_health())
-	check(_player.get_soul() == 11, "an enemy pogo gives soul (%d)" % _player.get_soul())
 
 
 func case_focus_heals_one() -> void:
