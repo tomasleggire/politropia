@@ -288,102 +288,6 @@
         "air_horizontal_attack": 6
       }
     },
-    "luz_rest_sheet.png": {
-      "grid": {
-        "columns": 4,
-        "rows": 5,
-        "cell_width": 512,
-        "cell_height": 512
-      },
-      "clips": {
-        "rest_mount": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7
-        ],
-        "rest_sit": [
-          8,
-          9,
-          10,
-          11
-        ],
-        "rest_dismount": [
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19
-        ]
-      },
-      "rest_ritual": {
-        "note": "Seated/hop frames sit above the feet row (413) by lift_px; the desk is not drawn.",
-        "seat_height_px": 150,
-        "lift_px": {
-          "rest_mount": [
-            0,
-            0,
-            0,
-            0,
-            20,
-            34,
-            150,
-            150
-          ],
-          "rest_sit": [
-            150,
-            150,
-            150,
-            150
-          ],
-          "rest_dismount": [
-            150,
-            48,
-            60,
-            0,
-            0,
-            0,
-            0,
-            0
-          ]
-        },
-        "dx_px": {
-          "rest_mount": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "rest_sit": [
-            0,
-            0,
-            0,
-            0
-          ],
-          "rest_dismount": [
-            0,
-            -35,
-            -20,
-            0,
-            0,
-            0,
-            0,
-            0
-          ]
-        }
-      }
-    },
     "luz_run_sheet.png": {
       "grid": {
         "columns": 4,
@@ -541,6 +445,99 @@
           20,
           21
         ]
+      }
+    },
+    "luz_heal_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 512,
+        "cell_height": 512
+      },
+      "clips": {
+        "heal_start": [
+          0,
+          1,
+          2
+        ],
+        "heal_loop": [
+          3,
+          4,
+          5,
+          6
+        ],
+        "heal_end": [
+          7,
+          8
+        ]
+      }
+    },
+    "luz_rest_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 5,
+        "cell_width": 512,
+        "cell_height": 512
+      },
+      "clips": {
+        "rest_mount": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "rest_sit": [
+          8,
+          9,
+          10,
+          11
+        ],
+        "rest_dismount": [
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19
+        ]
+      },
+      "rest_ritual": {
+        "seat_height_px": 150,
+        "note": "Seated clips use the shared 150-texel lift from the feet row (413).",
+        "lift_px": {
+          "rest_mount": [
+            0,
+            0,
+            0,
+            0,
+            20,
+            34,
+            150,
+            150
+          ],
+          "rest_sit": [
+            150,
+            150,
+            150,
+            150
+          ],
+          "rest_dismount": [
+            150,
+            48,
+            60,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
       }
     }
   },

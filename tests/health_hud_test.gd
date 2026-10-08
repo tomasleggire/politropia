@@ -23,7 +23,7 @@ const REFILL_DONE := 0.9
 const SAFE_AREA := Rect2(30.0, 20.0, 550.0, 300.0)
 
 const CHECKS := {
-	"case_pips_built": 5,
+	"case_pips_built": 8,
 	"case_damage_empties_one_pip": 3,
 	"case_heal_refills_all": 3,
 	"case_max_health_rebuilds": 4,
@@ -163,6 +163,9 @@ func case_pips_built() -> void:
 	check(_full_count() == 3, "every pip starts full")
 	check(_hud.layer > 30 and _hud.layer < 100, "the HUD sits above the vignette and below the touch controls (%d)" % _hud.layer)
 	check(_hud.is_bound(), "the HUD is bound to the player")
+	check(_hud.visible, "the health HUD layer is visible")
+	check(_hud.get_meter().is_visible_in_tree(), "the soul vessel is visible in the scene tree")
+	check(_hud.get_pips()[0].is_visible_in_tree(), "the health pips are visible in the scene tree")
 	var art := PlaceholderTexture2D.new()
 	_hud.full_texture = art
 	_player.set_max_health(4)

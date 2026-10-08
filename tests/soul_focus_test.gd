@@ -25,7 +25,7 @@ const LAYOUT_FRAMES := 3
 const CHECKS := {
 	"case_enemy_hit_adds_soul": 4,
 	"case_other_hits_add_nothing": 1,
-	"case_focus_heals_one": 6,
+	"case_focus_heals_one": 9,
 	"case_release_cancels": 3,
 	"case_damage_cancels": 4,
 	"case_leaving_the_floor_cancels": 3,
@@ -35,6 +35,7 @@ const CHECKS := {
 	"case_death_resets_soul": 2,
 	"case_hud_meter": 6,
 	"case_touch_button": 5,
+	"case_player_scene_is_reusable": 3,
 }
 
 var checks := 0
@@ -202,13 +203,16 @@ func case_focus_heals_one() -> void:
 	_player.request_focus(true)
 	await _secs(0.2)
 	check(_player.is_focusing(), "holding focus starts the channel")
+	check(_player._sprite.animation == &"heal_start", "focus plays its start clip")
 	check(_player.velocity == Vector2.ZERO, "she stands still")
 	await _secs(FOCUS_SECONDS - 0.5)
 	check(_player.get_health() == 1 and _player.get_soul() == 33, "nothing is spent before the channel ends")
-	await _secs(0.6)
+	check(_player._sprite.animation == &"heal_loop", "focus settles into its breathing loop")
+	await _secs(0.35)
 	check(_player.get_health() == 2, "one pip is healed (%d)" % _player.get_health())
 	check(_player.get_soul() == 0, "and 33 soul spent (%d)" % _player.get_soul())
 	check(not _player.is_focusing(), "with no soul left the channel ends")
+	check(_player._sprite.animation == &"heal_end", "completed focus plays its recovery clip")
 
 
 func case_release_cancels() -> void:
@@ -349,6 +353,18 @@ func case_touch_button() -> void:
 	check(not _player.is_focusing() and not Input.is_action_pressed(&"focus"), "releasing it stops, and the action is not stuck")
 	_player.restore_full_health()
 	check(not button.visible, "it hides again at full health")
+
+
+func case_player_scene_is_reusable() -> void:
+	var scene := load(PLAYER_SCENE) as PackedScene
+	var standalone := scene.instantiate() as Player
+	root.add_child(standalone)
+	await _frames(LAYOUT_FRAMES)
+	check(standalone != null and standalone.name == "Player" and standalone.is_in_group(&"player"), "the player scene instances as a grouped Player")
+	check(standalone.get_node_or_null("AnimatedSprite2D") != null and standalone.get_node_or_null("CollisionShape2D") != null, "the scene contains its visual and collider")
+	check(standalone.get_node_or_null("AttackHitbox") != null and standalone.get_node_or_null("Camera2D") != null, "the scene contains its combat and camera nodes")
+	standalone.queue_free()
+	await process_frame
 
 
 ## Touch events arrive in window pixels, so the canvas position is mapped through

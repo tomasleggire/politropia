@@ -41,17 +41,21 @@ var _frame := 0
 var _attack_mode := false
 var _air_mode := false
 var _mobility_mode := false
+var _heal_rest_mode := false
 var _target: Node2D
+var _desk: StillnessDesk
 var _tag := ""
 
 
 func _ready() -> void:
-	var path := LEVEL_PATH if ResourceLoader.exists(LEVEL_PATH) else LEVEL_FALLBACK
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_heal_rest_mode = OS.get_environment("LUZ_CAPTURE_MODE") == "heal_rest"
+	var path := LEVEL_FALLBACK if _heal_rest_mode else (LEVEL_PATH if ResourceLoader.exists(LEVEL_PATH) else LEVEL_FALLBACK)
 	add_child((load(path) as PackedScene).instantiate())
 	_attack_mode = OS.get_environment("LUZ_CAPTURE_MODE") == "attacks"
 	_air_mode = OS.get_environment("LUZ_CAPTURE_MODE") == "air"
 	_mobility_mode = OS.get_environment("LUZ_CAPTURE_MODE") == "mobility"
-	_steps = _attack_steps() if _attack_mode else (_air_steps() if _air_mode else (_mobility_steps() if _mobility_mode else _locomotion_steps()))
+	_steps = _heal_rest_steps() if _heal_rest_mode else (_attack_steps() if _attack_mode else (_air_steps() if _air_mode else (_mobility_steps() if _mobility_mode else _locomotion_steps())))
 	await get_tree().process_frame
 	_player = _find_player(self)
 	if _player == null:
@@ -69,6 +73,12 @@ func _ready() -> void:
 			camera.reset_physics_interpolation()
 	if _air_mode:
 		_player.unlock_double_jump()
+	if _heal_rest_mode:
+		_desk = _find_desk(self)
+		if _desk != null:
+			_player.global_position = _desk.get_spawn_position() + Vector2(35.0, 0.0)
+			_player._health = 1
+			_player.add_soul(66)
 	if _mobility_mode:
 		var test_wall := LevelGeometry.add_solid(_player.get_parent() as Node2D,
 			Rect2(START_POSITION.x + 650.0, -1100.0, 64.0, 686.0), Color(0.25, 0.28, 0.36))
@@ -127,6 +137,9 @@ func _spawn_target() -> void:
 
 func _on_step_start(tag: String) -> void:
 	_tag = tag
+	if tag == "rest" and _desk != null and _desk.get_phase() in [StillnessDesk.Phase.DORMANT, StillnessDesk.Phase.AWAKENED]:
+		_player.restore_full_health()
+		_desk.request_rest()
 	if tag == "target" and _target != null:
 		_target.global_position = _player.global_position + Vector2(62.0, 0.0)
 
@@ -170,6 +183,13 @@ func _mobility_steps() -> Array:
 	]
 
 
+func _heal_rest_steps() -> Array:
+	return [
+		[0.8, &""], [2.0, &"focus", "focus"], [1.0, &"", "focus"],
+		[0.5, &"", "rest"], [5.0, &"", "rest"], [0.05, &"jump", "exit"], [3.0, &"", "exit"],
+	]
+
+
 func _locomotion_steps() -> Array:
 	return [
 		[1.5, &""], [2.0, &"move_right"], [1.0, &""],
@@ -202,6 +222,16 @@ func _find_player(node: Node) -> Player:
 		return node
 	for child in node.get_children():
 		var found := _find_player(child)
+		if found != null:
+			return found
+	return null
+
+
+func _find_desk(node: Node) -> StillnessDesk:
+	if node is StillnessDesk:
+		return node
+	for child in node.get_children():
+		var found := _find_desk(child)
 		if found != null:
 			return found
 	return null

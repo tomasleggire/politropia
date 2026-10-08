@@ -39,6 +39,9 @@ const CLIP_SPEEDS := {
 	"rest_mount": 8.0,
 	"rest_sit": 2.0,
 	"rest_dismount": 10.0,
+	"heal_start": 14.3,
+	"heal_loop": 4.44,
+	"heal_end": 20.0,
 }
 
 ## PLACEHOLDER MAPPING (no art yet): "turn" and "skid" have no clip in the
@@ -57,7 +60,7 @@ const PLACEHOLDER_CLIPS := {
 ## jump, fall, double_jump and crouch play once over the physics window they
 ## were drawn for (rise 0.45 s, fall 0.41 s) and hold their last pose.
 const LOOPING_CLIPS := [
-	"idle", "walk",
+	"idle", "walk", "heal_loop",
 	"ground_dash", "air_dash", "wall_cling", "rest_sit",
 ]
 
@@ -69,6 +72,9 @@ const CLIP_SOURCE_NAMES := {
 	"attack_2": "ground_attack_2",
 	"attack_3": "ground_attack_3",
 	"air_attack": "air_horizontal_attack",
+	"heal_start": "heal_start",
+	"heal_loop": "heal_loop",
+	"heal_end": "heal_end",
 }
 
 ## Animations whose manifest "contact_frames" entry (if any) should be

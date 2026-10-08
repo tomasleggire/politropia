@@ -483,7 +483,8 @@ var _attack_segment_anchored := false
 var _soul := 0
 var _focus_left := 0.0
 var _focus_requested := false
-var _focus_glow: Polygon2D
+var _focus_vfx: FocusHealVfx
+var _focus_end_animating := false
 
 
 func _ready() -> void:
@@ -2165,38 +2166,46 @@ func _complete_focus() -> void:
 	if _focus_held() and is_focus_available():
 		_focus_left = focus_time
 		_state_time = 0.0
+		_play_focus_animation(&"heal_loop")
+		if _focus_vfx != null:
+			_focus_vfx.complete_channel()
 	else:
+		_focus_end_animating = true
+		_play_focus_animation(&"heal_end")
 		_enter_state(State.IDLE)
+		if _focus_vfx != null:
+			_focus_vfx.complete_channel()
 
 
 func _begin_focus() -> void:
 	velocity = Vector2.ZERO
 	_focus_left = focus_time
 	_update_focus_glow()
+	_focus_end_animating = false
+	_play_focus_animation(&"heal_start")
 
 
 func _end_focus() -> void:
 	_focus_left = 0.0
-	if _focus_glow != null:
-		_focus_glow.visible = false
+	if _focus_vfx != null:
+		_focus_vfx.cancel_channel()
 
 
-## Placeholder for the missing art: a soft pulsing glow that swells as the
-## channel nears completion.
 func _update_focus_glow() -> void:
-	if _focus_glow == null:
-		_focus_glow = Polygon2D.new()
-		_focus_glow.z_index = 1
-		_focus_glow.position = Vector2(0.0, -24.0)
-		var ring := PackedVector2Array()
-		for step in 24:
-			ring.append(Vector2.from_angle(TAU * float(step) / 24.0) * focus_glow_radius)
-		_focus_glow.polygon = ring
-		add_child(_focus_glow)
 	var progress := 1.0 - clampf(_focus_left / maxf(focus_time, 0.001), 0.0, 1.0)
-	_focus_glow.visible = true
-	_focus_glow.scale = Vector2.ONE * lerpf(0.6, 1.2, progress)
-	_focus_glow.color = Color(1.0, 0.95, 0.75, 0.22 + 0.12 * sin(_state_time * 14.0))
+	if _focus_vfx == null:
+		_focus_vfx = FocusHealVfx.new()
+		_focus_vfx.position = Vector2(0.0, -24.0)
+		_focus_vfx.z_index = -1
+		_focus_vfx.radius = focus_glow_radius
+		add_child(_focus_vfx)
+	_focus_vfx.set_channel_progress(progress, _state_time)
+
+
+func _play_focus_animation(animation_name: StringName) -> void:
+	if _sprite.sprite_frames.has_animation(animation_name):
+		_sprite.play(animation_name)
+		_sprite.set_frame_and_progress(0, 0.0)
 
 
 ## -- Input lock / meditation ---------------------------------------------------
@@ -2413,6 +2422,13 @@ func _poll_rest_exit_input() -> void:
 
 
 func _on_sprite_animation_finished() -> void:
+	if _state == State.FOCUS and _sprite.animation == &"heal_start":
+		_play_focus_animation(&"heal_loop")
+		return
+	if _focus_end_animating and _sprite.animation == &"heal_end":
+		_focus_end_animating = false
+		_play_animation(&"idle")
+		return
 	if _meditating and _rest_animation != &"":
 		rest_animation_finished.emit(_rest_animation)
 
@@ -2565,6 +2581,8 @@ func _update_animation() -> void:
 		if _rest_animation == &"":
 			_play_animation(&"idle")
 		return
+	if _focus_end_animating:
+		return
 	match _state:
 		State.CROUCH:
 			_play_animation(&"crouch")
@@ -2610,8 +2628,11 @@ func _update_animation() -> void:
 			_play_attack_animation(&"air_attack")
 		State.HURT:
 			_play_animation(&"fall")
-		State.DEAD, State.FOCUS:
+		State.DEAD:
 			_play_animation(&"idle")
+		State.FOCUS:
+			if _sprite.animation != &"heal_start" and _sprite.animation != &"heal_loop":
+				_play_focus_animation(&"heal_start")
 		_:
 			if _landing_left > 0.0:
 				_play_animation(&"land")
