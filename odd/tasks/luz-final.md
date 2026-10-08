@@ -86,7 +86,7 @@ Budget: Luz complete between this week and next, sharing time and Claude/Codex t
 
 - [x] P13 Wall-cling fix after the iPhone playtest. Root cause: Greece's solid terrain uses `TileMapLayer`; its generated collision body has no child `CollisionShape2D`, so `_collider_shape_size()` returned `Vector2.ZERO` and all three wall probes rejected a real tile-built wall. `scripts/player/player.gd` now resolves the tile cell from the ray's body RID and requires a contiguous vertical collision run at least `min_wall_height`; existing tall/narrow `StaticBody2D` checks and timings are unchanged. `tests/locomotion_test.gd` adds an end-to-end Player scene/input/physics case against a tall solid wall, proving cling, controlled slide, and wall jump (3 new assertions; suite PASS 63/63). A synthesized TileMap test fixture did not collide and was discarded; TileMap-specific in-level/iPhone confirmation remains pending parent playtest. Rollback boundary: revert only the TileMapLayer wall detection helper and the added locomotion case; retain P10/P12 art and timing.
   - Verification: `tests/locomotion_test.gd` PASS 63/63; `git diff --check` clean; Godot 4.7.2 headless boot `--quit-after 300` exit 0. Existing full-suite run was stopped by parent scope update after reporting only known Greece failures (`greece_layout_test.gd` 5/70 and `greece_population_test.gd` 2/33); no Greece geometry/tests were edited. P11 skid remains deferred; Greece geometry debt remains untouched. User approved P10 mobility and P12 heal/rest animations on 2026-10-08.
-  - Work-unit commit: pending.
+  - Work-unit commit: `7f3039c9003328458f6a3426099a6f2211200462`.
 
 ## Acceptance criteria
 - Luz occupies 32x48 and moves with the measured Blasphemous numbers; user confirms the feel on the iPhone.
