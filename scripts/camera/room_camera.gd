@@ -51,6 +51,7 @@ var _shake_strength := 0.0
 var _shake_duration := 0.0
 var _shake_left := 0.0
 var _shake_rng := RandomNumberGenerator.new()
+var _kick := CameraKick.new()
 
 
 func _ready() -> void:
@@ -64,6 +65,7 @@ func _ready() -> void:
 # Runs on physics ticks so physics interpolation smooths it together with the player.
 func _physics_process(delta: float) -> void:
 	_update_shake(delta)
+	_update_kick(delta)
 	if target == null:
 		return
 	var desired_look := _desired_look_ahead()
@@ -96,11 +98,26 @@ func shake(strength: float, duration: float) -> void:
 	_shake_left = duration
 
 
-## Stops any shake at once, leaving the offset exactly at zero.
+## Stops any shake at once, leaving only a combat kick in progress (zero when none).
 func cancel_shake() -> void:
 	_shake_left = 0.0
 	_shake_strength = 0.0
-	offset = Vector2.ZERO
+	offset = _kick.offset()
+
+
+## Combat jolt: jumps by `amplitude` pixels, holds, then snaps back (see
+## CameraKick). Runs on top of any shake in progress.
+func kick(amplitude: Vector2, hold: float, decay: float) -> void:
+	_kick.start(amplitude, hold, decay)
+	offset += _kick.offset()
+
+
+func _update_kick(delta: float) -> void:
+	if not _kick.is_active():
+		return
+	_kick.update(delta)
+	if _shake_left <= 0.0:
+		offset = _kick.offset()
 
 
 func _update_shake(delta: float) -> void:

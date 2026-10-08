@@ -52,6 +52,9 @@ const CORPSE_SQUASH := 0.55
 @export var hit_stop_time := 0.04
 @export var recoil_speed := 160.0
 @export var recoil_time := 0.10
+## Luz's attacks (named `attack_*`) never push enemies, like the Penitent's;
+## turn this on to let them recoil from her slashes anyway.
+@export var knockback_from_player_attacks := false
 
 @export_group("Physics")
 @export var gravity := 1400.0
@@ -167,7 +170,7 @@ func set_ai_active(active: bool) -> void:
 
 ## Applies one hit coming from `source_position`. Returns false, changing
 ## nothing, when the enemy is already a corpse or the damage is not positive.
-func receive_hit(damage: int, source_position: Vector2, _attack_name: StringName = &"") -> bool:
+func receive_hit(damage: int, source_position: Vector2, attack_name: StringName = &"") -> bool:
 	if _dead or damage <= 0:
 		return false
 	_health = maxi(_health - damage, 0)
@@ -179,8 +182,14 @@ func receive_hit(damage: int, source_position: Vector2, _attack_name: StringName
 		died.emit(self)
 		return true
 	_hit_stop_left = hit_stop_time
-	_start_recoil(source_position)
+	if knockback_from_player_attacks or not String(attack_name).begins_with("attack_"):
+		_start_recoil(source_position)
 	return true
+
+
+## Holds this enemy still for `duration` seconds (the player's hit-stop).
+func freeze(duration: float) -> void:
+	_hit_stop_left = maxf(_hit_stop_left, duration)
 
 
 ## Full health, spawn position and facing, AI idle. Also revives a corpse.
