@@ -45,6 +45,7 @@ import luz_ruler_length as rl  # noqa: E402
 import process_luz_attacks as pa  # noqa: E402  (patches the wood mask, shares the work canvas)
 import process_luz_combat_hits as pch  # noqa: E402
 import process_luz_run_turn_skid as base  # noqa: E402
+import luz_face as lf  # noqa: E402
 
 ROOT = pa.ROOT
 RAW_DIR = pa.RAW_DIR
@@ -151,16 +152,29 @@ def torso_centroid(mask: np.ndarray) -> tuple[float, float]:
 
 
 # Raw sheets with a standing frame (slot, 0-based): the scale is the idle's standing height over
-# the standing figure's height. Codex draws every sheet with the same head size relative to its
-# standing figure (land 0.777, crouch 0.77-0.79), so the sheets without a standing frame (jump,
-# fall, double jump: airborne, no standing pose) use the mean of the measured ones; the heads were
-# overlaid on the idle head to confirm (see the P9 log in odd/tasks/luz-final.md).
+# the standing figure's height. The sheets without one (jump, fall, double jump: airborne) used
+# to take the mean of those scales (0.767), which made the fall's head 12% smaller than the
+# jump's and the idle's (a visible pop on the phone). They are now scaled from the face size
+# (tools/luz_face.py) so their head matches the idle's; the fall then eases from the idle face
+# to the face of the landing's standing frame over its frames, so fall -> land has no pop either.
 STANDING_SLOT = {"luz_jump_land_raw.png": 4, "luz_crouch_raw.png": 7}
+PROVISIONAL_SCALE = 0.767
+FACE_RAMP_TO_LAND = {"fall"}
+
+
+def scaled_copy(source: Image.Image, scale: float) -> Image.Image:
+    w, h = max(1, round(source.width * scale)), max(1, round(source.height * scale))
+    return pch.unpremultiply(pch.premultiply(source).resize((w, h), pch.RESAMPLE))
+
+
+def idle_face() -> float:
+    sheet = Image.open(ASSET_DIR / "luz_idle_sheet.png").convert("RGBA")
+    frames = [sheet.crop(((s % 4) * OUT_CELL, (s // 4) * OUT_CELL, (s % 4 + 1) * OUT_CELL, (s // 4 + 1) * OUT_CELL)) for s in (0, 1, 2, 4, 5, 6, 7)]
+    return lf.median_face(frames)
 
 
 def place(source: Image.Image, scale: float, anchor: str, idle: dict[str, float], front_ref: float, label: str) -> Image.Image:
-    w, h = max(1, round(source.width * scale)), max(1, round(source.height * scale))
-    scaled = pch.unpremultiply(pch.premultiply(source).resize((w, h), pch.RESAMPLE))
+    scaled = scaled_copy(source, scale)
     x0, y0, x1, y1 = base.alpha_bbox(scaled)
     scaled = scaled.crop((x0, y0, x1 + 1, y1 + 1))
     mask = base.body_mask(scaled)
@@ -203,14 +217,33 @@ def load_raws(idle: dict[str, float]) -> dict[str, tuple[dict[int, Image.Image],
             measured[raw_name] = idle["height"] / float(rows.max() - rows.min() + 1)
     if not measured:
         raise ValueError("no standing reference raw (land or crouch) to fix the scale")
-    fallback = statistics.mean(measured.values())
-    result = {name: (frames, measured.get(name, fallback)) for name, frames in sources.items()}
-    for name, (_, scale) in result.items():
-        print(f"{name}: scale={scale:.3f}" + ("" if name in measured else " (mean of the standing sheets)"))
+    result: dict[str, tuple[dict[int, Image.Image], float]] = {}
+    face_ref = idle_face()
+    for name, frames in sources.items():
+        if name in measured:
+            result[name] = (frames, measured[name])
+            print(f"{name}: scale={measured[name]:.3f} (standing height)")
+            continue
+        face = lf.median_face([scaled_copy(f, PROVISIONAL_SCALE) for f in frames.values()])
+        if face is None:
+            raise ValueError(f"{name}: no face found to fix the scale")
+        scale = PROVISIONAL_SCALE * face_ref / face
+        result[name] = (frames, scale)
+        print(f"{name}: scale={scale:.3f} (face {face:.1f} at {PROVISIONAL_SCALE} vs idle {face_ref:.1f}; before: 0.767)")
     return result
 
 
-def process_clip(name: str, config: dict, idle: dict[str, float], front_ref: float, raws: dict, ruler_report: list[dict]):
+def land_face_ratio(raws: dict) -> float:
+    """Face of the landing's standing frame over the idle's (the fall eases to it)."""
+    name = "luz_jump_land_raw.png"
+    if name not in raws:
+        return 1.0
+    frames, scale = raws[name]
+    face = lf.face_size(scaled_copy(frames[STANDING_SLOT[name]], scale))
+    return 1.0 if face is None else face / idle_face()
+
+
+def process_clip(name: str, config: dict, idle: dict[str, float], front_ref: float, raws: dict, ruler_report: list[dict], land_ratio: float = 1.0):
     if config["raw"] not in raws:
         print(f"{name}: {config['raw']} not found, skipped (previous output kept)")
         return None
@@ -220,7 +253,9 @@ def process_clip(name: str, config: dict, idle: dict[str, float], front_ref: flo
     for index, slot in enumerate(config["slots"]):
         label = f"{name}[{index}]"
         anchor = config["anchor"][index] if isinstance(config["anchor"], list) else config["anchor"]
-        placed = place(sources[slot], scale, anchor, idle, front_ref, label)
+        count = len(config["slots"])
+        ratio = 1.0 + (land_ratio - 1.0) * index / max(count - 1, 1) if name in FACE_RAMP_TO_LAND else 1.0
+        placed = place(sources[slot], scale * ratio, anchor, idle, front_ref, label)
         force = config.get("force", {}).get(index)
         theta = pa.theta_for(placed, force[0], float(force[1])) if force else None
         frame, info = pa.fit_ruler(placed, label, theta)
@@ -293,9 +328,11 @@ def main() -> int:
     print(f"idle: height {idle['height']:.0f}, torso ({idle['torso_x']:.1f},{idle['torso_y']:.1f}), body ({idle['body_x']:.1f},{idle['body_y']:.1f}), front foot {front_ref:.1f}")
     ruler_report: list[dict] = []
     raws = load_raws(idle)
+    land_ratio = land_face_ratio(raws)
+    print(f"fall eases to the landing face ratio {land_ratio:.3f}")
     built: dict[str, dict[str, list[Image.Image]]] = {}
     for name, config in CLIPS.items():
-        frames = process_clip(name, config, idle, front_ref, raws, ruler_report)
+        frames = process_clip(name, config, idle, front_ref, raws, ruler_report, land_ratio)
         if frames is not None:
             built.setdefault(config["sheet"], {})[name] = frames
     for sheet_key, clip_frames in built.items():
