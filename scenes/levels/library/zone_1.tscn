@@ -14140,7 +14140,7 @@ position = Vector2(82, 693)
 [node name="Enemies" type="Node2D" parent="." unique_id=923529168]
 
 [node name="FragmentoLibro" parent="Enemies" unique_id=1920754797 instance=ExtResource("6_ts0jf")]
-position = Vector2(825, 544)
+position = Vector2(1491, 314)
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)

@@ -20,6 +20,7 @@
 [ext_resource type="Texture2D" uid="uid://b1t1md8ocmvl4" path="res://assets/art/greece/Foreground/foreground_column.png" id="16_kgimf"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="17_sbxl0"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="19_a34q0"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/shadow_owl.tscn" id="21_i8mgn"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("2_gkjph")
@@ -15169,3 +15170,9 @@ position = Vector2(-63.000004, -267)
 scale = Vector2(2.0583334, 1.7681057)
 texture = ExtResource("16_kgimf")
 flip_h = true
+
+[node name="ShadowOwl" parent="." unique_id=947189450 instance=ExtResource("21_i8mgn")]
+position = Vector2(773, 328)
+
+[node name="ShadowOwl2" parent="." unique_id=1038230610 instance=ExtResource("21_i8mgn")]
+position = Vector2(1470, 379)

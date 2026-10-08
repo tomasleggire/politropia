@@ -7,6 +7,8 @@
 [ext_resource type="Texture2D" uid="uid://b43xtbmb01bux" path="res://assets/art/library/Floor/floors_library.png" id="3_tyylc"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="4_fcwr3"]
 [ext_resource type="Texture2D" uid="uid://bos4jg5e0jdeu" path="res://assets/art/greece/Floor/floating_platforms_tileset.png" id="5_tyylc"]
+[ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_4.tscn" id="7_0mvx0"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="8_0xytk"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fcwr3"]
 texture = ExtResource("2_tyylc")
@@ -14604,8 +14606,23 @@ tile_set = SubResource("TileSet_w0rkp")
 position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
+[node name="FragmentoLibro" parent="TilemapLayers/Ground" unique_id=127322222 instance=ExtResource("7_0mvx0")]
+position = Vector2(853, -479)
+
 [node name="Player" parent="." unique_id=1611018514 instance=ExtResource("4_fcwr3")]
 position = Vector2(1368, 814)
+
+[node name="BookFlyer" parent="." unique_id=1113949942 instance=ExtResource("8_0xytk")]
+position = Vector2(279, 195)
+
+[node name="BookFlyer2" parent="." unique_id=1488631679 instance=ExtResource("8_0xytk")]
+position = Vector2(145, 692)
+
+[node name="BookFlyer3" parent="." unique_id=1293946812 instance=ExtResource("8_0xytk")]
+position = Vector2(1450, 234)
+
+[node name="BookFlyer4" parent="." unique_id=1992233274 instance=ExtResource("8_0xytk")]
+position = Vector2(1911, 546)
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)
