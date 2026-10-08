@@ -20,6 +20,7 @@
 [ext_resource type="Texture2D" uid="uid://b1t1md8ocmvl4" path="res://assets/art/greece/Foreground/foreground_column.png" id="16_kgimf"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="17_sbxl0"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="19_a34q0"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="21_book_flyer"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("2_gkjph")
@@ -15145,6 +15146,14 @@ tile_set = SubResource("TileSet_7wplu")
 position = Vector2(239, 396)
 
 [node name="Enemies" type="Node2D" parent="." unique_id=1451389218]
+
+[node name="BookFlyer" parent="Enemies" unique_id=345987344 instance=ExtResource("21_book_flyer")]
+position = Vector2(718, 354)
+enemy_id = &"greece_zone_1_book_a"
+start_facing = 1
+
+[node name="BookFlyer2" parent="Enemies" unique_id=885176904 instance=ExtResource("21_book_flyer")]
+position = Vector2(1059, 437)
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)

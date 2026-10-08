@@ -1,0 +1,50 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/shadow_owl.gd" id="1_owl"]
+[ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="2_contact"]
+[ext_resource type="AudioStream" path="res://assets/audio/owl_attack.mp3" id="3_attack_sfx"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(42, 34)
+
+[node name="ShadowOwl" type="CharacterBody2D"]
+collision_layer = 8
+collision_mask = 3
+script = ExtResource("1_owl")
+enemy_id = &"shadow_owl"
+max_health = 2
+recoil_speed = 300.0
+recoil_time = 0.15
+aggro_range = 320.0
+leash_distance = 520.0
+chase_acceleration = 420.0
+chase_max_speed = 150.0
+turn_factor = 0.55
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -18)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Visual" type="Node2D" parent="."]
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Visual"]
+position = Vector2(0, -18)
+scale = Vector2(0.28, 0.28)
+texture_filter = 1
+
+[node name="Body" type="Polygon2D" parent="Visual"]
+visible = false
+polygon = PackedVector2Array(-18, -34, 18, -34, 18, -2, -18, -2)
+
+[node name="SightProbe" type="RayCast2D" parent="."]
+position = Vector2(0, -18)
+target_position = Vector2(100, 0)
+collision_mask = 1
+
+[node name="AttackSfx" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("3_attack_sfx")
+volume_db = -3.0
+max_distance = 700.0
+
+[node name="ContactDamage" parent="." instance=ExtResource("2_contact")]
+position = Vector2(0, -18)

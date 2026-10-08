@@ -1,0 +1,40 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/world/fragmento_libro.png" id="1_sprite"]
+[ext_resource type="Script" path="res://scripts/world/floating_book_fragment.gd" id="2_script"]
+
+[sub_resource type="Gradient" id="GlowGradient"]
+offsets = PackedFloat32Array(0, 0.48, 1)
+colors = PackedColorArray(1, 0.82, 0.48, 0.62, 1, 0.72, 0.3, 0.35, 1, 0.55, 0.18, 0)
+
+[sub_resource type="GradientTexture2D" id="GlowTexture"]
+gradient = SubResource("GlowGradient")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="CanvasItemMaterial" id="GlowAdditive"]
+blend_mode = 1
+
+[node name="FragmentoLibro" type="Node2D"]
+z_index = 2
+script = ExtResource("2_script")
+
+[node name="Glow" type="Sprite2D" parent="."]
+position = Vector2(0, -12.5)
+z_index = -1
+scale = Vector2(0.82, 0.82)
+texture_filter = 2
+material = SubResource("GlowAdditive")
+texture = SubResource("GlowTexture")
+modulate = Color(1, 0.78, 0.42, 0.3)
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -12.5)
+scale = Vector2(0.027, 0.027)
+texture_filter = 1
+texture = ExtResource("1_sprite")
+
+[node name="Particles" type="Node2D" parent="."]
