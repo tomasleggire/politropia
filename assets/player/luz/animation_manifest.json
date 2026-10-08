@@ -2,44 +2,6 @@
   "index_origin": 0,
   "ordering": "row-major",
   "sheets": {
-    "luz_mobility_sheet.png": {
-      "grid": {
-        "columns": 4,
-        "rows": 4,
-        "cell_width": 512,
-        "cell_height": 512
-      },
-      "clips": {
-        "ground_dash": [
-          0,
-          1,
-          2,
-          3
-        ],
-        "air_dash": [
-          4,
-          5,
-          6,
-          7
-        ],
-        "wall_cling": [
-          8,
-          9
-        ],
-        "wall_jump": [
-          10,
-          11
-        ],
-        "ledge_hang": [
-          12,
-          13
-        ],
-        "ledge_climb": [
-          14,
-          15
-        ]
-      }
-    },
     "luz_ground_combat_sheet.png": {
       "grid": {
         "columns": 5,
@@ -538,6 +500,46 @@
           5,
           6,
           7
+        ]
+      }
+    },
+    "luz_mobility_sheet.png": {
+      "grid": {
+        "columns": 6,
+        "rows": 4,
+        "cell_width": 616,
+        "cell_height": 528
+      },
+      "clips": {
+        "ground_dash": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "air_dash": [
+          8,
+          9,
+          10,
+          11,
+          12,
+          13
+        ],
+        "wall_cling": [
+          14,
+          15,
+          16,
+          17
+        ],
+        "wall_jump": [
+          18,
+          19,
+          20,
+          21
         ]
       }
     }

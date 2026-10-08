@@ -19,6 +19,9 @@ extends Node
 ## LUZ_CAPTURE_MODE=air records the vertical set (see _air_steps): standing and running
 ## jumps, a double jump (unlocked for the capture), landings, crouch, crouch attack and
 ## standing up.
+## LUZ_CAPTURE_MODE=mobility records the dashes and the wall (see _mobility_steps): a ground
+## dash from rest and from a run, an air dash, a wall cling and a wall jump against a test
+## wall built next to the flat stretch.
 ## Input goes through Input.action_press/release like a player. track.csv has a
 ## `step` column (index into the sequence) to cut each action out.
 
@@ -37,6 +40,7 @@ var _log: FileAccess
 var _frame := 0
 var _attack_mode := false
 var _air_mode := false
+var _mobility_mode := false
 var _target: Node2D
 var _tag := ""
 
@@ -46,7 +50,8 @@ func _ready() -> void:
 	add_child((load(path) as PackedScene).instantiate())
 	_attack_mode = OS.get_environment("LUZ_CAPTURE_MODE") == "attacks"
 	_air_mode = OS.get_environment("LUZ_CAPTURE_MODE") == "air"
-	_steps = _attack_steps() if _attack_mode else (_air_steps() if _air_mode else _locomotion_steps())
+	_mobility_mode = OS.get_environment("LUZ_CAPTURE_MODE") == "mobility"
+	_steps = _attack_steps() if _attack_mode else (_air_steps() if _air_mode else (_mobility_steps() if _mobility_mode else _locomotion_steps()))
 	await get_tree().process_frame
 	_player = _find_player(self)
 	if _player == null:
@@ -64,6 +69,10 @@ func _ready() -> void:
 			camera.reset_physics_interpolation()
 	if _air_mode:
 		_player.unlock_double_jump()
+	if _mobility_mode:
+		var test_wall := LevelGeometry.add_solid(_player.get_parent() as Node2D,
+			Rect2(START_POSITION.x + 650.0, -1100.0, 64.0, 686.0), Color(0.25, 0.28, 0.36))
+		test_wall.z_index = -1
 	if _attack_mode:
 		_spawn_target()
 	# Per-frame track (frame, screen x/y, world x/y, velocity x, animation, frame
@@ -141,6 +150,23 @@ func _air_steps() -> Array:
 		[0.3, &""], [1.0, &"move_down"], [0.8, &""], [0.6, &""],
 		[0.5, &"move_down"], [0.05, [&"move_down", &"attack"], "crouch"], [0.9, &"move_down"], [0.5, &"move_down"],
 		[0.05, [&"move_down", &"attack"], "crouch"], [0.9, &"move_down"], [0.8, &""], [1.0, &""],
+	]
+
+
+## Dashes and wall, on the flat stretch with a test wall 650 px to the right of the start.
+func _mobility_steps() -> Array:
+	return [
+		[0.8, &""],
+		# Ground dash from rest, then from a run, then an air dash.
+		[0.1, &"dash"], [1.2, &""],
+		[0.6, &"move_right"], [0.1, [&"move_right", &"dash"]], [0.5, &"move_right"], [0.8, &""],
+		[0.15, &"jump"], [0.1, &""], [0.1, &"dash"], [1.4, &""],
+		# Wall: run into it, jump holding toward it, cling and slide, then jump away.
+		[0.8, &"move_right"], [0.35, [&"move_right", &"jump"]], [0.7, &"move_right"],
+		[0.1, [&"move_left", &"jump"]], [0.8, &"move_left"], [1.0, &""],
+		# Second visit: cling again and kick back up against the same wall (wall kick).
+		[0.9, &"move_right"], [0.35, [&"move_right", &"jump"]], [0.5, &"move_right"],
+		[0.1, [&"move_right", &"jump"]], [0.6, &"move_right"], [1.0, &""],
 	]
 
 
