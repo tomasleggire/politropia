@@ -16,6 +16,9 @@ extends Node
 ## recovery, a ground dash from rest, a ground dash from a run and an air dash.
 ## LUZ_CAPTURE_MODE=attacks records an attack sequence instead (see _attack_steps):
 ## whiffs, a full 3-hit combo on a dummy walker, crouch, up, a fast mash and air attacks.
+## LUZ_CAPTURE_MODE=air records the vertical set (see _air_steps): standing and running
+## jumps, a double jump (unlocked for the capture), landings, crouch, crouch attack and
+## standing up.
 ## Input goes through Input.action_press/release like a player. track.csv has a
 ## `step` column (index into the sequence) to cut each action out.
 
@@ -33,6 +36,7 @@ var _sprite: AnimatedSprite2D
 var _log: FileAccess
 var _frame := 0
 var _attack_mode := false
+var _air_mode := false
 var _target: Node2D
 var _tag := ""
 
@@ -41,7 +45,8 @@ func _ready() -> void:
 	var path := LEVEL_PATH if ResourceLoader.exists(LEVEL_PATH) else LEVEL_FALLBACK
 	add_child((load(path) as PackedScene).instantiate())
 	_attack_mode = OS.get_environment("LUZ_CAPTURE_MODE") == "attacks"
-	_steps = _attack_steps() if _attack_mode else _locomotion_steps()
+	_air_mode = OS.get_environment("LUZ_CAPTURE_MODE") == "air"
+	_steps = _attack_steps() if _attack_mode else (_air_steps() if _air_mode else _locomotion_steps())
 	await get_tree().process_frame
 	_player = _find_player(self)
 	if _player == null:
@@ -57,6 +62,8 @@ func _ready() -> void:
 		if camera != null:
 			camera.reset_smoothing()
 			camera.reset_physics_interpolation()
+	if _air_mode:
+		_player.unlock_double_jump()
 	if _attack_mode:
 		_spawn_target()
 	# Per-frame track (frame, screen x/y, world x/y, velocity x, animation, frame
@@ -113,6 +120,28 @@ func _on_step_start(tag: String) -> void:
 	_tag = tag
 	if tag == "target" and _target != null:
 		_target.global_position = _player.global_position + Vector2(62.0, 0.0)
+
+
+## Vertical set. Starts on the flat stretch (x 1144-2048): runs right 1 s, then jumps in place and
+## alternates directions so she never leaves it.
+func _air_steps() -> Array:
+	return [
+		[1.0, &""], [1.0, &"move_right"], [1.0, &""],
+		# Standing full jump (held) and its landing recovery.
+		[0.7, &"jump"], [1.6, &""],
+		# Tap jump, then a running jump and a running landing.
+		[0.05, &"jump"], [1.4, &""],
+		[0.5, &"move_right"], [0.7, [&"move_right", &"jump"]], [0.7, &"move_right"], [1.0, &""],
+		# Double jump: jump, release, press again near the apex (held both times).
+		[0.7, &"move_left"], [0.15, [&"move_left", &"jump"]], [0.2, &"move_left"],
+		[0.9, [&"move_left", &"jump"]], [1.0, &"move_left"], [1.4, &""],
+		# Standing double jump.
+		[0.4, &"jump"], [0.1, &""], [0.9, &"jump"], [1.6, &""],
+		# Crouch, hold, stand up; crouch attack and back to the crouch; stand up.
+		[0.3, &""], [1.0, &"move_down"], [0.8, &""], [0.6, &""],
+		[0.5, &"move_down"], [0.05, [&"move_down", &"attack"], "crouch"], [0.9, &"move_down"], [0.5, &"move_down"],
+		[0.05, [&"move_down", &"attack"], "crouch"], [0.9, &"move_down"], [0.8, &""], [1.0, &""],
+	]
 
 
 func _locomotion_steps() -> Array:

@@ -27,7 +27,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 OUT_W, OUT_H = 720, 540
-LUZ_WIN = (180, 135) if os.environ.get("LUZ_CAPTURE_MODE") == "attacks" else (120, 90)  # world px, 4x or 6x nearest => 720x540
+LUZ_WIN = (180, 135) if os.environ.get("LUZ_CAPTURE_MODE") in ("attacks", "air") else (120, 90)  # world px, 4x or 6x nearest => 720x540
 FEET_FRAC = 0.78
 PENITENT_BODY_VIDEO_PX = 148.0  # Penitent body = 48 world px (3.0 video px per art px)
 LUZ_FEET_OFFSET = 23.0  # collider half height below the node origin
@@ -137,7 +137,7 @@ def main() -> int:
         crop.save(out / "closeup" / f"c_{index:04d}.png")
         luz_images.append(crop)
     encode(out / "closeup", "c_%04d.png", out / "closeup.mp4")
-    if os.environ.get("LUZ_CAPTURE_MODE") == "attacks":
+    if os.environ.get("LUZ_CAPTURE_MODE") in ("attacks", "air"):
         attack_sheets(track, luz_images, out)
         return 0
     contact_sheet(luz_images[100:160:2], out / "contact_run.png")
