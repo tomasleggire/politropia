@@ -52,7 +52,7 @@ const SHAFT_STEPS: Array = [
 
 
 ## Spikes (world rects). Each rests on a floor, is 16 px tall so a jump clears
-## it, and can be pogoed. B2: a short row that invites a first pogo. The two
+## it. B2: a short row to learn the jump. The two
 ## pits cost a pip when missed and send Luz back to the last safe ground.
 const B2_SPIKES := Rect2(1320.0, 2704.0, 96.0, 16.0)
 const ALCOVE_PIT_SPIKES := Rect2(2040.0, 1480.0, 220.0, 16.0)
@@ -246,7 +246,7 @@ static func enemies() -> Array[Dictionary]:
 		_enemy(WALKER, "greece_b2_walker_a", Vector2(1700, 2720), -1),
 		_enemy(FLYER, "greece_shaft_flyer_a", Vector2(1680, 1641), -1),
 		_enemy(FLYER, "greece_shaft_flyer_b", Vector2(1680, 911), -1),
-		_enemy(FLYER, "greece_t1_flyer_a", Vector2(485, 421), 1),
+		_enemy(FLYER, "greece_t1_flyer_a", Vector2(485, 421), 1, &"book"),
 		_enemy(CHARGER, "greece_t2_charger_a", Vector2(2260, 544), -1),
 		_enemy(SHOOTER, "greece_t2_shooter_a", Vector2(2290, 204), -1),
 		_enemy(SHOOTER, "greece_exit_shooter_a", Vector2(2330, 1754), -1),
@@ -358,8 +358,22 @@ static func _nearest_room(point: Vector2, all: Dictionary) -> String:
 	return best
 
 
-static func _enemy(archetype: StringName, enemy_id: String, position: Vector2, facing: int) -> Dictionary:
-	return {"archetype": archetype, "enemy_id": StringName(enemy_id), "position": position, "facing": facing}
+static func _enemy(
+	archetype: StringName,
+	enemy_id: String,
+	position: Vector2,
+	facing: int,
+	variant: StringName = &""
+) -> Dictionary:
+	var placement := {
+		"archetype": archetype,
+		"enemy_id": StringName(enemy_id),
+		"position": position,
+		"facing": facing,
+	}
+	if not variant.is_empty():
+		placement["variant"] = variant
+	return placement
 
 
 static func _platform(x: float, top: float, width: float) -> Rect2:

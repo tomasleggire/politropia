@@ -8,7 +8,7 @@ const BODY_HALF_WIDTH := 19.0
 const SILL_START := 1860.0
 const TRIAL_SECONDS := 1.9
 const FLOOR_TOLERANCE := 4.0
-const WALL_KICK_PERIOD := 0.35
+const WALL_KICK_POLL := 0.05
 const TRIGGER_TIMEOUT := 1.2
 
 var probe: Probe
@@ -16,6 +16,8 @@ var reached_medal_floor := false
 var reached_sill := false
 ## Furthest x the body centre had while at or above the alcove floor level.
 var closest_x := 0.0
+## Highest point (smallest y) the body reached during the trial.
+var highest_y := INF
 
 
 func _init(shared_probe: Probe) -> void:
@@ -60,14 +62,17 @@ func run_off(start: Vector2, direction: float) -> void:
 	probe.release_all()
 
 
-## Presses toward the wall and taps jump repeatedly: cling, kick and re-cling.
+## Presses toward the wall and taps jump whenever she clings or stands: cling, kick and re-cling.
 func wall_kicks(start: Vector2, direction: float, seconds: float) -> void:
 	await _begin(start)
 	Input.action_press(_toward(direction))
 	var end := probe.clock + seconds
 	while probe.clock < end:
-		await probe.tap(&"jump")
-		await _watch(WALL_KICK_PERIOD)
+		# Kick the moment she clings (or leaves the floor), like a player would.
+		var player := probe.player
+		if player.is_on_floor() or player._state == Player.State.WALL_CLING:
+			await probe.tap(&"jump")
+		await _watch(WALL_KICK_POLL)
 	probe.release_all()
 
 
@@ -75,6 +80,7 @@ func _begin(start: Vector2) -> void:
 	reached_medal_floor = false
 	reached_sill = false
 	closest_x = 0.0
+	highest_y = INF
 	await probe.place(start)
 
 
@@ -89,6 +95,7 @@ func _on_alcove_floor() -> bool:
 
 
 func _sample() -> void:
+	highest_y = minf(highest_y, probe.player.global_position.y)
 	reached_medal_floor = reached_medal_floor or on_medal_floor()
 	reached_sill = reached_sill or on_sill()
 	if probe.player.global_position.y <= GreeceLayout.ALCOVE_FLOOR_Y + 1.0:

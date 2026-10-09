@@ -3,8 +3,8 @@ extends Area2D
 
 ## A shot fired by the Shooter. It flies straight, costs Luz one pip when it
 ## touches her and dies on solids, on her, after `lifetime` seconds, or when
-## her slash cuts it. It is never pogoable: `receive_hit` destroys it but
-## returns false, so a down slash on it does not bounce Luz.
+## her slash cuts it. `receive_hit` destroys it and returns false, so cutting it
+## gives no soul.
 ##
 ## Instances are pooled by their shooter: `launch()` revives one and
 ## `deactivate()` parks it, so nothing is allocated while enemies fight.
@@ -77,6 +77,9 @@ func _on_body_entered(body: Node2D) -> void:
 	if not _active:
 		return
 	var player := body as Player
+	if player != null and player.is_dash_invulnerable():
+		# Dash i-frames: the shot passes through her.
+		return
 	if player != null:
 		# Deferred: hurting her touches her own areas, which physics forbids
 		# while it is still flushing the query that raised this signal.

@@ -12,12 +12,12 @@ const PLAYER_SCENE := "res://scenes/player/player.tscn"
 const WATCHDOG_SECONDS := 120.0
 const SETTLE_FRAMES := 30
 const TAP_FRAMES := 2
-const APEX_DELAY := 0.36
-const FULL_JUMP := 130.0
-const DOUBLE_JUMP_PEAK := 260.0
+const APEX_DELAY := 0.45
+const FULL_JUMP := 87.0
+const DOUBLE_JUMP_PEAK := 174.0
 const PEAK_TOLERANCE := 15.0
 ## Anything launched by a jump leaves the player well above this upward speed.
-const LAUNCH_SPEED := -500.0
+const LAUNCH_SPEED := -300.0
 const FLOOR_RECT := Rect2(-3000.0, 0.0, 6000.0, 200.0)
 const LEDGE_FLOOR_RECT := Rect2(-3000.0, 0.0, 3200.0, 200.0)
 const WALL_RECT := Rect2(300.0, -600.0, 80.0, 600.0)
@@ -282,7 +282,7 @@ func case_ledge_fall_keeps_air_jump() -> void:
 	await _build_rig(100.0, LEDGE_FLOOR_RECT)
 	_player.unlock_double_jump()
 	Input.action_press(&"move_right")
-	await _secs(0.7)
+	await _secs(1.0)
 	Input.action_release(&"move_right")
 	check(not _player.is_on_floor() and _player.velocity.y > 0.0, "the player walked off the ledge and is falling")
 	var vy := await _press_and_read_vy()

@@ -9,8 +9,8 @@ extends Control
 const VESSEL := Color("9fc7e6")
 const VESSEL_EMPTY := Color(0.62, 0.78, 0.9, 0.3)
 const CUE := Color("fff3c2")
-const RING_WIDTH := 2.0
-const EDGE_INSET := 3.0
+const RING_WIDTH := 1.0
+const EDGE_INSET := 1.5
 
 @export_group("Art")
 @export var full_texture: Texture2D
@@ -66,7 +66,7 @@ func _draw() -> void:
 	if fill > 0.0:
 		_draw_fill()
 	if _can_heal:
-		draw_arc(size * 0.5, _radius() + 2.0, 0.0, TAU, 48, Color(CUE, 0.25 + 0.6 * glow), 3.0, true)
+		draw_arc(size * 0.5, _radius() + 1.0, 0.0, TAU, 48, Color(CUE, 0.25 + 0.6 * glow), 1.5, true)
 
 
 func _draw_empty() -> void:

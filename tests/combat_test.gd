@@ -21,7 +21,7 @@ const CHECKPOINT := Vector2(500.0, 0.0)
 const IFRAMES_OVER := 1.2
 const DEATH_BEAT := 1.0
 const HAZARD_RECT := Rect2(200.0, -16.0, 96.0, 16.0)
-const PLAYER_BODY := Vector2(38.0, 58.0)
+const PLAYER_BODY := Vector2(29.0, 46.0)
 
 const CHECKS := {
 	"case_hit_signals": 5,
@@ -30,6 +30,7 @@ const CHECKS := {
 	"case_control_lock": 4,
 	"case_flicker_restores": 3,
 	"case_air_actions_restored": 2,
+	"case_no_pogo_or_ledge": 5,
 	"case_hit_stop": 4,
 	"case_death_signals": 4,
 	"case_respawn_at_checkpoint": 6,
@@ -48,6 +49,14 @@ const CHECKS := {
 	"case_lethal_fall_uses_checkpoint": 5,
 	"case_fall_during_iframes_still_hurts": 4,
 	"case_levels_fall_costs_a_pip": 6,
+	"case_combo_rules": 9,
+	"case_whiff_repeats_hit1": 7,
+	"case_mash_is_one_buffered_press": 5,
+	"case_one_slash_per_attack": 20,
+	"case_no_recoil_and_camera_kick": 5,
+	"case_other_attack_boxes": 6,
+	"case_dash_invulnerable": 5,
+	"case_dash_hazards_and_grace": 4,
 }
 const LEVELS := {
 	"level_01": "res://scenes/levels/level_01.tscn",
@@ -64,6 +73,21 @@ class ResetCounter:
 
 	func reset_to_checkpoint_state() -> void:
 		count += 1
+
+
+## Stands in for an enemy: counts the slashes that strike it and records the
+## freezes the player asks for.
+class Dummy:
+	extends CharacterBody2D
+	var names: Array[StringName] = []
+	var freezes: Array[float] = []
+
+	func receive_hit(_damage: int, _source: Vector2, attack_name: StringName = &"") -> bool:
+		names.append(attack_name)
+		return true
+
+	func freeze(duration: float) -> void:
+		freezes.append(duration)
 
 
 var checks := 0
@@ -273,6 +297,28 @@ func case_air_actions_restored() -> void:
 	_player.take_damage(1, SOURCE_LEFT)
 	check(not _player._air_dash_used, "a hit gives the air dash back")
 	check(_player._air_jumps_left == _player.air_jumps, "a hit gives the air jump back")
+
+
+func case_no_pogo_or_ledge() -> void:
+	await _build_rig()
+	var states := Player.State.keys()
+	check(not states.has("LEDGE_HANG") and not states.has("LEDGE_CLIMB"), "no ledge state exists")
+	check(not ("pogo_height" in _player) and not ("ledge_climb_duration" in _player), "no pogo or ledge tunables exist")
+	check(_player.get_node_or_null("LedgeCheckAbove") == null, "the ledge probe is gone")
+	_player.global_position = Vector2(0.0, -150.0)
+	_player.velocity = Vector2.ZERO
+	await _frames(2)
+	Input.action_press(&"move_down")
+	_player.request_attack(1)
+	var swung := false
+	var bounced := false
+	for i: int in 24:
+		await _frames(1)
+		swung = swung or _player._state == Player.State.AIR_ATTACK
+		bounced = bounced or _player.velocity.y < -50.0
+	Input.action_release(&"move_down")
+	check(swung, "down + attack in the air swings the horizontal air attack")
+	check(not bounced, "and never bounces her upward")
 
 
 func case_hit_stop() -> void:
@@ -556,3 +602,339 @@ func case_levels_fall_costs_a_pip() -> void:
 		check(player.get_health() == 2, "%s: falling out of the map costs one pip (%d)" % [level_name, player.get_health()])
 		check(player.global_position.distance_to(safe) < 4.0, "%s: she is back on the last safe ground" % level_name)
 		check(not player.is_input_locked(), "%s: control is back" % level_name)
+
+
+# -- Attacks: combo rule, timings, hitboxes, hit-stop, lunge, camera, dash i-frames ----
+
+func _add_dummy(x: float) -> Dummy:
+	var dummy := Dummy.new()
+	dummy.collision_layer = 8
+	dummy.collision_mask = 0
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(20.0, 40.0)
+	shape.shape = rect
+	shape.position = Vector2(0.0, -20.0)
+	dummy.add_child(shape)
+	dummy.position = Vector2(x, 0.0)
+	_rig.add_child(dummy)
+	return dummy
+
+
+func _hitbox_shape() -> CollisionShape2D:
+	return _player.get_node("AttackHitbox/CollisionShape2D") as CollisionShape2D
+
+
+func _box_of_hitbox() -> Dictionary:
+	var shape := _hitbox_shape()
+	return {"size": (shape.shape as RectangleShape2D).size, "center": shape.position}
+
+
+func _box_matches(box: Dictionary, rect: Rect2, facing := 1) -> bool:
+	var want_center := Vector2(rect.get_center().x * float(facing), rect.get_center().y)
+	return (box["size"] as Vector2).is_equal_approx(rect.size) and (box["center"] as Vector2).distance_to(want_center) < 0.01
+
+
+## Waits until the attack is in `segment` of its active phase and returns the live hitbox.
+func _box_at_segment(segment: int, limit := 1.0) -> Dictionary:
+	var end := _clock + limit
+	while _clock < end:
+		await _frames(1)
+		if _player._attack_phase == Player.PHASE_ACTIVE and _player._attack_segment == segment:
+			return _box_of_hitbox()
+	return {"size": Vector2.ZERO, "center": Vector2(9999.0, 9999.0)}
+
+
+func case_combo_rules() -> void:
+	await _build_rig()
+	var dummy := _add_dummy(50.0)
+	var boxes := {}
+	var stops := {}
+	var seen := 0
+	var start_x := _player.global_position.x
+	var max_advance := 0.0
+	var end := _clock + 3.0
+	while _clock < end and not dummy.names.has(&"attack_ground_3"):
+		_player.request_attack(0)
+		await _frames(1)
+		if _player._attack_phase == Player.PHASE_ACTIVE and _player._state == Player.State.ATTACK:
+			var key := "%d" % _player._attack_combo_index
+			if not boxes.has(key):
+				boxes[key] = _box_of_hitbox()
+		if _player._state == Player.State.ATTACK and _player._attack_combo_index == 2:
+			max_advance = maxf(max_advance, _player.global_position.x - start_x)
+		while seen < dummy.names.size():
+			stops[dummy.names[seen]] = maxf(float(stops.get(dummy.names[seen], 0.0)), _player._hit_stop_left)
+			seen += 1
+	# Keep tracking the finisher's lunge without pressing again.
+	var tail := _clock + 0.5
+	while _clock < tail:
+		await _frames(1)
+		if _player._state == Player.State.ATTACK and _player._attack_combo_index == 2:
+			max_advance = maxf(max_advance, _player.global_position.x - start_x)
+	var first_of := func(attack_name: StringName) -> int: return dummy.names.find(attack_name)
+	check(
+		first_of.call(&"attack_ground_1") == 0 and first_of.call(&"attack_ground_2") > 0
+		and first_of.call(&"attack_ground_3") > first_of.call(&"attack_ground_2"),
+		"with a target the combo goes hit 1, 2, 3 in order (%s)" % [dummy.names]
+	)
+	check(boxes.has("0") and _box_matches(boxes["0"], _player.hitbox_hit1), "hit 1 single box")
+	check(boxes.has("1") and _box_matches(boxes["1"], _player.hitbox_hit2), "hit 2 single box")
+	check(boxes.has("2") and _box_matches(boxes["2"], _player.hitbox_hit3), "hit 3 finisher box")
+	check(absf(float(stops.get(&"attack_ground_1", 0.0)) - 0.09) < 0.02, "hit 1 hit-stop ~0.09 s (%.3f)" % float(stops.get(&"attack_ground_1", 0.0)))
+	check(absf(float(stops.get(&"attack_ground_2", 0.0)) - 0.10) < 0.02, "hit 2 hit-stop ~0.10 s (%.3f)" % float(stops.get(&"attack_ground_2", 0.0)))
+	check(absf(float(stops.get(&"attack_ground_3", 0.0)) - 0.20) < 0.02, "hit 3 hit-stop ~0.20 s (%.3f)" % float(stops.get(&"attack_ground_3", 0.0)))
+	check(absf(max_advance - 40.0) < 8.0, "the finisher lunges ~40 px (%.1f)" % max_advance)
+	await _secs(1.0)
+	check(absf(_player.global_position.x - start_x) < 6.0, "and slides back to where it started (%.1f)" % (_player.global_position.x - start_x))
+
+
+func case_whiff_repeats_hit1() -> void:
+	await _build_rig()
+	var starts: Array[float] = []
+	var max_index := 0
+	var last_segment := -2
+	var first_press := _clock
+	var first_active := -1.0
+	var start_frames: Array[int] = []
+	var max_strokes := 0
+	var sprite := _player.get_node("AnimatedSprite2D") as AnimatedSprite2D
+	var slash := _player.get_node("SlashVfx") as PlayerSlashVfx
+	var end := _clock + 2.2
+	while _clock < end:
+		_player.request_attack(0)
+		await _frames(1)
+		max_strokes = maxi(max_strokes, slash.stroke_count())
+		if _player._state == Player.State.ATTACK:
+			max_index = maxi(max_index, _player._attack_combo_index)
+			if _player._attack_segment == 0 and last_segment != 0:
+				starts.append(_clock)
+				start_frames.append(sprite.frame)
+				if first_active < 0.0:
+					first_active = _clock - first_press
+		last_segment = _player._attack_segment if _player._state == Player.State.ATTACK else -2
+	var gaps: Array[float] = []
+	for i in range(2, starts.size()):
+		gaps.append(starts[i] - starts[i - 1])
+	var mean := 0.0
+	for gap in gaps:
+		mean += gap
+	mean = mean / maxf(float(gaps.size()), 1.0)
+	check(max_index == 0, "whiffing never advances the combo (max index %d)" % max_index)
+	check(starts.size() >= 5, "hit 1 repeats while mashing (%d starts)" % starts.size())
+	check(absf(mean - 0.305) < 0.03, "whiff cadence ~0.305 s (%.3f)" % mean)
+	check(absf(first_active - 0.117) < 0.04, "hit 1 from rest reaches its active frame after ~0.117 s (%.3f)" % first_active)
+	var restarted := not start_frames.is_empty()
+	for frame in start_frames:
+		restarted = restarted and frame <= 5 and frame >= 3
+	check(restarted, "every repeat replays the clip: the sprite is on its contact frame when the slash starts (%s)" % [start_frames])
+	check(max_strokes == 1, "never more than one slash on screen (%d)" % max_strokes)
+	var min_gap := 9.0
+	for gap in gaps:
+		min_gap = minf(min_gap, gap)
+	check(min_gap > 0.27, "mashing can never exceed the animation cadence (shortest %.3f s)" % min_gap)
+
+
+func case_mash_is_one_buffered_press() -> void:
+	await _build_rig()
+	var sprite := _player.get_node("AnimatedSprite2D") as AnimatedSprite2D
+	var slash := _player.get_node("SlashVfx") as PlayerSlashVfx
+	var starts := 0
+	var last_segment := -2
+	var max_strokes := 0
+	var max_frame_per_attack := 0
+	var best_frames: Array[int] = []
+	var stuck := 0.0
+	var last_frame := -1
+	var end := _clock + 1.0
+	while _clock < end:
+		_player.request_attack(0)
+		await _frames(2)
+		max_strokes = maxi(max_strokes, slash.stroke_count())
+		var segment: int = _player._attack_segment if _player._state == Player.State.ATTACK else -2
+		if segment == 0 and last_segment != 0:
+			starts += 1
+			if starts > 1:
+				best_frames.append(max_frame_per_attack)
+			max_frame_per_attack = 0
+		last_segment = segment
+		max_frame_per_attack = maxi(max_frame_per_attack, sprite.frame)
+		if _player._state == Player.State.ATTACK and sprite.frame == last_frame:
+			stuck += 2.0 / 60.0
+		else:
+			stuck = 0.0
+		last_frame = sprite.frame
+	check(starts <= 4, "a 1 s mash starts at most 4 attacks, one per animation cycle (%d)" % starts)
+	check(starts >= 3, "and does not drop the repeats (%d)" % starts)
+	check(max_strokes == 1, "one slash at a time (%d)" % max_strokes)
+	var animated := not best_frames.is_empty()
+	for frame in best_frames:
+		animated = animated and frame >= 6
+	check(animated, "Luz plays every attack to its last frames while mashing (%s)" % [best_frames])
+	await _secs(0.6)
+	check(_player._state != Player.State.ATTACK and _player._attack_buffer_left <= 0.0, "after the burst nothing is left queued")
+
+
+func case_one_slash_per_attack() -> void:
+	for key: StringName in PlayerSlashVfx.SLASHES:
+		var bounds := PlayerSlashVfx.slash_bounds(key)
+		var rect: Rect2 = {
+			&"attack_1": _player_export(&"hitbox_hit1"), &"attack_2": _player_export(&"hitbox_hit2"),
+			&"attack_3": _player_export(&"hitbox_hit3"), &"crouch_attack": _player_export(&"hitbox_crouch"),
+			&"up_attack": _player_export(&"hitbox_up"), &"air_attack": _player_export(&"hitbox_air"),
+		}[key]
+		check(
+			rect.grow(1.0).encloses(bounds) or (rect.grow(1.0).intersects(bounds) and rect.end.x + 1.0 >= bounds.end.x and rect.position.y - 1.0 <= bounds.position.y),
+			"%s: the hitbox covers its slash (%s vs %s)" % [key, rect, bounds]
+		)
+		check(rect.end.x - bounds.end.x < 4.0 and rect.end.y - bounds.end.y < 4.0 + 3.0, "%s: no reach beyond the visible slash" % key)
+		var reach := {&"attack_1": 78.0, &"attack_2": 78.0, &"attack_3": 105.0, &"crouch_attack": 72.0, &"air_attack": 80.0}
+		if reach.has(key):
+			check(absf(bounds.end.x - float(reach[key])) <= float(reach[key]) * 0.10, "%s: reach %.1f within 10%% of %s" % [key, bounds.end.x, reach[key]])
+		else:
+			check(bounds.position.x > -52.0 and bounds.end.x < 38.0 and bounds.position.y < -100.0, "%s: overhead arc x %.0f..%.0f apex %.0f" % [key, bounds.position.x, bounds.end.x, -bounds.position.y])
+	await _build_rig()
+	var slash := _player.get_node("SlashVfx") as PlayerSlashVfx
+	var strokes := {}
+	_player.request_attack(0)
+	await _watch_slash(slash, strokes, 0.5)
+	await _secs(0.5)
+	Input.action_press(&"move_down")
+	await _secs(0.4)
+	_player.request_attack(0)
+	await _watch_slash(slash, strokes, 0.6)
+	Input.action_release(&"move_down")
+	await _secs(0.8)
+	_player.request_attack(-1)
+	await _watch_slash(slash, strokes, 0.6)
+	await _secs(0.8)
+	_player.global_position = Vector2(0.0, -200.0)
+	_player.velocity = Vector2.ZERO
+	await _frames(2)
+	_player.request_attack(0)
+	await _watch_slash(slash, strokes, 0.5)
+	check(int(strokes.get("max", 0)) == 1, "ground, crouch, up and air each cast exactly one slash (max %s)" % strokes.get("max", 0))
+	check(int(strokes.get("casts", 0)) == 4, "four attacks cast four slashes (%s)" % strokes.get("casts", 0))
+
+
+func _watch_slash(slash: PlayerSlashVfx, into: Dictionary, seconds: float) -> void:
+	var end := _clock + seconds
+	var was := false
+	while _clock < end:
+		await _frames(1)
+		into["max"] = maxi(int(into.get("max", 0)), slash.stroke_count())
+		var now := slash.stroke_count() > 0
+		if now and not was:
+			into["casts"] = int(into.get("casts", 0)) + 1
+		was = now
+
+
+func _player_export(property: StringName) -> Rect2:
+	var probe := (load(PLAYER_SCENE) as PackedScene).instantiate()
+	var rect: Rect2 = probe.get(property)
+	probe.free()
+	return rect
+
+
+func case_no_recoil_and_camera_kick() -> void:
+	await _build_rig()
+	await _add_camera()
+	var dummy := _add_dummy(50.0)
+	_player.request_attack(0)
+	var peak := 0.0
+	var end := _clock + 0.5
+	while _clock < end:
+		await _frames(1)
+		peak = maxf(peak, _camera.offset.x)
+	check(dummy.names.size() >= 1, "the slash landed")
+	check(absf(_player.global_position.x) < 0.5, "no recoil: Luz stays put (x %.2f)" % _player.global_position.x)
+	check(peak > 3.0 and peak <= _player.attack_kick_hit1.x + 0.01, "the RoomCamera is jolted toward the hit (%.1f)" % peak)
+	_camera.queue_free()
+	await _frames(2)
+	var player_camera := Camera2D.new()
+	player_camera.set_script(load("res://scripts/camera/camara_jugador.gd"))
+	_player.add_child(player_camera)
+	player_camera.make_current()
+	await _secs(0.5)
+	_player.request_attack(0)
+	var peak2 := 0.0
+	end = _clock + 0.5
+	while _clock < end:
+		await _frames(1)
+		peak2 = maxf(peak2, player_camera.offset.x)
+	check(peak2 > 3.0, "the player Camera2D is jolted too (%.1f)" % peak2)
+	check(player_camera.offset == Vector2.ZERO, "and settles back to zero")
+
+
+func case_other_attack_boxes() -> void:
+	await _build_rig()
+	Input.action_press(&"move_down")
+	await _secs(0.4)
+	_player.request_attack(0)
+	var crouch := await _box_at_segment(0)
+	var crouch_clip := _player.get_animation_length(&"crouch_attack")
+	Input.action_release(&"move_down")
+	await _secs(1.0)
+	_player.request_attack(-1)
+	var up := await _box_at_segment(0)
+	var up_clip := _player.get_animation_length(&"up_attack")
+	await _secs(1.0)
+	_player.global_position = Vector2(0.0, -200.0)
+	_player.velocity = Vector2.ZERO
+	await _frames(2)
+	_player.request_attack(0)
+	var air := await _box_at_segment(0)
+	check(_box_matches(crouch, _player.hitbox_crouch), "crouch single box")
+	check(_box_matches(up, _player.hitbox_up), "up attack single box")
+	check(_box_matches(air, _player.hitbox_air), "air single box")
+	check(_player.up_attack_startup_time == _player.crouch_attack_startup_time, "up windup equals the crouch windup")
+	check(_player.up_attack_phases == _player.crouch_attack_phases, "up active and recovery equal the crouch ones")
+	check(absf(up_clip - crouch_clip) < 0.001, "the up clip lasts as long as the crouch clip (%.3f vs %.3f)" % [up_clip, crouch_clip])
+
+
+func case_dash_invulnerable() -> void:
+	await _build_rig()
+	_player.request_dash()
+	await _secs(0.05)
+	var contact := (load(CONTACT_SCENE) as PackedScene).instantiate() as ContactDamage
+	_rig.add_child(contact)
+	contact.set_area_size(Vector2(1600.0, 400.0))
+	contact.position = Vector2(0.0, -100.0)
+	var shot := (load("res://scenes/enemies/enemy_projectile.tscn") as PackedScene).instantiate() as EnemyProjectile
+	_rig.add_child(shot)
+	shot.launch(_player.global_position + Vector2(-40.0, -20.0), Vector2.RIGHT, 250.0)
+	await _secs(0.3)
+	check(_player.is_dash_invulnerable(), "she is invulnerable during the dash")
+	check(_player.get_health() == 3, "enemy contact and a projectile do nothing during the dash (%d)" % _player.get_health())
+	check(shot.is_active(), "the projectile passes through her instead of vanishing")
+	check(_player._state == Player.State.DASH, "and the dash was not interrupted")
+	await _secs(0.9)
+	check(_player.get_health() == 2, "the same contact hurts right after the dash (%d)" % _player.get_health())
+
+
+func case_dash_hazards_and_grace() -> void:
+	await _build_rig()
+	_player.request_dash()
+	await _secs(0.1)
+	check(_player.take_hazard_damage(1, SOURCE_LEFT), "fixed hazards still hurt during the dash")
+	await _free_and_rebuild()
+	_player.dash_invulnerable = false
+	_player.request_dash()
+	await _secs(0.1)
+	check(_player.take_damage(1, SOURCE_LEFT), "with dash_invulnerable off the dash does not protect")
+	await _free_and_rebuild()
+	_player.dash_invulnerable_grace = 0.3
+	_player.request_dash()
+	var end := _clock + 1.5
+	while _player._state == Player.State.DASH and _clock < end:
+		await _frames(1)
+	check(not _player.take_damage(1, SOURCE_LEFT), "the grace after the dash still blocks hits")
+	await _secs(0.4)
+	check(_player.take_damage(1, SOURCE_LEFT), "and expires")
+
+
+func _free_and_rebuild() -> void:
+	_release_all()
+	_free_rig()
+	_checkpoints().clear()
+	await _build_rig()
