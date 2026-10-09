@@ -1,9 +1,32 @@
 @tool
 class_name ThornBush
 extends ContactDamage
-
+## Arbusto espinoso pegado a una pared. Hereda de ContactDamage, así que el
+## daño, los i-frames, el knockback y el retorno a zona segura los resuelve el
+## sistema existente (player.gd no se toca).
+##
+## Dos comportamientos (Inspector -> Behavior):
+##   KNOCKBACK              quita vida y empuja a Luz lejos de la pared; sigue
+##                          viva en el lugar. Vuelve a dañar cuando terminan
+##                          sus i-frames si sigue tocándolo (como un enemigo).
+##   RETURN_TO_SAFE_GROUND  quita vida y la lleva a la última zona segura con
+##                          fundido a negro (como los pinchos).
+##
+## Uso: escena con un Area2D como raíz + este script + un hijo Sprite2D con la
+## textura asignada EN LA ESCENA (así toda instancia ya la trae). El script
+## solo ajusta tamaño y flip del Sprite2D y crea el CollisionShape2D.
+## El ORIGEN del nodo es el centro del borde pegado a la pared: ponelo sobre
+## la cara de la pared. El arte original tiene la pared a la IZQUIERDA y las
+## espinas hacia la derecha; para una pared a la derecha, activá "Flip H".
+## No rotar ni escalar el nodo (usá Display Height).
 
 enum Behavior { KNOCKBACK, RETURN_TO_SAFE_GROUND }
+
+## Copias locales de las constantes de pogo de ContactDamage, para que el
+## arbusto compile aunque el equipo las renombre o las mueva. Tienen que
+## coincidir con contact_damage.gd y con la máscara del AttackHitbox.
+const POGO_LAYER_VALUE := 16
+const POGO_GROUP_NAME := &"pogoable"
 
 ## Cantidad de arbustos apilados en vertical a lo largo de la pared. El
 ## conjunto queda centrado en el origen y el hitbox cubre toda la pila.
@@ -62,8 +85,8 @@ func _ready() -> void:
 	kind = Kind.HAZARD if behavior == Behavior.RETURN_TO_SAFE_GROUND else Kind.ENEMY
 	super._ready()
 	if pogoable and kind == Kind.ENEMY:
-		add_to_group(POGO_GROUP)
-		collision_layer = POGO_LAYER
+		add_to_group(POGO_GROUP_NAME)
+		collision_layer = POGO_LAYER_VALUE
 
 
 ## Oculta "kind" del Inspector: lo decide "behavior".
