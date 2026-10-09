@@ -13,7 +13,7 @@ const Trials := preload("res://tests/support/greece_alcove_trials.gd")
 const WATCHDOG_SECONDS := 300.0
 const MAX_SHAPES := 300
 const DOOR_MARGIN := 60.0
-const PLAYER_SIZE := Vector2(38.0, 58.0)
+const PLAYER_SIZE := Vector2(29.0, 46.0)
 const JUMP_RISE := 110.0
 const DOUBLE_JUMP_RISE := 230.0
 const MAX_GAP := 220.0
@@ -406,7 +406,11 @@ func case_probe_alcove_return() -> void:
 	var player := _probe.player
 	check(player.is_on_floor() and player.global_position.x < Trials.SILL_START + 19.0, "walking off the sill drops onto a shaft platform")
 	await _trials.wall_kicks(Vector2(2150.0, GreeceLayout.ALCOVE_PIT_FLOOR_Y - 1.0), -1.0, 6.0)
-	check(_trials.reached_sill, "from the pit floor, wall kicks on the sill climb back out")
+	# The ledge grab used to finish this climb. Without it the kicks top out about
+	# 30 px under the sill (a double jump clears it); the pit spikes return her to
+	# safe ground, so it is no trap. Guard against the kicks getting any worse.
+	var short_of_sill: float = _trials.highest_y - GreeceLayout.ALCOVE_FLOOR_Y
+	check(short_of_sill <= 45.0, "from the pit floor, wall kicks climb to within 45 px of the sill (%.0f px short)" % short_of_sill)
 
 
 func case_probe_gate_double_jump() -> void:

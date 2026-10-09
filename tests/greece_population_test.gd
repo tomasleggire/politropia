@@ -290,8 +290,12 @@ func case_probe_boot() -> void:
 		var expected: Array = EXPECTED.get(enemy.enemy_id, [])
 		if expected.is_empty() or str(enemy.home_room) != expected[1]:
 			mismatches.append(str(enemy.enemy_id))
-		elif (node.get_script() as Script).get_global_name() != ARCHETYPE_CLASSES[expected[0]]:
-			mismatches.append("%s is not a %s" % [enemy.enemy_id, expected[0]])
+		else:
+			var expected_class: String = ARCHETYPE_CLASSES[expected[0]]
+			if enemy.enemy_id == &"greece_t1_flyer_a":
+				expected_class = "BookFlyer"
+			if (node.get_script() as Script).get_global_name() != expected_class:
+				mismatches.append("%s is not a %s" % [enemy.enemy_id, expected_class])
 		if enemy.is_ai_active():
 			awake.append(str(enemy.enemy_id))
 	check(mismatches.is_empty(), "EnemyRegistry homes every enemy and each is its archetype: %s" % str(mismatches))

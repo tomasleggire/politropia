@@ -10,8 +10,8 @@ extends Control
 const GEM := Color("efe6d4")
 const GEM_RIM := Color("b9ad94")
 const RING_EMPTY := Color(0.92, 0.89, 0.82, 0.32)
-const RING_WIDTH := 2.0
-const EDGE_INSET := 3.0
+const RING_WIDTH := 1.0
+const EDGE_INSET := 1.5
 
 @export_group("Art")
 ## Optional art; when set it replaces the drawn placeholder.
@@ -20,7 +20,7 @@ const EDGE_INSET := 3.0
 
 @export_group("Feedback")
 @export var lose_time := 0.35
-@export var shake_pixels := 4.0
+@export var shake_pixels := 2.0
 @export var refill_time := 0.2
 @export var pop_scale := 1.25
 ## Scale a pip shrinks to while it fades out on a loss.
@@ -137,7 +137,7 @@ func _draw_full() -> void:
 	var body := GEM.lerp(Color.WHITE, flash)
 	body.a = fill
 	draw_circle(center, _radius(), rim)
-	draw_circle(center, _radius() - 2.0, body)
+	draw_circle(center, _radius() - 1.0, body)
 	var shine := Color(1.0, 1.0, 1.0, 0.7 * fill)
 	draw_circle(center + Vector2(-_radius() * 0.3, -_radius() * 0.3), _radius() * 0.25, shine)
 

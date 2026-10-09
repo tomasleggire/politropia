@@ -24,10 +24,10 @@ func _draw() -> void:
 	var rim := Color("d8792e") if is_pressed else Color(0.25, 0.44, 0.64, 0.72)
 	var fill_alpha := 0.66 if is_pressed else 0.5
 
-	draw_circle(center, radius + 4.0, Color(0.006, 0.012, 0.035, 0.42))
+	draw_circle(center, radius + 2.0, Color(0.006, 0.012, 0.035, 0.42))
 	draw_circle(center, radius, Color(0.025, 0.055, 0.12, fill_alpha))
-	draw_arc(center, radius, 0.0, TAU, 64, Color(rim, 0.92), 2.5, true)
-	draw_arc(center, radius - 8.0, 0.0, TAU, 64, Color(rim, 0.28), 1.0, true)
+	draw_arc(center, radius, 0.0, TAU, 64, Color(rim, 0.92), 1.25, true)
+	draw_arc(center, radius - 4.0, 0.0, TAU, 64, Color(rim, 0.28), 1.0, true)
 
 	var extent := radius * 0.42
 	match icon:
@@ -49,16 +49,16 @@ func _draw_chevron(origin: Vector2, extent: float, color: Color, direction: Vect
 	var tip := origin + direction * extent
 	var back := origin - direction * extent * 0.6
 	var points := PackedVector2Array([back + normal * extent, tip, back - normal * extent])
-	draw_polyline(points, color, 4.0, true)
+	draw_polyline(points, color, 2.0, true)
 
 
 func _draw_slash(center: Vector2, extent: float, color: Color) -> void:
-	draw_line(center + Vector2(-extent, extent), center + Vector2(extent, -extent), color, 5.0, true)
+	draw_line(center + Vector2(-extent, extent), center + Vector2(extent, -extent), color, 2.5, true)
 	draw_line(
 		center + Vector2(-extent * 0.35, extent * 1.05),
 		center + Vector2(extent * 1.05, -extent * 0.35),
 		Color(color, 0.55),
-		3.0,
+		1.5,
 		true
 	)
 
@@ -71,10 +71,10 @@ func _draw_diamond(center: Vector2, extent: float, color: Color) -> void:
 		center + Vector2(-extent, 0.0),
 		center + Vector2(0.0, -extent),
 	])
-	draw_polyline(points, color, 4.0, true)
+	draw_polyline(points, color, 2.0, true)
 	draw_circle(center, extent * 0.22, color)
 
 
 func _draw_focus(center: Vector2, extent: float, color: Color) -> void:
-	draw_arc(center, extent, 0.0, TAU, 32, color, 4.0, true)
+	draw_arc(center, extent, 0.0, TAU, 32, color, 2.0, true)
 	draw_circle(center, extent * 0.35, color)

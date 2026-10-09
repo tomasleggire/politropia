@@ -3,9 +3,9 @@ extends CanvasLayer
 ## Blasphemous-style mobile layout: a floating left-thumb joystick that drives
 ## the same move_* input actions as the keyboard, plus three right-side
 ## buttons (jump, dash, attack). The attack fires the instant the finger
-## touches down (neutral, or directional if the pad already holds up/down);
+## touches down (neutral, or directional if the pad already holds up);
 ## a short swipe right after that can still upgrade the same attack to
-## up/down slash instead of firing a second one. Jump and dash also call the
+## up slash instead of firing a second one (a downward swipe does nothing). Jump and dash also call the
 ## player directly on touch-down (in addition to Input.action_press) so a
 ## very quick tap can never be missed by is_action_just_pressed's same-frame
 ## edge (see Player.request_jump/request_dash).
@@ -14,14 +14,14 @@ extends CanvasLayer
 
 @export_group("Joystick")
 @export var joystick_capture_fraction := 0.4
-@export var joystick_radius := 80.0
+@export var joystick_radius := 40.0
 @export var joystick_dead_zone := 0.25
 @export var joystick_vertical_ratio := 0.55
 @export var joystick_vertical_angle_deg := 60.0
-@export var joystick_rest_margin := Vector2(150.0, 150.0)
+@export var joystick_rest_margin := Vector2(75.0, 75.0)
 
 @export_group("Attack gesture")
-@export var attack_swipe_distance := 28.0
+@export var attack_swipe_distance := 14.0
 ## After touch-down, a qualifying vertical swipe within this window upgrades
 ## the attack that already fired to up/down (the player only honors the
 ## upgrade while its own startup phase is still active, ~attack_startup_time).

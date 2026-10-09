@@ -13,10 +13,10 @@ extends CanvasLayer
 const HUD_LAYER := 40
 
 @export_group("Layout")
-@export var pip_size := Vector2(30.0, 30.0)
-@export var pip_spacing := 8.0
+@export var pip_size := Vector2(15.0, 15.0)
+@export var pip_spacing := 4.0
 ## Distance from the safe area's top-left corner to the first pip.
-@export var edge_margin := Vector2(24.0, 20.0)
+@export var edge_margin := Vector2(12.0, 10.0)
 
 @export_group("Art")
 ## Optional final art for every pip; the drawn placeholder is used when unset.
@@ -24,7 +24,7 @@ const HUD_LAYER := 40
 @export var empty_texture: Texture2D
 
 @export_group("Soul Meter")
-@export var meter_size := Vector2(44.0, 44.0)
+@export var meter_size := Vector2(22.0, 22.0)
 ## Optional final art for the soul vessel; the drawn placeholder is used when unset.
 @export var meter_full_texture: Texture2D
 @export var meter_empty_texture: Texture2D

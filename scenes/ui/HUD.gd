@@ -20,12 +20,12 @@ func _on_player_health_changed(current_health: int, max_health: int) -> void:
 		heart.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		heart.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		heart.custom_minimum_size = Vector2(32, 32) # Ajusta el tamaño que quieras en pantalla
-		
+
 		if i < current_health:
 			heart.texture = heart_full_texture
 		else:
 			heart.texture = heart_empty_texture
-			
+
 		hearts_container.add_child(heart)
 
 func _on_player_energy_changed(current_energy: float, max_energy: float) -> void:

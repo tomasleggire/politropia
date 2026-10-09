@@ -15,18 +15,21 @@ check names.
   probes (including the medal alcove); helpers in `support/greece_*.gd`.
 - `double_jump_test.gd`: the gated double jump (off by default, air jump count,
   resets, jump buffer, unlock signal) on a synthetic floor.
+- `jump_dash_test.gd`: the Penitent-matched jump (height, apex, tap minimum, air
+  speed), the standing landing recovery and its jump cancel, the ground and air
+  dash profile, ledge, afterimages and dust.
 - `room_camera_bounds_test.gd`: per-room camera clamp and blend, room selection
   and the real camera in the Greece level.
 - `combat_test.gd`: damage, i-frames, knockback, control lock, hit-stop, death,
-  respawn and the `ContactDamage` component on a synthetic floor.
+  respawn, the `ContactDamage` component on a synthetic floor, the absence of
+  the pogo and ledge states, and the attacks (combo advances only on a landed
+  hit, whiff cadence, hitbox rectangles per phase, hit-stop, finisher lunge,
+  no recoil, camera kick) plus the dash i-frames.
 - `enemy_test.gd`: the enemy base and the walker (patrol, ledges and walls,
   contact damage, hits, corpses), the three room persistence rules, off-room
   pausing and the player's hit recoil.
 - `enemy_archetypes_test.gd`: the airborne and charging archetypes (flyer,
-  charger) plus their persistence rules and pogo.
-- `pogo_test.gd`: the down slash pogo (bounce height, restored air actions,
-  hazard grace, missed slash, crouch attack on the ground, touch paths) and the
-  removal of the plunge.
+  charger, shooter) plus their persistence rules.
 - `health_hud_test.gd`: the mask HUD (pips, loss and refill feedback, rebuild,
   safe area, presence in both levels).
 - `support/ritual_harness.gd`: shared state, game-clock waits, event recording.

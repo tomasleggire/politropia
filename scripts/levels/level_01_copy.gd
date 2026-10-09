@@ -142,5 +142,3 @@ func _solid(rect: Rect2, color := SOLID) -> void:
 
 func _one_way(rect: Rect2) -> void:
 	LevelGeometry.add_one_way_platform(_solids, rect, ONE_WAY, STONE)
-
-

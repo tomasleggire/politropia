@@ -1,0 +1,33 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/levels/greece/zone_1.tscn" id="1_zone"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/walker.tscn" id="2_walker"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/charger.tscn" id="3_charger"]
+
+[node name="LuzCombatArena" type="Node2D"]
+
+[node name="Zone" parent="." instance=ExtResource("1_zone")]
+
+[node name="TestEnemies" type="Node2D" parent="."]
+
+[node name="Walker1" parent="TestEnemies" instance=ExtResource("2_walker")]
+enemy_id = &"arena_Walker1"
+position = Vector2(380, 418)
+max_health = 3
+walk_speed = 35.0
+
+[node name="Walker2" parent="TestEnemies" instance=ExtResource("2_walker")]
+enemy_id = &"arena_Walker2"
+position = Vector2(600, 538)
+max_health = 3
+walk_speed = 35.0
+
+[node name="Charger" parent="TestEnemies" instance=ExtResource("3_charger")]
+enemy_id = &"arena_Charger"
+position = Vector2(1270, 650)
+max_health = 3
+detect_range = 200.0
+telegraph_time = 0.7
+charge_speed = 220.0
+charge_time = 0.8
+recover_time = 1.0

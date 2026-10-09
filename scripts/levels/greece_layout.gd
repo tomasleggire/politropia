@@ -52,7 +52,7 @@ const SHAFT_STEPS: Array = [
 
 
 ## Spikes (world rects). Each rests on a floor, is 16 px tall so a jump clears
-## it, and can be pogoed. B2: a short row that invites a first pogo. The two
+## it. B2: a short row to learn the jump. The two
 ## pits cost a pip when missed and send Luz back to the last safe ground.
 const B2_SPIKES := Rect2(1320.0, 2704.0, 96.0, 16.0)
 const ALCOVE_PIT_SPIKES := Rect2(2040.0, 1480.0, 220.0, 16.0)

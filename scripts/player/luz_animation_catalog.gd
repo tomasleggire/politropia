@@ -16,36 +16,52 @@ const ASSET_ROOT := "res://assets/player/luz/"
 ## player's own exported durations (see build_sprite_frames); these defaults
 ## only apply when no duration override is supplied.
 const CLIP_SPEEDS := {
-	"idle": 3.0,
-	"walk": 9.0,
-	"crouch": 4.0,
-	"jump": 6.0,
-	"fall": 5.0,
-	"land": 8.0,
-	"ground_dash": 9.0,
-	"air_dash": 9.0,
-	"wall_cling": 4.0,
-	"wall_jump": 7.0,
-	"ledge_hang": 4.0,
-	"ledge_climb": 8.0,
+	"idle": 8.0,
+	"walk": 13.4,
+	"crouch": 20.0,
+	"crouch_exit": 20.0,
+	"jump": 11.1,
+	"fall": 12.0,
+	"double_jump": 15.0,
+	"land": 14.3,
+	"turn": 20.0,
+	"skid": 6.0,
+	"ground_dash": 18.6,
+	"air_dash": 20.0,
+	"wall_cling": 6.0,
+	"wall_jump": 33.3,
 	"attack_1": 10.0,
 	"attack_2": 10.0,
 	"attack_3": 10.0,
 	"crouch_attack": 9.0,
 	"up_attack": 10.0,
 	"air_attack": 10.0,
-	"plunge": 10.0,
-	"plunge_land": 10.0,
 	"rest_mount": 8.0,
 	"rest_sit": 2.0,
 	"rest_dismount": 10.0,
+	"heal_start": 14.3,
+	"heal_loop": 4.44,
+	"heal_end": 20.0,
+}
+
+## PLACEHOLDER MAPPING (no art yet): "turn" and "skid" have no clip in the
+## manifest, so each borrows frames from an existing animation. As soon as the
+## manifest gains a clip named "turn" or "skid" (see CLIP_SOURCE_NAMES), that
+## art is used automatically and this entry is ignored -- no code change.
+##   turn: both `crouch` frames (3-4 frame turn crouch stand-in).
+##   skid: the last, lowest `crouch` frame, held (wide low skid pose stand-in).
+const PLACEHOLDER_CLIPS := {
+	"turn": {"from": "crouch", "frames": [0, 1]},
+	"skid": {"from": "crouch", "frames": [1]},
 }
 
 ## Animations that should hold/repeat while their state persists, rather
 ## than play once and freeze on the last frame.
+## jump, fall, double_jump and crouch play once over the physics window they
+## were drawn for (rise 0.45 s, fall 0.41 s) and hold their last pose.
 const LOOPING_CLIPS := [
-	"idle", "walk", "crouch", "jump", "fall",
-	"ground_dash", "air_dash", "wall_cling", "ledge_hang", "rest_sit",
+	"idle", "walk", "heal_loop",
+	"ground_dash", "air_dash", "wall_cling", "rest_sit",
 ]
 
 const CLIP_SOURCE_NAMES := {
@@ -56,6 +72,9 @@ const CLIP_SOURCE_NAMES := {
 	"attack_2": "ground_attack_2",
 	"attack_3": "ground_attack_3",
 	"air_attack": "air_horizontal_attack",
+	"heal_start": "heal_start",
+	"heal_loop": "heal_loop",
+	"heal_end": "heal_end",
 }
 
 ## Animations whose manifest "contact_frames" entry (if any) should be
@@ -84,7 +103,15 @@ const CONTACT_SYNCED_CLIPS := [
 ## -- i.e. precisely when the attack's hitbox activates -- instead of every
 ## frame getting an equal slice of the clip. An animation missing from
 ## startup_times (or mapped to 0.0) is never contact-synced.
-static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: Dictionary = {}) -> SpriteFrames:
+##
+## active_times optionally maps an animation name to the length of its active
+## (hitbox) phase. With a manifest "active_end_frames" entry (index of the first
+## recovery frame of that clip) the frames from the contact frame up to it share
+## exactly that time and the recovery frames share the rest, so the art's
+## active frames line up with the hitbox window.
+static func build_sprite_frames(
+	clip_durations: Dictionary = {}, startup_times: Dictionary = {}, active_times: Dictionary = {}
+) -> SpriteFrames:
 	var manifest := _read_manifest()
 	var frames := SpriteFrames.new()
 	for animation_name in CLIP_SPEEDS:
@@ -97,6 +124,7 @@ static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: 
 		var grid: Dictionary = sheet["grid"]
 		var clips: Dictionary = sheet["clips"]
 		var contact_frames: Dictionary = sheet.get("contact_frames", {})
+		var active_end_frames: Dictionary = sheet.get("active_end_frames", {})
 		for clip_name in clips:
 			var animation_name := _animation_name_for(clip_name)
 			if animation_name.is_empty():
@@ -110,13 +138,38 @@ static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: 
 			var total_duration: float = clip_durations.get(animation_name, float(frame_count) / speed)
 			var startup_time: float = startup_times.get(animation_name, 0.0)
 			var seconds := _frame_seconds(
-				animation_name, frame_count, contact_index, total_duration, startup_time
+				animation_name, frame_count, contact_index, total_duration, startup_time,
+				int(active_end_frames.get(clip_name, -1)), float(active_times.get(animation_name, 0.0))
 			)
 			for i in frame_count:
 				var texture := _build_frame_texture(atlas, grid, int(frame_indices[i]))
 				frames.add_frame(animation_name, texture, seconds[i] * speed)
 
+	_fill_placeholder_clips(frames, clip_durations)
 	return frames
+
+
+## Gives every PLACEHOLDER_CLIPS animation that the manifest did not fill its
+## stand-in frames, copied from the animation it borrows from.
+static func _fill_placeholder_clips(frames: SpriteFrames, clip_durations: Dictionary) -> void:
+	for animation_name: String in PLACEHOLDER_CLIPS:
+		if frames.has_animation(animation_name) and frames.get_frame_count(animation_name) > 0:
+			continue
+		var config: Dictionary = PLACEHOLDER_CLIPS[animation_name]
+		var source: String = config["from"]
+		var indices: Array = config["frames"]
+		if not frames.has_animation(source):
+			continue
+		var source_count := frames.get_frame_count(source)
+		var usable := indices.filter(func(index: int) -> bool: return index >= 0 and index < source_count)
+		if usable.size() != indices.size():
+			push_warning("LuzAnimationCatalog: '%s' lacks the frames '%s' borrows; clip skipped." % [source, animation_name])
+			continue
+		if not frames.has_animation(animation_name):
+			frames.add_animation(animation_name)
+		frames.set_animation_speed(animation_name, _clip_speed(animation_name, indices.size(), clip_durations))
+		for index: int in indices:
+			frames.add_frame(animation_name, frames.get_frame_texture(source, index), 1.0)
 
 
 ## Per-frame duration (seconds) for a clip: equal shares of total_duration,
@@ -126,7 +179,7 @@ static func build_sprite_frames(clip_durations: Dictionary = {}, startup_times: 
 ## stretched to fill the remaining (total_duration - startup_time).
 static func _frame_seconds(
 	animation_name: String, frame_count: int, contact_index: int,
-	total_duration: float, startup_time: float
+	total_duration: float, startup_time: float, active_end_index := -1, active_time := 0.0
 ) -> Array[float]:
 	var uniform: Array[float] = []
 	uniform.resize(frame_count)
@@ -145,6 +198,17 @@ static func _frame_seconds(
 	var lead_frame_seconds := startup_time / float(contact_index)
 	for i in contact_index:
 		result[i] = lead_frame_seconds
+	if (
+		active_end_index > contact_index and active_end_index < frame_count
+		and active_time > 0.0 and startup_time + active_time < total_duration
+	):
+		var active_frames := active_end_index - contact_index
+		for i in range(contact_index, active_end_index):
+			result[i] = active_time / float(active_frames)
+		var recovery_frames := frame_count - active_end_index
+		for i in range(active_end_index, frame_count):
+			result[i] = (total_duration - startup_time - active_time) / float(recovery_frames)
+		return result
 	var trail_frame_count := frame_count - contact_index
 	var trail_frame_seconds := (total_duration - startup_time) / float(trail_frame_count)
 	for i in range(contact_index, frame_count):

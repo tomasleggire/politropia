@@ -37,4 +37,3 @@ collision_mask = 1
 
 [node name="ContactDamage" parent="." instance=ExtResource("2_contact")]
 position = Vector2(0, -16)
-

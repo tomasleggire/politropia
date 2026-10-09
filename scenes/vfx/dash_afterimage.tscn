@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/vfx/dash_afterimage.gd" id="1_ghost"]
+[ext_resource type="Shader" path="res://shaders/luz_afterimage.gdshader" id="2_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tint"]
+shader = ExtResource("2_shader")
+shader_parameter/tint = Color(0.45, 0.58, 0.8, 1)
+shader_parameter/tint_strength = 0.85
+
+[node name="DashAfterimage" type="Sprite2D"]
+texture_filter = 1
+material = SubResource("ShaderMaterial_tint")
+script = ExtResource("1_ghost")

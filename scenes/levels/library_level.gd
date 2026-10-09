@@ -8,9 +8,8 @@ func _ready() -> void:
 		# Conectamos la señal de vida del jugador al método del HUD
 		if player.has_signal("health_changed") and hud.has_method("_on_player_health_changed"):
 			player.health_changed.connect(hud._on_player_health_changed)
-			print("¡Señal health_changed conectada correctamente al HUD!")
 		else:
-			print("ERROR: No se encontró la señal health_changed o el método _on_player_health_changed")
+			push_warning("The player health signal or HUD handler is unavailable")
 
 		if player.has_signal("energy_changed") and hud.has_method("_on_player_energy_changed"):
 			player.energy_changed.connect(hud._on_player_energy_changed)
@@ -19,4 +18,4 @@ func _ready() -> void:
 		hud._on_player_health_changed(player.current_health, player.max_health)
 		hud._on_player_energy_changed(player.current_energy, player.max_energy)
 	else:
-		print("ERROR: No se encontró el nodo Player o el nodo HUD en la escena del nivel.")
+		push_warning("The library player or HUD node is unavailable")

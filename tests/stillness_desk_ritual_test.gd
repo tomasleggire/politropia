@@ -14,6 +14,7 @@ const RitualSuite := preload("res://tests/support/ritual_suite.gd")
 const FlowCases := preload("res://tests/support/ritual_flow_cases.gd")
 const FxCases := preload("res://tests/support/ritual_fx_cases.gd")
 const TrailCases := preload("res://tests/support/ritual_trail_cases.gd")
+const DESK_SCENE := "res://scenes/world/stillness_desk.tscn"
 ## Real seconds before a stuck run (an aborted coroutine never resumes) fails.
 const WATCHDOG_SECONDS := 600.0
 
@@ -30,6 +31,8 @@ func run() -> void:
 	await process_frame
 	create_timer(WATCHDOG_SECONDS).timeout.connect(_on_watchdog)
 	_harness = Harness.new(self)
+	_expected_total += 4
+	await _case_desk_scene_is_reusable()
 	var suites: Array[RitualSuite] = [FlowCases.new(_harness), FxCases.new(_harness), TrailCases.new(_harness)]
 	for suite: RitualSuite in suites:
 		await _run_suite(suite)
@@ -43,6 +46,21 @@ func _run_suite(suite: RitualSuite) -> void:
 		var wanted: int = expected[case_name]
 		_expected_total += wanted
 		await _run_case(suite, case_name, wanted)
+
+
+func _case_desk_scene_is_reusable() -> void:
+	var packed := load(DESK_SCENE) as PackedScene
+	var desk := packed.instantiate()
+	desk.set("checkpoint_id", &"standalone_validation")
+	root.add_child(desk)
+	await process_frame
+	_harness.check(desk.is_in_group(&"interactable"), "a standalone desk registers as interactable")
+	_harness.check(desk.get_node_or_null("InteractionArea") != null and desk.get_node_or_null("SpawnAnchor") != null, "the desk scene contains its interaction and spawn anchors")
+	var background := desk.get_node_or_null("Visuals/Background") as CanvasItem
+	_harness.check(background != null and background.is_visible_in_tree(), "the desk scene loads its altar visuals")
+	_harness.check(desk.get("checkpoint_id") == &"standalone_validation", "a teammate can configure a unique checkpoint id")
+	desk.queue_free()
+	await process_frame
 
 
 func _run_case(suite: RitualSuite, case_name: String, wanted: int) -> void:

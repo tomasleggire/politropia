@@ -7,9 +7,18 @@
 [ext_resource type="Script" uid="uid://dy77m7qh61ceh" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
 [ext_resource type="Script" uid="uid://cvytubfx262a6" path="res://scripts/camera/camara_jugador.gd" id="7_0owmy"]
 [ext_resource type="Script" uid="uid://crlgiaggiu2j3" path="res://scripts/player/player_slash_vfx.gd" id="7_slash_vfx"]
+[ext_resource type="Shader" path="res://shaders/luz_rim_light.gdshader" id="8_rim"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_rim"]
+shader = ExtResource("8_rim")
+shader_parameter/enabled = true
+shader_parameter/rim_color = Color(0.4, 0.46, 0.58, 1)
+shader_parameter/width = 5.0
+shader_parameter/light_direction = Vector2(-0.5, -1)
+shader_parameter/strength = 0.45
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
-size = Vector2(38, 58)
+size = Vector2(29, 46)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_attack"]
 size = Vector2(10, 10)
@@ -20,32 +29,28 @@ safe_margin = 0.1
 script = ExtResource("1_player")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=343911153]
-position = Vector2(0, -29)
+position = Vector2(0, -23)
 shape = SubResource("RectangleShape2D_body")
 
 [node name="WallCheckHead" type="RayCast2D" parent="." unique_id=770997688]
-position = Vector2(0, -50)
-target_position = Vector2(20, 0)
+position = Vector2(0, -41)
+target_position = Vector2(16.5, 0)
 
 [node name="WallCheckChest" type="RayCast2D" parent="." unique_id=923204467]
-position = Vector2(0, -29)
-target_position = Vector2(20, 0)
+position = Vector2(0, -24)
+target_position = Vector2(16.5, 0)
 
 [node name="WallCheckFeet" type="RayCast2D" parent="." unique_id=1066087207]
-position = Vector2(0, -8)
-target_position = Vector2(20, 0)
-
-[node name="LedgeCheckAbove" type="RayCast2D" parent="." unique_id=304667157]
-position = Vector2(0, -60)
-target_position = Vector2(20, 0)
+position = Vector2(0, -7)
+target_position = Vector2(16.5, 0)
 
 [node name="HeadroomCheck" type="RayCast2D" parent="." unique_id=340467063]
-position = Vector2(0, -29)
-target_position = Vector2(0, -29)
+position = Vector2(0, -23)
+target_position = Vector2(0, -23)
 
 [node name="AttackHitbox" type="Area2D" parent="." unique_id=1578403106]
 collision_layer = 4
-collision_mask = 24
+collision_mask = 8
 script = ExtResource("6_hitbox")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="AttackHitbox" unique_id=1680862468]
@@ -53,8 +58,9 @@ shape = SubResource("RectangleShape2D_attack")
 disabled = true
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1844979423]
+material = SubResource("ShaderMaterial_rim")
 texture_filter = 4
-scale = Vector2(0.175, 0.175)
+scale = Vector2(0.1448, 0.1448)
 
 [node name="SlashVfx" type="Node2D" parent="." unique_id=883827761]
 z_index = 1

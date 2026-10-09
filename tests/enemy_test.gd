@@ -385,12 +385,13 @@ func case_player_recoil_on_hit() -> void:
 	await _build_rig()
 	await _spawn_walker()
 	_player.global_position = Vector2.ZERO
+	var walker_x := _walker.global_position.x
 	_player.request_attack(0)
-	await _secs(0.3)
+	await _secs(0.4)
 	check(_walker.get_health() == 1, "the slash landed")
-	check(_player.global_position.x < -4.0, "Luz is pushed away from the target (x %.1f)" % _player.global_position.x)
-	check(_player.global_position.x > -30.0, "only slightly (x %.1f)" % _player.global_position.x)
-	check(_player._state != Player.State.HURT, "the recoil is not a hurt state")
+	check(absf(_player.global_position.x) < 1.0, "Luz is not pushed back by a landed slash (x %.1f)" % _player.global_position.x)
+	check(absf(_walker.global_position.x - walker_x) < 1.0, "and the target is not knocked back (dx %.1f)" % (_walker.global_position.x - walker_x))
+	check(_player._state != Player.State.HURT, "the landed slash is not a hurt state")
 
 
 func case_no_recoil_without_a_hit() -> void:
@@ -404,12 +405,12 @@ func case_recoil_keeps_the_air_jump() -> void:
 	await _build_rig()
 	_player.can_double_jump = true
 	await _spawn_walker(&"w1", Vector2(60.0, 0.0))
-	_player.global_position = Vector2(0.0, -30.0)
+	_player.global_position = Vector2(0.0, -14.0)
 	_player.velocity = Vector2.ZERO
 	_player.request_attack(0)
 	await _secs(0.3)
 	check(_walker.get_health() == 1, "the air slash landed")
-	check(_player._air_jumps_left == _player.air_jumps, "the recoil leaves her air jump alone")
+	check(_player._air_jumps_left == _player.air_jumps, "a landed air slash leaves her air jump alone")
 
 
 func case_time_scale_untouched() -> void:
