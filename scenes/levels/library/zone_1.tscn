@@ -2,6 +2,7 @@
 
 [ext_resource type="Texture2D" uid="uid://3u8ygwfxl5vr" path="res://assets/art/library/Backgrounds/background1.png" id="1_i878q"]
 [ext_resource type="Texture2D" uid="uid://b43xtbmb01bux" path="res://assets/art/library/Floor/floors_library.png" id="3_248ka"]
+[ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="6_20pvq"]
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro.tscn" id="6_ts0jf"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="10_0j26h"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_6keu4"]
@@ -14082,6 +14083,9 @@ texture = ExtResource("10_0j26h")
 [sub_resource type="TileSet" id="TileSet_4nc6c"]
 sources/0 = SubResource("TileSetAtlasSource_211o3")
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wakga"]
+size = Vector2(1981.0215, 744)
+
 [node name="LibraryZone1" type="Node2D" unique_id=424136144]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
@@ -14135,7 +14139,7 @@ position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("19_6keu4")]
-position = Vector2(82, 693)
+position = Vector2(1415, 303)
 
 [node name="Enemies" type="Node2D" parent="." unique_id=923529168]
 
@@ -14157,3 +14161,14 @@ modulate = Color(0.07058824, 0.07058824, 0.07058824, 1)
 position = Vector2(42, 107)
 scale = Vector2(1.0685376, 1.0685376)
 tile_set = SubResource("TileSet_4nc6c")
+
+[node name="Area2D" type="Area2D" parent="." unique_id=930278579]
+rotation = -5.7870864e-05
+script = ExtResource("6_20pvq")
+limite_izquierdo = 5
+limite_derecho = 1970
+limite_inferior = 740
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1915471348]
+position = Vector2(994.48926, 371)
+shape = SubResource("RectangleShape2D_wakga")

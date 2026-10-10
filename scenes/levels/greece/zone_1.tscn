@@ -21,6 +21,7 @@
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="17_sbxl0"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="19_a34q0"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/shadow_owl.tscn" id="21_i8mgn"]
+[ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="22_5v0w6"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("2_gkjph")
@@ -15082,6 +15083,9 @@ texture = ExtResource("17_sbxl0")
 [sub_resource type="TileSet" id="TileSet_4nc6c"]
 sources/0 = SubResource("TileSetAtlasSource_211o3")
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wakga"]
+size = Vector2(2019, 1053)
+
 [node name="LevelGreece" type="Node2D" unique_id=424136144]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
@@ -15143,7 +15147,7 @@ position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("2_player")]
-position = Vector2(239, 396)
+position = Vector2(408, 351)
 
 [node name="Enemies" type="Node2D" parent="." unique_id=1451389218]
 
@@ -15173,6 +15177,19 @@ flip_h = true
 
 [node name="ShadowOwl" parent="." unique_id=947189450 instance=ExtResource("21_i8mgn")]
 position = Vector2(773, 328)
+max_fall_speed = 1400.0
 
 [node name="ShadowOwl2" parent="." unique_id=1038230610 instance=ExtResource("21_i8mgn")]
 position = Vector2(1470, 379)
+max_fall_speed = 1400.0
+
+[node name="Area2D" type="Area2D" parent="." unique_id=620321832]
+script = ExtResource("22_5v0w6")
+limite_izquierdo = 100
+limite_superior = -360
+limite_derecho = 2173
+limite_inferior = 690
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=915088873]
+position = Vector2(1162.5, 167.5)
+shape = SubResource("RectangleShape2D_wakga")
