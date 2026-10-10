@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://b43xtbmb01bux" path="res://assets/art/library/Floor/floors_library.png" id="3_aihyc"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="4_cxp8p"]
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_2.tscn" id="6_cxp8p"]
+[ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="7_cxp8p"]
 
 [sub_resource type="TileSet" id="TileSet_r6boj"]
 
@@ -14083,6 +14084,9 @@ texture = ExtResource("2_63xwj")
 [sub_resource type="TileSet" id="TileSet_4nc6c"]
 sources/0 = SubResource("TileSetAtlasSource_211o3")
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wakga"]
+size = Vector2(1926, 792)
+
 [node name="LibraryZone2" type="Node2D" unique_id=424136144]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
@@ -14159,3 +14163,14 @@ tile_set = SubResource("TileSet_4nc6c")
 
 [node name="FragmentoLibro" parent="." unique_id=672183376 instance=ExtResource("6_cxp8p")]
 position = Vector2(123, 631)
+
+[node name="Area2D" type="Area2D" parent="." unique_id=91601913]
+script = ExtResource("7_cxp8p")
+limite_izquierdo = 10
+limite_superior = 10
+limite_derecho = 1930
+limite_inferior = 780
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=2065692465]
+position = Vector2(963, 394)
+shape = SubResource("RectangleShape2D_wakga")

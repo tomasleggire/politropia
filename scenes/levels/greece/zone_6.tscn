@@ -15,6 +15,7 @@
 [ext_resource type="Texture2D" uid="uid://bos4jg5e0jdeu" path="res://assets/art/greece/Floor/floating_platforms_tileset.png" id="17_o3nxc"]
 [ext_resource type="Texture2D" uid="uid://cl66oh1yhyabw" path="res://assets/art/greece/Balconies/Balcony-01.png" id="18_pbyqt"]
 [ext_resource type="Texture2D" uid="uid://cpa6p5q4xmqud" path="res://assets/art/greece/Columns/Column-1.png" id="19_47cbv"]
+[ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="20_2nr8u"]
 [ext_resource type="Texture2D" uid="uid://b5dtp4mw8wlgs" path="res://assets/art/greece/Columns/Column-2.png" id="20_xhm28"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="21_foasc"]
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_1a6ik"]
@@ -15080,6 +15081,9 @@ texture = ExtResource("14_rvr3m")
 [sub_resource type="TileSet" id="TileSet_4nc6c"]
 sources/0 = SubResource("TileSetAtlasSource_211o3")
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_8w0r3"]
+size = Vector2(2405, 881)
+
 [node name="LevelGreece" type="Node2D" unique_id=424136144]
 position = Vector2(11, -36)
 
@@ -15152,3 +15156,14 @@ modulate = Color(0.07058824, 0.07058824, 0.07058824, 1)
 position = Vector2(42, 107)
 scale = Vector2(1.0685376, 1.0685376)
 tile_set = SubResource("TileSet_4nc6c")
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1479418738]
+position = Vector2(5, 33)
+script = ExtResource("20_2nr8u")
+limite_izquierdo = 5
+limite_derecho = 2410
+limite_inferior = 880
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=514890472]
+position = Vector2(1192.5, 475.5)
+shape = SubResource("RectangleShape2D_8w0r3")
