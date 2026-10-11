@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="4_a30ts"]
 [ext_resource type="TileSet" uid="uid://dul1ibpu3lwwe" path="res://tilesets/platforms_library.tres" id="5_sc1ob"]
 [ext_resource type="TileSet" uid="uid://bt608aiku7igc" path="res://tilesets/spikes_library.tres" id="6_7sxv7"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="8_cne4m"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="8_ctd55"]
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro.tscn" id="8_vrfrn"]
 
@@ -14227,7 +14228,7 @@ texture = ExtResource("4_a30ts")
 [sub_resource type="TileSet" id="TileSet_4nc6c"]
 sources/0 = SubResource("TileSetAtlasSource_211o3")
 
-[node name="LibraryZone1" type="Node2D" unique_id=424136144]
+[node name="LibraryZone3" type="Node2D" unique_id=424136144]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(2, 683)
@@ -14287,6 +14288,12 @@ tile_set = SubResource("TileSet_7wplu")
 
 [node name="Player" parent="." unique_id=1611018514 instance=ExtResource("8_ctd55")]
 position = Vector2(623, 1404)
+
+[node name="BookFlyer" parent="." unique_id=898895438 instance=ExtResource("8_cne4m")]
+position = Vector2(165, 916)
+
+[node name="BookFlyer2" parent="." unique_id=135052472 instance=ExtResource("8_cne4m")]
+position = Vector2(910, 255)
 
 [node name="FragmentoLibro" parent="." unique_id=1398381815 instance=ExtResource("8_vrfrn")]
 position = Vector2(103, 942)

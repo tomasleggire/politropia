@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://do3nvcri0dkii"
-path="res://.godot/imported/shadow_owl_atlas.png-9fec0060c80f6fcf7d60ff3dd1a1428c.ctex"
+path="res://.godot/imported/shadow_owl_atlas.png-d3ef54528c747ed0a842ebde63cf34bb.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/library/enemies/shadow_owl_atlas.png"
-dest_files=["res://.godot/imported/shadow_owl_atlas.png-9fec0060c80f6fcf7d60ff3dd1a1428c.ctex"]
+source_file="res://assets/art/library/Enemies/shadow_owl_atlas.png"
+dest_files=["res://.godot/imported/shadow_owl_atlas.png-d3ef54528c747ed0a842ebde63cf34bb.ctex"]
 
 [params]
 

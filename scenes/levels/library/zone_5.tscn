@@ -14235,6 +14235,7 @@ position = Vector2(2, 683)
 [node name="Background" type="TileMapLayer" parent="TilemapLayers" unique_id=449267912]
 
 [node name="Background5" type="Sprite2D" parent="TilemapLayers/Background" unique_id=1170453154]
+modulate = Color(0.8992584, 0.8992584, 0.8992584, 1)
 position = Vector2(993, -282)
 texture = ExtResource("1_6tcvq")
 
