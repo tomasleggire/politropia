@@ -11,6 +11,7 @@ extends SceneTree
 
 const Harness := preload("res://tests/support/ritual_harness.gd")
 const RitualSuite := preload("res://tests/support/ritual_suite.gd")
+const ArtemisCases := preload("res://tests/artemis_boss_test.gd")
 const FlowCases := preload("res://tests/support/ritual_flow_cases.gd")
 const FxCases := preload("res://tests/support/ritual_fx_cases.gd")
 const TrailCases := preload("res://tests/support/ritual_trail_cases.gd")
@@ -33,7 +34,7 @@ func run() -> void:
 	_harness = Harness.new(self)
 	_expected_total += 4
 	await _case_desk_scene_is_reusable()
-	var suites: Array[RitualSuite] = [FlowCases.new(_harness), FxCases.new(_harness), TrailCases.new(_harness)]
+	var suites: Array[RitualSuite] = [ArtemisCases.new(_harness), FlowCases.new(_harness), FxCases.new(_harness), TrailCases.new(_harness)]
 	for suite: RitualSuite in suites:
 		await _run_suite(suite)
 	_harness.cps.clear()

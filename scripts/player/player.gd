@@ -1869,6 +1869,16 @@ func take_hazard_damage(amount: int, source_position: Vector2) -> bool:
 	return _apply_damage(amount, source_position, true)
 
 
+## True while any attack is still in its startup, before a hitbox is active.
+## Bosses read it to react to a slash that is about to come.
+func is_attack_starting() -> bool:
+	var attacking := (
+		_state == State.ATTACK or _state == State.AIR_ATTACK
+		or _state == State.UP_ATTACK or _state == State.CROUCH_ATTACK
+	)
+	return attacking and _attack_phase == PHASE_STARTUP
+
+
 ## True during the whole dash (and its grace): non-hazard hits are ignored.
 func is_dash_invulnerable() -> bool:
 	return dash_invulnerable and (_state == State.DASH or _dash_grace_left > 0.0)
