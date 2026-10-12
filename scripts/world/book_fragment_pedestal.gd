@@ -40,6 +40,8 @@ const ORBIT_DURATION := 1.8
 @onready var _completion_pulse: Sprite2D = $CompletionPulse
 
 var _player: Player
+var _level_id := ""
+var _fragment_state: Node
 var _fragments_placed := 0
 var _fragment_nodes: Array[Node2D] = []
 var _reconstruction_started := false
@@ -61,6 +63,10 @@ func _ready() -> void:
 	_joining_sparks.emitting = false
 	_reveal_flash.emitting = false
 	add_to_group(INTERACTABLE_GROUP)
+	_fragment_state = get_node("/root/BookFragmentState")
+	_level_id = _fragment_state.current_level_id()
+	_fragment_state.state_changed.connect(_on_fragment_state_changed)
+	_restore_deposited_fragments()
 	_area.body_entered.connect(_on_body_entered)
 	_area.body_exited.connect(_on_body_exited)
 	_prompt.hide_prompt()
@@ -79,26 +85,56 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Place one fragment per keyboard or touch interaction.
 func request_interact() -> bool:
-	if _reconstruction_started or _fragments_placed >= FRAGMENT_SCENES.size() or not is_instance_valid(_player):
+	if _reconstruction_started or not is_instance_valid(_player):
 		return false
-	var fragment := FRAGMENT_SCENES[_fragments_placed].instantiate() as Node2D
-	fragment.position = _book_marker.position + FRAGMENT_OFFSETS[_fragments_placed]
-	add_child(fragment)
-	_fragment_nodes.append(fragment)
-	_fragments_placed += 1
+	var carried: Array[String] = _fragment_state.get_carried(_level_id)
+	if carried.is_empty():
+		return false
+	var deposited: Array[String] = _fragment_state.deposit_carried(_level_id)
+	for fragment_id in deposited:
+		_add_deposited_fragment(fragment_id)
+	_fragments_placed = _fragment_nodes.size()
 	_prompt.hide_prompt()
 	_play_activation_glow()
 	_update_emanating_light()
 	_update_side_auras()
 	_refresh_prompt()
-	if _fragments_placed == FRAGMENT_SCENES.size():
+	if _fragments_placed == FRAGMENT_SCENES.size() and _fragment_state.try_start_reconstruction(_level_id):
 		call_deferred("reconstruir_libro")
 	return true
 
 
+func _add_deposited_fragment(fragment_id: String) -> void:
+	var index := BookFragmentState.FRAGMENT_IDS.find(fragment_id)
+	if index < 0 or _fragment_nodes.size() >= FRAGMENT_SCENES.size():
+		return
+	var fragment := FRAGMENT_SCENES[index].instantiate() as Node2D
+	fragment.position = _book_marker.position + FRAGMENT_OFFSETS[index]
+	fragment.set_meta("pedestal_display", true)
+	add_child(fragment)
+	_fragment_nodes.append(fragment)
+
+
+func _restore_deposited_fragments() -> void:
+	for fragment_id in _fragment_state.get_deposited(_level_id):
+		_add_deposited_fragment(fragment_id)
+	_fragments_placed = _fragment_nodes.size()
+	if _fragment_state.has_reconstruction_started(_level_id):
+		_reconstruction_started = true
+		_book_reconstructed = true
+		_completed_book.visible = true
+		for fragment in _fragment_nodes:
+			fragment.visible = false
+		return
+	if _fragments_placed > 0:
+		_update_emanating_light()
+		_update_side_auras()
+		_play_activation_glow()
+
+
 ## Run once, after all four fragments have been placed on the lectern.
 func reconstruir_libro() -> void:
-	if _reconstruction_started or _book_reconstructed or _fragments_placed != FRAGMENT_SCENES.size():
+	if _book_reconstructed or _fragments_placed != FRAGMENT_SCENES.size():
 		return
 	_reconstruction_started = true
 	_prompt.hide_prompt()
@@ -294,8 +330,13 @@ func _on_body_exited(body: Node2D) -> void:
 		_refresh_prompt()
 
 
+func _on_fragment_state_changed(changed_level_id: String) -> void:
+	if changed_level_id == _level_id:
+		_refresh_prompt()
+
+
 func _refresh_prompt() -> void:
-	var available := _fragments_placed < FRAGMENT_SCENES.size() and is_instance_valid(_player) and not _reconstruction_started
+	var available: bool = not _fragment_state.get_carried(_level_id).is_empty() and is_instance_valid(_player) and not _reconstruction_started
 	if available and not TouchControls.visible:
 		_prompt.show_prompt()
 	else:

@@ -2076,6 +2076,9 @@ func _begin_death() -> void:
 	_hurt_left = 0.0
 	_set_soul(0)
 	_enter_state(State.DEAD)
+	var fragment_state := get_node_or_null("/root/BookFragmentState")
+	if fragment_state != null:
+		fragment_state.lose_carried(fragment_state.current_level_id())
 	died.emit()
 
 

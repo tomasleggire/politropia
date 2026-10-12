@@ -8,19 +8,35 @@ const GLOW_HIGH_ALPHA := 0.62
 const GLOW_HALF_CYCLE := 1.5
 const PARTICLE_COLORS := [Color("ffe9a6"), Color("ffd070"), Color("fff7df")]
 
+@export_enum("fragmento_1", "fragmento_2", "fragmento_3", "fragmento_4") var fragment_id := "fragmento_1"
+
 var _float_tween: Tween
 var _glow_tween: Tween
 var _particle_timer: Timer
 var _particle_rng := RandomNumberGenerator.new()
+var _level_id := ""
+var _collected := false
+var _home_position := Vector2.ZERO
+var _is_pedestal_display := false
 @onready var _glow: Sprite2D = $Glow
 @onready var _particle_container: Node2D = $Particles
+@onready var _pickup_area: Area2D = $PickupArea
 
 
 func _ready() -> void:
 	_particle_rng.randomize()
+	_home_position = position
+	_is_pedestal_display = bool(get_meta("pedestal_display", false))
+	_pickup_area.body_entered.connect(_on_body_entered)
+	_pickup_area.monitoring = not _is_pedestal_display
+	_pickup_area.monitorable = not _is_pedestal_display
 	_start_float_animation()
 	_start_glow_pulse()
 	_start_particle_loop()
+	if not _is_pedestal_display:
+		var fragment_state := get_node("/root/BookFragmentState")
+		_level_id = fragment_state.current_level_id()
+		fragment_state.register_pickup(_level_id, fragment_id, self)
 
 
 func _start_float_animation() -> void:
@@ -48,6 +64,30 @@ func _start_particle_loop() -> void:
 	_particle_timer.timeout.connect(_emit_magic_particle)
 	add_child(_particle_timer)
 	_schedule_next_particle()
+
+
+func _on_body_entered(body: Node2D) -> void:
+	if _collected or not body is Player:
+		return
+	get_node("/root/BookFragmentState").collect(_level_id, fragment_id, self)
+
+
+func set_collected(collected: bool) -> void:
+	if _collected == collected:
+		return
+	_collected = collected
+	visible = not collected
+	if is_instance_valid(_pickup_area):
+		_pickup_area.monitoring = not collected
+		_pickup_area.monitorable = not collected
+	if collected:
+		stop_idle_motion()
+	elif is_inside_tree():
+		position = _home_position
+		_start_float_animation()
+		_start_glow_pulse()
+		if is_instance_valid(_particle_timer):
+			_schedule_next_particle()
 
 
 func _schedule_next_particle() -> void:

@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://6xu6ikmpoqje" path="res://assets/art/obstacles/thorns.png" id="5_ns67n"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="6_20pvq"]
 [ext_resource type="Texture2D" uid="uid://ddqywkuh8qpr2" path="res://assets/art/obstacles/spikes.png" id="6_n3h83"]
+[ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro.tscn" id="8_vc2ga"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="10_0j26h"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_6keu4"]
 
@@ -14166,3 +14167,6 @@ limite_inferior = 740
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1915471348]
 position = Vector2(970.9766, 400.02905)
 shape = SubResource("RectangleShape2D_wakga")
+
+[node name="FragmentoLibro" parent="." unique_id=693040119 instance=ExtResource("8_vc2ga")]
+position = Vector2(1688, 269)

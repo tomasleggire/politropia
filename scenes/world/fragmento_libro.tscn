@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Texture2D" path="res://assets/world/fragmento_libro.png" id="1_sprite"]
 [ext_resource type="Script" path="res://scripts/world/floating_book_fragment.gd" id="2_script"]
@@ -18,9 +18,13 @@ fill_to = Vector2(1, 0.5)
 [sub_resource type="CanvasItemMaterial" id="GlowAdditive"]
 blend_mode = 1
 
+[sub_resource type="CircleShape2D" id="PickupShape"]
+radius = 30.0
+
 [node name="FragmentoLibro" type="Node2D"]
 z_index = 2
 script = ExtResource("2_script")
+fragment_id = "fragmento_1"
 
 [node name="Glow" type="Sprite2D" parent="."]
 position = Vector2(0, -12.5)
@@ -38,3 +42,11 @@ texture_filter = 1
 texture = ExtResource("1_sprite")
 
 [node name="Particles" type="Node2D" parent="."]
+
+[node name="PickupArea" type="Area2D" parent="."]
+position = Vector2(0, -12.5)
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="PickupArea"]
+shape = SubResource("PickupShape")
