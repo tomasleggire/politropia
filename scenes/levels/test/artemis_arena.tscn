@@ -1,7 +1,8 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/bosses/artemis.tscn" id="2_artemis"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/bosses/boss_arena.tscn" id="3_arena"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_floor"]
 size = Vector2(1000, 64)
@@ -55,6 +56,10 @@ polygon = PackedVector2Array(-16, -300, 16, -300, 16, 300, -16, 300)
 [node name="Player" parent="." instance=ExtResource("1_player")]
 position = Vector2(-300, 0)
 
-[node name="Artemis" parent="." instance=ExtResource("2_artemis")]
+[node name="BossArena" parent="." instance=ExtResource("3_arena")]
+arena_rect = Rect2(-434, -340, 868, 400)
+trigger_rect = Rect2(-200, -200, 400, 200)
+
+[node name="Artemis" parent="BossArena" instance=ExtResource("2_artemis")]
 position = Vector2(300, 0)
 enemy_id = &"arena_artemis"

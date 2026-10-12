@@ -54,6 +54,9 @@ const CHECKS := {
 	"case_phase_two_selection": 2,
 	"case_attack_without_luz": 3,
 	"case_phase_two_reset": 5,
+	"case_plain_hops_never_chain": 4,
+	"case_transition_postponed_by_stagger": 4,
+	"case_transition_postponed_by_vault": 4,
 }
 
 var _rig: Node2D
@@ -1037,4 +1040,69 @@ func case_phase_two_reset() -> void:
 	h.check(running and not _boss.get_stag().is_active(), "a reset also recalls the stag")
 	_hit(15)
 	h.check(_boss.get_state() == ArtemisBoss.State.TRANSITION, "and phase two can start again afterwards")
+	_end_case()
+
+
+# -- Advisories (e) and (f) -------------------------------------------------------------------
+
+## A pending follow-up starts only at the end of the hop that belongs to its own
+## string. A plain backstep or dodge in between must not fire it.
+func case_plain_hops_never_chain() -> void:
+	await _build_rig(Vector2(60.0, 0.0))
+	await _add_boss(Vector2.ZERO, P2_QUIET)
+	_boss._phase = P2
+	_boss._chain_next = ArtemisBoss.Attack.RAIN
+	h.check(_boss._try_backstep(), "the plain backstep starts")
+	await h.secs(0.6)
+	h.check(_boss.get_state() == ArtemisBoss.State.REPOSITION and _boss._chain_next == ArtemisBoss.NO_ATTACK, "its end repositions and drops the stale follow-up")
+	_boss._chain_next = ArtemisBoss.Attack.RAIN
+	h.check(_boss._try_chain_hop(), "the string's own hop starts")
+	await h.secs(0.6)
+	h.check(_boss.get_state() == ArtemisBoss.State.ATTACK and _boss.get_attack() == ArtemisBoss.Attack.RAIN, "its end starts the follow-up at once")
+	_end_case()
+
+
+## Counts how many times the transition beat starts in `seconds` of physics.
+func _transition_starts(seconds: float) -> int:
+	var starts := 0
+	var was := false
+	for i: int in int(seconds / _dt()):
+		await h.tree.physics_frame
+		var now := _boss.get_state() == ArtemisBoss.State.TRANSITION
+		starts += 1 if now and not was else 0
+		was = now
+	return starts
+
+
+func case_transition_postponed_by_stagger() -> void:
+	var tweaks := P2_QUIET.duplicate()
+	tweaks["stagger_hits"] = 6
+	await _build_rig(LUZ_START)
+	await _add_boss(Vector2(300.0, 0.0), tweaks)
+	var phases: Array[int] = []
+	_boss.phase_changed.connect(func(phase: int) -> void: phases.append(phase))
+	_hit(15)
+	h.check(_boss.get_state() == ArtemisBoss.State.STAGGER and phases == [2], "crossing the threshold inside a stagger waits for it (%s)" % [phases])
+	var starts := await _transition_starts(_boss.stagger_time + 0.3)
+	h.check(starts == 1, "the beat then starts exactly once (%d)" % starts)
+	await h.secs(_boss.phase_two_transition_time + 0.2)
+	h.check(_boss.get_state() != ArtemisBoss.State.STAGGER and _boss.get_state() != ArtemisBoss.State.TRANSITION, "the stagger and the beat are both over")
+	starts = await _transition_starts(1.5)
+	h.check(starts == 0 and phases == [2], "and never again")
+	_end_case()
+
+
+func case_transition_postponed_by_vault() -> void:
+	await _vault_rig(340.0)
+	var phases: Array[int] = []
+	_boss.phase_changed.connect(func(phase: int) -> void: phases.append(phase))
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.VAULT, "a hit while cornered starts the vault")
+	_hit(14)
+	h.check(_boss.get_state() == ArtemisBoss.State.VAULT and phases == [2], "crossing the threshold mid-vault waits for it (%s)" % [phases])
+	var starts := await _transition_starts(2.5)
+	h.check(starts == 1, "the beat then starts exactly once after the landing (%d)" % starts)
+	await h.secs(_boss.phase_two_transition_time + 0.2)
+	starts = await _transition_starts(1.5)
+	h.check(starts == 0 and _boss.get_phase() == 2, "and never again")
 	_end_case()

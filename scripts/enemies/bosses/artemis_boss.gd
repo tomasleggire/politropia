@@ -305,6 +305,11 @@ var _vault_dir := 1
 var _vault_vx := 0.0
 var _vault_elapsed := 0.0
 var _crouching := false
+var _hop_chains := false
+var _manual_engage := false
+var _has_arena_limits := false
+var _arena_left := 0.0
+var _arena_right := 0.0
 
 
 func _ready() -> void:
@@ -405,6 +410,28 @@ func is_telegraphing() -> bool:
 
 func get_telegraph() -> BossTelegraph:
 	return _telegraph
+
+
+## An arena feeds her its real left and right wall x, so rain, dive, stag and
+## vault clamp to it instead of probing for walls. Without it she probes.
+func set_arena_limits(left_x: float, right_x: float) -> void:
+	_has_arena_limits = true
+	_arena_left = minf(left_x, right_x)
+	_arena_right = maxf(left_x, right_x)
+
+
+func clear_arena_limits() -> void:
+	_has_arena_limits = false
+
+
+## True: she stays idle until `engage()` (or a hit) and ignores `wake_distance`.
+func set_manual_engage(on: bool) -> void:
+	_manual_engage = on
+
+
+## Idle at full health in phase one: nothing to reset.
+func is_fresh() -> bool:
+	return _state == State.IDLE and _phase == PHASE_ONE and _health == max_health
 
 
 ## Leaves IDLE for the fight without waiting for Luz to come close.
@@ -643,7 +670,7 @@ func _tick_cooldowns(delta: float) -> void:
 
 func _update_idle(delta: float) -> void:
 	velocity.x = 0.0
-	if _luz_distance() > wake_distance:
+	if _manual_engage or _luz_distance() > wake_distance:
 		return
 	_state_left -= delta
 	if _state_left <= 0.0:
@@ -770,7 +797,10 @@ func _try_dodge() -> bool:
 	return true
 
 
-func _start_hop(state: State, dir: int, speed: float, hop: float, time: float) -> void:
+## `chains` marks a hop that belongs to a string: only its end starts the pending
+## follow-up. A plain backstep or dodge never does.
+func _start_hop(state: State, dir: int, speed: float, hop: float, time: float, chains := false) -> void:
+	_hop_chains = chains
 	_move_dir = dir
 	_hop_speed = speed
 	velocity.y = -hop
@@ -782,7 +812,7 @@ func _update_hop(delta: float) -> void:
 	velocity.x = float(_move_dir) * _hop_speed
 	if _state_left <= 0.0 or _wall_touching(_move_dir):
 		velocity.x = 0.0
-		if not _start_chain():
+		if not (_hop_chains and _start_chain()):
 			_begin_reposition()
 
 
@@ -1051,9 +1081,12 @@ func _plan_rain() -> void:
 		_rain_count = 0
 
 
-## Left and right wall x around Luz, found with the wall probe from her column
-## at the boss's floor height; `arena_half_width` when no wall is in reach.
+## Left and right wall x: the arena's limits when it set them, else found around
+## Luz with the wall probe from her column at the boss's floor height
+## (`arena_half_width` when no wall is in reach).
 func _arena_bounds() -> Vector2:
+	if _has_arena_limits:
+		return Vector2(_arena_left, _arena_right)
 	var from := Vector2(_luz_x(), global_position.y + WALL_PROBE_HEIGHT)
 	return Vector2(_wall_x(from, -1), _wall_x(from, 1))
 
@@ -1145,7 +1178,7 @@ func _end_active(attack: Attack) -> void:
 	if not _hop_is_safe(away, dagger_flip_speed * dagger_flip_time):
 		return
 	_backstep_left = backstep_cooldown
-	_start_hop(State.BACKSTEP, away, dagger_flip_speed, dagger_flip_hop, dagger_flip_time)
+	_start_hop(State.BACKSTEP, away, dagger_flip_speed, dagger_flip_hop, dagger_flip_time, true)
 
 
 func _aim_at_luz() -> Vector2:
@@ -1191,7 +1224,7 @@ func _try_chain_hop() -> bool:
 	if not _hop_is_safe(away, backstep_speed * backstep_time):
 		return false
 	_backstep_left = backstep_cooldown
-	_start_hop(State.BACKSTEP, away, backstep_speed, backstep_hop, backstep_time)
+	_start_hop(State.BACKSTEP, away, backstep_speed, backstep_hop, backstep_time, true)
 	return true
 
 

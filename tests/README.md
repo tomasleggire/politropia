@@ -34,7 +34,14 @@ check names.
   aimed shot telegraph and arrow, dash i-frames, backstep, dodge, feint, kiting,
   walls and ledges, stagger, checkpoint reset). Unlike the standalone suites it is
   a ritual-style suite chained into the single runner, ahead of the level cases
-  (the boss targets the first Luz in the tree).
+  (the boss targets the first Luz in the tree). It also covers the phase-two
+  chain and transition advisories (a plain hop never starts a string; a
+  threshold crossed during a stagger or a vault fires the beat exactly once).
+- `boss_arena_test.gd`: the BossArena (trigger, doors, camera lock for a plain
+  Camera2D and a RoomCamera, boss health bar and phase notch, reset when Luz
+  dies with and without the checkpoint contract, defeat, the double jump reward
+  and its options, permanent defeat across desk rests and re-instantiation, and
+  arena limits fed to the boss). Chained right after the Artemis suite.
 - `health_hud_test.gd`: the mask HUD (pips, loss and refill feedback, rebuild,
   safe area, presence in both levels).
 - `support/ritual_harness.gd`: shared state, game-clock waits, event recording.

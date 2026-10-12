@@ -88,7 +88,7 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - Route: delegated (writer trigger: 2+ non-trivial files).
 - [x] **T2 Rest of phase 1:** fan, arrow rain with floor markers and gaps, dagger slash anti-turtle. Weighted, distance-based attack selection with no repeats. Also fix the T1 review advisories (a) and (b). Route: delegated.
 - [x] **T3 Phase 2 + cornered vault:** faster recoveries, chained strings, moon dive, spectral stag, the phase transition beat, and the cornered vault over Luz (user decision 2026-10-12). Also fix advisory (c). Route: delegated.
-- [ ] **T4 BossArena:** trigger, doors, camera lock, boss HP bar and name, reset on Luz death, double jump reward, arena bounds fed to the boss, and permanent defeat. Also fix advisories (e) and (f). Route: delegated.
+- [x] **T4 BossArena:** trigger, doors, camera lock, boss HP bar and name, reset on Luz death, double jump reward, arena bounds fed to the boss, and permanent defeat. Also fix advisories (e) and (f). Route: delegated.
 - [x] **T5 Animation contract:** `docs/bosses/ARTEMIS_ANIMATIONS.md` (clips, frame counts, durations, hit/fire frame events, what each pose must convey) plus the Codex backlog update. Route: inline (one doc).
 - [ ] **T6 Playtest and tuning:** iPhone deploy, user feel review, number pass. Route: inline.
 
@@ -136,6 +136,15 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - The Codex backlog in Engram is updated.
   - Deviation noted: the moon dive is VERTICAL in code (the design said diagonal). The doc follows the code.
 
+- 2026-10-12: T4 done (delegated writer).
+  - New scenes: `BossArena` (@tool debug draw: arena cyan, trigger yellow, doors red), `BossHealthBar` (name, trailing chunk, 50% notch, title card) and the `DoubleJumpReward` pickup.
+  - New `BossProgress` autoload holding the beaten boss ids. A beaten boss leaves `checkpoint_resettable`, so a desk rest or death never revives her.
+  - Camera lock through `RoomCamera.set_room_bounds`, saved and restored.
+  - The arena feeds `set_arena_limits` to the boss.
+  - Advisory (e) fixed with a `chains` flag on `_start_hop`; advisory (f) tests added.
+  - The test arena now uses BossArena.
+  - Results: 34 Artemis cases and 8 BossArena cases, all 0 failed (parent spot check rerun). The only failures are the level_01 ones.
+
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.
 - Should the dodge grant i-frames? Today it is only a hop.
@@ -145,7 +154,9 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
 - Are 18 rain arrows per volley fine on mobile? Check during the T6 playtest.
 - Should the arena bounds come from BossArena in T4 instead of `arena_half_width` probes? Planned: yes.
 - Does the 80 px vault landing distance feel right? Check during the T6 playtest.
+- `BossProgress` lasts one run only. If Luz leaves before taking the reward and the scene reloads, the reward does not reappear. Should the arena respawn the reward when the boss is beaten but the double jump is not yet unlocked? Needs the team's save-system direction.
+- Placing the arena in Greece belongs to the teammates: drop BossArena at the `BossArena` marker and remove the old `DoubleJumpPlaceholder`.
 - Moon dive: keep it vertical (current, the clearest read) or make it diagonal as originally designed? Check during the T6 playtest.
 
 ## Next step
-T4.
+T6.
