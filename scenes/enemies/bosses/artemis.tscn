@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/bosses/artemis_boss.gd" id="1_artemis"]
 [ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="2_contact"]
@@ -6,6 +6,9 @@
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(26, 56)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_dagger"]
+size = Vector2(56, 40)
 
 [node name="Artemis" type="CharacterBody2D"]
 collision_layer = 8
@@ -79,6 +82,22 @@ target_position = Vector2(40, 0)
 collision_mask = 1
 
 [node name="ContactDamage" parent="." instance=ExtResource("2_contact")]
+
+[node name="DaggerHitbox" type="Area2D" parent="."]
+position = Vector2(40, -28)
+collision_layer = 0
+collision_mask = 1
+monitoring = false
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DaggerHitbox"]
+shape = SubResource("RectangleShape2D_dagger")
+
+[node name="Slash" type="Polygon2D" parent="DaggerHitbox"]
+visible = false
+z_index = 2
+color = Color(0.95, 0.25, 0.2, 0.7)
+polygon = PackedVector2Array(-24, -18, 0, -22, 26, -6, 28, 6, 0, 22, -24, 18, -6, 0)
 
 [node name="Telegraph" type="Node2D" parent="."]
 script = ExtResource("3_telegraph")

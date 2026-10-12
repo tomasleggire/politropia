@@ -1,7 +1,8 @@
 extends "res://tests/support/ritual_suite.gd"
-## Artemis boss (T1): scene basics, health and defeat, the phase threshold, the
+## Artemis boss (T1 + T2): scene basics, health and defeat, the phase threshold, the
 ## aimed shot and its arrow, the dash i-frames, backstep, dodge, feint, kiting,
-## walls and ledges, stagger and the checkpoint reset. Each case builds its own
+## walls and ledges, stagger, the checkpoint reset, the fan volley, the arrow
+## rain, the dagger slash and the weighted attack choice. Each case builds its own
 ## floor (top at y=0), Luz and boss, and tweaks exports so only the behaviour
 ## under test can happen. Timings are measured in physics steps.
 ##
@@ -33,6 +34,12 @@ const CHECKS := {
 	"case_kite_and_walls": 3,
 	"case_feint": 4,
 	"case_checkpoint_reset": 6,
+	"case_fan_volley": 7,
+	"case_arrow_rain": 7,
+	"case_dagger_slash": 6,
+	"case_dagger_blocked_by_dash": 2,
+	"case_attack_selection": 6,
+	"case_reset_after_defeat_fade": 2,
 }
 
 var _rig: Node2D
@@ -197,6 +204,7 @@ func case_aimed_shot_telegraph_and_arrow() -> void:
 	h.check(absf(arrow.get_velocity().length() - _boss.arrow_speed) < 1.0, "at the arrow speed (%.0f)" % arrow.get_velocity().length())
 	while _boss.get_attack_phase() != ArtemisBoss.AttackPhase.RECOVER and t < 4.0:
 		await h.tree.physics_frame
+		t += _dt()
 	var recover := 0.0
 	while _boss.get_state() == ArtemisBoss.State.ATTACK and recover < 2.0:
 		await h.tree.physics_frame
@@ -382,4 +390,216 @@ func case_checkpoint_reset() -> void:
 	var visual := _boss.get_node("Visual") as Node2D
 	var revived := not _boss.is_dead() and _boss.visible and _boss.collision_layer == Enemy.ENEMY_LAYER
 	h.check(revived and is_equal_approx(visual.modulate.a, 1.0), "a reset after defeat revives her solid and fully visible")
+	_end_case()
+
+
+func case_reset_after_defeat_fade() -> void:
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), {"stagger_hits": 0, "opening_delay": 0.05})
+	_hit(30)
+	await h.secs(_boss.defeat_time + 0.4)
+	h.cps.reset_resettable_enemies()
+	await h.frames(3)
+	h.check(_boss.is_physics_processing() and _boss.visible, "a reset after the defeat fade switches her processing back on")
+	await h.secs(0.5)
+	h.check(_boss.get_state() != ArtemisBoss.State.IDLE, "and she acts again instead of standing frozen (state %d)" % _boss.get_state())
+	_end_case()
+
+
+# -- Fan volley ------------------------------------------------------------------------
+
+func _muzzle_position() -> Vector2:
+	return (_boss.get_node("Visual/Bow/Muzzle") as Node2D).global_position
+
+
+func case_fan_volley() -> void:
+	await _build_rig(LUZ_START)
+	await _add_boss(Vector2(300.0, 0.0), {"wake_distance": 0.0})
+	_boss.start_attack(ArtemisBoss.Attack.FAN)
+	var t := 0.0
+	var max_lines := 0
+	var glow_seen := false
+	while _boss.is_telegraphing() and t < 2.0:
+		await h.tree.physics_frame
+		t += _dt()
+		max_lines = maxi(max_lines, _boss.get_telegraph().visible_aim_line_count())
+		glow_seen = glow_seen or _boss.get_telegraph().is_glowing()
+	h.check(t >= 0.35 and absf(t - _boss.fan_telegraph_time) < 0.05, "the fan telegraph lasts %.2f s, never under 0.35 (%.2f)" % [_boss.fan_telegraph_time, t])
+	h.check(max_lines == _boss.fan_count and glow_seen, "it shows one aim line per arrow plus a glow (%d lines)" % max_lines)
+	h.check(_boss.get_telegraph().visible_aim_line_count() == 0 and not _boss.get_telegraph().is_glowing(), "and both are gone once she fires")
+	h.check(_boss.active_arrow_count() == _boss.fan_count, "exactly fan_count arrows fly (%d)" % _boss.active_arrow_count())
+	var wanted := (_player.global_position + CENTER - _muzzle_position()).normalized()
+	var angles: Array[float] = []
+	for arrow: EnemyProjectile in _boss.get_active_arrows():
+		angles.append(rad_to_deg(wanted.angle_to(arrow.get_velocity().normalized())))
+	angles.sort()
+	var spread_ok := angles.size() == 3
+	if spread_ok:
+		spread_ok = absf(angles[1] - angles[0] - _boss.fan_spread_degrees) < 1.0 and absf(angles[2] - angles[1] - _boss.fan_spread_degrees) < 1.0
+	h.check(spread_ok, "neighbouring arrows are %.0f degrees apart (%s)" % [_boss.fan_spread_degrees, angles])
+	h.check(angles.size() == 3 and absf(angles[1]) < 1.5, "and the fan is centred on Luz (%.1f degrees off)" % (angles[1] if angles.size() == 3 else 999.0))
+	var recover := 0.0
+	while _boss.get_state() == ArtemisBoss.State.ATTACK and recover < 2.0:
+		await h.tree.physics_frame
+		recover += _dt()
+	h.check(absf(recover - _boss.fan_recover_time - _boss.fan_active_time) < 0.08, "the recovery window lasts %.1f s (%.2f)" % [_boss.fan_recover_time, recover])
+	_end_case()
+
+
+# -- Arrow rain ------------------------------------------------------------------------
+
+const QUIET := {
+	"wake_distance": 0.0, "reposition_min_time": 99.0, "reposition_max_time": 99.0,
+	"kite_speed": 0.0, "backstep_trigger_distance": 0.0, "dodge_chance": 0.0,
+}
+
+
+## Starts a rain with Luz at `luz_x` and returns the zones once its telegraph ends.
+func _rain_telegraph(luz_x: float, stats: Dictionary) -> Array[Rect2]:
+	await _build_rig(Vector2(luz_x, 0.0))
+	await _add_boss(Vector2(300.0, 0.0), QUIET)
+	_boss.start_attack(ArtemisBoss.Attack.RAIN)
+	var t := 0.0
+	var marker_time := 0.0
+	var max_markers := 0
+	while _boss.is_telegraphing() and t < 2.0:
+		await h.tree.physics_frame
+		t += _dt()
+		var shown := 0
+		for i: int in BossTelegraph.MARKER_POOL_SIZE:
+			shown += 1 if _boss.get_telegraph().is_floor_marker_visible(i) else 0
+		max_markers = maxi(max_markers, shown)
+		marker_time += _dt() if shown > 0 else 0.0
+	stats["time"] = t
+	stats["marker_time"] = marker_time
+	stats["markers"] = max_markers
+	return _boss.get_rain_zones()
+
+
+func _gaps_are_open(zones: Array[Rect2]) -> bool:
+	for i: int in range(1, zones.size()):
+		if zones[i].position.x - zones[i - 1].end.x < _boss.rain_gap_width - 0.5:
+			return false
+	return true
+
+
+func case_arrow_rain() -> void:
+	var stats := {}
+	var zones := await _rain_telegraph(0.0, stats)
+	h.check(float(stats["time"]) >= 0.35 and absf(float(stats["time"]) - _boss.rain_telegraph_time) < 0.05, "the rain telegraph lasts %.2f s, never under 0.35 (%.2f)" % [_boss.rain_telegraph_time, stats["time"]])
+	h.check(int(stats["markers"]) == _boss.rain_zone_count and float(stats["marker_time"]) >= 0.35, "a floor marker per zone shows for at least 0.35 s (%d, %.2f s)" % [stats["markers"], stats["marker_time"]])
+	h.check(zones.size() == _boss.rain_zone_count and _gaps_are_open(zones), "the zones leave gaps of at least %.0f px between them" % _boss.rain_gap_width)
+	h.check(_boss.active_arrow_count() == zones.size() * ceili(_boss.rain_zone_width / ArtemisBoss.RAIN_ARROW_STEP), "arrows then fall on every zone (%d)" % _boss.active_arrow_count())
+	var gap_x := (zones[0].end.x + zones[1].position.x) * 0.5
+	_place_luz(Vector2(gap_x, 0.0))
+	await h.secs(1.2)
+	h.check(_player.get_health() == 3, "Luz standing in a gap is not hit (%d)" % _player.get_health())
+	_end_case()
+	zones = await _rain_telegraph(0.0, stats)
+	await h.secs(1.2)
+	h.check(_player.get_health() == 2, "Luz standing in a zone is hit (%d)" % _player.get_health())
+	_end_case()
+	zones = await _rain_telegraph(440.0, stats)
+	var inside := not zones.is_empty()
+	for zone: Rect2 in zones:
+		inside = inside and zone.position.x >= -450.0 and zone.end.x <= 450.0
+	h.check(inside and _gaps_are_open(zones), "against a wall the zones stay inside the arena and keep their gaps (%d zones)" % zones.size())
+	_end_case()
+
+
+# -- Dagger slash ------------------------------------------------------------------------
+
+const DAGGER_TWEAKS := {
+	"opening_delay": 0.05, "backstep_trigger_distance": 0.0, "dodge_chance": 0.0, "feint_chance": 0.0,
+	"reposition_min_time": 0.7, "reposition_max_time": 0.7, "kite_speed": 0.0,
+}
+
+
+func case_dagger_slash() -> void:
+	await _build_rig(Vector2(-55.0, 0.0))
+	await _add_boss(Vector2.ZERO, DAGGER_TWEAKS)
+	var waited := 0.0
+	while _boss.get_state() != ArtemisBoss.State.ATTACK and waited < 3.0:
+		await h.tree.physics_frame
+		waited += _dt()
+	h.check(_boss.get_attack() == ArtemisBoss.Attack.DAGGER and waited > _boss.dagger_trigger_time, "Luz lingering close forces the dagger after %.1f s (%.2f s)" % [_boss.dagger_trigger_time, waited])
+	var t := 0.0
+	var armed_early := false
+	var glow_seen := false
+	while _boss.is_telegraphing() and t < 1.0:
+		await h.tree.physics_frame
+		t += _dt()
+		armed_early = armed_early or (_boss.is_telegraphing() and _boss.is_dagger_active())
+		glow_seen = glow_seen or _boss.get_telegraph().is_glowing()
+	h.check(t >= 0.35 and glow_seen, "the dagger telegraph glows for at least 0.35 s (%.2f)" % t)
+	h.check(not armed_early and _player.get_health() == 3, "the hitbox is off and Luz unhurt while it telegraphs")
+	var armed := false
+	var retreat_seen := false
+	for i: int in int(0.5 / _dt()):
+		await h.tree.physics_frame
+		armed = armed or _boss.is_dagger_active()
+		retreat_seen = retreat_seen or _boss.get_state() == ArtemisBoss.State.BACKSTEP
+	h.check(armed and _player.get_health() == 2, "the armed hitbox hurts Luz (%d)" % _player.get_health())
+	h.check(retreat_seen and not _boss.is_dagger_active(), "she backflips away right after, hitbox off, with no punish window")
+	h.check(_boss.global_position.x > 80.0, "far from Luz (x %.0f)" % _boss.global_position.x)
+	_end_case()
+
+
+func case_dagger_blocked_by_dash() -> void:
+	await _build_rig(Vector2(-55.0, 0.0))
+	await _add_boss(Vector2.ZERO, QUIET)
+	_boss.start_attack(ArtemisBoss.Attack.DAGGER)
+	await h.secs(_boss.dagger_telegraph_time - 0.07)
+	_player.request_dash()
+	var covered := false
+	for i: int in int(0.6 / _dt()):
+		await h.tree.physics_frame
+		if _boss.is_dagger_active() and (_boss.get_node("DaggerHitbox") as Area2D).overlaps_body(_player):
+			covered = covered or _player.is_dash_invulnerable()
+	h.check(covered, "Luz was dashing inside the armed hitbox")
+	h.check(_player.get_health() == 3, "and her dash i-frames made the slash miss (%d)" % _player.get_health())
+	_end_case()
+
+
+# -- Attack selection ----------------------------------------------------------------------
+
+func _draws(luz_x: float, n: int) -> Array[int]:
+	_place_luz(Vector2(luz_x, 0.0))
+	var out: Array[int] = []
+	for i: int in n:
+		out.append(_boss._choose_attack())
+	return out
+
+
+func _never_repeats(draws: Array[int]) -> bool:
+	for i: int in range(1, draws.size()):
+		if draws[i] == draws[i - 1]:
+			return false
+	return true
+
+
+func case_attack_selection() -> void:
+	await _build_rig(Vector2(0.0, 0.0))
+	await _add_boss(Vector2(300.0, 0.0), {"wake_distance": 0.0})
+	var far := _draws(0.0, 120)
+	var mid := _draws(80.0, 120)
+	var near := _draws(200.0, 120)
+	h.check(_never_repeats(far) and _never_repeats(mid) and _never_repeats(near), "she never picks the same attack twice in a row")
+	var far_kinds := {}
+	for a: int in far:
+		far_kinds[a] = true
+	h.check(not far_kinds.has(ArtemisBoss.Attack.DAGGER) and far_kinds.size() == 3, "far away she mixes shot, fan and rain and never the dagger")
+	h.check(not mid.has(ArtemisBoss.Attack.DAGGER), "at mid range there is no dagger either")
+	h.check(near.count(ArtemisBoss.Attack.DAGGER) > near.size() * 0.4 and not near.has(ArtemisBoss.Attack.RAIN), "up close the dagger is preferred and rain is out")
+	var seeded: Array[Array] = []
+	for run: int in 2:
+		_boss.rng.seed = 5
+		_boss._last_attack = ArtemisBoss.NO_ATTACK
+		seeded.append(_draws(0.0, 20))
+	h.check(seeded[0] == seeded[1], "the same seed gives the same choices")
+	_boss._last_attack = ArtemisBoss.NO_ATTACK
+	_boss._luz_close_time = _boss.dagger_trigger_time + 0.1
+	var forced: int = _boss._choose_attack()
+	var again: int = _boss._choose_attack()
+	h.check(forced == ArtemisBoss.Attack.DAGGER and again != ArtemisBoss.Attack.DAGGER, "a lingering Luz forces one dagger, then the usual draw resumes")
 	_end_case()

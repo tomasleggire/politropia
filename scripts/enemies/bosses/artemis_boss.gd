@@ -10,8 +10,9 @@ extends Enemy
 ## State machine: IDLE -> REPOSITION <-> BACKSTEP / DODGE / FEINT / ATTACK, with
 ## STAGGER (interrupts anything) and DEFEATED. An attack runs TELEGRAPH ->
 ## ACTIVE -> RECOVER. To add an attack: extend `Attack`, then give it a case in
-## `_telegraph_time`, `_active_time`, `_recover_time`, `_animate_telegraph`,
-## `_fire_attack` and `_choose_attack`.
+## `_telegraph_time`, `_active_time`, `_recover_time`, `_animate_telegraph` and
+## `_fire_attack`, plus a weight in each `weights_*` array (one entry per
+## `Attack`, in enum order); `_choose_attack` reads them and needs no change.
 ##
 ## She is a normal enemy for the base class (hits, flash, registry, checkpoint
 ## reset) except she is never pushed and leaves no corpse. Placeholder visuals
@@ -22,13 +23,25 @@ signal defeated
 
 enum State { IDLE, REPOSITION, BACKSTEP, DODGE, FEINT, ATTACK, STAGGER, DEFEATED }
 enum AttackPhase { TELEGRAPH, ACTIVE, RECOVER }
-enum Attack { AIMED_SHOT }
+enum Attack { AIMED_SHOT, FAN, RAIN, DAGGER }
+enum Band { FAR, MID, NEAR }
 
 const ARROW_SCENE := preload("res://scenes/enemies/bosses/artemis_arrow.tscn")
-const ARROW_POOL_SIZE := 4
+## Arrows kept ready at start; rain adds what its zones need.
+const ARROW_POOL_SIZE := 8
+const NO_ATTACK := -1
 ## No telegraph is shorter than this: it must be readable on a phone.
 const MIN_TELEGRAPH := 0.35
 const AIM_LINE_LENGTH := 520.0
+const FAN_LINE_LENGTH := 300.0
+const RAIN_LINE_LENGTH := 140.0
+## Rain arrows are packed this far apart across a zone (the arrow is 10 px wide).
+const RAIN_ARROW_STEP := 10.0
+const RAIN_MARKER_HEIGHT := 8.0
+## Floor markers show after this long, so the sky aim reads first.
+const RAIN_MARKER_DELAY := 0.2
+const DAGGER_REACH := 40.0
+const DAGGER_DAMAGE := 1
 const PHASE_ONE := 1
 const PHASE_TWO := 2
 ## Seconds between ledge and wall probes while she walks.
@@ -90,6 +103,51 @@ const NEVER := -1.0e9
 @export var shot_recover_time := 0.5
 @export var arrow_speed := 420.0
 
+@export_group("Fan Volley")
+@export_range(0.35, 2.0) var fan_telegraph_time := 0.45
+@export var fan_aim_lock_time := 0.15
+@export var fan_active_time := 0.1
+@export var fan_recover_time := 0.4
+## Arrows per volley (at most BossTelegraph.LINE_POOL_SIZE).
+@export_range(1, 5) var fan_count := 3
+## Angle between neighbouring arrows, in degrees. The fan is centred on Luz.
+@export var fan_spread_degrees := 15.0
+
+@export_group("Arrow Rain")
+@export_range(0.35, 3.0) var rain_telegraph_time := 0.8
+@export var rain_active_time := 0.1
+## The punish window while she lands.
+@export var rain_recover_time := 0.9
+@export_range(1, 8) var rain_zone_count := 3
+@export var rain_zone_width := 56.0
+## Free floor between zones: wide enough to walk into.
+@export var rain_gap_width := 64.0
+## Arrows start this far above the floor.
+@export var rain_height := 260.0
+@export var rain_arrow_speed := 520.0
+## How far a wall can be; also the reach when no wall is found.
+@export var arena_half_width := 400.0
+
+@export_group("Dagger Slash")
+## Luz this close (in x) for `dagger_trigger_time` forces the next attack.
+@export var dagger_trigger_distance := 70.0
+@export var dagger_trigger_time := 0.6
+@export_range(0.35, 1.0) var dagger_telegraph_time := 0.35
+@export var dagger_active_time := 0.12
+## Only used when a wall or ledge blocks the backflip.
+@export var dagger_recover_time := 0.15
+@export var dagger_flip_speed := 340.0
+@export var dagger_flip_hop := 300.0
+@export var dagger_flip_time := 0.35
+
+@export_group("Attack Weights")
+## One weight per `Attack` (aimed shot, fan, rain, dagger) for Luz farther than
+## `kite_max_distance`, between the kite distances, and closer than
+## `kite_min_distance`. The attack she just used is never drawn again.
+@export var weights_far := PackedFloat32Array([3.0, 3.0, 2.0, 0.0])
+@export var weights_mid := PackedFloat32Array([3.0, 3.0, 2.0, 0.0])
+@export var weights_near := PackedFloat32Array([1.0, 1.0, 0.0, 4.0])
+
 @export_group("Phases")
 ## Phase two starts at this share of her health or below.
 @export_range(0.0, 1.0) var phase_two_threshold := 0.5
@@ -106,6 +164,7 @@ const NEVER := -1.0e9
 
 @onready var _floor_probe: RayCast2D = $FloorProbe
 @onready var _wall_probe: RayCast2D = $WallProbe
+@onready var _dagger: Area2D = $DaggerHitbox
 @onready var _muzzle: Marker2D = $Visual/Bow/Muzzle
 @onready var _telegraph: BossTelegraph = $Telegraph
 
@@ -135,6 +194,12 @@ var _ring_index := 0
 var _defeat_left := 0.0
 var _play_defeat := false
 var _pool: Array[EnemyProjectile] = []
+var _last_attack := NO_ATTACK
+var _luz_close_time := 0.0
+var _dagger_on := false
+var _dagger_hit := false
+var _rain_x := PackedFloat32Array()
+var _rain_count := 0
 
 
 func _ready() -> void:
@@ -149,7 +214,8 @@ func _ready() -> void:
 	else:
 		rng.seed = rng_seed
 	_telegraph.bind_body($Visual/Body as Polygon2D)
-	for i: int in ARROW_POOL_SIZE:
+	_rain_x.resize(BossTelegraph.MARKER_POOL_SIZE)
+	for i: int in maxi(ARROW_POOL_SIZE, mini(rain_zone_count, BossTelegraph.MARKER_POOL_SIZE) * _rain_arrows_per_zone()):
 		_pool.append(_make_arrow())
 	_reset_hit_ring()
 	if not _dead:
@@ -175,6 +241,28 @@ func get_phase() -> int:
 	return _phase
 
 
+func get_attack() -> Attack:
+	return _attack
+
+
+## True while the dagger hitbox is armed (the ACTIVE part of the slash).
+func is_dagger_active() -> bool:
+	return _dagger_on
+
+
+## True once Luz has stayed within `dagger_trigger_distance` long enough.
+func is_dagger_forced() -> bool:
+	return _luz_close_time > dagger_trigger_time
+
+
+## The floor zones of the current rain, as world rectangles (for tests and HUD).
+func get_rain_zones() -> Array[Rect2]:
+	var zones: Array[Rect2] = []
+	for i: int in _rain_count:
+		zones.append(_rain_zone_rect(i))
+	return zones
+
+
 func get_aim_direction() -> Vector2:
 	return _aim_dir
 
@@ -198,6 +286,7 @@ func start_attack(attack: Attack) -> void:
 	if _dead:
 		return
 	_attack = attack
+	_last_attack = attack
 	_enter_state(State.ATTACK)
 	_set_attack_phase(AttackPhase.TELEGRAPH)
 
@@ -249,6 +338,7 @@ func receive_hit(damage: int, source_position: Vector2, attack_name: StringName 
 ## (she was beaten earlier) just stays hidden.
 func make_corpse_at(at: Vector2, facing: int) -> void:
 	clear_arrows()
+	_set_dagger(false)
 	_enter_state(State.DEFEATED)
 	super.make_corpse_at(at, facing)
 	_defeat_left = defeat_time if _play_defeat else 0.0
@@ -266,9 +356,15 @@ func _reset_ai() -> void:
 	_defeat_left = 0.0
 	_play_defeat = false
 	visible = true
+	# A defeat fade switches her AI off for good: a checkpoint must revive it.
+	set_physics_process(true)
 	_visual.position = Vector2.ZERO
 	clear_arrows()
 	_telegraph.clear()
+	_set_dagger(false)
+	_last_attack = NO_ATTACK
+	_luz_close_time = 0.0
+	_rain_count = 0
 	_backstep_left = 0.0
 	_dodge_left = 0.0
 	_feint_left = 0.0
@@ -322,6 +418,7 @@ func _think(delta: float) -> void:
 	if _luz == null or not is_instance_valid(_luz):
 		velocity.x = 0.0
 		return
+	_track_luz_closeness(delta)
 	var luz_started_attack := _poll_luz_attack()
 	if _state != State.STAGGER:
 		_face_luz()
@@ -345,6 +442,7 @@ func _think(delta: float) -> void:
 func _enter_state(state: State, duration := 0.0) -> void:
 	if _state == State.ATTACK and state != State.ATTACK and _telegraph != null:
 		_telegraph.clear()
+		_set_dagger(false)
 	_state = state
 	_state_left = duration
 	_apply_visual()
@@ -394,14 +492,66 @@ func _kite(dist: float) -> void:
 
 
 func _pick_next_action() -> void:
+	if is_dagger_forced() and _last_attack != Attack.DAGGER:
+		start_attack(Attack.DAGGER)
+		return
 	if _try_feint():
 		return
 	start_attack(_choose_attack())
 
 
-## One place to weigh attacks by distance and avoid repeats once there are more.
+## Time Luz spends inside dagger range; leaving it starts the count over.
+func _track_luz_closeness(delta: float) -> void:
+	if _distance_x() < dagger_trigger_distance:
+		_luz_close_time += delta
+	else:
+		_luz_close_time = 0.0
+
+
+## A forced dagger first; otherwise a weighted draw from the table of Luz's
+## distance band that skips the attack she used last.
 func _choose_attack() -> Attack:
+	var choice := _draw_attack(_band_weights(_distance_band()))
+	_last_attack = choice
+	return choice
+
+
+func _distance_band() -> Band:
+	var dist := _distance_x()
+	if dist > kite_max_distance:
+		return Band.FAR
+	return Band.MID if dist >= kite_min_distance else Band.NEAR
+
+
+func _band_weights(band: Band) -> PackedFloat32Array:
+	match band:
+		Band.FAR:
+			return weights_far
+		Band.MID:
+			return weights_mid
+	return weights_near
+
+
+func _draw_attack(weights: PackedFloat32Array) -> Attack:
+	if is_dagger_forced() and _last_attack != Attack.DAGGER:
+		return Attack.DAGGER
+	var total := 0.0
+	for i: int in Attack.size():
+		total += _weight_of(weights, i)
+	if total <= 0.0:
+		return Attack.AIMED_SHOT if _last_attack != Attack.AIMED_SHOT else Attack.FAN
+	var roll := rng.randf() * total
+	for i: int in Attack.size():
+		roll -= _weight_of(weights, i)
+		if roll < 0.0:
+			return i as Attack
 	return Attack.AIMED_SHOT
+
+
+func _weight_of(weights: PackedFloat32Array, index: int) -> float:
+	if index == _last_attack or index >= weights.size():
+		return 0.0
+	return maxf(weights[index], 0.0)
 
 
 ## -- Backstep and dodge ---------------------------------------------------------
@@ -500,6 +650,7 @@ func _update_attack(delta: float) -> void:
 			if _state_left <= 0.0:
 				_set_attack_phase(AttackPhase.ACTIVE)
 		AttackPhase.ACTIVE:
+			_poll_dagger()
 			if _state_left <= 0.0:
 				_set_attack_phase(AttackPhase.RECOVER)
 		AttackPhase.RECOVER:
@@ -509,22 +660,32 @@ func _update_attack(delta: float) -> void:
 
 func _set_attack_phase(attack_phase: AttackPhase) -> void:
 	_attack_phase = attack_phase
+	if attack_phase != AttackPhase.ACTIVE:
+		_set_dagger(false)
 	match attack_phase:
 		AttackPhase.TELEGRAPH:
 			_state_left = _telegraph_time(_attack)
 			velocity.x = 0.0
+			_begin_telegraph(_attack)
 		AttackPhase.ACTIVE:
 			_state_left = _active_time(_attack)
 			_telegraph.clear()
 			_fire_attack(_attack)
 		AttackPhase.RECOVER:
 			_state_left = _recover_time(_attack) * _recover_scale()
+			_end_active(_attack)
 
 
 func _telegraph_time(attack: Attack) -> float:
 	match attack:
 		Attack.AIMED_SHOT:
 			return maxf(shot_telegraph_time, MIN_TELEGRAPH)
+		Attack.FAN:
+			return maxf(fan_telegraph_time, MIN_TELEGRAPH)
+		Attack.RAIN:
+			return maxf(rain_telegraph_time, MIN_TELEGRAPH)
+		Attack.DAGGER:
+			return maxf(dagger_telegraph_time, MIN_TELEGRAPH)
 	return MIN_TELEGRAPH
 
 
@@ -532,6 +693,12 @@ func _active_time(attack: Attack) -> float:
 	match attack:
 		Attack.AIMED_SHOT:
 			return shot_active_time
+		Attack.FAN:
+			return fan_active_time
+		Attack.RAIN:
+			return rain_active_time
+		Attack.DAGGER:
+			return dagger_active_time
 	return 0.0
 
 
@@ -539,6 +706,12 @@ func _recover_time(attack: Attack) -> float:
 	match attack:
 		Attack.AIMED_SHOT:
 			return shot_recover_time
+		Attack.FAN:
+			return fan_recover_time
+		Attack.RAIN:
+			return rain_recover_time
+		Attack.DAGGER:
+			return dagger_recover_time
 	return 0.0
 
 
@@ -550,12 +723,24 @@ func _animate_telegraph() -> void:
 	match _attack:
 		Attack.AIMED_SHOT:
 			_animate_aimed_shot()
+		Attack.FAN:
+			_animate_fan()
+		Attack.RAIN:
+			_animate_rain()
+		Attack.DAGGER:
+			_animate_dagger()
 
 
 func _fire_attack(attack: Attack) -> void:
 	match attack:
 		Attack.AIMED_SHOT:
 			_launch_arrow(_muzzle.global_position, _aim_dir)
+		Attack.FAN:
+			_fire_fan()
+		Attack.RAIN:
+			_fire_rain()
+		Attack.DAGGER:
+			_swing_dagger()
 
 
 ## Follows Luz until the last `shot_aim_lock_time`, then holds the line.
@@ -568,6 +753,153 @@ func _animate_aimed_shot() -> void:
 	_telegraph.set_glow(BossTelegraph.RANGED_COLOR, 1.0 - clampf(_state_left / total, 0.0, 1.0))
 
 
+## -- Fan volley ----------------------------------------------------------------
+
+func _fan_count() -> int:
+	return clampi(fan_count, 1, BossTelegraph.LINE_POOL_SIZE)
+
+
+## Angle of arrow `index` from the aim line; the fan is centred on it.
+func _fan_angle(index: int) -> float:
+	return (float(index) - float(_fan_count() - 1) * 0.5) * deg_to_rad(fan_spread_degrees)
+
+
+## Tracks Luz like the aimed shot, but draws one short line per arrow, so the
+## fan reads as a spread and not as a single shot.
+func _animate_fan() -> void:
+	var total := _telegraph_time(Attack.FAN)
+	var locked := _state_left <= fan_aim_lock_time
+	if not locked:
+		_aim_dir = _aim_at_luz()
+	for i: int in _fan_count():
+		_telegraph.show_aim_line(_muzzle.global_position, _aim_dir.rotated(_fan_angle(i)), FAN_LINE_LENGTH, BossTelegraph.RANGED_COLOR, locked, i)
+	_telegraph.set_glow(BossTelegraph.RANGED_COLOR, 1.0 - clampf(_state_left / total, 0.0, 1.0))
+
+
+func _fire_fan() -> void:
+	for i: int in _fan_count():
+		_launch_arrow(_muzzle.global_position, _aim_dir.rotated(_fan_angle(i)))
+
+
+## -- Arrow rain -----------------------------------------------------------------
+
+func _begin_telegraph(attack: Attack) -> void:
+	if attack == Attack.RAIN:
+		_plan_rain()
+
+
+func _rain_arrows_per_zone() -> int:
+	return maxi(ceili(rain_zone_width / RAIN_ARROW_STEP), 1)
+
+
+func _rain_zone_rect(index: int) -> Rect2:
+	return Rect2(_rain_x[index], global_position.y - RAIN_MARKER_HEIGHT, rain_zone_width, RAIN_MARKER_HEIGHT)
+
+
+## Lays zones around Luz, one gap apart. Zones that would leave the arena are
+## dropped, so what remains always has gaps she can walk into.
+func _plan_rain() -> void:
+	var bounds := _arena_bounds()
+	var count := mini(rain_zone_count, BossTelegraph.MARKER_POOL_SIZE)
+	var pitch := rain_zone_width + rain_gap_width
+	var half := rain_zone_width * 0.5
+	var center := clampf(_luz.global_position.x, bounds.x + half, maxf(bounds.y - half, bounds.x + half))
+	_rain_count = 0
+	for i: int in count:
+		var x0 := center + (float(i) - float(count - 1) * 0.5) * pitch - half
+		if x0 >= bounds.x and x0 + rain_zone_width <= bounds.y:
+			_rain_x[_rain_count] = x0
+			_rain_count += 1
+	# A lone zone in a room too narrow to stand beside it would trap Luz.
+	if _rain_count == 1 and bounds.y - bounds.x < rain_zone_width + rain_gap_width:
+		_rain_count = 0
+
+
+## Left and right wall x around Luz, found with the wall probe from her column
+## at the boss's floor height; `arena_half_width` when no wall is in reach.
+func _arena_bounds() -> Vector2:
+	var from := Vector2(_luz.global_position.x, global_position.y + WALL_PROBE_HEIGHT)
+	return Vector2(_wall_x(from, -1), _wall_x(from, 1))
+
+
+func _wall_x(from: Vector2, dir: int) -> float:
+	_wall_probe.global_position = from
+	_wall_probe.target_position = Vector2(float(dir) * arena_half_width, 0.0)
+	_wall_probe.force_raycast_update()
+	if _wall_probe.is_colliding():
+		return _wall_probe.get_collision_point().x
+	return from.x + float(dir) * arena_half_width
+
+
+## She aims at the sky; the floor markers appear a moment later and pulse
+## faster as the arrows near.
+func _animate_rain() -> void:
+	var total := _telegraph_time(Attack.RAIN)
+	var progress := 1.0 - clampf(_state_left / total, 0.0, 1.0)
+	_telegraph.show_aim_line(_muzzle.global_position, Vector2.UP, RAIN_LINE_LENGTH, BossTelegraph.RANGED_COLOR, true)
+	_telegraph.set_glow(BossTelegraph.RANGED_COLOR, progress)
+	if total * progress < minf(RAIN_MARKER_DELAY, total - MIN_TELEGRAPH):
+		return
+	var pulse := 0.5 + 0.5 * sin(_clock * lerpf(8.0, 24.0, progress))
+	var alpha := lerpf(BossTelegraph.MARKER_ALPHA, 0.7, progress) * (0.75 + 0.25 * pulse)
+	for i: int in _rain_count:
+		_telegraph.show_floor_marker(i, _rain_zone_rect(i), BossTelegraph.RANGED_COLOR, alpha)
+
+
+func _fire_rain() -> void:
+	var per_zone := _rain_arrows_per_zone()
+	var start_y := global_position.y - rain_height
+	for i: int in _rain_count:
+		for k: int in per_zone:
+			var along := 0.5 if per_zone == 1 else float(k) / float(per_zone - 1)
+			var x := _rain_x[i] + RAIN_ARROW_STEP * 0.5 + along * (rain_zone_width - RAIN_ARROW_STEP)
+			_launch_arrow(Vector2(x, start_y), Vector2.DOWN, rain_arrow_speed)
+
+
+## -- Dagger slash -------------------------------------------------------------------
+
+func _animate_dagger() -> void:
+	var total := _telegraph_time(Attack.DAGGER)
+	_telegraph.set_glow(BossTelegraph.MELEE_COLOR, 1.0 - clampf(_state_left / total, 0.0, 1.0))
+
+
+func _swing_dagger() -> void:
+	_dagger_hit = false
+	_dagger.position.x = float(_facing) * DAGGER_REACH
+	_dagger.scale.x = float(_facing)
+	_set_dagger(true)
+	_luz_close_time = 0.0
+
+
+func _set_dagger(on: bool) -> void:
+	_dagger_on = on
+	_dagger.set_deferred(&"monitoring", on)
+	($DaggerHitbox/Slash as Polygon2D).visible = on
+
+
+## Hurts Luz once per slash. Her own damage gate decides about dash i-frames
+## and i-frames after a hit.
+func _poll_dagger() -> void:
+	if _attack != Attack.DAGGER or not _dagger_on or _dagger_hit or not _dagger.monitoring:
+		return
+	for body: Node2D in _dagger.get_overlapping_bodies():
+		var player := body as Player
+		if player != null and player.take_damage(DAGGER_DAMAGE, global_position):
+			_dagger_hit = true
+
+
+## The dagger has no punish window: she backflips away right after the swing.
+## Pinned against a wall or ledge she only gets the short recovery.
+func _end_active(attack: Attack) -> void:
+	if attack != Attack.DAGGER:
+		return
+	var away := -_dir_to_luz()
+	if not _hop_is_safe(away, dagger_flip_speed * dagger_flip_time):
+		return
+	_backstep_left = backstep_cooldown
+	_start_hop(State.BACKSTEP, away, dagger_flip_speed, dagger_flip_hop, dagger_flip_time)
+
+
 func _aim_at_luz() -> Vector2:
 	var to_luz := _luz.global_position + PLAYER_CENTER_OFFSET - _muzzle.global_position
 	if to_luz.length_squared() < 1.0:
@@ -577,10 +909,11 @@ func _aim_at_luz() -> Vector2:
 
 ## -- Arrows ----------------------------------------------------------------------
 
-func _launch_arrow(from: Vector2, direction: Vector2) -> void:
+## `speed` 0 means the aimed-shot `arrow_speed`.
+func _launch_arrow(from: Vector2, direction: Vector2, speed := 0.0) -> void:
 	var arrow := _acquire_arrow()
 	arrow.rotation = direction.angle()
-	arrow.launch(from, direction, arrow_speed)
+	arrow.launch(from, direction, speed if speed > 0.0 else arrow_speed)
 
 
 func _acquire_arrow() -> EnemyProjectile:

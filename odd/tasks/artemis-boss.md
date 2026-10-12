@@ -86,7 +86,7 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - Defeat sequence (no corpse), `defeated` signal and checkpoint reset.
   - Test arena `scenes/test/artemis_arena.tscn` and the `tests/artemis_boss_test.gd` suite wired into the runner.
   - Route: delegated (writer trigger: 2+ non-trivial files).
-- [ ] **T2 Rest of phase 1:** fan, arrow rain with floor markers and gaps, dagger slash anti-turtle. Weighted, distance-based attack selection with no repeats. Route: delegated.
+- [x] **T2 Rest of phase 1:** fan, arrow rain with floor markers and gaps, dagger slash anti-turtle. Weighted, distance-based attack selection with no repeats. Also fix the T1 review advisories (a) and (b). Route: delegated.
 - [ ] **T3 Phase 2:** faster recoveries, chained strings, moon dive, spectral stag, phase transition beat. Route: delegated.
 - [ ] **T4 BossArena:** trigger, doors, camera lock, boss HP bar and name, reset on Luz death, double jump reward. Route: delegated.
 - [ ] **T5 Animation contract:** `docs/bosses/ARTEMIS_ANIMATIONS.md` (clips, frame counts, durations, hit/fire frame events, what each pose must convey) plus the Codex backlog update. Route: inline (one doc).
@@ -102,11 +102,25 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - The dodge is allowed only in REPOSITION and FEINT. The first hit wakes an idle boss (`engage()`).
   - Known environmental failure on base: `scenes/levels/level_01.tscn` was removed in a1da262, so the Stillness Desk ritual cases and the health_hud and camera suites fail to load it. Base runner result: `FAIL incomplete run (13 of 263 checks ran)`. This is not caused by this feature and is left for the team.
 
+- 2026-10-12: T1 native review was granted by the user and APPROVED (lineage review-4ea566f2b0645116, medium risk), then acknowledged. The reviewed boundary is now 2786b40. Two non-blocking advisory findings were carried into T2:
+  - (a) `_reset_ai` does not re-enable physics processing after the defeat fade, so a checkpoint reset after `defeat_time` would revive a frozen boss.
+  - (b) The RECOVER wait loop in `tests/artemis_boss_test.gd:198` never increments `t`.
+
+- 2026-10-12: T2 done (delegated writer).
+  - Fan: 3 arrows; `fan_spread_degrees` 15 is the angle between neighbouring arrows.
+  - Rain: 3 zones of 56 px with 64 px gaps around Luz's x, a 0.8 s telegraph, markers pulsing, 18 pooled arrows.
+  - Dagger: forced after 0.6 s within 70 px, then a backflip.
+  - Weighted band selection (`weights_far`/`mid`/`near`) with no repeats.
+  - Advisories fixed: an explicit physics re-enable in `_reset_ai` plus a regression test, and the bounded wait loop.
+  - 19 Artemis cases, all 0 failed (parent spot check rerun).
+
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.
 - Should the dodge grant i-frames? Today it is only a hop.
 - Cornered escape: when she is pinned in melee she just shoots. Should she hop over Luz instead?
 - Should the BossArena call `engage()`? Planned for T4: yes.
+- Should the rain zones follow Luz (current) or sweep the whole floor?
+- Are 18 rain arrows per volley fine on mobile? Check during the T6 playtest.
 
 ## Next step
-T2.
+T3.
