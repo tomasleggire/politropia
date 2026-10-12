@@ -37,6 +37,9 @@ const CHECKS := {
 	"case_defeat_is_permanent": 10,
 	"case_room_camera_lock": 4,
 	"case_arena_limits_bound_boss": 5,
+	"case_armed_boss_is_untouchable": 3,
+	"case_dead_boss_while_armed_never_locks": 7,
+	"case_rearm_survives_free": 1,
 }
 
 var _rig: Node2D
@@ -162,6 +165,12 @@ func _kill_luz() -> void:
 	_player._apply_damage(99, HIT_FROM, false, true)
 
 
+## Into the trigger and past the intro delay: she is hittable only once engaged.
+func _enter_fight() -> void:
+	await _enter_trigger()
+	await h.secs(0.3)
+
+
 func _doors_blocking() -> bool:
 	var blocking := true
 	for door: StaticBody2D in _arena.get_doors():
@@ -206,7 +215,7 @@ func case_trigger_starts_fight() -> void:
 
 func case_boss_health_bar() -> void:
 	await _build()
-	await _enter_trigger()
+	await _enter_fight()
 	var bar := _arena.get_bar()
 	bar.set_safe_area(VIEWPORT_RECT)
 	_hit(3)
@@ -305,7 +314,7 @@ func case_defeat_opens_arena_and_rewards() -> void:
 
 func case_reward_options() -> void:
 	await _build({"reward_enabled": false})
-	await _enter_trigger()
+	await _enter_fight()
 	_hit(30)
 	await h.secs(_arena.defeat_beat + 0.3)
 	h.check(_arena.get_reward() == null, "reward_enabled off: no pickup appears")
@@ -320,7 +329,7 @@ func case_reward_options() -> void:
 	_arena = _make_arena({"reward_marker": NodePath("../Spot")})
 	_boss = _arena.get_boss() as ArtemisBoss
 	await h.frames(SETTLE_FRAMES)
-	await _enter_trigger()
+	await _enter_fight()
 	_hit(30)
 	await h.secs(_arena.defeat_beat + 0.3)
 	h.check(_arena.get_reward() != null and _arena.get_reward().global_position.is_equal_approx(Vector2(120.0, -40.0)), "reward_marker places the pickup on a marker")
@@ -331,7 +340,7 @@ func case_reward_options() -> void:
 
 func case_defeat_is_permanent() -> void:
 	await _build()
-	await _enter_trigger()
+	await _enter_fight()
 	_hit(30)
 	await h.secs(_arena.defeat_beat + _boss.defeat_time + 0.3)
 	h.check(_boss.is_dead() and not _boss.visible, "the boss is down and gone")
@@ -352,7 +361,7 @@ func case_defeat_is_permanent() -> void:
 	h.check(_arena.get_boss() == null, "a re-instantiated arena finds her already beaten: no boss")
 	h.check(_arena.get_reward() == null and not _arena.are_doors_closed() and _doors_passable(), "no reward and open doors")
 	h.check(not _arena.is_trigger_armed(), "and the trigger is off")
-	await _enter_trigger()
+	await _enter_fight()
 	await h.secs(0.2)
 	h.check(not _arena.are_doors_closed() and not _arena.get_bar().is_bar_shown(), "walking in starts nothing")
 	h.check(_progress().is_defeated(BOSS_ID), "the defeat is still remembered")
@@ -416,3 +425,41 @@ func case_arena_limits_bound_boss() -> void:
 	await h.secs(1.5)
 	h.check(_boss.get_state() == ArtemisBoss.State.IDLE, "with manual engage she waits for engage() even with Luz in range")
 	_end_case()
+
+
+# -- Softlock guards ------------------------------------------------------------------
+
+func case_armed_boss_is_untouchable() -> void:
+	await _build()
+	var soul := _player.get_soul()
+	_hit(5)
+	h.check(_boss.get_health() == _boss.max_health, "a hit on an armed arena boss deals no damage")
+	h.check(not _boss.receive_hit(1, HIT_FROM, &"attack_1") and _boss.get_state() == ArtemisBoss.State.IDLE, "it neither lands nor wakes her")
+	h.check(_player.get_soul() == soul, "and Luz gains no soul")
+	_end_case()
+
+
+func case_dead_boss_while_armed_never_locks() -> void:
+	await _build()
+	_boss.reset_to_spawn()
+	_boss.set_manual_engage(false)
+	_boss.engage()
+	_hit(30)
+	await h.secs(_arena.defeat_beat + 0.3)
+	h.check(_arena.get_state() == BossArena.FightState.DEFEATED, "a boss killed while ARMED leaves the arena defeated")
+	h.check(_progress().is_defeated(BOSS_ID), "the defeat is recorded")
+	h.check(_arena.get_reward() != null, "the reward appears")
+	h.check(not _boss.is_in_group(Enemy.GROUP_RESETTABLE), "and the boss is out of the checkpoint contract")
+	await _enter_trigger()
+	h.check(not _arena.are_doors_closed() and _doors_passable(), "entering the trigger does not close the doors")
+	h.check(_arena.get_state() == BossArena.FightState.DEFEATED, "and no fight starts")
+	h.check(not _arena.is_trigger_armed(), "the trigger is disarmed for good")
+	_end_case()
+
+
+func case_rearm_survives_free() -> void:
+	await _build()
+	_arena._rearm_trigger()
+	_free_rig()
+	await h.frames(5)
+	h.check(true, "freeing the arena during re-arm leaves no dangling await")

@@ -378,11 +378,15 @@ func _on_boss_hit(_amount: int, remaining: int) -> void:
 ## -- Fight ----------------------------------------------------------------------------------
 
 func _on_trigger_body_entered(body: Node2D) -> void:
-	if _state != FightState.ARMED or _boss == null or not body.is_in_group(PLAYER_GROUP):
+	if _state != FightState.ARMED or not _boss_alive() or not body.is_in_group(PLAYER_GROUP):
 		return
 	var player := body as Player
 	if player != null:
 		_start_fight(player)
+
+
+func _boss_alive() -> bool:
+	return is_instance_valid(_boss) and not _boss.is_dead()
 
 
 func _start_fight(player: Player) -> void:
@@ -445,6 +449,8 @@ func _reset_fight() -> void:
 func _rearm_trigger() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
+	if not is_inside_tree():
+		return
 	if _state == FightState.ARMED:
 		_trigger.monitoring = true
 
@@ -461,10 +467,15 @@ func _reset_boss() -> void:
 ## -- Defeat -------------------------------------------------------------------------------------
 
 func _on_boss_died(_enemy: Enemy) -> void:
-	if _state != FightState.ACTIVE:
+	if _state == FightState.DEFEATED:
 		return
+	var was_active := _state == FightState.ACTIVE
 	_state = FightState.DEFEATED
 	_kill(_intro_tween)
+	_trigger.set_deferred(&"monitoring", false)
+	if not was_active:
+		_bar.hide_title()
+		_bar.hide_bar(false)
 	_remember_defeat()
 	# Out of the checkpoint contract: a desk rest or Luz's death must not revive her.
 	_boss.remove_from_group(Enemy.GROUP_RESETTABLE)

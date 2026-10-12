@@ -145,6 +145,16 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - The test arena now uses BossArena.
   - Results: 34 Artemis cases and 8 BossArena cases, all 0 failed (parent spot check rerun). The only failures are the level_01 ones.
 
+- 2026-10-12: T4 native review was granted and APPROVED (lineage review-382a8f661ad26612, base 617ddc6), then acknowledged. The boundary is now 91ec13b. Advisories, fixed now as a follow-up commit:
+  - (g) Softlock: the boss could be killed while the arena was ARMED, and then the doors closed on a dead boss.
+  - (h) `_rearm_trigger` could resume after the arena was freed.
+
+- 2026-10-12: advisories (g) and (h) fixed.
+  - The boss cannot be damaged while she is under manual engage and IDLE.
+  - The arena refuses to start a fight on a dead boss and records a defeat in any state.
+  - The rearm stops if the arena has left the tree.
+  - Three new tests added. Only the level_01 cases fail.
+
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.
 - Should the dodge grant i-frames? Today it is only a hop.

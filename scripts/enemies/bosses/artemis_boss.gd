@@ -429,6 +429,11 @@ func set_manual_engage(on: bool) -> void:
 	_manual_engage = on
 
 
+## Under manual engage she is untouchable until the arena wakes her.
+func _awaiting_arena() -> bool:
+	return _manual_engage and _state == State.IDLE
+
+
 ## Idle at full health in phase one: nothing to reset.
 func is_fresh() -> bool:
 	return _state == State.IDLE and _phase == PHASE_ONE and _health == max_health
@@ -487,7 +492,7 @@ func set_ai_active(active: bool) -> void:
 ## Registers the hit, then checks the phase threshold and the stagger window.
 ## A killing blow plays the defeat beat instead of leaving a corpse.
 func receive_hit(damage: int, source_position: Vector2, attack_name: StringName = &"") -> bool:
-	if not _hittable:
+	if not _hittable or _awaiting_arena():
 		return false
 	_play_defeat = not _dead and damage > 0 and _health - damage <= 0
 	var landed := super.receive_hit(damage, source_position, attack_name)
