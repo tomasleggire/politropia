@@ -155,6 +155,15 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - The rearm stops if the arena has left the tree.
   - Three new tests added. Only the level_01 cases fail.
 
+- 2026-10-12: Playtest 1 on iPhone (5a6b4e1). The user said it "looks fine" and reported three issues, all fixed (delegated writer):
+  - (1) Interruptible telegraphs (user request).
+    - A hit during TELEGRAPH cancels the attack. She flinches 0.25 s, then escapes with a backstep or a vault.
+    - Poise cooldown: 3 s in phase 1, 4 s in phase 2. ACTIVE and RECOVER are never interrupted.
+    - New FLINCH state and `attack_interrupted` signal.
+  - (2) Invisible arrows. Root cause: the arrow polygon was self-overlapping and triangulated to 0 triangles. The `Hair` polygon had the same bug. Both were fixed, and arrows are now reparented beside the boss.
+  - (3) Missing HUD. `health_hud.tscn` was only instanced by the deleted level_01, so it was added to the test arena. The main game levels (Greece, library, garden) lack the HUD too; this is for the team.
+  - Verified with movie-writer frames and the suite (only the level_01 cases fail).
+
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.
 - Should the dodge grant i-frames? Today it is only a hop.

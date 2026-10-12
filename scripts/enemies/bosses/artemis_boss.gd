@@ -30,8 +30,11 @@ extends Enemy
 
 signal phase_changed(phase: int)
 signal defeated
+## A hit cancelled a telegraph. `attack` is the `Attack` that was winding up, or
+## NO_ATTACK (-1) for the cornered vault's crouch. For VFX and animation.
+signal attack_interrupted(attack: int)
 
-enum State { IDLE, REPOSITION, BACKSTEP, DODGE, FEINT, ATTACK, STAGGER, DEFEATED, TRANSITION, VAULT }
+enum State { IDLE, REPOSITION, BACKSTEP, DODGE, FEINT, ATTACK, STAGGER, DEFEATED, TRANSITION, VAULT, FLINCH }
 enum AttackPhase { TELEGRAPH, ACTIVE, RECOVER }
 enum Attack { AIMED_SHOT, FAN, RAIN, DAGGER, MOON_DIVE, STAG }
 enum VaultPhase { CROUCH, AIR, LAND }
@@ -79,6 +82,9 @@ const LEDGE_AHEAD := 8.0
 const WALL_PROBE_HEIGHT := -24.0
 const PLAYER_CENTER_OFFSET := Vector2(0.0, -29.0)
 const STAGGER_TINT := Color(0.72, 0.75, 0.95)
+const FLINCH_TINT := Color(1.0, 0.55, 0.55)
+## Radians per second of the flinch shake.
+const FLINCH_SHAKE_RATE := 90.0
 const NEVER := -1.0e9
 
 @export_group("Movement")
@@ -123,6 +129,18 @@ const NEVER := -1.0e9
 @export var stagger_hits := 6
 @export var stagger_window := 2.5
 @export var stagger_time := 1.5
+
+@export_group("Interrupt")
+## A hit that lands while she winds up an attack (any telegraph, the vault crouch
+## included) cancels it: no arrow, no hitbox. She flinches, then escapes at once.
+@export var interrupt_enabled := true
+@export var interrupt_flinch_time := 0.25
+## After an interrupt her telegraphs hold firm for this long (poise): hits still
+## hurt, they just no longer cancel. Phase two uses its own, longer value.
+@export var interrupt_cooldown := 3.0
+@export var phase_two_interrupt_cooldown := 4.0
+## Sideways shake of the flinch, in pixels.
+@export var interrupt_shake := 3.0
 
 @export_group("Aimed Shot")
 @export_range(0.35, 2.0) var shot_telegraph_time := 0.6
@@ -310,6 +328,7 @@ var _manual_engage := false
 var _has_arena_limits := false
 var _arena_left := 0.0
 var _arena_right := 0.0
+var _interrupt_left := 0.0
 
 
 func _ready() -> void:
@@ -506,6 +525,7 @@ func receive_hit(damage: int, source_position: Vector2, attack_name: StringName 
 	_check_phase_two()
 	_register_stagger_hit()
 	_try_transition()
+	_try_interrupt()
 	_try_vault_on_hit()
 	return true
 
@@ -550,6 +570,7 @@ func _reset_ai() -> void:
 	_chain_next = NO_ATTACK
 	_chain_length = 0
 	_vault_left = 0.0
+	_interrupt_left = 0.0
 	_vault_close_time = 0.0
 	_last_attack = NO_ATTACK
 	_luz_close_time = 0.0
@@ -583,6 +604,8 @@ func _apply_visual() -> void:
 	match _state:
 		State.STAGGER:
 			_visual.modulate = STAGGER_TINT
+		State.FLINCH:
+			_visual.modulate = FLINCH_TINT
 		State.DEFEATED:
 			_visual.modulate = Color(1.0, 1.0, 1.0, _defeat_alpha())
 		_:
@@ -633,6 +656,8 @@ func _think(delta: float) -> void:
 			_update_transition(delta)
 		State.VAULT:
 			_update_vault(delta)
+		State.FLINCH:
+			_update_flinch(delta)
 
 
 func _enter_state(state: State, duration := 0.0) -> void:
@@ -657,6 +682,8 @@ func _leave_state(next: State) -> void:
 			_telegraph.clear()
 			_crouching = false
 			_set_contact(true)
+		State.FLINCH:
+			_visual.position.x = 0.0
 
 
 func _begin_reposition() -> void:
@@ -671,6 +698,7 @@ func _tick_cooldowns(delta: float) -> void:
 	_feint_left = maxf(_feint_left - delta, 0.0)
 	_probe_left -= delta
 	_vault_left = maxf(_vault_left - delta, 0.0)
+	_interrupt_left = maxf(_interrupt_left - delta, 0.0)
 
 
 func _update_idle(delta: float) -> void:
@@ -1394,6 +1422,51 @@ func _summon_stag() -> void:
 	_stag.launch(from, _stag_dir, stag_speed, _stag_far_x, _luz)
 
 
+## -- Interrupt ---------------------------------------------------------------------
+
+## Only the wind-up can be cancelled: once the arrow has left (ACTIVE, RECOVER) a
+## hit is just damage. Stagger and the phase beat win because they change the
+## state before this runs.
+func _is_interruptible() -> bool:
+	if not interrupt_enabled or _interrupt_left > 0.0 or _dead:
+		return false
+	if _state == State.VAULT:
+		return _vault_phase == VaultPhase.CROUCH
+	return is_telegraphing()
+
+
+func _try_interrupt() -> void:
+	if not _is_interruptible():
+		return
+	var interrupted: int = NO_ATTACK if _state == State.VAULT else _attack
+	if _state == State.VAULT:
+		# The vault never happened, so it is still available as the escape.
+		_vault_left = 0.0
+	_interrupt_left = phase_two_interrupt_cooldown if _phase == PHASE_TWO else interrupt_cooldown
+	_chain_next = NO_ATTACK
+	_chain_length = 0
+	_rain_count = 0
+	velocity.x = 0.0
+	_enter_state(State.FLINCH, interrupt_flinch_time)
+	attack_interrupted.emit(interrupted)
+
+
+func _update_flinch(delta: float) -> void:
+	velocity.x = 0.0
+	_state_left -= delta
+	_visual.position.x = sin(_clock * FLINCH_SHAKE_RATE) * interrupt_shake
+	if _state_left <= 0.0:
+		_escape_after_flinch()
+
+
+## Cornered, she vaults over Luz if she can; otherwise she hops back.
+func _escape_after_flinch() -> void:
+	if _vault_left <= 0.0 and _is_cornered():
+		_start_vault()
+	elif not _try_backstep():
+		_begin_reposition()
+
+
 ## -- Cornered vault ---------------------------------------------------------------------
 
 ## Her back is within `vault_wall_distance` of a wall or ledge (on the ground).
@@ -1511,10 +1584,29 @@ func _acquire_arrow() -> EnemyProjectile:
 	return extra
 
 
+## Arrows live beside her, not under her: a child would inherit her modulate and
+## visibility (a flash, a fade, a hidden boss) and vanish with it. They are born
+## under her (the parent may still be busy adding its children) and moved next frame.
 func _make_arrow() -> EnemyProjectile:
 	var arrow := ARROW_SCENE.instantiate() as EnemyProjectile
 	add_child(arrow)
+	_rehome_arrow.call_deferred(arrow)
 	return arrow
+
+
+func _rehome_arrow(arrow: EnemyProjectile) -> void:
+	var home := get_parent()
+	if is_instance_valid(arrow) and home != null and arrow.get_parent() == self:
+		arrow.reparent(home, false)
+
+
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_PREDELETE:
+		return
+	# Untyped: a pooled arrow may already be freed with its new parent.
+	for arrow in _pool:
+		if is_instance_valid(arrow) and arrow.get_parent() != self and not arrow.is_queued_for_deletion():
+			arrow.queue_free()
 
 
 ## -- Stagger and phases ------------------------------------------------------------

@@ -57,6 +57,13 @@ const CHECKS := {
 	"case_plain_hops_never_chain": 4,
 	"case_transition_postponed_by_stagger": 4,
 	"case_transition_postponed_by_vault": 4,
+	"case_interrupt_aimed_shot": 9,
+	"case_interrupt_dagger": 3,
+	"case_interrupt_rain": 3,
+	"case_interrupt_not_after_release": 4,
+	"case_interrupt_vault_crouch": 4,
+	"case_interrupt_phase_two_and_stagger": 4,
+	"case_arrows_live_beside_the_boss": 7,
 }
 
 var _rig: Node2D
@@ -97,6 +104,8 @@ func _add_boss(at: Vector2, tweaks := {}) -> ArtemisBoss:
 	_boss.enemy_id = &"artemis"
 	_boss.position = at
 	_boss.rng_seed = 11
+	# Hits cancel telegraphs by default; the older cases hit her mid-attack on purpose.
+	_boss.interrupt_enabled = false
 	for key: String in tweaks:
 		_boss.set(key, tweaks[key])
 	_rig.add_child(_boss)
@@ -1106,3 +1115,161 @@ func case_transition_postponed_by_vault() -> void:
 	starts = await _transition_starts(1.5)
 	h.check(starts == 0 and _boss.get_phase() == 2, "and never again")
 	_end_case()
+
+
+# -- Interrupt ---------------------------------------------------------------------------------------
+
+const INTERRUPT := {"wake_distance": 0.0, "interrupt_enabled": true, "stagger_hits": 0}
+
+
+func _interrupts() -> Array[int]:
+	var seen: Array[int] = []
+	_boss.attack_interrupted.connect(func(attack: int) -> void: seen.append(attack))
+	return seen
+
+
+func case_interrupt_aimed_shot() -> void:
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), INTERRUPT)
+	var seen := _interrupts()
+	var fresh := (load(BOSS_SCENE) as PackedScene).instantiate() as ArtemisBoss
+	h.check(fresh.interrupt_enabled, "interrupts are on by default")
+	fresh.free()
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	await h.secs(0.2)
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.FLINCH and seen == [ArtemisBoss.Attack.AIMED_SHOT], "a hit during the wind-up cancels it and flinches (%s)" % [seen])
+	h.check(not _boss.get_telegraph().is_aim_line_visible() and not _boss.get_telegraph().is_glowing(), "the aim line and the glow are gone")
+	h.check(_boss.get_health() == 29, "the hit still deals its damage")
+	h.check(await _sees_state(ArtemisBoss.State.BACKSTEP, 0.45), "after the flinch she escapes with a backstep")
+	await h.secs(0.4)
+	h.check(_boss.active_arrow_count() == 0, "and no arrow was ever fired")
+	_boss.clear_arrows()
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	await h.secs(0.2)
+	_hit(1)
+	h.check(_boss.is_telegraphing() and seen.size() == 1, "inside the poise window a hit does not interrupt the next wind-up")
+	await h.secs(0.5)
+	h.check(_boss.active_arrow_count() == 1, "and the arrow is fired")
+	await h.secs(_boss.interrupt_cooldown)
+	_boss.clear_arrows()
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	await h.secs(0.2)
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.FLINCH and seen.size() == 2, "once the cooldown is over a hit interrupts again")
+	_end_case()
+
+
+func case_interrupt_dagger() -> void:
+	await _build_rig(Vector2(-55.0, 0.0))
+	await _add_boss(Vector2.ZERO, INTERRUPT)
+	var seen := _interrupts()
+	_boss.start_attack(ArtemisBoss.Attack.DAGGER)
+	await h.secs(0.15)
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.FLINCH and seen == [ArtemisBoss.Attack.DAGGER], "a hit cancels the dagger wind-up (%s)" % [seen])
+	h.check(not _boss.is_dagger_active() and not _boss.get_telegraph().is_glowing(), "no hitbox and no glow")
+	await h.secs(0.8)
+	h.check(_player.get_health() == 3, "Luz is never slashed (%d)" % _player.get_health())
+	_end_case()
+
+
+func case_interrupt_rain() -> void:
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), INTERRUPT)
+	var seen := _interrupts()
+	_boss.start_attack(ArtemisBoss.Attack.RAIN)
+	await h.secs(0.5)
+	h.check(_boss.get_telegraph().is_floor_marker_visible(0), "the rain markers show first")
+	_hit(1)
+	h.check(seen == [ArtemisBoss.Attack.RAIN] and not _boss.get_telegraph().is_floor_marker_visible(0) and _boss.get_rain_zones().is_empty(), "a hit clears the markers and the zones")
+	await h.secs(0.9)
+	h.check(_boss.active_arrow_count() == 0, "no arrow falls")
+	_end_case()
+
+
+func case_interrupt_not_after_release() -> void:
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), INTERRUPT)
+	var seen := _interrupts()
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	_boss._set_attack_phase(ArtemisBoss.AttackPhase.ACTIVE)
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.ATTACK and _boss.active_arrow_count() == 1, "a hit while the arrow leaves does not cancel it")
+	_boss._set_attack_phase(ArtemisBoss.AttackPhase.RECOVER)
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.ATTACK and _boss.get_attack_phase() == ArtemisBoss.AttackPhase.RECOVER, "nor does a hit during the recovery")
+	h.check(seen.is_empty() and _boss.get_health() == 28, "no interrupt, both hits deal damage")
+	_boss._set_attack_phase(ArtemisBoss.AttackPhase.TELEGRAPH)
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.FLINCH, "the poise was never spent: the next wind-up is interruptible")
+	_end_case()
+
+
+func case_interrupt_vault_crouch() -> void:
+	await _vault_rig(340.0, {"interrupt_enabled": true})
+	var seen := _interrupts()
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.VAULT and seen.is_empty(), "the hit that starts the vault does not interrupt anything")
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.FLINCH and seen == [-1], "a hit during the crouch cancels the vault (%s)" % [seen])
+	await h.secs(_boss.interrupt_flinch_time + 0.1)
+	h.check(_boss.get_state() == ArtemisBoss.State.VAULT, "cornered, she escapes by vaulting once the flinch ends")
+	var t := 0.0
+	while _boss.get_state() == ArtemisBoss.State.VAULT and t < 3.0:
+		await h.tree.physics_frame
+		t += _dt()
+	h.check(_boss.global_position.x < _player.global_position.x, "and lands on the other side of Luz (x %.0f)" % _boss.global_position.x)
+	_end_case()
+
+
+func case_interrupt_phase_two_and_stagger() -> void:
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), {"wake_distance": 0.0, "interrupt_enabled": true})
+	_boss._phase = ArtemisBoss.PHASE_TWO
+	_boss.start_attack(ArtemisBoss.Attack.FAN)
+	await h.secs(0.1)
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.FLINCH and absf(_boss._interrupt_left - _boss.phase_two_interrupt_cooldown) < 0.05, "phase two interrupts with its own cooldown (%.2f)" % _boss._interrupt_left)
+	h.check(_boss.phase_two_interrupt_cooldown > _boss.interrupt_cooldown, "which is longer than phase one's")
+	_end_case()
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), {"wake_distance": 0.0, "interrupt_enabled": true})
+	var seen := _interrupts()
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	await h.secs(0.2)
+	_hit(6)
+	h.check(_boss.get_state() == ArtemisBoss.State.STAGGER, "the sixth hit staggers her: stagger still wins")
+	h.check(seen.size() == 1 and _boss.active_arrow_count() == 0, "and no arrow is fired")
+	_end_case()
+
+
+# -- Arrows --------------------------------------------------------------------------------------------------
+
+func case_arrows_live_beside_the_boss() -> void:
+	await _build_rig(Vector2.ZERO)
+	await _add_boss(Vector2(300.0, 0.0), {"wake_distance": 0.0})
+	var beside := true
+	for arrow: EnemyProjectile in _boss._pool:
+		beside = beside and arrow.get_parent() == _rig and not _boss.is_ancestor_of(arrow)
+	h.check(beside and _boss._pool.size() >= ArtemisBoss.ARROW_POOL_SIZE, "the pooled arrows are siblings of the boss (%d)" % _boss._pool.size())
+	var extra := _boss._make_arrow()
+	await h.frames(2)
+	h.check(extra.get_parent() == _rig, "an arrow grown beyond the pool is moved beside her too")
+	_boss.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_boss._launch_arrow(Vector2(200.0, -100.0), Vector2.LEFT, 10.0)
+	var arrow := _boss.get_active_arrows()[0]
+	h.check(arrow.is_visible_in_tree() and arrow.get_parent() == _rig, "an arrow stays visible whatever her modulate")
+	_boss.visible = false
+	h.check(arrow.is_visible_in_tree(), "and when she is hidden")
+	_boss.visible = true
+	_boss.clear_arrows()
+	h.check(_boss.active_arrow_count() == 0, "clear_arrows still empties the pool")
+	_boss._launch_arrow(Vector2(200.0, -100.0), Vector2.LEFT, 10.0)
+	_boss.make_corpse_at(_boss.global_position, 1)
+	h.check(_boss.active_arrow_count() == 0, "and so does her defeat")
+	_end_case()
+	var points := (load("res://scenes/enemies/bosses/artemis_arrow.tscn") as PackedScene).instantiate()
+	var shape := (points.get_node("Visual") as Polygon2D).polygon
+	points.free()
+	h.check(not Geometry2D.triangulate_polygon(shape).is_empty(), "the arrow outline triangulates: a polygon that does not is drawn as nothing")

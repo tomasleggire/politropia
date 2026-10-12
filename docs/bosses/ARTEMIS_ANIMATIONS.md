@@ -103,9 +103,12 @@ Hook points (each is one added line; no behaviour change):
 | `_animate_aimed_shot`, `_animate_fan` when `locked` first becomes true | `shot_hold` / `fan_hold` |
 | `_animate_moon_dive`, `_begin_dive_fall`, `_end_dive` | `dive_leap`, (hidden), `dive_fall`, `dive_stuck` |
 | `_start_vault`, `_launch_vault`, `_land_vault` | `vault_crouch`, `vault_air`, `vault_land` |
+| `_try_interrupt` / `attack_interrupted` signal | `interrupt_flinch` (cuts the running telegraph clip) |
 | `_try_transition` / phase change at the TRANSITION midpoint | `_set_skin(PHASE_TWO)` |
 | `_reset_ai` | `idle`, skin back to phase one |
 | `SpectralStag.launch` / `deactivate` | `stag_appear` then `stag_run`; hidden on deactivate |
+
+Signal `attack_interrupted(attack: int)`: emitted when a hit cancels a telegraph (`Attack` value, or -1 for the vault crouch). Hook VFX and the `interrupt_flinch` clip here. After an interrupt her telegraphs cannot be interrupted for `interrupt_cooldown` 3.0 s (`phase_two_interrupt_cooldown` 4.0 s in phase 2): a poise window an optional cue may show. ACTIVE and RECOVER are never interrupted.
 
 Rule: **a clip never decides when a state ends.** The state machine ends the state; the clip is cut or held (last frame) to follow it.
 
@@ -127,6 +130,7 @@ Defaults: fps 12 unless stated. "Suggested frames" = `round(duration x fps)` as 
 | `feint_dash` | `FEINT`: approach at `feint_speed` 360 until within `feint_stop_distance` 80 or `feint_max_time` 1.2 | variable | loop | 14 / 6 | none | Fast low forward run, head down, **no weapon raised**: it is a bluff, so it must not look like an attack wind-up. |
 | `feint_stop` | `_feint_retreating` becomes true (one frame of zero speed) | at most 0.1 s, plays over the start of the retreat | one-shot | 20 / 2 | Skid with boots dragging | A hard brake just outside melee reach. Teaches "she stopped, she is not attacking". |
 | `feint_retreat` | `feint_retreat_time` 0.35 at 300 px/s away | 0.35 s | one-shot | 14 / 5 | Ends in a ready stance | Smooth glide back, bow ready. |
+| `interrupt_flinch` | `FLINCH` (`_try_interrupt`): a hit during any telegraph, the vault crouch included, cancels the attack. Emits `attack_interrupted(attack)` (`Attack`, or -1 for the vault crouch) | `interrupt_flinch_time` 0.25 s | one-shot | 20 / 5 | Frame 0 on the hit. Code shakes `Visual.position.x` by `interrupt_shake` and applies `FLINCH_TINT` to `Visual.modulate`; do not bake either. Ends into `backstep` (or `vault_crouch` when cornered), never into a lock | Caught mid-draw: the bow snaps off the string, shoulders jerk, eyes narrow. Must read as "her attack was cancelled", lighter than `stagger_in` (no free-hit window follows). Cut the clip from any telegraph pose, so it starts from the pose the cancelled clip was holding. |
 | `stagger_in` | `STAGGER` entry (`_enter_stagger`) | 0.15 s | one-shot | 20 / 3 | Recoil frame 0 | Knocked off balance. |
 | `stagger_loop` | `STAGGER`, rest of `stagger_time` 1.5 s | 1.35 s (the clip repeats until the state ends) | loop | 8 / 6 | Code already applies `STAGGER_TINT` to `Visual.modulate`; do not bake that tint | Dazed: bow arm low, head down, swaying. A clear "free hits" read. |
 | `phase_transition` | `TRANSITION` (`_update_transition`) | `phase_two_transition_time` 1.0 s | one-shot | 12 / 12 | Skin swap to phase 2 at about 0.5 s (frame 6). She stays hittable throughout. Code pulses a silver glow at `TRANSITION_PULSE_RATE` 10 rad/s | Raises the bow to the moon, silver light rising through the body, ends in a ready stance with the halo. Reads as "she got serious", not as an attack: bow aimed up but **no aim line, no amber**. |

@@ -10,6 +10,8 @@ extends "res://tests/support/ritual_suite.gd"
 
 const ARENA_SCENE := "res://scenes/enemies/bosses/boss_arena.tscn"
 const BOSS_SCENE := "res://scenes/enemies/bosses/artemis.tscn"
+const TEST_ARENA_SCENE := "res://scenes/levels/test/artemis_arena.tscn"
+const HUD_SCENE := "res://scenes/ui/health_hud.tscn"
 const PLAYER_SCENE := "res://scenes/player/player.tscn"
 const FLOOR_RECT := Rect2(-500.0, 0.0, 1000.0, 100.0)
 const LUZ_START := Vector2(-300.0, 0.0)
@@ -40,6 +42,7 @@ const CHECKS := {
 	"case_armed_boss_is_untouchable": 3,
 	"case_dead_boss_while_armed_never_locks": 7,
 	"case_rearm_survives_free": 1,
+	"case_test_arena_shows_luz_hud": 3,
 }
 
 var _rig: Node2D
@@ -463,3 +466,23 @@ func case_rearm_survives_free() -> void:
 	_free_rig()
 	await h.frames(5)
 	h.check(true, "freeing the arena during re-arm leaves no dangling await")
+
+
+# -- Test arena HUD ----------------------------------------------------------------------
+
+func case_test_arena_shows_luz_hud() -> void:
+	var state := (load(TEST_ARENA_SCENE) as PackedScene).get_state()
+	var instanced: Array[String] = []
+	for i: int in state.get_node_count():
+		var packed := state.get_node_instance(i)
+		if packed != null:
+			instanced.append(packed.resource_path)
+	h.check(HUD_SCENE in instanced, "the test arena instances the health HUD (%s)" % [instanced])
+	_reset_world()
+	_add_luz()
+	var hud := (load(HUD_SCENE) as PackedScene).instantiate() as HealthHud
+	_rig.add_child(hud)
+	await h.frames(3)
+	h.check(hud.get_pips().size() == _player.get_max_health(), "it shows one pip per health point (%d)" % hud.get_pips().size())
+	h.check(hud.get_meter() != null and hud.get_meter().is_inside_tree(), "and the soul meter")
+	_end_case()

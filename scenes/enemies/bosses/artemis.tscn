@@ -57,7 +57,7 @@ polygon = PackedVector2Array(-5, -3, -2, -6, 2, -6, 5, -3, 5, 2, 2, 6, -2, 6, -5
 [node name="Hair" type="Polygon2D" parent="Visual/Head"]
 z_index = 1
 color = Color(0.82, 0.84, 0.92, 1)
-polygon = PackedVector2Array(-5, -2, -3, -7, 3, -7, 5, -3, 1, -4, -14, 6, -12, 10, -5, 4)
+polygon = PackedVector2Array(-5, -3, -2, -7, 3, -7, 5, -3, 1, -4, -3, -2, -5, 1, -12, 10, -14, 6)
 
 [node name="Arm" type="Polygon2D" parent="Visual"]
 z_index = 1
