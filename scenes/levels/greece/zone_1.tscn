@@ -24,6 +24,7 @@
 [ext_resource type="PackedScene" uid="uid://df7x5n262u3v1" path="res://scenes/enemies/lancet_enemy.tscn" id="21_r00ng"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="22_5v0w6"]
 [ext_resource type="PackedScene" uid="uid://ctl0cunw2lanc" path="res://scenes/enemies/snake_enemy.tscn" id="24_pblv5"]
+[ext_resource type="PackedScene" path="res://scenes/world/change_scene_vertical.tscn" id="25_j468d"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("2_gkjph")
@@ -15195,13 +15196,14 @@ start_facing = 1
 position = Vector2(1387, -240)
 enemy_id = &"snake01"
 start_facing = 1
+max_health = 2
 
 [node name="SnakeEnemy2" parent="Enemies" unique_id=1238404916 instance=ExtResource("24_pblv5")]
 position = Vector2(1987, -108)
 enemy_id = &"snake02"
+max_health = 2
 
 [node name="Area2D" type="Area2D" parent="." unique_id=620321832]
-visible = false
 script = ExtResource("22_5v0w6")
 limite_izquierdo = 100
 limite_superior = -360
@@ -15211,3 +15213,7 @@ limite_inferior = 690
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=915088873]
 position = Vector2(1162.5, 167.5)
 shape = SubResource("RectangleShape2D_wakga")
+
+[node name="SceneTransitionArea" parent="." unique_id=651564701 instance=ExtResource("25_j468d")]
+position = Vector2(2212, -218)
+target_scene_path = "uid://3nag83g3qfyp"

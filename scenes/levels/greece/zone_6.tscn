@@ -18,6 +18,7 @@
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="20_2nr8u"]
 [ext_resource type="Texture2D" uid="uid://b5dtp4mw8wlgs" path="res://assets/art/greece/Columns/Column-2.png" id="20_xhm28"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="21_foasc"]
+[ext_resource type="PackedScene" path="res://scenes/world/change_scene_vertical.tscn" id="21_jrq8j"]
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_1a6ik"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_6hx0b"]
 
@@ -15167,3 +15168,7 @@ limite_inferior = 880
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=514890472]
 position = Vector2(1192.5, 475.5)
 shape = SubResource("RectangleShape2D_8w0r3")
+
+[node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("21_jrq8j")]
+position = Vector2(2486, 739)
+target_scene_path = "uid://drehrd4yly6oj"
