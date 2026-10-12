@@ -8,7 +8,9 @@ extends "res://tests/support/ritual_suite.gd"
 ## Like the Artemis suite this one runs inside the single runner, before any
 ## level scene is loaded: the boss targets the first node of group `player`.
 
+const ShakeSpy := preload("res://tests/support/shake_spy_camera.gd")
 const ARENA_SCENE := "res://scenes/enemies/bosses/boss_arena.tscn"
+const PREFAB_SCENE := "res://scenes/enemies/bosses/artemis_boss_arena.tscn"
 const BOSS_SCENE := "res://scenes/enemies/bosses/artemis.tscn"
 const TEST_ARENA_SCENE := "res://scenes/levels/test/artemis_arena.tscn"
 const HUD_SCENE := "res://scenes/ui/health_hud.tscn"
@@ -43,6 +45,11 @@ const CHECKS := {
 	"case_dead_boss_while_armed_never_locks": 7,
 	"case_rearm_survives_free": 1,
 	"case_test_arena_shows_luz_hud": 3,
+	"case_corpse_is_inert": 8,
+	"case_corpse_reloads_where_she_fell": 18,
+	"case_boss_progress_round_trip": 8,
+	"case_arena_cues_and_door_shake": 6,
+	"case_prefab_is_one_drag": 8,
 }
 
 var _rig: Node2D
@@ -96,6 +103,9 @@ func _make_boss() -> ArtemisBoss:
 	boss.position = BOSS_START
 	boss.rng_seed = 11
 	boss.stagger_hits = 0
+	# The killing blow's slow motion would only stretch the waits here.
+	boss.final_freeze_time = 0.0
+	boss.final_slowmo_time = 0.0
 	return boss
 
 
@@ -148,6 +158,7 @@ func _free_rig() -> void:
 
 
 func _end_case() -> void:
+	BossFeel.cancel()
 	_free_rig()
 	_registry().clear()
 	_progress().clear()
@@ -346,10 +357,10 @@ func case_defeat_is_permanent() -> void:
 	await _enter_fight()
 	_hit(30)
 	await h.secs(_arena.defeat_beat + _boss.defeat_time + 0.3)
-	h.check(_boss.is_dead() and not _boss.visible, "the boss is down and gone")
+	h.check(_boss.is_dead() and _boss.visible, "the boss is down and her corpse stays")
 	h.cps.reset_resettable_enemies()
 	await h.frames(3)
-	h.check(_boss.is_dead() and not _boss.visible, "a desk rest (checkpoint reset) does not bring her back")
+	h.check(_boss.is_dead() and _boss.visible, "a desk rest (checkpoint reset) does not bring her back")
 	_registry().enter_room(ROOM)
 	await h.frames(3)
 	h.check(_boss.is_dead() and _boss.collision_layer == 0, "neither does re-entering the room")
@@ -361,8 +372,8 @@ func case_defeat_is_permanent() -> void:
 	_registry().clear()
 	_arena = _make_arena()
 	await h.frames(5)
-	h.check(_arena.get_boss() == null, "a re-instantiated arena finds her already beaten: no boss")
-	h.check(_arena.get_reward() == null and not _arena.are_doors_closed() and _doors_passable(), "no reward and open doors")
+	h.check(_arena.get_boss() != null and _arena.get_boss().is_dead(), "a re-instantiated arena finds her already beaten: her corpse")
+	h.check(not _arena.are_doors_closed() and _doors_passable() and _arena.get_state() == BossArena.FightState.DEFEATED, "open doors")
 	h.check(not _arena.is_trigger_armed(), "and the trigger is off")
 	await _enter_fight()
 	await h.secs(0.2)
@@ -485,4 +496,172 @@ func case_test_arena_shows_luz_hud() -> void:
 	await h.frames(3)
 	h.check(hud.get_pips().size() == _player.get_max_health(), "it shows one pip per health point (%d)" % hud.get_pips().size())
 	h.check(hud.get_meter() != null and hud.get_meter().is_inside_tree(), "and the soul meter")
+	_end_case()
+
+
+# -- Corpse, reload and save hooks (T8) ------------------------------------------------
+
+func _defeat_and_settle() -> void:
+	await _enter_fight()
+	_place_luz(Vector2(-250.0, 0.0))
+	_hit(30)
+	await h.secs(_arena.defeat_beat + _boss.defeat_time + 0.3)
+
+
+func _reload_arena(forget_registry: bool) -> void:
+	_arena.free()
+	if forget_registry:
+		_registry().clear()
+	_arena = _make_arena()
+	_boss = _arena.get_boss() as ArtemisBoss
+	await h.frames(5)
+
+
+func case_corpse_is_inert() -> void:
+	await _build()
+	await _defeat_and_settle()
+	var soul := _player.get_soul()
+	var health := _player.get_health()
+	_place_luz(_boss.global_position + Vector2(0.0, 0.0))
+	await h.secs(0.4)
+	h.check(_boss.collision_layer == 0 and not (_boss.get_node("ContactDamage") as Area2D).monitoring, "the corpse has no collision and no contact damage")
+	h.check(_player.get_health() == health and absf(_player.global_position.x - _boss.global_position.x) < 2.0, "Luz stands on it untouched and unblocked")
+	h.check(not _boss.receive_hit(1, HIT_FROM, &"attack_1") and _player.get_soul() == soul, "it is not hittable and gives no soul")
+	h.cps.reset_resettable_enemies()
+	_registry().reset_to_checkpoint_state()
+	_registry().enter_room(ROOM)
+	await h.frames(3)
+	h.check(_boss.is_dead() and _boss.visible and not _boss.is_in_group(Enemy.GROUP_RESETTABLE), "a desk rest and a registry reset leave it lying")
+	_kill_luz()
+	await h.secs(_player.death_fade_time + 0.4)
+	h.check(_boss.is_dead() and _arena.get_state() == BossArena.FightState.DEFEATED, "so does Luz dying and waking up")
+	h.check(not _arena.are_doors_closed() and not _arena.is_trigger_armed(), "the arena stays open with the trigger off")
+	h.check(_boss.get_state() == ArtemisBoss.State.DEFEATED and not _boss.is_physics_processing(), "she is still in her defeated state, at rest")
+	h.check(_progress().is_defeated(BOSS_ID), "and the progress remembers her")
+	_end_case()
+
+
+func case_corpse_reloads_where_she_fell() -> void:
+	await _build()
+	await _defeat_and_settle()
+	var fell_at := _boss.global_position
+	var facing := _boss.get_facing()
+	var corpse: Dictionary = _progress().get_corpse(BOSS_ID)
+	h.check((corpse["position"] as Vector2).is_equal_approx(fell_at) and corpse["facing"] == facing, "the progress stores where she lies and how (%s)" % [corpse])
+	h.check(_arena.get_reward() != null and not _progress().is_reward_claimed(BOSS_ID), "the reward is out and still unclaimed")
+	# A room revisit after a desk rest: the registry forgot, the progress did not.
+	await _reload_arena(true)
+	h.check(_boss != null and _boss.is_dead() and _boss.visible, "the reloaded arena holds her corpse")
+	h.check(_boss.global_position.is_equal_approx(fell_at) and _boss.get_facing() == facing, "at the stored spot, facing the stored way (%s)" % [_boss.global_position])
+	h.check(_arena.get_state() == BossArena.FightState.DEFEATED and not _arena.are_doors_closed() and _doors_passable(), "the arena is open")
+	h.check(not _arena.is_trigger_armed() and _boss.collision_layer == 0 and not _boss.is_in_group(Enemy.GROUP_RESETTABLE), "the trigger is off and the corpse is out of the checkpoint contract")
+	var reward := _arena.get_reward()
+	h.check(reward != null, "the unclaimed reward is spawned again")
+	_place_luz(Vector2(-150.0, 0.0))
+	await h.secs(0.4)
+	h.check(not _arena.are_doors_closed() and _arena.get_state() == BossArena.FightState.DEFEATED, "walking into the old trigger starts nothing")
+	_place_luz(reward.global_position + Vector2(0.0, 28.0))
+	await h.secs(0.3)
+	h.check(_player.has_double_jump() and _progress().is_reward_claimed(BOSS_ID), "picking it up unlocks the double jump and records the claim")
+	# A scene reload: the registry still remembers the kill, so it restores her too.
+	await _reload_arena(false)
+	h.check(_boss.is_dead() and _boss.global_position.is_equal_approx(fell_at), "a reload that keeps the registry restores the same corpse")
+	h.check(_arena.get_reward() == null, "no reward once it was claimed")
+	await _reload_arena(true)
+	h.check(_arena.get_reward() == null and _boss.is_dead(), "not after a forgotten registry either")
+	h.check(_boss.get_state() == ArtemisBoss.State.DEFEATED and _boss.visible, "the restored boss is in the defeated state")
+	# Defeated, unclaimed, but Luz already double jumps: nothing to give.
+	var saved: Dictionary = _progress().to_dict()
+	saved["bosses"][String(BOSS_ID)]["reward_claimed"] = false
+	_progress().from_dict(saved)
+	await _reload_arena(true)
+	h.check(_arena.get_reward() == null, "no pickup for a Luz that can already double jump")
+	_end_case()
+	# And unclaimed with no double jump: back from a save.
+	await _build()
+	_progress().from_dict({"version": 1, "bosses": {String(BOSS_ID): {"defeated": true, "x": 120.0, "y": 0.0, "facing": 1, "reward_claimed": false}}})
+	await _reload_arena(false)
+	h.check(_boss.is_dead() and _boss.global_position.is_equal_approx(Vector2(120.0, 0.0)) and _boss.get_facing() == 1, "a loaded save puts the corpse at its saved spot")
+	h.check(_arena.get_reward() != null and not _player.has_double_jump(), "and brings the reward back when Luz lacks the double jump")
+	_end_case()
+	await _build()
+	h.check(_boss.get_health() == _boss.max_health and not _boss.is_dead(), "with no progress the boss is alive")
+	h.check(not _progress().is_defeated(BOSS_ID) and _progress().get_corpse(BOSS_ID).is_empty(), "and no corpse is stored")
+	_end_case()
+
+
+func case_boss_progress_round_trip() -> void:
+	var progress := _progress()
+	progress.clear()
+	progress.mark_defeated(&"a", Vector2(120.5, -3.0), -1)
+	progress.mark_reward_claimed(&"a")
+	progress.mark_defeated(&"b", Vector2(5.0, 6.0), 1)
+	var data: Dictionary = progress.to_dict()
+	h.check(data["version"] == 1 and (data["bosses"] as Dictionary).size() == 2, "to_dict is versioned and lists both bosses")
+	var through_json: Variant = JSON.parse_string(JSON.stringify(data))
+	progress.clear()
+	h.check(not progress.is_defeated(&"a"), "clear forgets them")
+	progress.from_dict(through_json as Dictionary)
+	var a: Dictionary = progress.get_corpse(&"a")
+	h.check(progress.is_defeated(&"a") and (a["position"] as Vector2).is_equal_approx(Vector2(120.5, -3.0)) and a["facing"] == -1, "from_dict restores the corpse, through JSON too")
+	h.check(progress.is_reward_claimed(&"a") and not progress.is_reward_claimed(&"b"), "and the reward claims")
+	progress.mark_defeated(&"a", Vector2.ZERO, 1)
+	h.check(progress.is_reward_claimed(&"a"), "defeating again keeps the claim")
+	progress.from_dict({"version": 99, "bosses": {"a": {"defeated": true}}})
+	h.check(not progress.is_defeated(&"a"), "an unknown version leaves a clean slate")
+	progress.from_dict({"version": 1, "bosses": {"x": 5, "y": {"defeated": true, "x": 1.0, "y": 2.0, "facing": 1}}})
+	h.check(not progress.is_defeated(&"x") and progress.is_defeated(&"y"), "bad entries are skipped, good ones kept")
+	progress.from_dict({})
+	h.check(not progress.is_defeated(&"y"), "an empty dictionary is a clean slate")
+	progress.clear()
+
+
+func case_arena_cues_and_door_shake() -> void:
+	await _build()
+	var spy := ShakeSpy.new() as Camera2D
+	_rig.add_child(spy)
+	spy.make_current()
+	var cues: Array[StringName] = []
+	_arena.sfx_cue.connect(func(cue: StringName) -> void: cues.append(cue))
+	var all_slots := true
+	for cue: StringName in [BossArena.CUE_DOORS_CLOSE, BossArena.CUE_DOORS_OPEN, BossArena.CUE_BOSS_INTRO]:
+		var player := _arena.get_node_or_null("Sfx/" + String(cue)) as AudioStreamPlayer
+		all_slots = all_slots and player != null and player.stream == null
+	h.check(all_slots, "the arena has three empty audio slots under Sfx")
+	_arena.play_cue(BossArena.CUE_DOORS_OPEN)
+	h.check(not (_arena.get_node("Sfx/DoorsOpen") as AudioStreamPlayer).playing, "an empty slot is a silent no-op")
+	cues.clear()
+	await _enter_trigger()
+	h.check(cues == [BossArena.CUE_DOORS_CLOSE, BossArena.CUE_BOSS_INTRO], "the doors close, then the boss intro cue (%s)" % [cues])
+	h.check(spy.shakes.size() == 1 and is_equal_approx(spy.shakes[0].x, _arena.door_shake_strength), "the doors closing shake the camera lightly (%s)" % [spy.shakes])
+	await h.secs(0.3)
+	_hit(30)
+	await h.secs(_arena.defeat_beat + 0.3)
+	h.check(cues.back() == BossArena.CUE_DOORS_OPEN, "the doors opening has its cue")
+	h.check(spy.has_shake(_boss.final_shake_strength), "the killing blow shook the camera too")
+	_end_case()
+
+
+func case_prefab_is_one_drag() -> void:
+	_reset_world()
+	var prefab := (load(PREFAB_SCENE) as PackedScene).instantiate() as BossArena
+	_rig.add_child(prefab)
+	_arena = prefab
+	_add_luz()
+	await h.frames(SETTLE_FRAMES)
+	var boss := prefab.get_boss()
+	h.check(boss is ArtemisBoss and boss.get_parent() == prefab, "the prefab holds Artemis as a child of the arena")
+	h.check(boss.enemy_id == &"greece_artemis" and boss.enemy_id != &"artemis", "with its own unique default enemy_id (%s)" % boss.enemy_id)
+	h.check(prefab.boss_name == "Artemis" and prefab.arena_rect.size == Vector2(936.0, 480.0), "named, and sized for the 936x480 room (%s)" % prefab.arena_rect.size)
+	h.check(prefab.arena_rect.end.y == 0.0 and absf(prefab.arena_rect.get_center().x) < 0.01, "origin at the floor line, centred")
+	var doors := prefab.get_doors()
+	h.check(is_equal_approx(doors[0].position.x, -456.0) and is_equal_approx(doors[1].position.x, 456.0), "the doors sit just inside the walls")
+	h.check(prefab.get_state() == BossArena.FightState.ARMED and prefab.is_trigger_armed(), "it starts armed")
+	h.check(prefab.get_world_rect().has_point(boss.global_position + Vector2(0.0, -10.0)), "Artemis starts inside the arena")
+	var state := (load(TEST_ARENA_SCENE) as PackedScene).get_state()
+	var uses_prefab := false
+	for i: int in state.get_node_count():
+		var packed := state.get_node_instance(i)
+		uses_prefab = uses_prefab or (packed != null and packed.resource_path == PREFAB_SCENE)
+	h.check(uses_prefab, "and the test arena is just this prefab plus platforms and a HUD")
 	_end_case()

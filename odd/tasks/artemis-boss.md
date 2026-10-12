@@ -97,20 +97,27 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - The proximity rules (dagger, backstep, vault) use real 2D distance or a vertical tolerance.
   - She never ends up standing on a platform.
   - Route: delegated.
-- [ ] **T8 Defeat feel + persistent corpse + save hooks.**
+- [x] **T8 Defeat feel + persistent corpse + save hooks.**
   - The final hit gets a freeze, white flash, about 0.5 s of slow motion and a camera shake.
   - The corpse stays where she fell across revisits, rests and deaths during the run (BossProgress stores the position and facing).
   - `to_dict`/`from_dict` hooks for a future save system. The project has no disk save; the boss must be saved together with the double jump to avoid a softlock.
   - Route: delegated.
-- [ ] **T9 Camera shakes + audio hooks.**
+- [x] **T9 Camera shakes + audio hooks.**
   - Shakes on the phase-2 transition and the dive impact.
   - `AudioStreamPlayer2D` slots for every telegraph and impact, with empty streams for now.
   - The animation contract gets an audio cue table.
   - Route: delegated with T8.
-- [ ] **T10 One-drag prefab + team guide.**
+- [x] **T10 One-drag prefab + team guide.**
   - `artemis_boss_arena.tscn` with the arena and Artemis prewired.
   - `docs/bosses/BOSS_ARENA.md`: placement, sizes, unique `enemy_id`, platforms, and a Stillness Desk before the arena.
   - Route: delegated with T8.
+- [ ] **T12 Hardening from the 91ec13b..1ddcd0f review** (approved, lineage review-75c4d13612dcf640, acknowledged; boundary now 1ddcd0f). Fix after T8-T10 land:
+  - (i) `_rearm_trigger` must check after EACH await, or cache the SceneTree.
+  - (j) `case_rearm_survives_free` is vacuous (`check(true)`).
+  - (k) Clear `_rain_marker_count` on interrupt.
+  - (l) Test interrupting the dive leap and the stag cast: visual height restored, no marker or column, no stag spawned.
+  - (m) Track arena engagement explicitly. Today any IDLE period under manual engage, including the opening delay, makes her silently immune.
+  - Route: delegated.
 - [ ] **T11 Push** `feat/artemis-boss` to the remote, ONLY after the user approves an iPhone build of the finished T7-T10 work (user instruction 2026-10-12). Route: inline.
 
 ## Progress
@@ -193,6 +200,17 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - Her body and floor probe use mask 1 only, so she never stands on a one-way platform.
   - The test arena has 3 platforms (tops -104, -194, -104).
   - 5 new cases. Movie-writer frames confirm the markers on the platform and the dive column.
+
+- 2026-10-12: T8-T10 done (one delegated writer).
+  - `BossFeel` slow motion: freeze at 0.05, then 0.3, then restore to 1.0. It runs on SceneTree timers that ignore time scale and uses a token for safe restores.
+  - `ScreenFlash` white flash on the final blow.
+  - The corpse slumps and stays. BossProgress stores her position and facing, and a revisit restores the corpse.
+  - Reward: `reward_claimed` is tracked, and the reward re-spawns if it is unclaimed and Luz cannot double jump.
+  - Save hooks: `to_dict`/`from_dict` (v1).
+  - Shakes on phase two, dive, stag, doors and the final blow.
+  - 14+3 empty audio slots with a `play_cue` helper.
+  - Prefab `artemis_boss_arena.tscn` (936x480, `enemy_id` `greece_artemis`) and the guide `docs/bosses/BOSS_ARENA.md`.
+  - 11 new cases. Frames confirm the flash and the corpse.
 
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.

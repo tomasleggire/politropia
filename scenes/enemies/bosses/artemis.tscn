@@ -1,10 +1,11 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemies/bosses/artemis_boss.gd" id="1_artemis"]
 [ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="2_contact"]
 [ext_resource type="Script" path="res://scripts/enemies/bosses/boss_telegraph.gd" id="3_telegraph"]
 
 [ext_resource type="Script" path="res://scripts/enemies/bosses/spectral_stag.gd" id="4_stag"]
+[ext_resource type="Script" path="res://scripts/enemies/bosses/screen_flash.gd" id="5_flash"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(26, 56)
@@ -141,3 +142,45 @@ polygon = PackedVector2Array(-28, -20, -24, -32, 12, -34, 20, -42, 26, -48, 24, 
 
 [node name="Telegraph" type="Node2D" parent="."]
 script = ExtResource("3_telegraph")
+
+[node name="Sfx" type="Node2D" parent="."]
+
+[node name="BowDraw" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="BowRelease" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="RainWhistle" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="RainImpact" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="DaggerSwish" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="VaultCrouch" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="DiveLeap" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="DiveImpact" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="StagHorn" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="StagCharge" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="Flinch" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="Stagger" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="PhaseTwo" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="Defeat" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="FinalFlash" type="CanvasLayer" parent="."]
+layer = 100
+script = ExtResource("5_flash")
+
+[node name="Rect" type="ColorRect" parent="FinalFlash"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0)

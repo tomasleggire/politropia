@@ -15,6 +15,7 @@ extends "res://tests/support/ritual_suite.gd"
 ## `player`, so no other Luz may exist.
 
 const BOSS_SCENE := "res://scenes/enemies/bosses/artemis.tscn"
+const ShakeSpy := preload("res://tests/support/shake_spy_camera.gd")
 const PLAYER_SCENE := "res://scenes/player/player.tscn"
 const FLOOR_RECT := Rect2(-500.0, 0.0, 1000.0, 100.0)
 const LEDGE_FLOOR := Rect2(-300.0, 0.0, 600.0, 100.0)
@@ -71,6 +72,12 @@ const CHECKS := {
 	"case_dive_column_reaches_a_platform": 5,
 	"case_proximity_needs_same_height": 8,
 	"case_never_stands_on_a_platform": 3,
+	"case_final_blow_restores_time_scale": 8,
+	"case_corpse_stays": 9,
+	"case_audio_cue_slots": 3,
+	"case_cues_ranged_attacks": 4,
+	"case_cues_phase_two_and_shakes": 6,
+	"case_cues_reactions": 3,
 }
 
 var _rig: Node2D
@@ -113,6 +120,10 @@ func _add_boss(at: Vector2, tweaks := {}) -> ArtemisBoss:
 	_boss.rng_seed = 11
 	# Hits cancel telegraphs by default; the older cases hit her mid-attack on purpose.
 	_boss.interrupt_enabled = false
+	# The killing blow's slow motion is covered by its own case; elsewhere it
+	# would only stretch the waits.
+	_boss.final_freeze_time = 0.0
+	_boss.final_slowmo_time = 0.0
 	for key: String in tweaks:
 		_boss.set(key, tweaks[key])
 	_rig.add_child(_boss)
@@ -134,6 +145,7 @@ func _free_rig() -> void:
 
 
 func _end_case() -> void:
+	BossFeel.cancel()
 	_free_rig()
 	_registry().clear()
 	h.cps.clear()
@@ -190,8 +202,8 @@ func case_damage_and_defeat() -> void:
 	h.check(_boss.is_dead() and events.size() == 1, "the 30th hit defeats her and emits defeated once (%d)" % events.size())
 	h.check(_boss.collision_layer == 0, "the defeated boss no longer collides")
 	await h.secs(_boss.defeat_time + 0.4)
-	h.check(not _boss.visible, "no corpse is left: she fades out and disappears")
-	h.check(not _boss.is_physics_processing(), "and her AI is switched off")
+	h.check(_boss.visible and _boss.is_dead(), "she stays as a corpse where she fell")
+	h.check(not _boss.is_physics_processing(), "once settled, her processing is switched off")
 	h.check(not _boss.receive_hit(1, HIT_FROM, &"attack_1") and events.size() == 1, "further hits do nothing and defeat fires only once")
 	_end_case()
 
@@ -1460,4 +1472,191 @@ func case_never_stands_on_a_platform() -> void:
 	var hopped := await _sees_state(ArtemisBoss.State.BACKSTEP, 0.5)
 	await h.secs(0.6)
 	h.check(hopped and _boss.global_position.x > 60.0 and absf(_boss.global_position.y) < 1.0, "a backstep across a low platform ends on the floor (%.0f, %.1f)" % [_boss.global_position.x, _boss.global_position.y])
+	_end_case()
+
+
+# -- Defeat feel, corpse, audio cues and shakes (T8, T9) -----------------------------------
+
+func _add_spy() -> Node:
+	var spy := ShakeSpy.new() as Camera2D
+	_rig.add_child(spy)
+	spy.make_current()
+	return spy
+
+
+## True once Engine.time_scale is back to 1.0, waiting up to `limit` REAL seconds.
+func _wait_normal_speed(limit: float) -> bool:
+	var end := Time.get_ticks_msec() + int(limit * 1000.0)
+	while not is_equal_approx(Engine.time_scale, 1.0) and Time.get_ticks_msec() < end:
+		await h.tree.process_frame
+	return is_equal_approx(Engine.time_scale, 1.0)
+
+
+func _record_cues() -> Array[StringName]:
+	var cues: Array[StringName] = []
+	_boss.sfx_cue.connect(func(cue: StringName) -> void: cues.append(cue))
+	return cues
+
+
+const SLOWMO := {"stagger_hits": 0, "phase_two_threshold": 0.0, "final_freeze_time": 0.05, "final_slowmo_time": 0.12, "final_slowmo_scale": 0.3}
+
+
+func case_final_blow_restores_time_scale() -> void:
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), SLOWMO)
+	var spy := _add_spy()
+	var cues := _record_cues()
+	_hit(29)
+	h.check(is_equal_approx(Engine.time_scale, 1.0), "before the killing blow the clock is untouched")
+	_hit(1)
+	var flash := _boss.get_node("FinalFlash") as ScreenFlash
+	h.check(Engine.time_scale < 0.5 and flash.is_flashing(), "the killing blow freezes the world and flashes the screen white (%.2f)" % Engine.time_scale)
+	h.check(spy.shakes.size() == 1 and is_equal_approx(spy.shakes[0].x, _boss.final_shake_strength), "and asks the camera for a strong shake (%s)" % [spy.shakes])
+	h.check(cues == [ArtemisBoss.CUE_DEFEAT], "and plays the defeat cue (%s)" % [cues])
+	h.check(await _wait_normal_speed(3.0), "the clock returns to 1.0 by itself")
+	_end_case()
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), SLOWMO)
+	_hit(30)
+	_free_rig()
+	h.check(Engine.time_scale < 0.5, "freed right after the killing blow, the world is still slowed")
+	h.check(await _wait_normal_speed(3.0), "but the clock is restored even though the boss is gone")
+	_end_case()
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), {"stagger_hits": 0})
+	_hit(30)
+	h.check(is_equal_approx(Engine.time_scale, 1.0), "with freeze and slow motion at 0 the clock is never touched")
+	_end_case()
+
+
+func case_corpse_stays() -> void:
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), {"stagger_hits": 0})
+	var settled: Array[int] = []
+	_boss.corpse_settled.connect(func() -> void: settled.append(1))
+	_hit(30)
+	await h.secs(_boss.defeat_time + 0.4)
+	var visual := _boss.get_node("Visual") as Node2D
+	h.check(settled == [1] and not _boss.is_physics_processing(), "the collapse ends once and she rests (%s)" % [settled])
+	h.check(visual.modulate.is_equal_approx(Enemy.CORPSE_TINT) and absf(visual.scale.y - ArtemisBoss.CORPSE_SQUASH_Y) < 0.01, "dimmed and squashed in a kneeling pose")
+	h.check(absf(visual.rotation) > 0.3 and signf(visual.rotation) == float(_boss.get_facing()), "slumped forward, toward where she faced (%.2f)" % visual.rotation)
+	var bow := _boss.get_node("Visual/Bow") as Node2D
+	h.check(bow.position.is_equal_approx(ArtemisBoss.BOW_DROPPED_POSITION), "the bow lies dropped in front of her")
+	h.check(_boss.collision_layer == 0, "no collision")
+	await h.frames(2)
+	h.check(not (_boss.get_node("ContactDamage") as Area2D).monitoring, "no contact damage")
+	h.check(not _boss.receive_hit(1, HIT_FROM, &"attack_1"), "not hittable")
+	var here := _boss.global_position
+	await h.secs(0.5)
+	h.check(_boss.global_position == here and _boss.visible, "and she stays where she fell")
+	_end_case()
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), {"stagger_hits": 0})
+	_boss.global_position = Vector2(300.0, -120.0)
+	_boss.velocity = Vector2.ZERO
+	settled.clear()
+	_boss.corpse_settled.connect(func() -> void: settled.append(1))
+	_hit(30)
+	await h.secs(_boss.defeat_time + 0.8)
+	h.check(settled == [1] and absf(_boss.global_position.y) < 2.0, "killed in mid-air she falls first, then rests on the floor (y %.1f)" % _boss.global_position.y)
+	_end_case()
+
+
+func case_audio_cue_slots() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(300.0, 0.0))
+	var names: Array[StringName] = [
+		ArtemisBoss.CUE_BOW_DRAW, ArtemisBoss.CUE_BOW_RELEASE, ArtemisBoss.CUE_RAIN_WHISTLE, ArtemisBoss.CUE_RAIN_IMPACT,
+		ArtemisBoss.CUE_DAGGER_SWISH, ArtemisBoss.CUE_VAULT_CROUCH, ArtemisBoss.CUE_DIVE_LEAP, ArtemisBoss.CUE_DIVE_IMPACT,
+		ArtemisBoss.CUE_STAG_HORN, ArtemisBoss.CUE_STAG_CHARGE, ArtemisBoss.CUE_FLINCH, ArtemisBoss.CUE_STAGGER,
+		ArtemisBoss.CUE_PHASE_TWO, ArtemisBoss.CUE_DEFEAT,
+	]
+	var all_slots := true
+	for cue: StringName in names:
+		var player := _boss.get_node_or_null("Sfx/" + String(cue)) as AudioStreamPlayer2D
+		all_slots = all_slots and player != null and player.stream == null
+	h.check(all_slots and _boss.get_node("Sfx").get_child_count() == names.size(), "every cue has an empty AudioStreamPlayer2D under Sfx (%d)" % names.size())
+	var cues := _record_cues()
+	var silent := true
+	for cue: StringName in names:
+		_boss.play_cue(cue)
+		silent = silent and not _boss.get_cue_player(cue).playing
+	h.check(silent and cues == names, "playing an empty slot is a no-op that still announces the cue")
+	_boss.play_cue(&"NoSuchCue")
+	h.check(cues.size() == names.size() + 1, "an unknown cue is ignored without an error")
+	_end_case()
+
+
+func case_cues_ranged_attacks() -> void:
+	for pair: Array in [
+		[ArtemisBoss.Attack.AIMED_SHOT, [ArtemisBoss.CUE_BOW_DRAW, ArtemisBoss.CUE_BOW_RELEASE]],
+		[ArtemisBoss.Attack.FAN, [ArtemisBoss.CUE_BOW_DRAW, ArtemisBoss.CUE_BOW_RELEASE]],
+		[ArtemisBoss.Attack.RAIN, [ArtemisBoss.CUE_RAIN_WHISTLE, ArtemisBoss.CUE_BOW_RELEASE, ArtemisBoss.CUE_RAIN_IMPACT]],
+		[ArtemisBoss.Attack.DAGGER, [ArtemisBoss.CUE_DAGGER_SWISH]],
+	]:
+		await _build_rig()
+		_tough_luz()
+		await _add_boss(Vector2(300.0, 0.0), P2_QUIET)
+		var cues := _record_cues()
+		_boss.start_attack(pair[0])
+		await h.secs(3.0)
+		h.check(cues == pair[1], "attack %d fires its cues in order (%s)" % [pair[0], cues])
+		_end_case()
+
+
+func case_cues_phase_two_and_shakes() -> void:
+	await _build_rig(Vector2(0.0, 0.0))
+	_tough_luz()
+	await _add_boss(Vector2(300.0, 0.0), P2_QUIET)
+	var spy := _add_spy()
+	var cues := _record_cues()
+	_boss._phase = P2
+	_boss.start_attack(ArtemisBoss.Attack.MOON_DIVE)
+	await h.secs(2.4)
+	h.check(cues == [ArtemisBoss.CUE_DIVE_LEAP, ArtemisBoss.CUE_DIVE_IMPACT], "the dive plays its leap and its impact (%s)" % [cues])
+	h.check(spy.has_shake(_boss.dive_shake_strength), "and shakes the camera on the impact (%s)" % [spy.shakes])
+	_end_case()
+	await _build_rig(LUZ_START)
+	_tough_luz()
+	await _add_boss(Vector2(0.0, 0.0), P2_QUIET.merged({"arena_half_width": 900.0}))
+	spy = _add_spy()
+	cues = _record_cues()
+	_boss._phase = P2
+	_boss.start_attack(ArtemisBoss.Attack.STAG)
+	await h.secs(1.2)
+	h.check(cues == [ArtemisBoss.CUE_STAG_HORN, ArtemisBoss.CUE_STAG_CHARGE], "the stag has a horn at the telegraph and a charge at the launch (%s)" % [cues])
+	h.check(spy.has_shake(_boss.stag_shake_strength), "and the launch shakes the camera lightly")
+	_end_case()
+	await _build_rig(LUZ_START)
+	await _add_boss(Vector2(300.0, 0.0), P2_QUIET)
+	spy = _add_spy()
+	cues = _record_cues()
+	_hit(15)
+	h.check(cues.has(ArtemisBoss.CUE_PHASE_TWO), "phase two announces itself")
+	h.check(spy.has_shake(_boss.phase_shake_strength), "and shakes the camera when the transition starts")
+	_end_case()
+
+
+func case_cues_reactions() -> void:
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), INTERRUPT)
+	var cues := _record_cues()
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	await h.secs(0.2)
+	_hit(1)
+	h.check(cues == [ArtemisBoss.CUE_BOW_DRAW, ArtemisBoss.CUE_FLINCH], "a cancelled wind-up flinches (%s)" % [cues])
+	_end_case()
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), {"wake_distance": 0.0})
+	cues = _record_cues()
+	_hit(6)
+	h.check(cues.has(ArtemisBoss.CUE_STAGGER), "the stagger has its cue")
+	_end_case()
+	await _vault_rig(340.0)
+	cues = _record_cues()
+	var t := 0.0
+	while _boss.get_state() != ArtemisBoss.State.VAULT and t < 1.5:
+		await h.tree.physics_frame
+		t += _dt()
+	h.check(cues.has(ArtemisBoss.CUE_VAULT_CROUCH), "the vault crouch has its cue")
 	_end_case()

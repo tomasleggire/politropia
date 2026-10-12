@@ -31,14 +31,24 @@ extends Enemy
 ## at her height (`vertical_engage_tolerance`).
 ##
 ## She is a normal enemy for the base class (hits, flash, registry, checkpoint
-## reset) except she is never pushed and leaves no corpse. Placeholder visuals
-## only; the animation contract replaces them without touching this logic.
+## reset) except she is never pushed. The killing blow is a moment (white flash,
+## freeze, slow motion, shake, see `BossFeel`) and she stays as a corpse where she
+## fell; BossArena remembers it for the run. Camera shakes and audio cues are
+## hooks: the cues are `AudioStreamPlayer2D` slots under `Sfx` (empty streams,
+## `play_cue` is a no-op without one) and every cue also emits `sfx_cue`.
+## Placeholder visuals only; the animation contract replaces them without
+## touching this logic.
 
 signal phase_changed(phase: int)
 signal defeated
 ## A hit cancelled a telegraph. `attack` is the `Attack` that was winding up, or
 ## NO_ATTACK (-1) for the cornered vault's crouch. For VFX and animation.
 signal attack_interrupted(attack: int)
+## The defeat collapse finished and the corpse lies still at its final position.
+signal corpse_settled
+## A sound cue fired. `cue` is the node name under `Sfx` (CUE_* constants), fired
+## even when its stream is empty, so tools and tests can follow the events.
+signal sfx_cue(cue: StringName)
 
 enum State { IDLE, REPOSITION, BACKSTEP, DODGE, FEINT, ATTACK, STAGGER, DEFEATED, TRANSITION, VAULT, FLINCH }
 enum AttackPhase { TELEGRAPH, ACTIVE, RECOVER }
@@ -103,6 +113,27 @@ const FLINCH_TINT := Color(1.0, 0.55, 0.55)
 ## Radians per second of the flinch shake.
 const FLINCH_SHAKE_RATE := 90.0
 const NEVER := -1.0e9
+## Kneeling pose of the corpse: forward slump (radians), squash, and where the
+## dropped bow ends up (in the right-facing local space of `Visual`).
+const CORPSE_TILT := 0.45
+const CORPSE_SQUASH_Y := 0.6
+const BOW_DROPPED_POSITION := Vector2(30.0, -12.0)
+const BOW_DROPPED_ROTATION := 1.35
+const FLASH_FADE_IN := 0.04
+const CUE_BOW_DRAW := &"BowDraw"
+const CUE_BOW_RELEASE := &"BowRelease"
+const CUE_RAIN_WHISTLE := &"RainWhistle"
+const CUE_RAIN_IMPACT := &"RainImpact"
+const CUE_DAGGER_SWISH := &"DaggerSwish"
+const CUE_VAULT_CROUCH := &"VaultCrouch"
+const CUE_DIVE_LEAP := &"DiveLeap"
+const CUE_DIVE_IMPACT := &"DiveImpact"
+const CUE_STAG_HORN := &"StagHorn"
+const CUE_STAG_CHARGE := &"StagCharge"
+const CUE_FLINCH := &"Flinch"
+const CUE_STAGGER := &"Stagger"
+const CUE_PHASE_TWO := &"PhaseTwo"
+const CUE_DEFEAT := &"Defeat"
 
 @export_group("Movement")
 ## Luz farther than this (in sight) wakes her up.
@@ -279,8 +310,30 @@ const NEVER := -1.0e9
 @export var phase_two_transition_time := 1.0
 
 @export_group("Defeat")
+## Seconds she takes to slump into the corpse pose after the killing blow.
 @export var defeat_time := 0.9
-@export var defeat_rise := 24.0
+
+@export_group("Final Blow")
+## Real seconds the whole world freezes on the killing blow (0 skips it).
+@export var final_freeze_time := 0.25
+## Real seconds of slow motion after the freeze (0 skips it).
+@export var final_slowmo_time := 0.5
+@export_range(0.05, 1.0) var final_slowmo_scale := 0.3
+## Peak opacity of the white screen flash (0 turns it off).
+@export_range(0.0, 1.0) var final_flash_peak := 0.85
+## Real seconds the flash takes to fade out.
+@export var final_flash_time := 0.35
+@export var final_shake_strength := 10.0
+@export var final_shake_time := 0.7
+
+@export_group("Camera Shakes")
+## Strength is in pixels (the RoomCamera caps it at its `shake_max_strength`).
+@export var phase_shake_strength := 5.0
+@export var phase_shake_time := 0.6
+@export var dive_shake_strength := 8.0
+@export var dive_shake_time := 0.4
+@export var stag_shake_strength := 3.0
+@export var stag_shake_time := 0.25
 
 @export_group("Randomness")
 ## 0 randomizes. Tests set `rng` directly or fix this seed.
@@ -293,6 +346,9 @@ const NEVER := -1.0e9
 @onready var _telegraph: BossTelegraph = $Telegraph
 @onready var _dive_hitbox: Area2D = $DiveHitbox
 @onready var _stag: SpectralStag = $SpectralStag
+@onready var _bow: Node2D = $Visual/Bow
+@onready var _sfx: Node = $Sfx
+@onready var _flash_layer: ScreenFlash = $FinalFlash
 
 var rng := RandomNumberGenerator.new()
 
@@ -318,6 +374,10 @@ var _probe_blocked := false
 var _hit_ring := PackedFloat32Array()
 var _ring_index := 0
 var _defeat_left := 0.0
+var _bow_rest := Vector2.ZERO
+var _cues: Dictionary = {}
+var _dive_landed := false
+var _rain_impact_left := 0.0
 var _play_defeat := false
 var _pool: Array[EnemyProjectile] = []
 var _last_attack := NO_ATTACK
@@ -377,7 +437,12 @@ func _ready() -> void:
 	for i: int in maxi(ARROW_POOL_SIZE, mini(rain_zone_count, RAIN_MAX_ZONES) * _rain_arrows_per_zone()):
 		_pool.append(_make_arrow())
 	_reset_hit_ring()
-	if not _dead:
+	_bow_rest = _bow.position
+	for cue: Node in _sfx.get_children():
+		_cues[cue.name] = cue
+	if _dead:
+		_enter_state(State.DEFEATED)
+	else:
 		_enter_state(State.IDLE, opening_delay)
 
 
@@ -551,7 +616,7 @@ func set_ai_active(active: bool) -> void:
 
 
 ## Registers the hit, then checks the phase threshold and the stagger window.
-## A killing blow plays the defeat beat instead of leaving a corpse.
+## A killing blow plays the final-blow moment, then she slumps into a corpse.
 func receive_hit(damage: int, source_position: Vector2, attack_name: StringName = &"") -> bool:
 	if not _hittable or _awaiting_arena():
 		return false
@@ -561,6 +626,7 @@ func receive_hit(damage: int, source_position: Vector2, attack_name: StringName 
 	if not landed:
 		return false
 	if _dead:
+		_play_final_blow()
 		defeated.emit()
 		return true
 	engage()
@@ -572,18 +638,25 @@ func receive_hit(damage: int, source_position: Vector2, attack_name: StringName 
 	return true
 
 
-## Defeat: no corpse. A fresh kill fades out; a kill restored by the registry
-## (she was beaten earlier) just stays hidden.
+## Defeat: a fresh kill slumps over `defeat_time`; a corpse restored by the
+## registry or the arena (she was beaten earlier) lies there at once. Either way
+## she stays, dimmed, harmless and out of every hit and reset.
 func make_corpse_at(at: Vector2, facing: int) -> void:
+	# The registry restores a corpse while the base `_ready` is still running,
+	# before her own nodes are bound: `_ready` finishes the job then.
+	if is_node_ready():
+		_clear_attack_leftovers()
+	# Dead first, so leaving a dive or a vault cannot re-arm her collision or contact.
+	super.make_corpse_at(at, facing)
+	_defeat_left = defeat_time if _play_defeat else 0.0
+	if is_node_ready():
+		_enter_state(State.DEFEATED)
+
+
+func _clear_attack_leftovers() -> void:
 	clear_arrows()
 	_stag.deactivate()
 	_set_dagger(false)
-	# Dead first, so leaving a dive or a vault cannot re-arm her collision or contact.
-	super.make_corpse_at(at, facing)
-	_enter_state(State.DEFEATED)
-	_defeat_left = defeat_time if _play_defeat else 0.0
-	if not _play_defeat:
-		_hide_for_good()
 
 
 ## -- Hooks -----------------------------------------------------------------------
@@ -595,10 +668,14 @@ func _reset_ai() -> void:
 	_phase = PHASE_ONE
 	_defeat_left = 0.0
 	_play_defeat = false
+	_rain_impact_left = 0.0
 	visible = true
-	# A defeat fade switches her AI off for good: a checkpoint must revive it.
+	# A settled corpse switches her processing off: a checkpoint must revive it.
 	set_physics_process(true)
 	_visual.position = Vector2.ZERO
+	_visual.rotation = 0.0
+	_bow.position = _bow_rest
+	_bow.rotation = 0.0
 	clear_arrows()
 	_stag.deactivate()
 	_telegraph.clear()
@@ -652,20 +729,21 @@ func _apply_visual() -> void:
 		State.FLINCH:
 			_visual.modulate = FLINCH_TINT
 		State.DEFEATED:
-			_visual.modulate = Color(1.0, 1.0, 1.0, _defeat_alpha())
+			_pose_corpse(_defeat_progress())
 		_:
 			_visual.modulate = Color.WHITE
 
 
+## Slumps while `_defeat_left` runs down, then rests once on the floor (a kill in
+## mid-air falls first) and stops processing.
 func _update_corpse(delta: float) -> void:
 	velocity.x = 0.0
 	_apply_gravity(delta)
 	move_and_slide()
-	_defeat_left -= delta
-	_visual.position.y = -defeat_rise * (1.0 - _defeat_alpha())
+	_defeat_left = maxf(_defeat_left - delta, 0.0)
 	_apply_visual()
-	if _defeat_left <= 0.0:
-		_hide_for_good()
+	if _defeat_left <= 0.0 and is_on_floor():
+		_settle_corpse()
 
 
 ## -- State machine ---------------------------------------------------------------
@@ -744,6 +822,7 @@ func _tick_cooldowns(delta: float) -> void:
 	_probe_left -= delta
 	_vault_left = maxf(_vault_left - delta, 0.0)
 	_interrupt_left = maxf(_interrupt_left - delta, 0.0)
+	_tick_rain_impact(delta)
 
 
 func _update_idle(delta: float) -> void:
@@ -1071,10 +1150,13 @@ func _fire_attack(attack: Attack) -> void:
 	match attack:
 		Attack.AIMED_SHOT:
 			_launch_arrow(_muzzle.global_position, _aim_dir)
+			play_cue(CUE_BOW_RELEASE)
 		Attack.FAN:
 			_fire_fan()
+			play_cue(CUE_BOW_RELEASE)
 		Attack.RAIN:
 			_fire_rain()
+			play_cue(CUE_BOW_RELEASE)
 		Attack.DAGGER:
 			_swing_dagger()
 		Attack.MOON_DIVE:
@@ -1125,12 +1207,17 @@ func _fire_fan() -> void:
 
 func _begin_telegraph(attack: Attack) -> void:
 	match attack:
+		Attack.AIMED_SHOT, Attack.FAN:
+			play_cue(CUE_BOW_DRAW)
 		Attack.RAIN:
 			_plan_rain()
+			play_cue(CUE_RAIN_WHISTLE)
 		Attack.MOON_DIVE:
 			_begin_dive()
+			play_cue(CUE_DIVE_LEAP)
 		Attack.STAG:
 			_plan_stag()
+			play_cue(CUE_STAG_HORN)
 
 
 func _rain_arrows_per_zone() -> int:
@@ -1260,6 +1347,25 @@ func _fire_rain() -> void:
 	for i: int in _rain_count:
 		for k: int in per_zone:
 			_launch_arrow(Vector2(_rain_arrow_x(i, k), start_y), Vector2.DOWN, rain_arrow_speed)
+	_rain_impact_left = _rain_fall_time(start_y)
+
+
+## Seconds until the first rain arrow reaches a surface (the nearest marker).
+func _rain_fall_time(start_y: float) -> float:
+	var surface_y := global_position.y
+	if _rain_marker_count > 0:
+		surface_y = _rain_markers[0].end.y
+		for i: int in range(1, _rain_marker_count):
+			surface_y = minf(surface_y, _rain_markers[i].end.y)
+	return maxf(surface_y - start_y, 0.0) / maxf(rain_arrow_speed, 1.0)
+
+
+func _tick_rain_impact(delta: float) -> void:
+	if _rain_impact_left <= 0.0:
+		return
+	_rain_impact_left -= delta
+	if _rain_impact_left <= 0.0:
+		play_cue(CUE_RAIN_IMPACT)
 
 
 ## -- Dagger slash -------------------------------------------------------------------
@@ -1274,6 +1380,7 @@ func _swing_dagger() -> void:
 	_dagger.position.x = float(_facing) * DAGGER_REACH
 	_dagger.scale.x = float(_facing)
 	_set_dagger(true)
+	play_cue(CUE_DAGGER_SWISH)
 	_luz_close_time = 0.0
 
 
@@ -1371,6 +1478,8 @@ func _try_transition() -> void:
 	_chain_next = NO_ATTACK
 	velocity.x = 0.0
 	_enter_state(State.TRANSITION, phase_two_transition_time)
+	play_cue(CUE_PHASE_TWO)
+	_shake(phase_shake_strength, phase_shake_time)
 
 
 func _update_transition(delta: float) -> void:
@@ -1447,6 +1556,7 @@ func _begin_dive_fall() -> void:
 	_visual.position.y = -dive_height
 	_visual.visible = true
 	_dive_hit = false
+	_dive_landed = false
 	_set_dive_hitbox(true)
 	_dive_hitbox.position.y = DIVE_BOX_Y - dive_height
 
@@ -1455,6 +1565,10 @@ func _update_dive_fall(delta: float) -> void:
 	_visual.position.y = minf(_visual.position.y + dive_speed * delta, 0.0)
 	_dive_hitbox.position.y = DIVE_BOX_Y + _visual.position.y
 	_poll_dive()
+	if not _dive_landed and _visual.position.y >= 0.0:
+		_dive_landed = true
+		play_cue(CUE_DIVE_IMPACT)
+		_shake(dive_shake_strength, dive_shake_time)
 
 
 func _set_dive_hitbox(on: bool) -> void:
@@ -1516,6 +1630,8 @@ func _animate_stag() -> void:
 func _summon_stag() -> void:
 	var from := Vector2(_stag_wall_x + float(_stag_dir) * SpectralStag.WIDTH * 0.5, global_position.y)
 	_stag.launch(from, _stag_dir, stag_speed, _stag_far_x, _luz)
+	play_cue(CUE_STAG_CHARGE)
+	_shake(stag_shake_strength, stag_shake_time)
 
 
 ## -- Interrupt ---------------------------------------------------------------------
@@ -1544,6 +1660,7 @@ func _try_interrupt() -> void:
 	_rain_count = 0
 	velocity.x = 0.0
 	_enter_state(State.FLINCH, interrupt_flinch_time)
+	play_cue(CUE_FLINCH)
 	attack_interrupted.emit(interrupted)
 
 
@@ -1614,6 +1731,7 @@ func _start_vault() -> void:
 	_set_contact(vault_contact_damage)
 	velocity.x = 0.0
 	_enter_state(State.VAULT, maxf(vault_telegraph_time, MIN_TELEGRAPH))
+	play_cue(CUE_VAULT_CROUCH)
 	_apply_visual()
 
 
@@ -1734,6 +1852,7 @@ func _enter_stagger() -> void:
 	_chain_next = NO_ATTACK
 	velocity.x = 0.0
 	_enter_state(State.STAGGER, stagger_time)
+	play_cue(CUE_STAGGER)
 
 
 func _update_stagger(delta: float) -> void:
@@ -1778,15 +1897,63 @@ func _face_luz() -> void:
 		_apply_visual()
 
 
-func _defeat_alpha() -> float:
+## 0 standing, 1 fully slumped.
+func _defeat_progress() -> float:
 	if defeat_time <= 0.0:
-		return 0.0
-	return clampf(_defeat_left / defeat_time, 0.0, 1.0)
+		return 1.0
+	var t := 1.0 - clampf(_defeat_left / defeat_time, 0.0, 1.0)
+	return t * t * (3.0 - 2.0 * t)
 
 
-func _hide_for_good() -> void:
-	visible = false
+## Kneeling collapse from the existing polygons: slumped forward and squashed,
+## dimmed like any enemy corpse, the bow dropped on the ground in front of her.
+func _pose_corpse(progress: float) -> void:
+	_visual.scale = Vector2(float(_facing), lerpf(1.0, CORPSE_SQUASH_Y, progress))
+	_visual.rotation = float(_facing) * CORPSE_TILT * progress
+	_visual.modulate = Color.WHITE.lerp(CORPSE_TINT, progress)
+	_visual.z_index = -1 if progress >= 1.0 else 0
+	if _bow != null:
+		_bow.position = _bow_rest.lerp(BOW_DROPPED_POSITION, progress)
+		_bow.rotation = BOW_DROPPED_ROTATION * progress
+
+
+func _settle_corpse() -> void:
+	_defeat_left = 0.0
+	_apply_visual()
 	set_physics_process(false)
+	corpse_settled.emit()
+
+
+## The killing blow as a moment: white flash, the world freezes, slow motion,
+## a strong shake. The slow motion is restored by SceneTree timers (BossFeel),
+## never by this node, so freeing her or the arena cannot leave it stuck.
+func _play_final_blow() -> void:
+	play_cue(CUE_DEFEAT)
+	var tree := get_tree()
+	if final_flash_peak > 0.0:
+		_flash_layer.flash(final_flash_peak, FLASH_FADE_IN, final_flash_time)
+	BossFeel.shake_camera(get_viewport(), final_shake_strength, final_shake_time)
+	if final_freeze_time > 0.0 or final_slowmo_time > 0.0:
+		BossFeel.slow_motion(tree, final_freeze_time, final_slowmo_time, final_slowmo_scale)
+
+
+## -- Audio cues ---------------------------------------------------------------
+
+## Plays the player named `cue` under `Sfx` and announces it. A slot with no
+## stream (the default) stays silent, so a missing sound is never an error.
+func play_cue(cue: StringName) -> void:
+	sfx_cue.emit(cue)
+	var player := _cues.get(cue) as AudioStreamPlayer2D
+	if player != null and player.stream != null:
+		player.play()
+
+
+func get_cue_player(cue: StringName) -> AudioStreamPlayer2D:
+	return _cues.get(cue) as AudioStreamPlayer2D
+
+
+func _shake(strength: float, duration: float) -> void:
+	BossFeel.shake_camera(get_viewport(), strength, duration)
 
 
 ## -- Walls and ledges ----------------------------------------------------------

@@ -38,7 +38,7 @@ The silhouette must stay readable against dark navy backgrounds: keep a light va
 
 | Path (under `Artemis`, a `CharacterBody2D`) | Contract |
 |---|---|
-| `Visual` (`Node2D`) | Code owns it: `scale = (facing, crouch)`, `position.y` (dive and defeat), `modulate` (stagger tint, defeat fade), `visible` (off-screen dive). **Never animate these properties from art.** |
+| `Visual` (`Node2D`) | Code owns it: `scale = (facing, crouch)`, `position.y` (dive), `rotation`, `scale` and `modulate` (stagger tint, corpse pose), `visible` (off-screen dive). **Never animate these properties from art.** |
 | `Visual/Body` (`Polygon2D`) | **Keep.** `Enemy._setup_flash` clones its polygon into a white hurt flash, and `BossTelegraph.bind_body` clones it into the colour glow. Set `visible = false` (as `shadow_owl.tscn`) and make the polygon trace the **final art silhouette** so flash and glow match the sprite. The clones have their own visibility, so a hidden `Body` still flashes. |
 | `Visual/AnimatedSprite2D` (new) | The final art. Add it as the **first child of `Visual`** (index 0) so the glow and flash clones, inserted after `Body`, draw above it. `texture_filter = 1`. |
 | `Visual/Bow/Muzzle` (`Marker2D`) | **Keep the path.** Arrows spawn here (`@onready _muzzle`) and aim lines start here. Local position now `(17, -34)` (Bow `(13,-34)` + Muzzle `(4,0)`). Match the bow hand to it, or move the node in the scene (position only) and keep draw/release poses within about 6 px of it. |
@@ -171,7 +171,7 @@ Attack structure in code: TELEGRAPH (`_telegraph_time`, never under `MIN_TELEGRA
 | `vault_crouch` | `VAULT` / `VaultPhase.CROUCH` (`_start_vault`) | `vault_telegraph_time` 0.35 s (floor `MIN_TELEGRAPH`) | one-shot | 14 / 5 | White glow (`VAULT_COLOR`) rises (code) | Tight crouch, **white**, pinned against a wall: "she is about to jump over you". Differs from the red dagger and the amber draws: no weapon raised. |
 | `vault_air` | `VaultPhase.AIR` (`_launch_vault`) | flight = 2 x sqrt(2 x 1400 x 130) / 1400 = **0.86 s** (apex `vault_apex_height` 130, rise about 0.43 s) | one-shot (holds on landing) | 12 / 8 | Apex at about frame 4. She is **not** `Visual`-offset: the arc is physical (`CharacterBody2D`), so the art must be drawn in place | Arc over Luz: tucked body, trailing hair, bow clear. Contact damage is off (`vault_contact_damage` false) so the pose must not look like an attack. |
 | `vault_land` | `VaultPhase.LAND` | `vault_recover_time` 0.3 s | one-shot | 12 / 4 | Dust VFX at frame 0 | Soft landing, recovers to ready stance. |
-| `defeat` | `DEFEATED` (`make_corpse_at`) | `defeat_time` 0.9 s | one-shot | 10 / 9 | Code moves `Visual.position.y` up to `-defeat_rise` 24 px and fades `Visual.modulate.a` 1 to 0 over the same 0.9 s, then hides the node. The last frames may be near-invisible | Kneels, bow drops, dissolves into moonlight. No corpse. A boss restored as already dead stays hidden: no clip. |
+| `defeat` | `DEFEATED` (`make_corpse_at`) | `defeat_time` 0.9 s | one-shot, **holds its last frame forever** | 10 / 9 | The killing blow first plays a screen flash, a freeze and a slow motion (code, `BossFeel`). Code then slumps `Visual` (rotation, squash, dim) and drops `Visual/Bow` on the ground over `defeat_time`; the node is NOT hidden: she stays as a corpse where she fell for the rest of the run. A boss restored as already dead skips the clip and shows the last frame at once | Kneels, bow drops, collapses forward and stays down. The last frame is the permanent corpse: it must read as clearly defeated, lie on the floor line, and not look like a pose she could get up from. It is dimmed by code (`Enemy.CORPSE_TINT`), do not bake the dimming |
 | `intro` | Entry to the arena (BossArena T4) | **TBD** | one-shot | TBD | TBD. Must end in the `idle` pose and run before the first `opening_delay` | **TBD**: optional. Not part of the first integration. |
 
 ### 3.4 Spectral stag (`SpectralStag`, `Area2D`)
@@ -261,3 +261,31 @@ Orientation: the stag is drawn facing right; `scale.x = dir` flips it.
 - Aim-angle range of the shot: `_aim_dir` is free-angle; no angle limit exists in code. Optional `aim_up` / `aim_level` / `aim_down` draw variants are TBD.
 - Stag travel duration: depends on the arena width found by the wall probe (up to `arena_half_width` 400 each side, so about 1.5 s at most with no wall).
 - `intro` and `stag_vanish`: not defined in code; TBD.
+
+---
+
+## 7. Audio cues
+
+Every cue is an empty `AudioStreamPlayer2D` under `Artemis/Sfx` (arena cues: `AudioStreamPlayer` under `BossArena/Sfx`). A sound designer only assigns a stream to the node; no code change. A slot with no stream is silent and never an error. Each cue also emits the `sfx_cue(cue)` signal (boss) or `BossArena.sfx_cue`, even when silent, so tools can follow the events. Cues share the Master bus (the project defines no other bus yet).
+
+| Cue (node path) | Trigger event (code) | Intended feel | Supports telegraph |
+|---|---|---|---|
+| `Sfx/BowDraw` | Start of the aimed shot and the fan telegraph (`_begin_telegraph`) | Creak of a bow being drawn, rising tension, about 0.5 s | Aimed shot 0.6 s, fan 0.45 s |
+| `Sfx/BowRelease` | The arrow(s) leave the bow: shot, fan and rain launch (`_fire_attack`) | Sharp string snap and whoosh | Closes the shot, fan and rain telegraphs |
+| `Sfx/RainWhistle` | Start of the arrow rain telegraph (`_begin_telegraph`) | A rising whistle of arrows climbing the sky, about 0.8 s | Arrow rain 0.8 s |
+| `Sfx/RainImpact` | The first rain arrow reaches a surface (`_rain_fall_time` after release) | Many thin thuds into the ground | Marks the end of the rain, start of the punish |
+| `Sfx/DaggerSwish` | The dagger swing begins (`_swing_dagger`) | A short, close blade slash | Dagger 0.35 s |
+| `Sfx/VaultCrouch` | The cornered vault crouch begins (`_start_vault`) | A quick gather and cloth rustle, subtle | Vault crouch 0.35 s |
+| `Sfx/DiveLeap` | Start of the moon dive telegraph (`_begin_dive`) | A silvery rising leap, fading out as she leaves the screen | Moon dive leap and track |
+| `Sfx/DiveImpact` | She lands in the ground (`_update_dive_fall`, same frame as the camera shake) | A heavy impact with a moonlit ring | Moon dive lock marker |
+| `Sfx/StagHorn` | Start of the stag telegraph (`_begin_telegraph`) | A distant horn call, ominous, about 0.8 s | Spectral stag 0.8 s edge glow |
+| `Sfx/StagCharge` | The stag is launched (`_summon_stag`, with the light camera shake) | Hooves and spectral rush crossing the arena | Closes the stag telegraph |
+| `Sfx/Flinch` | A hit cancels a telegraph (`_try_interrupt`) | A short grunt and a snapped string | Any cancelled telegraph |
+| `Sfx/Stagger` | She is staggered (`_enter_stagger`) | A dazed stumble and exhale | None (reaction) |
+| `Sfx/PhaseTwo` | The phase-two transition starts (`_try_transition`, with the camera shake) | Moonlight swelling, a rising choir or chime | None (phase beat) |
+| `Sfx/Defeat` | The killing blow (`_play_final_blow`, with the flash, freeze and shake) | A final, resonant impact fading into silence | None (defeat) |
+| `BossArena/Sfx/DoorsClose` | The doors fall shut (`BossArena._set_doors(true)`, with a light camera shake) | Heavy stone doors slamming | Fight start |
+| `BossArena/Sfx/DoorsOpen` | The doors rise (`BossArena._set_doors(false)`) | Stone grinding open, relief | Fight end |
+| `BossArena/Sfx/BossIntro` | The name card shows (`BossArena._start_fight`) | A short sting or drum as the title appears | None (intro) |
+
+Camera shakes (strengths are `@export`s on `Artemis`, group "Camera Shakes" and "Final Blow", and on `BossArena`, group "Camera Shake"): phase-two transition, moon dive impact, stag launch (light), doors closing (light), killing blow (strong).

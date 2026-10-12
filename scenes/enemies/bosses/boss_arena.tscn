@@ -30,3 +30,11 @@ disabled = true
 
 [node name="Visual" type="Polygon2D" parent="DoorRight"]
 color = Color(0.42, 0.34, 0.26, 1)
+
+[node name="Sfx" type="Node" parent="."]
+
+[node name="DoorsClose" type="AudioStreamPlayer" parent="Sfx"]
+
+[node name="DoorsOpen" type="AudioStreamPlayer" parent="Sfx"]
+
+[node name="BossIntro" type="AudioStreamPlayer" parent="Sfx"]

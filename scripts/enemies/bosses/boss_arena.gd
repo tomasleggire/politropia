@@ -10,7 +10,14 @@ extends Node2D
 ## to the arena, the name card and the health bar show, and the boss is engaged.
 ## When Luz dies and wakes up, everything resets and the trigger is armed again.
 ## When the boss falls, the doors open, the camera is released and the reward
-## (the double jump) appears. A beaten boss stays beaten: see BossProgress.
+## (the double jump) appears. A beaten boss stays beaten, as a corpse where she
+## fell: see BossProgress. Loading the arena again (a revisit, a scene reload)
+## puts the corpse back, opens everything, and re-spawns the reward if it was
+## never picked up, so a reload can never lose the double jump.
+##
+## Audio cues: `Sfx/DoorsClose`, `Sfx/DoorsOpen` and `Sfx/BossIntro` are empty
+## `AudioStreamPlayer` slots; assign streams to them. Each cue also emits
+## `sfx_cue`.
 ##
 ## Boss contract: an `Enemy` (`hit`, `died`, `reset_to_spawn`, `get_health`). The
 ## optional methods `engage()`, `set_arena_limits(left_x, right_x)`,
@@ -24,6 +31,8 @@ signal fight_started
 signal fight_reset
 signal arena_cleared
 signal reward_spawned(reward: DoubleJumpReward)
+## A sound cue fired (`DoorsClose`, `DoorsOpen`, `BossIntro`), even with an empty stream.
+signal sfx_cue(cue: StringName)
 
 enum FightState { ARMED, ACTIVE, DEFEATED }
 
@@ -37,6 +46,9 @@ const TRIGGER_MASK := 1
 ## Reward height above the floor (the centre of Luz's body).
 const REWARD_HEIGHT := 28.0
 const PHASE_THRESHOLD_PROPERTY := &"phase_two_threshold"
+const CUE_DOORS_CLOSE := &"DoorsClose"
+const CUE_DOORS_OPEN := &"DoorsOpen"
+const CUE_BOSS_INTRO := &"BossIntro"
 const EDITOR_ARENA_COLOR := Color(0.2, 0.9, 1.0)
 const EDITOR_TRIGGER_COLOR := Color(1.0, 0.9, 0.2)
 const EDITOR_DOOR_COLOR := Color(1.0, 0.3, 0.3)
@@ -72,6 +84,11 @@ const EDITOR_DOOR_COLOR := Color(1.0, 0.3, 0.3)
 		_refresh()
 ## Seconds a door takes to fall shut or rise (0 is instant).
 @export var door_time := 0.25
+
+@export_group("Camera Shake")
+## Light shake when the doors slam shut (pixels, seconds).
+@export var door_shake_strength := 3.0
+@export var door_shake_time := 0.25
 
 @export_group("Boss")
 ## The boss when it is not a direct child of the arena.
@@ -135,8 +152,6 @@ func _ready() -> void:
 		return
 	_boss_id = _boss.get_enemy_key()
 	if _already_defeated():
-		_boss.queue_free()
-		_boss = null
 		_enter_defeated_state()
 		return
 	_connect_boss()
@@ -184,6 +199,14 @@ func get_bar() -> BossHealthBar:
 
 func get_reward() -> DoubleJumpReward:
 	return _reward
+
+
+## Plays the empty-by-default slot `cue` under `Sfx` (no-op without a stream).
+func play_cue(cue: StringName) -> void:
+	sfx_cue.emit(cue)
+	var player := get_node_or_null("Sfx/" + String(cue)) as AudioStreamPlayer
+	if player != null and player.stream != null:
+		player.play()
 
 
 func are_doors_closed() -> bool:
@@ -263,6 +286,10 @@ func _set_doors(closed: bool) -> void:
 	if closed:
 		_set_doors_physics(true)
 		_set_doors_visible(true)
+		play_cue(CUE_DOORS_CLOSE)
+		BossFeel.shake_camera(get_viewport(), door_shake_strength, door_shake_time)
+	else:
+		play_cue(CUE_DOORS_OPEN)
 	if door_time <= 0.0:
 		_snap_doors(closed)
 		_finish_doors(closed)
@@ -400,6 +427,7 @@ func _start_fight(player: Player) -> void:
 	_bar.set_health(_boss.get_health())
 	_bar.show_bar()
 	_bar.show_title(boss_name, title_time)
+	play_cue(CUE_BOSS_INTRO)
 	_kill(_intro_tween)
 	_intro_tween = create_tween()
 	_intro_tween.tween_interval(engage_delay)
@@ -477,8 +505,9 @@ func _on_boss_died(_enemy: Enemy) -> void:
 		_bar.hide_title()
 		_bar.hide_bar(false)
 	_remember_defeat()
-	# Out of the checkpoint contract: a desk rest or Luz's death must not revive her.
-	_boss.remove_from_group(Enemy.GROUP_RESETTABLE)
+	_leave_checkpoint_contract()
+	if _boss.has_signal(&"corpse_settled"):
+		_boss.connect(&"corpse_settled", _remember_defeat)
 	_defeat_tween = create_tween()
 	_defeat_tween.tween_interval(defeat_beat)
 	_defeat_tween.tween_callback(_open_arena)
@@ -499,7 +528,14 @@ func _spawn_reward() -> void:
 	_reward = REWARD_SCENE.instantiate() as DoubleJumpReward
 	add_child(_reward)
 	_reward.global_position = _reward_position()
+	_reward.collected.connect(_on_reward_collected)
 	reward_spawned.emit(_reward)
+
+
+func _on_reward_collected(_player: Node) -> void:
+	var progress := _progress()
+	if progress != null:
+		progress.mark_reward_claimed(_boss_id)
 
 
 func _reward_position() -> Vector2:
@@ -519,10 +555,12 @@ func _progress() -> Node:
 	return get_node_or_null(PROGRESS_PATH)
 
 
+## Also called again when the corpse settles, so the stored spot is the one she
+## really rests on (a kill in mid-air falls first).
 func _remember_defeat() -> void:
 	var progress := _progress()
-	if progress != null:
-		progress.mark_defeated(_boss_id)
+	if progress != null and is_instance_valid(_boss):
+		progress.mark_defeated(_boss_id, _boss.global_position, _boss.get_facing())
 
 
 func _already_defeated() -> bool:
@@ -530,10 +568,29 @@ func _already_defeated() -> bool:
 	return progress != null and progress.is_defeated(_boss_id)
 
 
-## A boss beaten earlier: no boss, no reward, nothing to close.
+## A boss beaten earlier: she lies as a corpse where she fell, nothing closes,
+## and the reward comes back if it was never picked up.
 func _enter_defeated_state() -> void:
 	_state = FightState.DEFEATED
 	_trigger.monitoring = false
+	var corpse: Dictionary = _progress().get_corpse(_boss_id)
+	_boss.make_corpse_at(corpse["position"], corpse["facing"])
+	_leave_checkpoint_contract()
+	if _should_respawn_reward():
+		_spawn_reward()
+
+
+## Out of the checkpoint contract: a desk rest or Luz's death must not revive her.
+func _leave_checkpoint_contract() -> void:
+	_boss.remove_from_group(Enemy.GROUP_RESETTABLE)
+
+
+## Defeated but never claimed, and Luz still cannot double jump.
+func _should_respawn_reward() -> bool:
+	if not reward_enabled or _progress().is_reward_claimed(_boss_id):
+		return false
+	var player := get_tree().get_first_node_in_group(PLAYER_GROUP)
+	return player == null or not player.has_method(&"has_double_jump") or not player.call(&"has_double_jump")
 
 
 func _kill(tween: Tween) -> void:
