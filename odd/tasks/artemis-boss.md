@@ -87,7 +87,7 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - Test arena `scenes/test/artemis_arena.tscn` and the `tests/artemis_boss_test.gd` suite wired into the runner.
   - Route: delegated (writer trigger: 2+ non-trivial files).
 - [x] **T2 Rest of phase 1:** fan, arrow rain with floor markers and gaps, dagger slash anti-turtle. Weighted, distance-based attack selection with no repeats. Also fix the T1 review advisories (a) and (b). Route: delegated.
-- [ ] **T3 Phase 2:** faster recoveries, chained strings, moon dive, spectral stag, phase transition beat. Route: delegated.
+- [x] **T3 Phase 2 + cornered vault:** faster recoveries, chained strings, moon dive, spectral stag, the phase transition beat, and the cornered vault over Luz (user decision 2026-10-12). Also fix advisory (c). Route: delegated.
 - [ ] **T4 BossArena:** trigger, doors, camera lock, boss HP bar and name, reset on Luz death, double jump reward. Route: delegated.
 - [ ] **T5 Animation contract:** `docs/bosses/ARTEMIS_ANIMATIONS.md` (clips, frame counts, durations, hit/fire frame events, what each pose must convey) plus the Codex backlog update. Route: inline (one doc).
 - [ ] **T6 Playtest and tuning:** iPhone deploy, user feel review, number pass. Route: inline.
@@ -114,13 +114,28 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - Advisories fixed: an explicit physics re-enable in `_reset_ai` plus a regression test, and the bounded wait loop.
   - 19 Artemis cases, all 0 failed (parent spot check rerun).
 
+- 2026-10-12: T2 native review was granted and APPROVED (lineage review-ceeb991b3de6ea4c, scoped to db59ecc only), then acknowledged. The boundary is now db59ecc. Advisories:
+  - (c) `_plan_rain` and `_arena_bounds` read `_luz` without a null guard when `start_attack(RAIN)` is called externally. This is real and is carried into T3.
+  - (d) A stale WallProbe after the rain. Verified as not a bug: `_wall_probe.position` is reset before every movement probe (artemis_boss.gd:1038). Optional hardening only.
+
+- 2026-10-12: T3 done (delegated writer).
+  - Phase transition: 1.0 s, still hittable, postponed while an attack is ACTIVE, in STAGGER or in VAULT.
+  - Chains through `CHAIN_TABLE`: SHOT → hop → RAIN, FAN → MOON_DIVE, DAGGER → SHOT. At most 3 links.
+  - Moon dive: leap 0.4, track 0.6, lock 0.4, stuck 1.2. The stuck window is not scaled, she is unhittable while off-screen, and contact is off while stuck.
+  - Spectral stag: new `scripts/enemies/bosses/spectral_stag.gd`. It spawns at the wall farthest from Luz, is 60x48, and can be jumped or dashed.
+  - Cornered vault: telegraph 0.35, apex 130, lands 80 px past Luz, cooldown 4, no contact damage. It has priority over the dagger when she is cornered.
+  - Advisory (c) fixed with `_luz_x()` guards; `_wall_x` restores the probe.
+  - Results: 31 Artemis cases, all 0 failed (parent spot check rerun). The only other failures depend on level_01: case_first_rest and case_level_trail_placement.
+
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.
 - Should the dodge grant i-frames? Today it is only a hop.
-- Cornered escape: when she is pinned in melee she just shoots. Should she hop over Luz instead?
+- ~~Cornered escape?~~ DECIDED 2026-10-12: she vaults over Luz when cornered. The vault is telegraphed and has a cooldown.
 - Should the BossArena call `engage()`? Planned for T4: yes.
 - Should the rain zones follow Luz (current) or sweep the whole floor?
 - Are 18 rain arrows per volley fine on mobile? Check during the T6 playtest.
+- Should the arena bounds come from BossArena in T4 instead of `arena_half_width` probes? Planned: yes.
+- Does the 80 px vault landing distance feel right? Check during the T6 playtest.
 
 ## Next step
-T3.
+T4.

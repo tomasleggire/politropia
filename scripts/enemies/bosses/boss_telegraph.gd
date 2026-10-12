@@ -9,11 +9,12 @@ extends Node2D
 ## calls: the boss logic only talks to this API.
 ##
 ## Colour language: amber warns of a ranged attack, red of melee, pale
-## moon-silver marks phase two.
+## moon-silver marks phase two, and plain white marks her vault over Luz.
 
 const RANGED_COLOR := Color(1.0, 0.72, 0.25)
 const MELEE_COLOR := Color(0.95, 0.25, 0.2)
 const MOON_COLOR := Color(0.8, 0.9, 1.0)
+const VAULT_COLOR := Color(1.0, 1.0, 1.0)
 
 const MARKER_POOL_SIZE := 8
 ## Aim lines available at once (a fan draws one per arrow).

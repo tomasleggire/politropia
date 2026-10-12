@@ -1,8 +1,10 @@
 extends "res://tests/support/ritual_suite.gd"
-## Artemis boss (T1 + T2): scene basics, health and defeat, the phase threshold, the
+## Artemis boss (T1 to T3): scene basics, health and defeat, the phase threshold, the
 ## aimed shot and its arrow, the dash i-frames, backstep, dodge, feint, kiting,
 ## walls and ledges, stagger, the checkpoint reset, the fan volley, the arrow
-## rain, the dagger slash and the weighted attack choice. Each case builds its own
+## rain, the dagger slash and the weighted attack choice, then phase two: the
+## transition beat, shorter recoveries, chained strings, the moon dive, the
+## spectral stag and the cornered vault. Each case builds its own
 ## floor (top at y=0), Luz and boss, and tweaks exports so only the behaviour
 ## under test can happen. Timings are measured in physics steps.
 ##
@@ -40,6 +42,18 @@ const CHECKS := {
 	"case_dagger_blocked_by_dash": 2,
 	"case_attack_selection": 6,
 	"case_reset_after_defeat_fade": 2,
+	"case_phase_transition": 8,
+	"case_phase_two_recoveries": 2,
+	"case_chained_strings": 6,
+	"case_moon_dive": 6,
+	"case_moon_dive_stuck_is_a_punish_window": 5,
+	"case_moon_dive_dash": 2,
+	"case_spectral_stag": 8,
+	"case_cornered_vault": 10,
+	"case_vault_on_hit_and_priority": 5,
+	"case_phase_two_selection": 2,
+	"case_attack_without_luz": 3,
+	"case_phase_two_reset": 5,
 }
 
 var _rig: Node2D
@@ -602,4 +616,425 @@ func case_attack_selection() -> void:
 	var forced: int = _boss._choose_attack()
 	var again: int = _boss._choose_attack()
 	h.check(forced == ArtemisBoss.Attack.DAGGER and again != ArtemisBoss.Attack.DAGGER, "a lingering Luz forces one dagger, then the usual draw resumes")
+	_end_case()
+
+
+# -- Phase two: transition, recoveries, chains ------------------------------------------------
+
+const P2 := ArtemisBoss.PHASE_TWO
+const P2_QUIET := {
+	"wake_distance": 0.0, "reposition_min_time": 99.0, "reposition_max_time": 99.0,
+	"kite_speed": 0.0, "backstep_trigger_distance": 0.0, "dodge_chance": 0.0,
+	"feint_chance": 0.0, "stagger_hits": 0, "chain_chance": 0.0,
+}
+
+
+## A Luz that survives every hit the tests throw at her.
+func _tough_luz() -> void:
+	_player.set_max_health(30)
+	_player.heal(30)
+
+
+func case_phase_transition() -> void:
+	await _build_rig(LUZ_START)
+	await _add_boss(Vector2(300.0, 0.0), P2_QUIET)
+	var phases: Array[int] = []
+	_boss.phase_changed.connect(func(phase: int) -> void: phases.append(phase))
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	await h.secs(0.2)
+	_hit(15)
+	h.check(_boss.get_state() == ArtemisBoss.State.TRANSITION and not _boss.get_telegraph().is_aim_line_visible(), "crossing the threshold interrupts a telegraph and starts the transition")
+	h.check(phases == [2], "phase_changed(2) is emitted once (%s)" % [phases])
+	var landed := _boss.receive_hit(1, HIT_FROM, &"attack_1")
+	h.check(landed and _boss.get_health() == 14, "she stays hittable during the transition (%d)" % _boss.get_health())
+	var glow_seen := false
+	var t := 0.0
+	while _boss.get_state() == ArtemisBoss.State.TRANSITION and t < 0.9:
+		await h.tree.physics_frame
+		t += _dt()
+		glow_seen = glow_seen or _boss.get_telegraph().is_glowing()
+	h.check(glow_seen and _boss.active_arrow_count() == 0, "she glows silver and does not attack")
+	await h.secs(0.3)
+	h.check(absf(_boss.phase_two_transition_time - 1.0) < 0.001 and _boss.get_state() != ArtemisBoss.State.TRANSITION and not _boss.get_telegraph().is_glowing(), "the beat lasts about a second, then the glow is gone")
+	_hit(1)
+	h.check(_boss.get_state() != ArtemisBoss.State.TRANSITION and phases == [2], "it never plays twice")
+	await _build_rig(LUZ_START)
+	await _add_boss(Vector2(300.0, 0.0), P2_QUIET)
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	_boss._set_attack_phase(ArtemisBoss.AttackPhase.ACTIVE)
+	_hit(15)
+	h.check(_boss.get_state() == ArtemisBoss.State.ATTACK, "a strike that is already active is not interrupted")
+	var entered := await _sees_state(ArtemisBoss.State.TRANSITION, 0.5)
+	h.check(entered, "the transition starts once the strike is over")
+	_end_case()
+
+
+func _recover_duration() -> float:
+	var t := 0.0
+	while _boss.get_attack_phase() != ArtemisBoss.AttackPhase.RECOVER and t < 4.0:
+		await h.tree.physics_frame
+		t += _dt()
+	var recover := 0.0
+	while _boss.get_state() == ArtemisBoss.State.ATTACK and recover < 3.0:
+		await h.tree.physics_frame
+		recover += _dt()
+	return recover
+
+
+func case_phase_two_recoveries() -> void:
+	await _build_rig(LUZ_START)
+	await _add_boss(Vector2(300.0, 0.0), P2_QUIET)
+	_boss._phase = P2
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	var shot := await _recover_duration()
+	h.check(absf(shot - _boss.shot_recover_time * _boss.phase_two_recover_scale) < 0.06, "the shot recovery is 15%% shorter in phase two (%.2f)" % shot)
+	_boss.start_attack(ArtemisBoss.Attack.STAG)
+	var stag := await _recover_duration()
+	h.check(absf(stag - _boss.stag_recover_time * _boss.phase_two_recover_scale) < 0.06, "and so is the stag's, a new attack (%.2f)" % stag)
+	_end_case()
+
+
+## Attacks started, in order, over `seconds` of play.
+func _run_string(first: ArtemisBoss.Attack, tweaks: Dictionary, luz_x: float, boss_x: float, phase: int, seconds: float) -> Array[int]:
+	await _build_rig(Vector2(luz_x, 0.0))
+	_tough_luz()
+	await _add_boss(Vector2(boss_x, 0.0), tweaks)
+	_boss._phase = phase
+	_boss.start_attack(first)
+	var seen: Array[int] = []
+	var was_telegraphing := false
+	for i: int in int(seconds / _dt()):
+		await h.tree.physics_frame
+		var now := _boss.is_telegraphing()
+		if now and not was_telegraphing:
+			seen.append(_boss.get_attack())
+		was_telegraphing = now
+	return seen
+
+
+func _no_repeats(attacks: Array[int]) -> bool:
+	for i: int in range(1, attacks.size()):
+		if attacks[i] == attacks[i - 1]:
+			return false
+	return true
+
+
+func case_chained_strings() -> void:
+	var tweaks := P2_QUIET.duplicate()
+	tweaks["chain_chance"] = 1.0
+	var dagger := ArtemisBoss.Attack.DAGGER
+	var shot := ArtemisBoss.Attack.AIMED_SHOT
+	var rain := ArtemisBoss.Attack.RAIN
+	var full := await _run_string(dagger, tweaks, -55.0, 0.0, P2, 6.0)
+	h.check(full == [dagger, shot, rain], "dagger flip chains into a shot, then a rain: %s" % [full])
+	h.check(_no_repeats(full) and _boss.get_state() == ArtemisBoss.State.REPOSITION, "never the same attack twice, and the string ends in a reposition")
+	var capped := tweaks.duplicate()
+	capped["chain_max_length"] = 2
+	var short := await _run_string(dagger, capped, -55.0, 0.0, P2, 6.0)
+	h.check(short == [dagger, shot] and _boss.get_state() == ArtemisBoss.State.REPOSITION, "chain_max_length forces the reposition after that many attacks: %s" % [short])
+	var phase_one := await _run_string(dagger, tweaks, -55.0, 0.0, 1, 3.0)
+	h.check(phase_one == [dagger], "phase one never chains: %s" % [phase_one])
+	var seeded := P2_QUIET.duplicate()
+	seeded["chain_chance"] = 0.5
+	var first_run := await _run_string(shot, seeded, 0.0, 300.0, P2, 5.0)
+	var second_run := await _run_string(shot, seeded, 0.0, 300.0, P2, 5.0)
+	h.check(first_run == second_run and _no_repeats(first_run), "with the seeded rng the strings repeat exactly: %s" % [first_run])
+	var hop_seen := false
+	await _build_rig(Vector2(0.0, 0.0))
+	await _add_boss(Vector2(300.0, 0.0), tweaks)
+	_boss._phase = P2
+	_boss.start_attack(shot)
+	hop_seen = await _sees_state(ArtemisBoss.State.BACKSTEP, 2.5)
+	h.check(hop_seen, "a shot string hops back before the rain")
+	_end_case()
+
+
+# -- Moon dive ------------------------------------------------------------------------------
+
+func _contact_on() -> bool:
+	return (_boss.get_node("ContactDamage") as Area2D).monitoring
+
+
+func case_moon_dive() -> void:
+	await _build_rig(Vector2(0.0, 0.0))
+	_tough_luz()
+	await _add_boss(Vector2(300.0, 0.0), P2_QUIET)
+	_boss._phase = P2
+	_boss.start_attack(ArtemisBoss.Attack.MOON_DIVE)
+	var t := 0.0
+	var stage := 0
+	var locked_time := 0.0
+	var marker_during_lock := true
+	var off_ok := false
+	var tracked_left := false
+	var tracked_right := false
+	while _boss.is_telegraphing() and t < 3.0:
+		await h.tree.physics_frame
+		t += _dt()
+		if t > 0.5 and stage == 0:
+			_place_luz(Vector2(-120.0, 0.0))
+			stage = 1
+		elif t > 0.65 and stage == 1:
+			tracked_left = absf(_boss.get_dive_x() + 120.0) < 3.0
+			stage = 2
+		elif t > 0.8 and stage == 2:
+			_place_luz(Vector2(100.0, 0.0))
+			stage = 3
+		elif t > 0.9 and stage == 3:
+			tracked_right = absf(_boss.get_dive_x() - 100.0) < 3.0
+			stage = 4
+		elif _boss.is_dive_locked() and stage == 4:
+			_place_luz(Vector2(-200.0, 0.0))
+			stage = 5
+		if _boss.is_telegraphing() and _boss.is_dive_locked():
+			locked_time += _dt()
+			marker_during_lock = marker_during_lock and _boss.get_telegraph().is_floor_marker_visible(0)
+		if _boss.is_offscreen() and not off_ok:
+			await h.frames(2)
+			off_ok = not _boss.receive_hit(1, HIT_FROM, &"attack_1") and _boss.collision_layer == 0 and not _contact_on() and not (_boss.get_node("Visual") as Node2D).visible
+	h.check(off_ok, "off-screen she cannot be hit and deals no contact damage")
+	h.check(tracked_left and tracked_right, "the marker tracks Luz's x while she leaps and tracks")
+	h.check(absf(_boss.get_dive_x() - 100.0) < 3.0, "then it locks and ignores Luz moving away (%.0f)" % _boss.get_dive_x())
+	h.check(locked_time >= 0.35 and marker_during_lock, "the lock lasts at least 0.35 s with the marker shown (%.2f)" % locked_time)
+	await h.frames(8)
+	h.check(absf(_boss.global_position.x - 100.0) < 3.0 and _player.get_health() == 30, "she dives onto the locked x and Luz, elsewhere, is untouched (x %.0f)" % _boss.global_position.x)
+	var stuck := await _recover_duration()
+	h.check(stuck >= 1.2 - 0.03, "stuck in the ground for at least 1.2 s even in phase two (%.2f)" % stuck)
+	_end_case()
+
+
+func case_moon_dive_stuck_is_a_punish_window() -> void:
+	await _build_rig(Vector2(0.0, 0.0))
+	await _add_boss(Vector2(300.0, 0.0), P2_QUIET)
+	_boss._phase = P2
+	_boss.start_attack(ArtemisBoss.Attack.MOON_DIVE)
+	var t := 0.0
+	while _boss.get_attack_phase() != ArtemisBoss.AttackPhase.RECOVER and t < 4.0:
+		await h.tree.physics_frame
+		t += _dt()
+	await h.frames(3)
+	h.check(_player.get_health() == 2, "the impact hurts Luz standing at the locked x (%d)" % _player.get_health())
+	h.check(_boss.collision_layer == Enemy.ENEMY_LAYER and _boss.visible and not _boss.is_offscreen(), "once she is stuck she is solid and visible again")
+	h.check(not _contact_on(), "her body is harmless while she is stuck, so Luz can punish")
+	h.check(_boss.receive_hit(1, HIT_FROM, &"attack_1"), "and she can be hit")
+	await _recover_duration()
+	await h.frames(3)
+	h.check(_contact_on() and _boss.get_state() != ArtemisBoss.State.ATTACK, "contact damage returns when she moves again")
+	_end_case()
+
+
+func case_moon_dive_dash() -> void:
+	var tweaks := P2_QUIET.duplicate()
+	tweaks["dive_speed"] = 100000.0
+	tweaks["dive_impact_time"] = 0.5
+	await _build_rig(Vector2(0.0, 0.0))
+	await _add_boss(Vector2(300.0, 0.0), tweaks)
+	_boss._phase = P2
+	_boss.start_attack(ArtemisBoss.Attack.MOON_DIVE)
+	var t := 0.0
+	while not (_boss.is_telegraphing() and _boss._state_left < 0.04) and t < 3.0:
+		await h.tree.physics_frame
+		t += _dt()
+	_player.request_dash()
+	var covered := false
+	for i: int in int(0.7 / _dt()):
+		await h.tree.physics_frame
+		if _boss.is_dive_hitbox_armed() and (_boss.get_node("DiveHitbox") as Area2D).overlaps_body(_player):
+			covered = covered or _player.is_dash_invulnerable()
+	h.check(covered, "Luz was dashing inside the armed impact")
+	h.check(_player.get_health() == 3, "and her dash i-frames made the dive miss (%d)" % _player.get_health())
+	_end_case()
+
+
+# -- Spectral stag --------------------------------------------------------------------------------
+
+func _stag_run(react: String) -> Dictionary:
+	await _build_rig(LUZ_START)
+	_tough_luz()
+	var tweaks := P2_QUIET.duplicate()
+	tweaks["arena_half_width"] = 900.0
+	await _add_boss(Vector2(0.0, 0.0), tweaks)
+	_boss._phase = P2
+	var stag := _boss.get_stag()
+	var out := {"min_x": 1.0e9, "start_x": 0.0, "clearance": 1.0e9, "covered": false, "edge": 0.0, "telegraph": 0.0, "hittable": false, "dir": 0}
+	_boss.start_attack(ArtemisBoss.Attack.STAG)
+	var t := 0.0
+	while _boss.is_telegraphing() and t < 2.0:
+		await h.tree.physics_frame
+		t += _dt()
+		out["edge"] += _dt() if _boss.get_telegraph().is_floor_marker_visible(0) else 0.0
+		out["hittable"] = out["hittable"] or _boss.collision_layer == Enemy.ENEMY_LAYER
+	out["telegraph"] = t
+	var acted := false
+	for i: int in int(3.5 / _dt()):
+		await h.tree.physics_frame
+		if stag.is_active():
+			if out["start_x"] == 0.0:
+				out["start_x"] = stag.global_position.x
+				out["dir"] = stag.get_direction()
+			out["min_x"] = minf(out["min_x"], stag.global_position.x)
+			var dx := absf(stag.global_position.x - _player.global_position.x)
+			if not acted and dx < (150.0 if react == "jump" else 200.0) and react != "none":
+				acted = true
+				if react == "jump":
+					_player.request_jump()
+				else:
+					_player.request_dash()
+			if dx < SpectralStag.WIDTH * 0.5 + 14.0:
+				out["clearance"] = minf(out["clearance"], -_player.global_position.y)
+				out["covered"] = out["covered"] or _player.is_dash_invulnerable()
+		elif out["start_x"] != 0.0:
+			break
+	out["active_after"] = stag.is_active()
+	out["visible_after"] = stag.visible
+	out["hit"] = stag.has_hit()
+	return out
+
+
+func case_spectral_stag() -> void:
+	var run := await _stag_run("none")
+	h.check(float(run["edge"]) >= 0.35 and absf(float(run["telegraph"]) - _boss.stag_telegraph_time) < 0.05, "the edge glow lasts %.1f s, never under 0.35 (%.2f / %.2f)" % [_boss.stag_telegraph_time, run["edge"], run["telegraph"]])
+	h.check(run["hittable"], "she stands casting, solid and hittable, meanwhile")
+	h.check(int(run["dir"]) == -1 and float(run["start_x"]) > 400.0, "it appears at the wall farthest from Luz (x %.0f)" % run["start_x"])
+	h.check(float(run["min_x"]) < -400.0, "it charges across the whole arena (to x %.0f)" % run["min_x"])
+	h.check(_player.get_health() == 29 and run["hit"], "a grounded Luz is hit exactly once (%d)" % _player.get_health())
+	h.check(not run["active_after"] and not run["visible_after"], "and it despawns at the far wall")
+	_end_case()
+	run = await _stag_run("jump")
+	h.check(float(run["clearance"]) > SpectralStag.HEIGHT and _player.get_health() == 30, "a normal jump clears it (%.0f px up, health %d)" % [run["clearance"], _player.get_health()])
+	_end_case()
+	run = await _stag_run("dash")
+	h.check(run["covered"] and _player.get_health() == 30, "a dash passes through it (health %d)" % _player.get_health())
+	_end_case()
+
+
+# -- Cornered vault --------------------------------------------------------------------------------
+
+const WALL_SIDE := Vector2(430.0, 0.0)
+
+
+func _vault_rig(luz_x: float, tweaks := {}) -> void:
+	var all := P2_QUIET.duplicate()
+	all.merge(tweaks, true)
+	await _build_rig(Vector2(luz_x, 0.0))
+	_tough_luz()
+	await _add_boss(WALL_SIDE, all)
+	_boss.engage()
+
+
+func case_cornered_vault() -> void:
+	await _vault_rig(340.0)
+	var t := 0.0
+	while _boss.get_state() != ArtemisBoss.State.VAULT and t < 1.5:
+		await h.tree.physics_frame
+		t += _dt()
+	h.check(_boss.get_state() == ArtemisBoss.State.VAULT and t > _boss.vault_trigger_time - 0.05, "Luz in her face with a wall at her back triggers the vault after %.1f s (%.2f)" % [_boss.vault_trigger_time, t])
+	var crouch := 0.0
+	var glow_seen := false
+	while _boss.get_vault_phase() == ArtemisBoss.VaultPhase.CROUCH and crouch < 1.0:
+		await h.tree.physics_frame
+		crouch += _dt()
+		glow_seen = glow_seen or _boss.get_telegraph().is_glowing()
+	h.check(crouch >= 0.35 - 0.03 and glow_seen, "a crouch with a white glow warns for at least 0.35 s (%.2f)" % crouch)
+	h.check(not _contact_on(), "no contact damage during the vault by default")
+	var apex := 0.0
+	var air := 0.0
+	while _boss.get_state() == ArtemisBoss.State.VAULT and air < 3.0:
+		await h.tree.physics_frame
+		air += _dt()
+		apex = minf(apex, _boss.global_position.y)
+	h.check(apex < -100.0, "the arc clears Luz's 58 px body with room to spare (apex %.0f)" % apex)
+	h.check(_boss.global_position.x < _player.global_position.x, "she lands on the other side of Luz (x %.0f)" % _boss.global_position.x)
+	h.check(_boss.global_position.x > -450.0 + 13.0 and _boss.global_position.x < 450.0 - 13.0, "inside the arena")
+	h.check(_player.get_health() == 30, "and Luz is not hurt")
+	h.check(_boss.get_state() == ArtemisBoss.State.REPOSITION, "after the short landing recovery she repositions")
+	_boss.global_position = WALL_SIDE
+	_boss.velocity = Vector2.ZERO
+	await h.secs(1.2)
+	h.check(_boss.get_state() != ArtemisBoss.State.VAULT, "the cooldown stops a second vault right away")
+	_end_case()
+	await _vault_rig(340.0, {"vault_contact_damage": true})
+	await h.secs(0.5)
+	h.check(_boss.get_state() == ArtemisBoss.State.VAULT and _contact_on(), "contact damage during the vault is an exported option")
+	_end_case()
+
+
+func case_vault_on_hit_and_priority() -> void:
+	await _vault_rig(200.0)
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.VAULT, "a hit while cornered makes her vault even with Luz far")
+	_end_case()
+	await _vault_rig(200.0)
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	_boss._set_attack_phase(ArtemisBoss.AttackPhase.ACTIVE)
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.ATTACK, "never while an attack is active")
+	_end_case()
+	await _vault_rig(400.0)
+	_boss._luz_close_time = _boss.dagger_trigger_time + 0.5
+	_boss._pick_next_action()
+	h.check(_boss.get_state() == ArtemisBoss.State.VAULT, "cornered, the vault takes priority over the forced dagger")
+	_end_case()
+	await _vault_rig(400.0)
+	_boss._luz_close_time = _boss.dagger_trigger_time + 0.5
+	_boss._vault_left = 3.0
+	_boss._pick_next_action()
+	h.check(_boss.get_state() == ArtemisBoss.State.ATTACK and _boss.get_attack() == ArtemisBoss.Attack.DAGGER, "on cooldown the dagger answers instead")
+	_end_case()
+	await _vault_rig(0.0)
+	_boss.global_position = Vector2.ZERO
+	await h.secs(0.8)
+	h.check(_boss.get_state() != ArtemisBoss.State.VAULT, "in the open with Luz close she does not vault")
+	_end_case()
+
+
+# -- Selection, guards and reset in phase two ------------------------------------------------------
+
+func case_phase_two_selection() -> void:
+	await _build_rig(Vector2(0.0, 0.0))
+	await _add_boss(Vector2(300.0, 0.0), {"wake_distance": 0.0})
+	var one: Array[int] = []
+	for x: float in [0.0, 80.0, 200.0]:
+		one.append_array(_draws(x, 150))
+	h.check(one.max() <= ArtemisBoss.Attack.DAGGER, "phase one never draws the moon dive or the stag")
+	_boss._phase = P2
+	_boss._last_attack = ArtemisBoss.NO_ATTACK
+	var two := _draws(0.0, 200)
+	h.check(two.has(ArtemisBoss.Attack.MOON_DIVE) and two.has(ArtemisBoss.Attack.STAG) and _never_repeats(two), "phase two mixes them in and still never repeats")
+	_end_case()
+
+
+func case_attack_without_luz() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(300.0, 0.0), {"wake_distance": 0.0})
+	_boss.start_attack(ArtemisBoss.Attack.RAIN)
+	h.check(_boss.get_state() == ArtemisBoss.State.ATTACK, "an external rain without Luz does not crash")
+	_boss.start_attack(ArtemisBoss.Attack.STAG)
+	_boss.start_attack(ArtemisBoss.Attack.MOON_DIVE)
+	_boss.start_attack(ArtemisBoss.Attack.AIMED_SHOT)
+	h.check(_boss._arena_bounds().x < _boss._arena_bounds().y, "nor do the dive, the stag or the arena bounds")
+	h.check(_boss.get_node("WallProbe").position == Vector2(0.0, -24.0), "and the wall probe goes back where it was")
+	_end_case()
+
+
+func case_phase_two_reset() -> void:
+	await _build_rig(LUZ_START)
+	await _add_boss(Vector2(300.0, 0.0), P2_QUIET)
+	_hit(15)
+	_boss.start_attack(ArtemisBoss.Attack.MOON_DIVE)
+	await h.secs(0.7)
+	h.check(_boss.is_offscreen(), "mid-dive she is off-screen")
+	h.cps.reset_resettable_enemies()
+	await h.frames(3)
+	h.check(_boss.get_phase() == 1 and _boss.get_state() == ArtemisBoss.State.IDLE, "a checkpoint reset returns to phase one and idle")
+	h.check(_boss.visible and _boss.collision_layer == Enemy.ENEMY_LAYER and not _boss.is_offscreen() and _contact_on(), "and she is back, solid and harmful")
+	_boss._phase = P2
+	_boss.start_attack(ArtemisBoss.Attack.STAG)
+	await h.secs(1.2)
+	var running := _boss.get_stag().is_active()
+	h.cps.reset_resettable_enemies()
+	await h.frames(2)
+	h.check(running and not _boss.get_stag().is_active(), "a reset also recalls the stag")
+	_hit(15)
+	h.check(_boss.get_state() == ArtemisBoss.State.TRANSITION, "and phase two can start again afterwards")
 	_end_case()
