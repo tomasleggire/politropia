@@ -88,8 +88,8 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - Route: delegated (writer trigger: 2+ non-trivial files).
 - [x] **T2 Rest of phase 1:** fan, arrow rain with floor markers and gaps, dagger slash anti-turtle. Weighted, distance-based attack selection with no repeats. Also fix the T1 review advisories (a) and (b). Route: delegated.
 - [x] **T3 Phase 2 + cornered vault:** faster recoveries, chained strings, moon dive, spectral stag, the phase transition beat, and the cornered vault over Luz (user decision 2026-10-12). Also fix advisory (c). Route: delegated.
-- [ ] **T4 BossArena:** trigger, doors, camera lock, boss HP bar and name, reset on Luz death, double jump reward. Route: delegated.
-- [ ] **T5 Animation contract:** `docs/bosses/ARTEMIS_ANIMATIONS.md` (clips, frame counts, durations, hit/fire frame events, what each pose must convey) plus the Codex backlog update. Route: inline (one doc).
+- [ ] **T4 BossArena:** trigger, doors, camera lock, boss HP bar and name, reset on Luz death, double jump reward, arena bounds fed to the boss, and permanent defeat. Also fix advisories (e) and (f). Route: delegated.
+- [x] **T5 Animation contract:** `docs/bosses/ARTEMIS_ANIMATIONS.md` (clips, frame counts, durations, hit/fire frame events, what each pose must convey) plus the Codex backlog update. Route: inline (one doc).
 - [ ] **T6 Playtest and tuning:** iPhone deploy, user feel review, number pass. Route: inline.
 
 ## Progress
@@ -127,6 +127,15 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - Advisory (c) fixed with `_luz_x()` guards; `_wall_x` restores the probe.
   - Results: 31 Artemis cases, all 0 failed (parent spot check rerun). The only other failures depend on level_01: case_first_rest and case_level_trail_placement.
 
+- 2026-10-12: T3 native review was granted and APPROVED (lineage review-070a1abba84a1c34, scoped to 617ddc6), then acknowledged. The boundary is now 617ddc6. Advisories carried into T4:
+  - (e) `_update_hop` starts a pending chain at the end of ANY hop. The dodge is only allowed in REPOSITION/FEINT, which clear the chain, so this is likely unreachable. Harden it anyway: chain only on the chain's own hop.
+  - (f) Add tests for the transition postponed by STAGGER or VAULT that fires exactly once afterwards.
+
+- 2026-10-12: T5 done (delegated writer, run in parallel with T4).
+  - `docs/bosses/ARTEMIS_ANIMATIONS.md`, 259 lines: node contract, a proposed `artemis_animation_catalog.gd` and `_play()` hook, about 45 clips derived from the exports, VFX, telegraph rules, a checklist and an unknowns list.
+  - The Codex backlog in Engram is updated.
+  - Deviation noted: the moon dive is VERTICAL in code (the design said diagonal). The doc follows the code.
+
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.
 - Should the dodge grant i-frames? Today it is only a hop.
@@ -136,6 +145,7 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
 - Are 18 rain arrows per volley fine on mobile? Check during the T6 playtest.
 - Should the arena bounds come from BossArena in T4 instead of `arena_half_width` probes? Planned: yes.
 - Does the 80 px vault landing distance feel right? Check during the T6 playtest.
+- Moon dive: keep it vertical (current, the clearest read) or make it diagonal as originally designed? Check during the T6 playtest.
 
 ## Next step
 T4.
