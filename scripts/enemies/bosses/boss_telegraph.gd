@@ -16,7 +16,8 @@ const MELEE_COLOR := Color(0.95, 0.25, 0.2)
 const MOON_COLOR := Color(0.8, 0.9, 1.0)
 const VAULT_COLOR := Color(1.0, 1.0, 1.0)
 
-const MARKER_POOL_SIZE := 8
+## A rain draws one marker per zone, split where its floor changes height.
+const MARKER_POOL_SIZE := 16
 ## Aim lines available at once (a fan draws one per arrow).
 const LINE_POOL_SIZE := 5
 ## Share of a floor marker's width taken by each bright edge.

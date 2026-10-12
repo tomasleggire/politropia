@@ -24,6 +24,12 @@ extends Enemy
 ## jumps over her, and that takes priority over the dagger; the dagger stays the
 ## anti-turtle everywhere else.
 ##
+## Platforms: she never uses one-way platforms. Her body only collides with solids
+## (layer 1), so she can neither perch on one nor be caught by one; but every attack
+## respects them (arrows stop on their tops, the rain marks the surface it will
+## hit, the dive column reaches Luz on a platform) and the proximity rules need Luz
+## at her height (`vertical_engage_tolerance`).
+##
 ## She is a normal enemy for the base class (hits, flash, registry, checkpoint
 ## reset) except she is never pushed and leaves no corpse. Placeholder visuals
 ## only; the animation contract replaces them without touching this logic.
@@ -40,6 +46,17 @@ enum Attack { AIMED_SHOT, FAN, RAIN, DAGGER, MOON_DIVE, STAG }
 enum VaultPhase { CROUCH, AIR, LAND }
 enum Band { FAR, MID, NEAR }
 
+## She collides with solids only: one-way platforms (layer 2) never hold her.
+const BODY_MASK := 1
+## Solids and one-way platforms: what an arrow or a marker ray can land on.
+const SURFACE_MASK := 3
+const RAIN_MAX_ZONES := 8
+## The surface ray runs this far below the floor, so a pit still finds its bottom.
+const SURFACE_RAY_SLACK := 64.0
+## Two arrow columns whose surfaces differ by less than this share one marker.
+const SURFACE_MERGE := 1.0
+const DIVE_COLUMN_SLOT := 1
+const DIVE_COLUMN_ALPHA_SCALE := 0.55
 const ARROW_SCENE := preload("res://scenes/enemies/bosses/artemis_arrow.tscn")
 ## Arrows kept ready at start; rain adds what its zones need.
 const ARROW_POOL_SIZE := 8
@@ -103,6 +120,12 @@ const NEVER := -1.0e9
 @export var backstep_hop := 240.0
 @export var backstep_cooldown := 2.0
 @export var ledge_probe_depth := 12.0
+
+@export_group("Platforms")
+## Luz counts as "close" (dagger, backstep, vault, dodge, feint, near band) only
+## when her feet are within this many pixels of hers: on a platform above, she is
+## far no matter the x distance.
+@export var vertical_engage_tolerance := 60.0
 
 @export_group("Dodge")
 ## Chance to hop away from the startup of a Luz attack.
@@ -329,12 +352,19 @@ var _has_arena_limits := false
 var _arena_left := 0.0
 var _arena_right := 0.0
 var _interrupt_left := 0.0
+var _surface_ray := PhysicsRayQueryParameters2D.new()
+var _rain_markers: Array[Rect2] = []
+var _rain_marker_count := 0
 
 
 func _ready() -> void:
 	super._ready()
 	if Engine.is_editor_hint():
 		return
+	collision_mask = BODY_MASK
+	_floor_probe.collision_mask = BODY_MASK
+	_surface_ray.collision_mask = SURFACE_MASK
+	_rain_markers.resize(BossTelegraph.MARKER_POOL_SIZE)
 	var body := $CollisionShape2D as CollisionShape2D
 	if body.shape is RectangleShape2D:
 		_half_width = (body.shape as RectangleShape2D).size.x * 0.5
@@ -343,8 +373,8 @@ func _ready() -> void:
 	else:
 		rng.seed = rng_seed
 	_telegraph.bind_body($Visual/Body as Polygon2D)
-	_rain_x.resize(BossTelegraph.MARKER_POOL_SIZE)
-	for i: int in maxi(ARROW_POOL_SIZE, mini(rain_zone_count, BossTelegraph.MARKER_POOL_SIZE) * _rain_arrows_per_zone()):
+	_rain_x.resize(RAIN_MAX_ZONES)
+	for i: int in maxi(ARROW_POOL_SIZE, mini(rain_zone_count, RAIN_MAX_ZONES) * _rain_arrows_per_zone()):
 		_pool.append(_make_arrow())
 	_reset_hit_ring()
 	if not _dead:
@@ -390,6 +420,18 @@ func get_rain_zones() -> Array[Rect2]:
 	for i: int in _rain_count:
 		zones.append(_rain_zone_rect(i))
 	return zones
+
+
+## The markers the current rain draws, on the surface each arrow column will hit
+## (a zone over a platform edge is split in two). World rectangles, for tests.
+func get_rain_markers() -> Array[Rect2]:
+	return _rain_markers.slice(0, _rain_marker_count)
+
+
+## The silver column of the moon dive at the current dive x: from the height she
+## drops from down to the floor. Everything in it is hit by the falling hitbox.
+func get_dive_column() -> Rect2:
+	return Rect2(_dive_x - dive_marker_width * 0.5, global_position.y - dive_height, dive_marker_width, dive_height)
 
 
 ## True while she is off-screen in a moon dive: unhittable and harmless.
@@ -575,6 +617,7 @@ func _reset_ai() -> void:
 	_last_attack = NO_ATTACK
 	_luz_close_time = 0.0
 	_rain_count = 0
+	_rain_marker_count = 0
 	_backstep_left = 0.0
 	_dodge_left = 0.0
 	_feint_left = 0.0
@@ -589,6 +632,8 @@ func _on_player_found(player: Node) -> void:
 	_luz = player as Player
 	_floor_probe.add_exception(player as CollisionObject2D)
 	_wall_probe.add_exception(player as CollisionObject2D)
+	# Markers show the ground, not Luz's head.
+	_surface_ray.exclude = [(player as CollisionObject2D).get_rid()]
 
 
 ## Bosses are never pushed: a hit must not freeze her timers either.
@@ -713,7 +758,7 @@ func _update_idle(delta: float) -> void:
 func _update_reposition(delta: float) -> void:
 	_state_left -= delta
 	var dist := _distance_x()
-	if dist < backstep_trigger_distance and _backstep_left <= 0.0 and _try_backstep():
+	if dist < backstep_trigger_distance and _luz_level() and _backstep_left <= 0.0 and _try_backstep():
 		return
 	_kite(dist)
 	if _state_left <= 0.0:
@@ -748,7 +793,7 @@ func _pick_next_action() -> void:
 
 ## Time Luz spends inside dagger range; leaving it starts the count over.
 func _track_luz_closeness(delta: float) -> void:
-	if _distance_x() < dagger_trigger_distance:
+	if _distance_x() < dagger_trigger_distance and _luz_level():
 		_luz_close_time += delta
 	else:
 		_luz_close_time = 0.0
@@ -766,7 +811,8 @@ func _distance_band() -> Band:
 	var dist := _distance_x()
 	if dist > kite_max_distance:
 		return Band.FAR
-	return Band.MID if dist >= kite_min_distance else Band.NEAR
+	# Luz on a platform above her is never "near": ranged weights, no dagger.
+	return Band.MID if dist >= kite_min_distance or not _luz_level() else Band.NEAR
 
 
 func _band_weights(band: Band) -> PackedFloat32Array:
@@ -818,7 +864,7 @@ func _can_dodge() -> bool:
 
 ## Rolls only when the dodge is actually available, so a seeded run is stable.
 func _try_dodge() -> bool:
-	if _dodge_left > 0.0 or _distance_x() > dodge_react_distance:
+	if _dodge_left > 0.0 or _distance_x() > dodge_react_distance or not _luz_level():
 		return false
 	if rng.randf() >= dodge_chance:
 		return false
@@ -860,7 +906,7 @@ func _poll_luz_attack() -> bool:
 ## -- Feint ---------------------------------------------------------------------
 
 func _try_feint() -> bool:
-	if _feint_left > 0.0 or rng.randf() >= feint_chance:
+	if _feint_left > 0.0 or not _luz_level() or rng.randf() >= feint_chance:
 		return false
 	if _blocked_ahead(_dir_to_luz()):
 		return false
@@ -1099,7 +1145,7 @@ func _rain_zone_rect(index: int) -> Rect2:
 ## dropped, so what remains always has gaps she can walk into.
 func _plan_rain() -> void:
 	var bounds := _arena_bounds()
-	var count := mini(rain_zone_count, BossTelegraph.MARKER_POOL_SIZE)
+	var count := mini(rain_zone_count, RAIN_MAX_ZONES)
 	var pitch := rain_zone_width + rain_gap_width
 	var half := rain_zone_width * 0.5
 	var center := clampf(_luz_x(), bounds.x + half, maxf(bounds.y - half, bounds.x + half))
@@ -1112,6 +1158,57 @@ func _plan_rain() -> void:
 	# A lone zone in a room too narrow to stand beside it would trap Luz.
 	if _rain_count == 1 and bounds.y - bounds.x < rain_zone_width + rain_gap_width:
 		_rain_count = 0
+	_scan_rain_surfaces()
+
+
+## Where arrow `k` of zone `zone` falls (shared by the markers and `_fire_rain`).
+func _rain_arrow_x(zone: int, k: int) -> float:
+	var per_zone := _rain_arrows_per_zone()
+	var along := 0.5 if per_zone == 1 else float(k) / float(per_zone - 1)
+	return _rain_x[zone] + RAIN_ARROW_STEP * 0.5 + along * (rain_zone_width - RAIN_ARROW_STEP)
+
+
+func _rain_start_y() -> float:
+	return global_position.y - rain_height
+
+
+## First solid or one-way top under (`x`, `from_y`); the boss's floor when nothing
+## is there. One ray per call, and the query object is reused.
+func _surface_y(x: float, from_y: float) -> float:
+	_surface_ray.from = Vector2(x, from_y)
+	_surface_ray.to = Vector2(x, global_position.y + SURFACE_RAY_SLACK)
+	var hit := get_world_2d().direct_space_state.intersect_ray(_surface_ray)
+	return float(hit["position"].y) if not hit.is_empty() else global_position.y
+
+
+## One ray per arrow column, once per rain. Runs of columns with the same surface
+## become one marker, so a zone over a platform edge shows part on the platform and
+## part on the floor, exactly where its arrows will stop.
+func _scan_rain_surfaces() -> void:
+	_rain_marker_count = 0
+	var start_y := _rain_start_y()
+	var per_zone := _rain_arrows_per_zone()
+	for zone: int in _rain_count:
+		var run_x := _rain_x[zone]
+		var run_y := _surface_y(_rain_arrow_x(zone, 0), start_y)
+		for k: int in range(1, per_zone):
+			var y := _surface_y(_rain_arrow_x(zone, k), start_y)
+			if absf(y - run_y) < SURFACE_MERGE:
+				continue
+			var edge := (_rain_arrow_x(zone, k - 1) + _rain_arrow_x(zone, k)) * 0.5
+			_push_rain_marker(run_x, edge, run_y)
+			run_x = edge
+			run_y = y
+		_push_rain_marker(run_x, _rain_x[zone] + rain_zone_width, run_y)
+
+
+## A full pool drops the extra piece: it needs more than two surface changes in
+## each of eight zones.
+func _push_rain_marker(x0: float, x1: float, surface_y: float) -> void:
+	if _rain_marker_count >= _rain_markers.size():
+		return
+	_rain_markers[_rain_marker_count] = Rect2(x0, surface_y - RAIN_MARKER_HEIGHT, x1 - x0, RAIN_MARKER_HEIGHT)
+	_rain_marker_count += 1
 
 
 ## Left and right wall x: the arena's limits when it set them, else found around
@@ -1153,18 +1250,16 @@ func _animate_rain() -> void:
 		return
 	var pulse := 0.5 + 0.5 * sin(_clock * lerpf(8.0, 24.0, progress))
 	var alpha := lerpf(BossTelegraph.MARKER_ALPHA, 0.7, progress) * (0.75 + 0.25 * pulse)
-	for i: int in _rain_count:
-		_telegraph.show_floor_marker(i, _rain_zone_rect(i), BossTelegraph.RANGED_COLOR, alpha)
+	for i: int in _rain_marker_count:
+		_telegraph.show_floor_marker(i, _rain_markers[i], BossTelegraph.RANGED_COLOR, alpha)
 
 
 func _fire_rain() -> void:
 	var per_zone := _rain_arrows_per_zone()
-	var start_y := global_position.y - rain_height
+	var start_y := _rain_start_y()
 	for i: int in _rain_count:
 		for k: int in per_zone:
-			var along := 0.5 if per_zone == 1 else float(k) / float(per_zone - 1)
-			var x := _rain_x[i] + RAIN_ARROW_STEP * 0.5 + along * (rain_zone_width - RAIN_ARROW_STEP)
-			_launch_arrow(Vector2(x, start_y), Vector2.DOWN, rain_arrow_speed)
+			_launch_arrow(Vector2(_rain_arrow_x(i, k), start_y), Vector2.DOWN, rain_arrow_speed)
 
 
 ## -- Dagger slash -------------------------------------------------------------------
@@ -1324,6 +1419,7 @@ func _animate_moon_dive() -> void:
 	var alpha := (0.8 if _dive_locked else BossTelegraph.MARKER_ALPHA) * pulse
 	var rect := Rect2(_dive_x - dive_marker_width * 0.5, global_position.y - RAIN_MARKER_HEIGHT, dive_marker_width, RAIN_MARKER_HEIGHT)
 	_telegraph.show_floor_marker(0, rect, BossTelegraph.MOON_COLOR, alpha)
+	_telegraph.show_floor_marker(DIVE_COLUMN_SLOT, get_dive_column(), BossTelegraph.MOON_COLOR, alpha * DIVE_COLUMN_ALPHA_SCALE)
 
 
 func _vanish_for_dive() -> void:
@@ -1493,7 +1589,7 @@ func _vault_allowed() -> bool:
 
 ## Luz in her face while she is cornered, long enough, makes her vault.
 func _poll_vault(delta: float) -> bool:
-	if not _vault_allowed() or _distance_x() > vault_trigger_distance or not _is_cornered():
+	if not _vault_allowed() or _distance_x() > vault_trigger_distance or not _luz_level() or not _is_cornered():
 		_vault_close_time = 0.0
 		return false
 	_vault_close_time += delta
@@ -1589,6 +1685,7 @@ func _acquire_arrow() -> EnemyProjectile:
 ## under her (the parent may still be busy adding its children) and moved next frame.
 func _make_arrow() -> EnemyProjectile:
 	var arrow := ARROW_SCENE.instantiate() as EnemyProjectile
+	arrow.stops_on_one_ways = true
 	add_child(arrow)
 	_rehome_arrow.call_deferred(arrow)
 	return arrow
@@ -1661,6 +1758,12 @@ func _luz_distance() -> float:
 
 func _distance_x() -> float:
 	return absf(_luz.global_position.x - global_position.x)
+
+
+## Luz's feet are within `vertical_engage_tolerance` of hers: same level, not on a
+## platform above or a pit below.
+func _luz_level() -> bool:
+	return absf(_luz.global_position.y - global_position.y) <= vertical_engage_tolerance
 
 
 func _dir_to_luz() -> int:

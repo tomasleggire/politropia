@@ -90,7 +90,28 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
 - [x] **T3 Phase 2 + cornered vault:** faster recoveries, chained strings, moon dive, spectral stag, the phase transition beat, and the cornered vault over Luz (user decision 2026-10-12). Also fix advisory (c). Route: delegated.
 - [x] **T4 BossArena:** trigger, doors, camera lock, boss HP bar and name, reset on Luz death, double jump reward, arena bounds fed to the boss, and permanent defeat. Also fix advisories (e) and (f). Route: delegated.
 - [x] **T5 Animation contract:** `docs/bosses/ARTEMIS_ANIMATIONS.md` (clips, frame counts, durations, hit/fire frame events, what each pose must convey) plus the Codex backlog update. Route: inline (one doc).
-- [ ] **T6 Playtest and tuning:** iPhone deploy, user feel review, number pass. Route: inline.
+- [x] **T6 Playtest and tuning:** iPhone deploy and user feel review. Playtest 1 fixes are in 526f60c. Playtest 2 (2026-10-12): the user says she is "perfectly playable". Route: inline.
+- [x] **T7 Platform-aware attacks** (user decision 2026-10-12: she must NOT use platforms, but every attack must respect their physics). The planned Greece T3 arena has three one-way platforms (greece_layout.gd:288-290).
+  - Rain arrows stop on the first surface below them, and the markers are drawn on that surface.
+  - The moon dive marks the whole column, and the column hits Luz on a platform.
+  - The proximity rules (dagger, backstep, vault) use real 2D distance or a vertical tolerance.
+  - She never ends up standing on a platform.
+  - Route: delegated.
+- [ ] **T8 Defeat feel + persistent corpse + save hooks.**
+  - The final hit gets a freeze, white flash, about 0.5 s of slow motion and a camera shake.
+  - The corpse stays where she fell across revisits, rests and deaths during the run (BossProgress stores the position and facing).
+  - `to_dict`/`from_dict` hooks for a future save system. The project has no disk save; the boss must be saved together with the double jump to avoid a softlock.
+  - Route: delegated.
+- [ ] **T9 Camera shakes + audio hooks.**
+  - Shakes on the phase-2 transition and the dive impact.
+  - `AudioStreamPlayer2D` slots for every telegraph and impact, with empty streams for now.
+  - The animation contract gets an audio cue table.
+  - Route: delegated with T8.
+- [ ] **T10 One-drag prefab + team guide.**
+  - `artemis_boss_arena.tscn` with the arena and Artemis prewired.
+  - `docs/bosses/BOSS_ARENA.md`: placement, sizes, unique `enemy_id`, platforms, and a Stillness Desk before the arena.
+  - Route: delegated with T8.
+- [ ] **T11 Push** `feat/artemis-boss` to the remote, ONLY after the user approves an iPhone build of the finished T7-T10 work (user instruction 2026-10-12). Route: inline.
 
 ## Progress
 - 2026-10-12: design accepted; branch `feat/artemis-boss` created from main 460f501.
@@ -164,6 +185,15 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - (3) Missing HUD. `health_hud.tscn` was only instanced by the deleted level_01, so it was added to the test arena. The main game levels (Greece, library, garden) lack the HUD too; this is for the team.
   - Verified with movie-writer frames and the suite (only the level_01 cases fail).
 
+- 2026-10-12: T7 done (delegated writer).
+  - Rain: one ray per arrow column; markers are split per surface.
+  - `EnemyProjectile.stops_on_one_ways`, set only for Artemis arrows: a downward arrow stops on a one-way platform top.
+  - Moon dive: a silver column telegraph (the hitbox already sweeps the column).
+  - `vertical_engage_tolerance` 60 gates backstep, dagger, dodge, vault and the near band.
+  - Her body and floor probe use mask 1 only, so she never stands on a one-way platform.
+  - The test arena has 3 platforms (tops -104, -194, -104).
+  - 5 new cases. Movie-writer frames confirm the markers on the platform and the dive column.
+
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.
 - Should the dodge grant i-frames? Today it is only a hop.
@@ -175,7 +205,8 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
 - Does the 80 px vault landing distance feel right? Check during the T6 playtest.
 - `BossProgress` lasts one run only. If Luz leaves before taking the reward and the scene reloads, the reward does not reappear. Should the arena respawn the reward when the boss is beaten but the double jump is not yet unlocked? Needs the team's save-system direction.
 - Placing the arena in Greece belongs to the teammates: drop BossArena at the `BossArena` marker and remove the old `DoubleJumpPlaceholder`.
+- Luz jumping more than 60 px above Artemis counts as "not close" (`vertical_engage_tolerance`). Raise it if mid-air dagger or backstep responses are missed.
 - Moon dive: keep it vertical (current, the clearest read) or make it diagonal as originally designed? Check during the T6 playtest.
 
 ## Next step
-T6.
+T7.

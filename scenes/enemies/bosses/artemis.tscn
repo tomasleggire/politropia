@@ -20,7 +20,7 @@ size = Vector2(60, 48)
 
 [node name="Artemis" type="CharacterBody2D"]
 collision_layer = 8
-collision_mask = 3
+collision_mask = 1
 script = ExtResource("1_artemis")
 max_health = 30
 knockback_resistance = 1.0
@@ -82,7 +82,7 @@ position = Vector2(4, 0)
 [node name="FloorProbe" type="RayCast2D" parent="."]
 position = Vector2(19, -4)
 target_position = Vector2(0, 16)
-collision_mask = 3
+collision_mask = 1
 
 [node name="WallProbe" type="RayCast2D" parent="."]
 position = Vector2(0, -24)

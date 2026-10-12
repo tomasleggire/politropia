@@ -4,7 +4,9 @@ extends "res://tests/support/ritual_suite.gd"
 ## walls and ledges, stagger, the checkpoint reset, the fan volley, the arrow
 ## rain, the dagger slash and the weighted attack choice, then phase two: the
 ## transition beat, shorter recoveries, chained strings, the moon dive, the
-## spectral stag and the cornered vault. Each case builds its own
+## spectral stag and the cornered vault, and the platform rules (T7): arrows, rain
+## markers and the dive column respect one-way platforms, proximity needs the same
+## height, and she never ends on a platform. Each case builds its own
 ## floor (top at y=0), Luz and boss, and tweaks exports so only the behaviour
 ## under test can happen. Timings are measured in physics steps.
 ##
@@ -64,6 +66,11 @@ const CHECKS := {
 	"case_interrupt_vault_crouch": 4,
 	"case_interrupt_phase_two_and_stagger": 4,
 	"case_arrows_live_beside_the_boss": 7,
+	"case_rain_respects_platforms": 5,
+	"case_aimed_arrows_and_one_ways": 3,
+	"case_dive_column_reaches_a_platform": 5,
+	"case_proximity_needs_same_height": 8,
+	"case_never_stands_on_a_platform": 3,
 }
 
 var _rig: Node2D
@@ -1273,3 +1280,184 @@ func case_arrows_live_beside_the_boss() -> void:
 	var shape := (points.get_node("Visual") as Polygon2D).polygon
 	points.free()
 	h.check(not Geometry2D.triangulate_polygon(shape).is_empty(), "the arrow outline triangulates: a polygon that does not is drawn as nothing")
+
+
+# -- Platforms (T7) -----------------------------------------------------------------------
+
+const PLATFORM := Rect2(-60.0, -104.0, 120.0, 20.0)
+## Zones with Luz at x 0: [-148, -92], [-28, 28], [92, 148]. The platform covers the middle one.
+const PLATFORM_MARKER_Y := -104.0 - ArtemisBoss.RAIN_MARKER_HEIGHT
+const FLOOR_MARKER_Y := -ArtemisBoss.RAIN_MARKER_HEIGHT
+const ON_PLATFORM := Vector2(0.0, -105.0)
+const CLOSE_TWEAKS := {
+	"wake_distance": 0.0, "kite_speed": 0.0, "reposition_min_time": 0.7, "reposition_max_time": 0.7,
+	"dodge_chance": 0.0, "feint_chance": 0.0, "stagger_hits": 0, "opening_delay": 0.05,
+}
+
+
+func _add_platform(rect: Rect2) -> void:
+	LevelGeometry.add_one_way_platform(_rig, rect, Color.STEEL_BLUE)
+	await _steps(3)
+
+
+## A rig with one platform, Luz placed after it exists (she settles on it) and a
+## quiet boss at `boss_at`.
+func _platform_rig(platform: Rect2, luz_at: Vector2, boss_at: Vector2, tweaks: Dictionary) -> void:
+	await _build_rig(LUZ_START)
+	await _add_platform(platform)
+	_tough_luz()
+	_place_luz(luz_at)
+	await _add_boss(boss_at, tweaks)
+
+
+## Starts a rain over `platform` with Luz at `luz_at`; returns when its telegraph ends.
+func _platform_rain(platform: Rect2, luz_at: Vector2) -> void:
+	await _platform_rig(platform, luz_at, Vector2(300.0, 0.0), QUIET)
+	_player.set_max_health(3)
+	_player.heal(3)
+	_boss.start_attack(ArtemisBoss.Attack.RAIN)
+	var t := 0.0
+	while _boss.is_telegraphing() and t < 2.0:
+		await h.tree.physics_frame
+		t += _dt()
+
+
+func case_rain_respects_platforms() -> void:
+	await _platform_rain(PLATFORM, Vector2.ZERO)
+	var markers := _boss.get_rain_markers()
+	var heights_ok := markers.size() == 3
+	if heights_ok:
+		heights_ok = absf(markers[0].position.y - FLOOR_MARKER_Y) < 0.5 and absf(markers[1].position.y - PLATFORM_MARKER_Y) < 0.5 and absf(markers[2].position.y - FLOOR_MARKER_Y) < 0.5
+	h.check(heights_ok, "the marker of a zone over a platform sits on its top, the others on the floor (%d markers)" % markers.size())
+	var lowest := -1.0e9
+	for i: int in int(0.7 / _dt()):
+		await h.tree.physics_frame
+		for arrow: EnemyProjectile in _boss.get_active_arrows():
+			if absf(arrow.global_position.x) < 28.0:
+				lowest = maxf(lowest, arrow.global_position.y)
+	h.check(lowest <= PLATFORM.position.y, "the arrows over the platform never get below its top (%.0f)" % lowest)
+	await h.secs(0.5)
+	h.check(_player.get_health() == 3 and _boss.active_arrow_count() == 0, "Luz under the platform is not hit (%d)" % _player.get_health())
+	_end_case()
+	await _platform_rain(PLATFORM, ON_PLATFORM)
+	await h.secs(1.2)
+	h.check(_player.get_health() == 2, "Luz on the platform inside a zone is hit (%d)" % _player.get_health())
+	_end_case()
+	await _platform_rain(Rect2(0.0, -104.0, 60.0, 20.0), Vector2.ZERO)
+	markers = _boss.get_rain_markers()
+	var split := markers.size() == 4
+	if split:
+		split = absf(markers[1].end.x - 0.0) < 5.0 and absf(markers[1].position.y - FLOOR_MARKER_Y) < 0.5 and absf(markers[2].position.x - 0.0) < 5.0 and absf(markers[2].position.y - PLATFORM_MARKER_Y) < 0.5
+	h.check(split, "a zone over a platform edge is split: floor marker beside platform marker (%d markers)" % markers.size())
+	_end_case()
+
+
+func case_aimed_arrows_and_one_ways() -> void:
+	await _platform_rig(PLATFORM, LUZ_START, Vector2(300.0, 0.0), QUIET)
+	_boss._launch_arrow(Vector2(-20.0, -200.0), Vector2(0.3, 1.0).normalized())
+	var down := _boss.get_active_arrows()[0]
+	await h.secs(1.0)
+	h.check(not down.is_active() and absf(down.global_position.y - PLATFORM.position.y) < 12.0, "an arrow flying down stops on the platform top (y %.0f)" % down.global_position.y)
+	_boss._launch_arrow(Vector2(0.0, -50.0), Vector2(0.2, -1.0).normalized())
+	var up := _boss.get_active_arrows()[0]
+	await h.secs(0.5)
+	h.check(up.is_active() and up.global_position.y < PLATFORM.position.y - 20.0, "an arrow flying up passes through it (y %.0f)" % up.global_position.y)
+	_boss._launch_arrow(Vector2(-200.0, -94.0), Vector2.RIGHT)
+	var flat := _boss.get_active_arrows()[0]
+	await h.secs(0.8)
+	h.check(flat.is_active() and flat.global_position.x > PLATFORM.end.x, "a flat arrow passes through it (x %.0f)" % flat.global_position.x)
+	_end_case()
+
+
+func case_dive_column_reaches_a_platform() -> void:
+	await _platform_rig(PLATFORM, ON_PLATFORM, Vector2(300.0, 0.0), P2_QUIET)
+	_boss._phase = P2
+	_boss.start_attack(ArtemisBoss.Attack.MOON_DIVE)
+	var t := 0.0
+	var locked_time := 0.0
+	var column := Rect2()
+	var column_shown := false
+	while _boss.is_telegraphing() and t < 3.0:
+		await h.tree.physics_frame
+		t += _dt()
+		if _boss.is_dive_locked() and _boss.is_telegraphing():
+			locked_time += _dt()
+			column = _boss.get_dive_column()
+			column_shown = _boss.get_telegraph().is_floor_marker_visible(ArtemisBoss.DIVE_COLUMN_SLOT)
+	var reaches := column.has_point(ON_PLATFORM + ArtemisBoss.PLAYER_CENTER_OFFSET) and absf(column.end.y) < 0.5 and column.position.y < PLATFORM.position.y - 100.0
+	h.check(reaches and column_shown, "a silver column from the drop height to the floor is shown over Luz on the platform")
+	h.check(locked_time >= 0.35, "the column stays locked for at least 0.35 s (%.2f)" % locked_time)
+	await h.secs(0.2)
+	h.check(not _boss.get_telegraph().is_floor_marker_visible(ArtemisBoss.DIVE_COLUMN_SLOT), "the column is cleared once she drops")
+	await h.secs(0.6)
+	h.check(_player.get_health() < 30, "the falling hitbox hits Luz on the platform (%d)" % _player.get_health())
+	h.check(absf(_boss.global_position.y) < 1.0 and _boss.is_on_floor(), "she lands on the floor, not the platform (y %.1f)" % _boss.global_position.y)
+	_end_case()
+
+
+## Runs `seconds` with Luz at `luz_at` and reports which close-range reactions fired.
+func _close_run(platform: Rect2, luz_at: Vector2, boss_at: Vector2, tweaks: Dictionary, seconds: float) -> Dictionary:
+	await _platform_rig(platform, luz_at, boss_at, tweaks)
+	_boss.engage()
+	var seen := {"backstep": false, "dagger": false, "vault": false}
+	for i: int in int(seconds / _dt()):
+		await h.tree.physics_frame
+		var state := _boss.get_state()
+		seen["backstep"] = seen["backstep"] or state == ArtemisBoss.State.BACKSTEP
+		seen["vault"] = seen["vault"] or state == ArtemisBoss.State.VAULT
+		seen["dagger"] = seen["dagger"] or _boss.is_dagger_forced() or (state == ArtemisBoss.State.ATTACK and _boss.get_attack() == ArtemisBoss.Attack.DAGGER)
+	_end_case()
+	return seen
+
+
+func case_proximity_needs_same_height() -> void:
+	var near := Vector2(30.0, 0.0)
+	var backstep := (await _close_run(PLATFORM, Vector2.ZERO, near, CLOSE_TWEAKS, 1.0))["backstep"] as bool
+	h.check(backstep, "control: Luz at her height in her face makes her hop back")
+	backstep = (await _close_run(PLATFORM, ON_PLATFORM, near, CLOSE_TWEAKS, 1.5))["backstep"] as bool
+	h.check(not backstep, "Luz on a platform right above her does not")
+	var no_hop := CLOSE_TWEAKS.duplicate()
+	no_hop["backstep_trigger_distance"] = 0.0
+	var dagger := (await _close_run(PLATFORM, Vector2.ZERO, near, no_hop, 2.0))["dagger"] as bool
+	h.check(dagger, "control: Luz at her height for a while forces the dagger")
+	dagger = (await _close_run(PLATFORM, ON_PLATFORM, near, no_hop, 2.0))["dagger"] as bool
+	h.check(not dagger, "Luz on a platform above her never does")
+	var cornered := P2_QUIET.duplicate()
+	var side_platform := Rect2(290.0, -104.0, 120.0, 20.0)
+	var vault := (await _close_run(side_platform, Vector2(350.0, 0.0), WALL_SIDE, cornered, 1.5))["vault"] as bool
+	h.check(vault, "control: Luz at her height with a wall at her back makes her vault")
+	vault = (await _close_run(side_platform, Vector2(350.0, -105.0), WALL_SIDE, cornered, 1.5))["vault"] as bool
+	h.check(not vault, "Luz on a platform above her does not")
+	await _platform_rig(PLATFORM, ON_PLATFORM, near, CLOSE_TWEAKS)
+	h.check(_boss._distance_band() == ArtemisBoss.Band.MID, "Luz high above counts as the middle band (ranged), never near")
+	_place_luz(Vector2.ZERO)
+	await _steps(4)
+	h.check(_boss._distance_band() == ArtemisBoss.Band.NEAR, "and at her height the same distance is near")
+	_end_case()
+
+
+func case_never_stands_on_a_platform() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(300.0, 0.0), QUIET)
+	h.check(not _boss.get_collision_mask_value(2) and (_boss.get_node("FloorProbe") as RayCast2D).collision_mask == 1, "her body and floor probe see solids only")
+	_end_case()
+	# The platform sits where her vault lands: she must fall through to the floor.
+	await _platform_rig(Rect2(200.0, -100.0, 120.0, 20.0), Vector2(340.0, 0.0), WALL_SIDE, P2_QUIET)
+	_boss.engage()
+	var t := 0.0
+	var vaulted := false
+	while t < 3.0 and not (vaulted and _boss.get_state() != ArtemisBoss.State.VAULT):
+		await h.tree.physics_frame
+		t += _dt()
+		vaulted = vaulted or _boss.get_state() == ArtemisBoss.State.VAULT
+	await _steps(30)
+	var landed := _boss.global_position
+	h.check(vaulted and landed.x > 200.0 and landed.x < 320.0 and absf(landed.y) < 1.0, "a vault that lands over a platform ends on the floor (%.0f, %.0f)" % [landed.x, landed.y])
+	_end_case()
+	# A low platform in the path of her backstep, high enough to catch a hop.
+	await _platform_rig(Rect2(60.0, -15.0, 120.0, 20.0), Vector2.ZERO, Vector2(30.0, 0.0), {"wake_distance": 0.0, "kite_speed": 0.0, "reposition_min_time": 99.0, "reposition_max_time": 99.0, "dodge_chance": 0.0, "feint_chance": 0.0})
+	_boss.engage()
+	var hopped := await _sees_state(ArtemisBoss.State.BACKSTEP, 0.5)
+	await h.secs(0.6)
+	h.check(hopped and _boss.global_position.x > 60.0 and absf(_boss.global_position.y) < 1.0, "a backstep across a low platform ends on the floor (%.0f, %.1f)" % [_boss.global_position.x, _boss.global_position.y])
+	_end_case()
