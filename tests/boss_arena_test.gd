@@ -738,5 +738,5 @@ func case_prefab_is_one_drag() -> void:
 	for i: int in state.get_node_count():
 		var packed := state.get_node_instance(i)
 		uses_prefab = uses_prefab or (packed != null and packed.resource_path == PREFAB_SCENE)
-	h.check(uses_prefab, "and the test arena is just this prefab plus platforms and a HUD")
+	h.check(uses_prefab, "and the test arena is just this prefab plus a HUD")
 	_end_case()

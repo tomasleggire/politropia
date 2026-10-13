@@ -237,6 +237,8 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - `EnemyProjectile.breakable_by_attacks` is false for Artemis arrows: they sit on layer 0 and are not slashable.
   - 3 dash regression cases added.
 
+- 2026-10-12: Playtest 4. The user approved the build ("está perfecto así"). The middle platform was removed from the test arena at the user's request; platform support stays in code. Next: merge origin/main, then push (T11).
+
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.
 - Should the dodge grant i-frames? Today it is only a hop.

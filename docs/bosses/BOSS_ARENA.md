@@ -38,7 +38,7 @@ Audience: level designers. One scene gives you a complete Artemis fight.
 
 ## Test it
 
-Open `scenes/levels/test/artemis_arena.tscn` (this prefab plus one middle platform and the HUD) and run the scene. Headless coverage lives in `tests/boss_arena_test.gd` and `tests/artemis_boss_test.gd`.
+Open `scenes/levels/test/artemis_arena.tscn` (this prefab plus the HUD; platforms are supported but the test arena has none) and run the scene. Headless coverage lives in `tests/boss_arena_test.gd` and `tests/artemis_boss_test.gd`.
 
 ## Tuning and art
 
