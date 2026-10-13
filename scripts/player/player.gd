@@ -6,6 +6,9 @@ extends CharacterBody2D
 ## air dash per airborne period), wall cling + climb kick,
 ## a 3-hit ground combo, up/air/crouch attacks.
 
+const HUD_SCENE = preload("res://scenes/ui/hud.tscn")
+var hud_instance: CanvasLayer = null
+
 signal respawned
 ## Emitted after a hazard return has moved her onto the last safe ground, while
 ## the screen is still dark, so a level can re-frame its camera.
@@ -49,7 +52,7 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 ]
 
 @export_group("Health")
-@export var max_health := 3
+@export var max_health := 5
 
 @export_group("Energy")
 @export var max_energy := 100.0
@@ -529,6 +532,13 @@ func _ready() -> void:
 
 	_enter_state(State.IDLE)
 
+# --- INSTANCIACIÓN DEL HUD ---
+	hud_instance = HUD_SCENE.instantiate()
+	add_child(hud_instance)
+
+	
+	if hud_instance.has_method("bind_player"):
+		hud_instance.bind_player(self)
 
 func _recompute_jump_physics() -> void:
 	_rise_gravity = (2.0 * jump_height) / (jump_time_to_apex * jump_time_to_apex)
