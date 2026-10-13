@@ -130,7 +130,7 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - (c) Luz's attack must NOT break Artemis arrows. Today `EnemyProjectile.receive_hit` deactivates them; this applies to Artemis arrows only.
   - (d) Dash through arrows and through Artemis. Already correct: arrows pass a dashing Luz and keep flying (enemy_projectile.gd:115), and contact damage respects the dash i-frames. Add regression tests.
   - Route: delegated.
-- [ ] **T11 Push** `feat/artemis-boss` to the remote, ONLY after the user approves an iPhone build of the finished T7-T10 work (user instruction 2026-10-12). Route: inline.
+- [x] **T11 Push** `feat/artemis-boss` to the remote, ONLY after the user approves an iPhone build of the finished T7-T10 work (user instruction 2026-10-12). Route: inline.
 
 ## Progress
 - 2026-10-12: design accepted; branch `feat/artemis-boss` created from main 460f501.
@@ -239,6 +239,12 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
 
 - 2026-10-12: Playtest 4. The user approved the build ("está perfecto así"). The middle platform was removed from the test arena at the user's request; platform support stays in code. Next: merge origin/main, then push (T11).
 
+- 2026-10-12: Merged origin/main 54f64a8 (teammate HUD.gd, no overlap) at 049b378.
+  - The final slice review was APPROVED (lineage review-6c27a7eb7f6a6bda) and acknowledged.
+  - Pushed `feat/artemis-boss` at 049b378 (the pre-push GGA hook passed).
+  - Follow-up (ours, minor): `_resolve_reward` connects to `node_added` with no teardown and can connect twice.
+  - Team notes: `HUD.gd` and the shadow_owl uid change came from main; the real levels lack the Luz HUD.
+
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.
 - Should the dodge grant i-frames? Today it is only a hop.
@@ -254,4 +260,4 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
 - Moon dive: keep it vertical (current, the clearest read) or make it diagonal as originally designed? Check during the T6 playtest.
 
 ## Next step
-T7.
+Open the PR when the user decides, and handle the `_resolve_reward` follow-up.
