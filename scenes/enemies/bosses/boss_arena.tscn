@@ -1,0 +1,40 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/bosses/boss_arena.gd" id="1_arena"]
+
+[node name="BossArena" type="Node2D"]
+script = ExtResource("1_arena")
+
+[node name="Trigger" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Trigger"]
+
+[node name="DoorLeft" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DoorLeft"]
+disabled = true
+
+[node name="Visual" type="Polygon2D" parent="DoorLeft"]
+color = Color(0.42, 0.34, 0.26, 1)
+
+[node name="DoorRight" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DoorRight"]
+disabled = true
+
+[node name="Visual" type="Polygon2D" parent="DoorRight"]
+color = Color(0.42, 0.34, 0.26, 1)
+
+[node name="Sfx" type="Node" parent="."]
+
+[node name="DoorsClose" type="AudioStreamPlayer" parent="Sfx"]
+
+[node name="DoorsOpen" type="AudioStreamPlayer" parent="Sfx"]
+
+[node name="BossIntro" type="AudioStreamPlayer" parent="Sfx"]

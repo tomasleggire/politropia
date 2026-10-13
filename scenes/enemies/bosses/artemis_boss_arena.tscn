@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/enemies/bosses/boss_arena.tscn" id="1_arena"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/bosses/artemis.tscn" id="2_artemis"]
+
+[node name="ArtemisBossArena" instance=ExtResource("1_arena")]
+arena_rect = Rect2(-468, -480, 936, 480)
+trigger_rect = Rect2(-200, -200, 400, 200)
+left_door = Vector2(-456, 0)
+right_door = Vector2(456, 0)
+boss_name = "Artemis"
+
+[node name="Artemis" parent="." instance=ExtResource("2_artemis")]
+position = Vector2(300, 0)
+enemy_id = &"greece_artemis"
