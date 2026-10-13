@@ -408,6 +408,7 @@ var _vault_elapsed := 0.0
 var _crouching := false
 var _hop_chains := false
 var _manual_engage := false
+var _engaged := false
 var _has_arena_limits := false
 var _arena_left := 0.0
 var _arena_right := 0.0
@@ -553,11 +554,13 @@ func clear_arena_limits() -> void:
 ## True: she stays idle until `engage()` (or a hit) and ignores `wake_distance`.
 func set_manual_engage(on: bool) -> void:
 	_manual_engage = on
+	_engaged = false
 
 
-## Under manual engage she is untouchable until the arena wakes her.
+## Under manual engage she is untouchable until the arena wakes her; once
+## engaged she stays hittable, whatever state she is in, until a reset.
 func _awaiting_arena() -> bool:
-	return _manual_engage and _state == State.IDLE
+	return _manual_engage and not _engaged
 
 
 ## Idle at full health in phase one: nothing to reset.
@@ -567,6 +570,7 @@ func is_fresh() -> bool:
 
 ## Leaves IDLE for the fight without waiting for Luz to come close.
 func engage() -> void:
+	_engaged = true
 	if _state == State.IDLE:
 		_begin_reposition()
 
@@ -695,6 +699,7 @@ func _reset_ai() -> void:
 	_luz_close_time = 0.0
 	_rain_count = 0
 	_rain_marker_count = 0
+	_engaged = false
 	_backstep_left = 0.0
 	_dodge_left = 0.0
 	_feint_left = 0.0
@@ -1658,6 +1663,7 @@ func _try_interrupt() -> void:
 	_chain_next = NO_ATTACK
 	_chain_length = 0
 	_rain_count = 0
+	_rain_marker_count = 0
 	velocity.x = 0.0
 	_enter_state(State.FLINCH, interrupt_flinch_time)
 	play_cue(CUE_FLINCH)

@@ -111,7 +111,7 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - `artemis_boss_arena.tscn` with the arena and Artemis prewired.
   - `docs/bosses/BOSS_ARENA.md`: placement, sizes, unique `enemy_id`, platforms, and a Stillness Desk before the arena.
   - Route: delegated with T8.
-- [ ] **T12 Hardening from the 91ec13b..1ddcd0f review** (approved, lineage review-75c4d13612dcf640, acknowledged; boundary now 1ddcd0f). Fix after T8-T10 land:
+- [x] **T12 Hardening from the 91ec13b..1ddcd0f review** (approved, lineage review-75c4d13612dcf640, acknowledged; boundary now 1ddcd0f). Fix after T8-T10 land:
   - (i) `_rearm_trigger` must check after EACH await, or cache the SceneTree.
   - (j) `case_rearm_survives_free` is vacuous (`check(true)`).
   - (k) Clear `_rain_marker_count` on interrupt.
@@ -211,6 +211,13 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - 14+3 empty audio slots with a `play_cue` helper.
   - Prefab `artemis_boss_arena.tscn` (936x480, `enemy_id` `greece_artemis`) and the guide `docs/bosses/BOSS_ARENA.md`.
   - 11 new cases. Frames confirm the flash and the corpse.
+
+- 2026-10-12: T12 done (delegated writer).
+  - (i) Tree checks after each await.
+  - (j) The rearm test is now observable.
+  - (k) Rain markers are cleared on interrupt.
+  - (l) Dive-leap and stag-cast interrupt tests added; the existing behavior was already correct.
+  - (m) An explicit `_engaged` flag, so she is hittable from `engage()` onward, including the opening delay.
 
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.

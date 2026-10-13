@@ -62,7 +62,9 @@ const CHECKS := {
 	"case_transition_postponed_by_vault": 4,
 	"case_interrupt_aimed_shot": 9,
 	"case_interrupt_dagger": 3,
-	"case_interrupt_rain": 3,
+	"case_interrupt_rain": 4,
+	"case_interrupt_moon_dive_leap": 7,
+	"case_interrupt_stag_cast": 5,
 	"case_interrupt_not_after_release": 4,
 	"case_interrupt_vault_crouch": 4,
 	"case_interrupt_phase_two_and_stagger": 4,
@@ -1202,8 +1204,53 @@ func case_interrupt_rain() -> void:
 	h.check(_boss.get_telegraph().is_floor_marker_visible(0), "the rain markers show first")
 	_hit(1)
 	h.check(seen == [ArtemisBoss.Attack.RAIN] and not _boss.get_telegraph().is_floor_marker_visible(0) and _boss.get_rain_zones().is_empty(), "a hit clears the markers and the zones")
+	h.check(_boss.get_rain_markers().is_empty(), "and the marker list is empty too")
 	await h.secs(0.9)
 	h.check(_boss.active_arrow_count() == 0, "no arrow falls")
+	_end_case()
+
+
+func case_interrupt_moon_dive_leap() -> void:
+	await _build_rig()
+	_tough_luz()
+	var tweaks := P2_QUIET.duplicate()
+	tweaks["interrupt_enabled"] = true
+	await _add_boss(Vector2(300.0, 0.0), tweaks)
+	_boss._phase = P2
+	var visual := _boss.get_node("Visual") as Node2D
+	var seen := _interrupts()
+	_boss.start_attack(ArtemisBoss.Attack.MOON_DIVE)
+	await h.secs(_boss.dive_leap_time * 0.6)
+	h.check(visual.position.y < -1.0, "mid-leap she has risen (y %.1f)" % visual.position.y)
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.FLINCH and seen == [ArtemisBoss.Attack.MOON_DIVE], "a hit during the leap interrupts the dive (%s)" % [seen])
+	await h.frames(2)
+	h.check(is_zero_approx(visual.position.y) and visual.visible, "the visual is back on the ground (y %.1f)" % visual.position.y)
+	h.check(_boss.collision_layer == Enemy.ENEMY_LAYER and _contact_on(), "she is hittable and her contact is back")
+	h.check(not _boss.get_telegraph().is_floor_marker_visible(0) and not _boss.get_telegraph().is_floor_marker_visible(ArtemisBoss.DIVE_COLUMN_SLOT), "no dive marker and no column")
+	h.check(not _boss.is_dive_hitbox_armed() and not _boss.is_offscreen(), "no active dive hitbox")
+	await h.secs(_boss.interrupt_flinch_time + 0.2)
+	h.check(is_zero_approx(visual.position.x) and is_zero_approx(visual.position.y), "after the flinch the visual rests at the origin")
+	_end_case()
+
+
+func case_interrupt_stag_cast() -> void:
+	await _build_rig()
+	_tough_luz()
+	var tweaks := P2_QUIET.duplicate()
+	tweaks["interrupt_enabled"] = true
+	await _add_boss(Vector2(0.0, 0.0), tweaks)
+	_boss._phase = P2
+	var seen := _interrupts()
+	_boss.start_attack(ArtemisBoss.Attack.STAG)
+	await h.secs(0.3)
+	h.check(_boss.get_telegraph().is_floor_marker_visible(0), "the edge telegraph shows first")
+	_hit(1)
+	h.check(_boss.get_state() == ArtemisBoss.State.FLINCH and seen == [ArtemisBoss.Attack.STAG], "a hit during the cast interrupts it (%s)" % [seen])
+	h.check(not _boss.get_telegraph().is_floor_marker_visible(0) and not _boss.get_telegraph().is_glowing(), "the edge telegraph and the glow are cleared")
+	await h.secs(_boss.stag_telegraph_time + 0.5)
+	h.check(not _boss.get_stag().is_active() and not _boss.get_stag().visible, "no stag is ever spawned")
+	h.check(_player.get_health() == 30, "and Luz is untouched")
 	_end_case()
 
 

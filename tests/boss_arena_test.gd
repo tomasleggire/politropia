@@ -43,7 +43,8 @@ const CHECKS := {
 	"case_arena_limits_bound_boss": 5,
 	"case_armed_boss_is_untouchable": 3,
 	"case_dead_boss_while_armed_never_locks": 7,
-	"case_rearm_survives_free": 1,
+	"case_rearm_survives_free": 4,
+	"case_engaged_boss_always_hittable": 6,
 	"case_test_arena_shows_luz_hud": 3,
 	"case_corpse_is_inert": 8,
 	"case_corpse_reloads_where_she_fell": 18,
@@ -473,10 +474,42 @@ func case_dead_boss_while_armed_never_locks() -> void:
 
 func case_rearm_survives_free() -> void:
 	await _build()
-	_arena._rearm_trigger()
+	var arena := _arena
+	arena._trigger.monitoring = false
+	arena._rearm_trigger()
+	await h.tree.physics_frame
+	_rig.remove_child(arena)
+	await h.frames(5)
+	h.check(not arena.is_inside_tree(), "the arena left the tree between the re-arm awaits")
+	h.check(not arena.is_trigger_armed() and arena.get_state() == BossArena.FightState.ARMED, "so the trigger did not re-arm and the state is unchanged")
+	arena.free()
+	_arena = null
+	_boss = null
+	_end_case()
+	await _build()
+	var freed := _arena
+	freed._rearm_trigger()
 	_free_rig()
 	await h.frames(5)
-	h.check(true, "freeing the arena during re-arm leaves no dangling await")
+	h.check(not is_instance_valid(freed), "freeing the arena during re-arm leaves it gone")
+	h.check(not is_instance_valid(_arena), "with no dangling await or error")
+	_end_case()
+
+
+func case_engaged_boss_always_hittable() -> void:
+	await _build()
+	h.check(not _boss.receive_hit(1, HIT_FROM, &"attack_1"), "before the arena engages her she is untouchable")
+	_boss.engage()
+	h.check(_boss.receive_hit(1, HIT_FROM, &"attack_1") and _boss.get_health() == _boss.max_health - 1, "a hit right after engage() deals damage")
+	_boss._enter_state(ArtemisBoss.State.IDLE, 5.0)
+	h.check(_boss.receive_hit(1, HIT_FROM, &"attack_1") and _boss.get_health() == _boss.max_health - 2, "and she stays hittable in a later IDLE")
+	_boss.reset_to_spawn()
+	h.check(_boss.get_state() == ArtemisBoss.State.IDLE and not _boss.receive_hit(1, HIT_FROM, &"attack_1"), "after a reset she is untouchable again until engaged")
+	h.check(_boss.get_health() == _boss.max_health, "and takes no damage")
+	await _enter_fight()
+	_boss._enter_state(ArtemisBoss.State.IDLE, 5.0)
+	h.check(_boss.receive_hit(1, HIT_FROM, &"attack_1"), "once the arena engaged her, an IDLE beat does not make her immune")
+	_end_case()
 
 
 # -- Test arena HUD ----------------------------------------------------------------------

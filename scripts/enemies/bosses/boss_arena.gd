@@ -475,8 +475,10 @@ func _reset_fight() -> void:
 ## Two physics steps after the reset: Luz was just teleported away, and a trigger
 ## armed in the same step can still see her at the old spot and start the fight.
 func _rearm_trigger() -> void:
-	await get_tree().physics_frame
-	await get_tree().physics_frame
+	for _step: int in 2:
+		if not is_inside_tree():
+			return
+		await get_tree().physics_frame
 	if not is_inside_tree():
 		return
 	if _state == FightState.ARMED:
