@@ -17,9 +17,12 @@
 [ext_resource type="Texture2D" uid="uid://cpa6p5q4xmqud" path="res://assets/art/greece/Columns/Column-1.png" id="19_2xowb"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="19_5qkyi"]
 [ext_resource type="Texture2D" uid="uid://b5dtp4mw8wlgs" path="res://assets/art/greece/Columns/Column-2.png" id="20_4bstp"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/shadow_owl.tscn" id="20_7td2e"]
+[ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="20_7td2e"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="21_2l1de"]
+[ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="21_e2d28"]
+[ext_resource type="PackedScene" uid="uid://ctl0cunw2lanc" path="res://scenes/enemies/snake_enemy.tscn" id="22_j5lj7"]
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_po34q"]
+[ext_resource type="PackedScene" uid="uid://df7x5n262u3v1" path="res://scenes/enemies/lancet_enemy.tscn" id="23_3ceah"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_kvk6j"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_rvh4a"]
@@ -15120,6 +15123,12 @@ tile_set = SubResource("TileSet_wsxys")
 position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
+[node name="SceneTransitionArea" parent="TilemapLayers/Ground" unique_id=1518630621 instance=ExtResource("21_e2d28")]
+position = Vector2(2124, -864)
+target_scene_path = "uid://hlgyax3hjqhs"
+door_id = 2
+target_door_id = 1
+
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("24_kvk6j")]
 position = Vector2(50, 132)
 
@@ -15156,3 +15165,19 @@ limite_inferior = 1300
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=942865586]
 position = Vector2(1308.5, 640)
 shape = SubResource("RectangleShape2D_h4t55")
+
+[node name="SceneTransitionArea" parent="." unique_id=965278355 instance=ExtResource("20_7td2e")]
+position = Vector2(1107, -74)
+target_scene_path = "uid://crlljgoutm1lu"
+
+[node name="SceneTransitionArea2" parent="." unique_id=1016494036 instance=ExtResource("21_e2d28")]
+position = Vector2(2671, 738)
+target_scene_path = "uid://sa4mtebqbp50"
+
+[node name="SnakeEnemy" parent="." unique_id=383943052 instance=ExtResource("22_j5lj7")]
+position = Vector2(1755, 665)
+enemy_id = &"snake01"
+max_health = 2
+
+[node name="LancetEnemy" parent="." unique_id=1519339315 instance=ExtResource("23_3ceah")]
+position = Vector2(2396, 1189)

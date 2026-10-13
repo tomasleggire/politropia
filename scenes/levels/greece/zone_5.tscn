@@ -1,5 +1,7 @@
 [gd_scene format=4 uid="uid://drehrd4yly6oj"]
 
+[ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="2_kdxh3"]
+[ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="3_njreu"]
 [ext_resource type="Texture2D" uid="uid://esg2ic82pa31" path="res://assets/art/greece/Backgrounds/file_00000000fa70820ea35d2497dee97bac.png" id="5_f1j3f"]
 [ext_resource type="Texture2D" uid="uid://bnsueojiix3er" path="res://assets/art/greece/Walls/Wall_01.png" id="6_w5tkt"]
 [ext_resource type="Texture2D" uid="uid://b73mejcmbq4fk" path="res://assets/art/greece/Walls/wall_tileset.png" id="7_7xxoj"]
@@ -19,6 +21,7 @@
 [ext_resource type="Texture2D" uid="uid://b5dtp4mw8wlgs" path="res://assets/art/greece/Columns/Column-2.png" id="20_nerxw"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="21_udyla"]
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_de354"]
+[ext_resource type="PackedScene" uid="uid://ctl0cunw2lanc" path="res://scenes/enemies/snake_enemy.tscn" id="23_pmixq"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_tolj8"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
@@ -15096,6 +15099,14 @@ position = Vector2(4890, -3532.0002)
 scale = Vector2(1.0687267, 1.1239423)
 texture = ExtResource("5_f1j3f")
 
+[node name="SceneTransitionArea" parent="TilemapLayers/Background" unique_id=1518630621 instance=ExtResource("2_kdxh3")]
+position = Vector2(3890, -3078)
+target_scene_path = "uid://crlljgoutm1lu"
+
+[node name="SceneTransitionArea2" parent="TilemapLayers/Background" unique_id=1678416142 instance=ExtResource("3_njreu")]
+position = Vector2(3612, -3223)
+target_scene_path = "uid://4qdhshe8hq63"
+
 [node name="Ground" type="TileMapLayer" parent="TilemapLayers" unique_id=606604179]
 modulate = Color(0.90359825, 0.90359825, 0.903598, 1)
 
@@ -15171,3 +15182,8 @@ limite_inferior = 835
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=834295811]
 position = Vector2(1173.5, 523.5)
 shape = SubResource("RectangleShape2D_8w0r3")
+
+[node name="SnakeEnemy" parent="." unique_id=383943052 instance=ExtResource("23_pmixq")]
+position = Vector2(1018, 733)
+start_facing = 1
+max_health = 2
