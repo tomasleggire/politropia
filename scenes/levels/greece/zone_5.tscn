@@ -17,6 +17,7 @@
 [ext_resource type="Texture2D" uid="uid://cpa6p5q4xmqud" path="res://assets/art/greece/Columns/Column-1.png" id="19_bkxon"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="20_b6xpd"]
 [ext_resource type="Texture2D" uid="uid://b5dtp4mw8wlgs" path="res://assets/art/greece/Columns/Column-2.png" id="20_nerxw"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/bosses/artemis_boss_arena.tscn" id="21_nphov"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="21_udyla"]
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_de354"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_tolj8"]
@@ -15171,3 +15172,6 @@ limite_inferior = 835
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=834295811]
 position = Vector2(1173.5, 523.5)
 shape = SubResource("RectangleShape2D_8w0r3")
+
+[node name="ArtemisBossArena" parent="." unique_id=2143184259 instance=ExtResource("21_nphov")]
+position = Vector2(1872, 627)
