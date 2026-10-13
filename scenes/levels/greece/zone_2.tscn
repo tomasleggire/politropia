@@ -15153,10 +15153,10 @@ tile_set = SubResource("TileSet_7wplu")
 
 [node name="SceneTransitionArea" parent="TilemapLayers/Ground" unique_id=1518630621 instance=ExtResource("21_e2d28")]
 position = Vector2(2124, -864)
-script = null
+target_scene_path = "uid://hlgyax3hjqhs"
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("24_kvk6j")]
-position = Vector2(50, 132)
+position = Vector2(1061, 72)
 
 [node name="Enemies" type="Node2D" parent="." unique_id=217469104]
 
@@ -15205,8 +15205,12 @@ shape = SubResource("RectangleShape2D_h4t55")
 
 [node name="SceneTransitionArea" parent="." unique_id=965278355 instance=ExtResource("20_7td2e")]
 position = Vector2(1107, -74)
-script = null
+target_scene_path = "uid://crlljgoutm1lu"
+target_door_id = 6
+door_id = 5
 
 [node name="SceneTransitionArea2" parent="." unique_id=1016494036 instance=ExtResource("21_e2d28")]
 position = Vector2(2671, 738)
-script = null
+target_scene_path = "uid://sa4mtebqbp50"
+target_door_id = 4
+door_id = 3
