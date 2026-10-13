@@ -1,6 +1,6 @@
 extends Control
 
-const ESCENA_JUEGO := "res://scenes/levels/library-level.tscn"
+const ESCENA_JUEGO := "res://scenes/levels/greece/zone_1.tscn"
 
 @onready var btn_nueva: Button = %NewGame
 @onready var btn_continuar: Button = %Continue
@@ -20,7 +20,11 @@ func _on_nueva_partida() -> void:
 	btn_nueva.disabled = true  # evita tocar dos veces
 	# Si todavía no terminó de cargar, espera  lo que falte
 	var escena: PackedScene = ResourceLoader.load_threaded_get(ESCENA_JUEGO)
-	get_tree().change_scene_to_packed(escena)
+	if escena != null:
+		get_tree().change_scene_to_packed(escena)
+	else:
+		# Fallback por si la carga diferida falla
+		get_tree().change_scene_to_file(ESCENA_JUEGO)
 
 func _on_coleccionables() -> void:
 	print("Coleccionables: pendiente")

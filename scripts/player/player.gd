@@ -55,8 +55,8 @@ const REST_EXIT_ACTIONS: Array[StringName] = [
 @export var max_health := 5
 
 @export_group("Energy")
-@export var max_energy := 100.0
-var current_energy := 100.0
+@export var max_energy: float = 100.0
+var current_energy: float = 100.0
 
 var current_health: int:
 	get:
@@ -539,6 +539,7 @@ func _ready() -> void:
 	
 	if hud_instance.has_method("bind_player"):
 		hud_instance.bind_player(self)
+
 
 func _recompute_jump_physics() -> void:
 	_rise_gravity = (2.0 * jump_height) / (jump_time_to_apex * jump_time_to_apex)

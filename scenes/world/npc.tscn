@@ -1,0 +1,41 @@
+[gd_scene format=3 uid="uid://d0fndhvvtp3yq"]
+
+[ext_resource type="Texture2D" uid="uid://cvjdmwt7wk0da" path="res://assets/ui/librarian.png" id="1_1oqjc"]
+[ext_resource type="PackedScene" uid="uid://bq2h3mekduxqo" path="res://scenes/ui/speech_bubble.tscn" id="1_kmc6d"]
+[ext_resource type="Script" uid="uid://esr7sh3cwqgi" path="res://scripts/world/npc.gd" id="1_ts6vr"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ts6vr"]
+size = Vector2(53, 15)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_davfq"]
+radius = 35.0
+
+[node name="NPC" type="CharacterBody2D" unique_id=188900045]
+script = ExtResource("1_ts6vr")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1609965343]
+position = Vector2(183.4125, 266.5)
+scale = Vector2(0.05, 0.05)
+texture = ExtResource("1_1oqjc")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1912003316]
+position = Vector2(187.5, 301.5)
+shape = SubResource("RectangleShape2D_ts6vr")
+
+[node name="InteractionArea" type="Area2D" parent="." unique_id=885440345]
+collision_layer = 0
+collision_mask = 7
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea" unique_id=292416956]
+position = Vector2(187, 267)
+shape = SubResource("CircleShape2D_davfq")
+
+[node name="PromptIcon" type="Label" parent="." unique_id=1175269131]
+offset_left = 170.0
+offset_top = 212.0
+offset_right = 184.0
+offset_bottom = 235.0
+text = "E"
+
+[node name="SpeechBubble" parent="." unique_id=641743792 instance=ExtResource("1_kmc6d")]
+position = Vector2(199, 139)
