@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://6xu6ikmpoqje" path="res://assets/art/obstacles/thorns.png" id="5_ns67n"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="6_20pvq"]
 [ext_resource type="Texture2D" uid="uid://ddqywkuh8qpr2" path="res://assets/art/obstacles/spikes.png" id="6_n3h83"]
+[ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="6_vc2ga"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="10_0j26h"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_6keu4"]
 
@@ -14119,6 +14120,15 @@ tile_set = ExtResource("3_20pvq")
 [node name="Spikes" type="TileMapLayer" parent="TilemapLayers/Ground/Platforms" unique_id=669948088]
 tile_map_data = PackedByteArray("AAASAAgABQAAAAAAAAASAAkABQAAAAEAAAASAAoABQAAAAIAAAATAAgABQABAAAAAAATAAkABQABAAEAAAATAAoABQABAAIAAAAUAAgABQACAAAAAAAUAAkABQACAAEAAAAUAAoABQACAAIAAAAVAAkABQADAAEAAAAVAAoABQADAAIAAAAWAAgABQAEAAAAAAAWAAkABQAEAAEAAAAWAAoABQAEAAIAAAAXAAgABQAFAAAAAAAXAAkABQAFAAEAAAAXAAoABQAFAAIAAAAsAAgABQAAAAAAAAAsAAkABQAAAAEAAAAsAAoABQAAAAIAAAAtAAgABQABAAAAAAAtAAkABQABAAEAAAAtAAoABQABAAIAAAAuAAgABQACAAAAAAAuAAkABQACAAEAAAAuAAoABQACAAIAAAAvAAkABQADAAEAAAAvAAoABQADAAIAAAAwAAgABQAEAAAAAAAwAAkABQAEAAEAAAAwAAoABQAEAAIAAAAxAAgABQAFAAAAAAAxAAkABQAFAAEAAAAxAAoABQAFAAIAAAAyAAgABQAAAAAAAAAyAAkABQAAAAEAAAAyAAoABQAAAAIAAAAzAAgABQABAAAAAAAzAAkABQABAAEAAAAzAAoABQABAAIAAAA0AAgABQACAAAAAAA0AAkABQACAAEAAAA0AAoABQACAAIAAAA=")
 tile_set = SubResource("TileSet_7rfnt")
+
+[node name="ContactDamage" parent="TilemapLayers/Ground/Platforms/Spikes" unique_id=1514069160 instance=ExtResource("6_vc2ga")]
+position = Vector2(388, 161)
+scale = Vector2(2, 1)
+kind = 1
+
+[node name="ContactDamage2" parent="TilemapLayers/Ground/Platforms/Spikes" unique_id=1827223100 instance=ExtResource("6_vc2ga")]
+position = Vector2(167, 159)
+kind = 1
 
 [node name="Balconies" type="TileMapLayer" parent="TilemapLayers/Ground" unique_id=1238046016]
 position = Vector2(-64, 0)

@@ -18,6 +18,7 @@
 [ext_resource type="TileSet" uid="uid://bt608aiku7igc" path="res://tilesets/spikes_library.tres" id="15_5v0w6"]
 [ext_resource type="Texture2D" uid="uid://bos4jg5e0jdeu" path="res://assets/art/greece/Floor/floating_platforms_tileset.png" id="15_211o3"]
 [ext_resource type="Texture2D" uid="uid://b1t1md8ocmvl4" path="res://assets/art/greece/Foreground/foreground_column.png" id="16_kgimf"]
+[ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="16_mdqms"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="17_sbxl0"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="19_a34q0"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/shadow_owl.tscn" id="21_i8mgn"]
@@ -25,7 +26,6 @@
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="22_5v0w6"]
 [ext_resource type="PackedScene" uid="uid://ctl0cunw2lanc" path="res://scenes/enemies/snake_enemy.tscn" id="24_pblv5"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="25_j468d"]
-[ext_resource type="Script" uid="uid://d2fnxqpwm2vx" path="res://scripts/world/spawn_point.gd" id="26_spawn"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("2_gkjph")
@@ -15070,7 +15070,7 @@ sources/0 = SubResource("TileSetAtlasSource_211o3")
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wakga"]
 size = Vector2(2019, 1053)
 
-[node name="LevelGreece" type="Node2D" unique_id=424136144]
+[node name="GreeceZone1" type="Node2D" unique_id=424136144]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(2, 683)
@@ -15078,7 +15078,7 @@ position = Vector2(2, 683)
 [node name="Background" type="TileMapLayer" parent="TilemapLayers" unique_id=449267912]
 
 [node name="Background1" type="Sprite2D" parent="TilemapLayers/Background" unique_id=1070137044]
-modulate = Color(0.77254903, 0.77254903, 0.77254903, 1)
+modulate = Color(0.8132577, 0.8132577, 0.81325763, 1)
 position = Vector2(1033, -478.5)
 scale = Vector2(1.5168376, 1.4726563)
 texture = ExtResource("1_fi0oj")
@@ -15125,6 +15125,16 @@ position = Vector2(-169, 121)
 tile_map_data = PackedByteArray("AAB3AP7/BQAAAAAAAAB3AP//BQAAAAEAAAB3AAAABQAAAAIAAAB4AP7/BQABAAAAAAB4AP//BQABAAEAAAB4AAAABQABAAIAAAB5AP7/BQACAAAAAAB5AP//BQACAAEAAAB5AAAABQACAAIAAAB6AP7/BQADAAAAAAB6AP//BQADAAEAAAB6AAAABQADAAIAAAB7AP7/BQAEAAAAAAB7AP//BQAEAAEAAAB7AAAABQAEAAIAAAB8AP7/BQAFAAAAAAB8AP//BQAFAAEAAAB8AAAABQAFAAIAAAB9AP7/BQAAAAAAAAB9AP//BQAAAAEAAAB9AAAABQAAAAIAAAB+AP7/BQABAAAAAAB+AP//BQABAAEAAAB+AAAABQABAAIAAAB/AP7/BQACAAAAAAB/AP//BQACAAEAAAB/AAAABQACAAIAAACAAP7/BQADAAAAAACAAP//BQADAAEAAACAAAAABQADAAIAAACBAP7/BQAEAAAAAACBAP//BQAEAAEAAACBAAAABQAEAAIAAACCAP7/BQAFAAAAAACCAP//BQAFAAEAAACCAAAABQAFAAIAAACQAOP/BQAAAAAAAACRAOP/BQABAAAAAACSAOP/BQACAAAAAACTAOP/BQADAAAAAACUAOP/BQAEAAAAAACVAOP/BQAFAAAAAACWAOP/BQAAAAAAAACXAOP/BQABAAAAAACYAOP/BQACAAAAAACZAOP/BQADAAAAAACaAOP/BQAEAAAAAACbAOP/BQAFAAAAAACcAOP/BQAAAAAAAACdAOP/BQABAAAAAACeAOP/BQACAAAAAACfAOP/BQADAAAAAACgAOP/BQAEAAAAAAChAOP/BQAFAAAAAACiAOP/BQAAAAAAAACjAOP/BQABAAAAAACkAOP/BQACAAAAAAClAOP/BQADAAAAAACmAOP/BQAEAAAAAACnAOP/BQAFAAAAAACQAOT/BQAAAAEAAACQAOX/BQAAAAIAAACRAOT/BQABAAEAAACRAOX/BQABAAIAAACSAOT/BQACAAEAAACSAOX/BQACAAIAAACTAOT/BQADAAEAAACTAOX/BQADAAIAAACUAOT/BQAEAAEAAACUAOX/BQAEAAIAAACVAOT/BQAFAAEAAACVAOX/BQAFAAIAAACWAOT/BQAAAAEAAACWAOX/BQAAAAIAAACXAOT/BQABAAEAAACXAOX/BQABAAIAAACYAOT/BQACAAEAAACYAOX/BQACAAIAAACZAOT/BQADAAEAAACZAOX/BQADAAIAAACaAOT/BQAEAAEAAACaAOX/BQAEAAIAAACbAOT/BQAFAAEAAACbAOX/BQAFAAIAAACcAOT/BQAAAAEAAACcAOX/BQAAAAIAAACdAOT/BQABAAEAAACdAOX/BQABAAIAAACeAOT/BQACAAEAAACeAOX/BQACAAIAAACfAOT/BQADAAEAAACfAOX/BQADAAIAAACgAOT/BQAEAAEAAACgAOX/BQAEAAIAAAChAOT/BQAFAAEAAAChAOX/BQAFAAIAAACiAOT/BQAAAAEAAACiAOX/BQAAAAIAAACjAOT/BQABAAEAAACjAOX/BQABAAIAAACkAOT/BQACAAEAAACkAOX/BQACAAIAAAClAOT/BQADAAEAAAClAOX/BQADAAIAAACmAOT/BQAEAAEAAACmAOX/BQAEAAIAAACnAOT/BQAFAAEAAACnAOX/BQAFAAIAAAA=")
 tile_set = ExtResource("15_5v0w6")
 
+[node name="ContactDamage" parent="TilemapLayers/Ground/Platforms/Spikes" unique_id=1860052428 instance=ExtResource("16_mdqms")]
+position = Vector2(1001, 2)
+scale = Vector2(2.5, 1)
+kind = 1
+
+[node name="ContactDamage2" parent="TilemapLayers/Ground/Platforms/Spikes" unique_id=63115339 instance=ExtResource("16_mdqms")]
+position = Vector2(1247, -429)
+scale = Vector2(6, 1)
+kind = 1
+
 [node name="Balconies" type="TileMapLayer" parent="TilemapLayers/Ground" unique_id=1238046016]
 position = Vector2(-64, 0)
 tile_set = SubResource("TileSet_wsxys")
@@ -15135,6 +15145,28 @@ tile_set = SubResource("TileSet_7wplu")
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("2_player")]
 position = Vector2(345, 352)
+
+[node name="Enemies" type="Node2D" parent="." unique_id=1451389218]
+
+[node name="ShadowOwl" parent="Enemies" unique_id=947189450 instance=ExtResource("21_i8mgn")]
+position = Vector2(997, 447)
+max_fall_speed = 1400.0
+
+[node name="LancetEnemy" parent="Enemies" unique_id=945093425 instance=ExtResource("21_r00ng")]
+position = Vector2(1882, 547)
+walk_speed = 120.0
+start_facing = 1
+
+[node name="SnakeEnemy" parent="Enemies" unique_id=383943052 instance=ExtResource("24_pblv5")]
+position = Vector2(1387, -240)
+enemy_id = &"snake01"
+start_facing = 1
+max_health = 2
+
+[node name="SnakeEnemy2" parent="Enemies" unique_id=1238404916 instance=ExtResource("24_pblv5")]
+position = Vector2(1987, -108)
+enemy_id = &"snake02"
+max_health = 2
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)
@@ -15160,33 +15192,8 @@ scale = Vector2(2.0583334, 1.7681057)
 texture = ExtResource("16_kgimf")
 flip_h = true
 
-[node name="Enemies" type="Node2D" parent="." unique_id=1451389218]
-
-[node name="ShadowOwl" parent="Enemies" unique_id=947189450 instance=ExtResource("21_i8mgn")]
-position = Vector2(773, 328)
-max_fall_speed = 1400.0
-
-[node name="ShadowOwl2" parent="Enemies" unique_id=1038230610 instance=ExtResource("21_i8mgn")]
-position = Vector2(1470, 379)
-max_fall_speed = 1400.0
-
-[node name="LancetEnemy" parent="Enemies" unique_id=945093425 instance=ExtResource("21_r00ng")]
-position = Vector2(1882, 547)
-walk_speed = 120.0
-start_facing = 1
-
-[node name="SnakeEnemy" parent="Enemies" unique_id=383943052 instance=ExtResource("24_pblv5")]
-position = Vector2(1387, -240)
-enemy_id = &"snake01"
-start_facing = 1
-max_health = 2
-
-[node name="SnakeEnemy2" parent="Enemies" unique_id=1238404916 instance=ExtResource("24_pblv5")]
-position = Vector2(1987, -108)
-enemy_id = &"snake02"
-max_health = 2
-
 [node name="Area2D" type="Area2D" parent="." unique_id=620321832]
+visible = false
 script = ExtResource("22_5v0w6")
 limite_izquierdo = 100
 limite_superior = -360
@@ -15199,10 +15206,7 @@ shape = SubResource("RectangleShape2D_wakga")
 
 [node name="SceneTransitionArea" parent="." unique_id=651564701 instance=ExtResource("25_j468d")]
 position = Vector2(2212, -217)
-target_scene_path = "uid://3nag83g3qfyp"
-door_id = 1
+script = null
 
 [node name="SpawnPoint" type="Marker2D" parent="." unique_id=1300084273 groups=["spawn_points"]]
 position = Vector2(2162, -142)
-script = ExtResource("26_spawn")
-spawn_id = 1
