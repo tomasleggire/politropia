@@ -18,8 +18,10 @@
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="20_3c0f7"]
 [ext_resource type="Texture2D" uid="uid://b5dtp4mw8wlgs" path="res://assets/art/greece/Columns/Column-2.png" id="20_jcgej"]
 [ext_resource type="PackedScene" uid="uid://ctl0cunw2lanc" path="res://scenes/enemies/snake_enemy.tscn" id="21_2d4ur"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/shadow_owl.tscn" id="21_ms0bv"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="21_sij8n"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="22_4dr0a"]
+[ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_3.tscn" id="22_jpvhh"]
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_xbgl8"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="23_pmn7b"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_5bejm"]
@@ -15087,7 +15089,7 @@ sources/0 = SubResource("TileSetAtlasSource_211o3")
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_8w0r3"]
 size = Vector2(1129, 1807)
 
-[node name="Zone4" type="Node2D" unique_id=424136144]
+[node name="GreeceZone4" type="Node2D" unique_id=424136144]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(-2781, 2949)
@@ -15095,7 +15097,7 @@ position = Vector2(-2781, 2949)
 [node name="Background" type="TileMapLayer" parent="TilemapLayers" unique_id=449267912]
 
 [node name="Background4" type="Sprite2D" parent="TilemapLayers/Background" unique_id=1491045617]
-modulate = Color(0.68721527, 0.6872149, 0.68721485, 1)
+modulate = Color(0.7750634, 0.7750634, 0.7750634, 1)
 position = Vector2(3295.75, -1947.125)
 scale = Vector2(1.0356443, 1.0356443)
 texture = ExtResource("4_7rb1v")
@@ -15146,6 +15148,45 @@ tile_set = SubResource("TileSet_7wplu")
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("24_5bejm")]
 position = Vector2(710, 1733)
 
+[node name="Enemies" type="Node2D" parent="." unique_id=256642699]
+
+[node name="SnakeEnemy" parent="Enemies" unique_id=383943052 instance=ExtResource("21_2d4ur")]
+position = Vector2(146, 1707)
+enemy_id = &"snake01"
+start_facing = 1
+max_health = 2
+
+[node name="SnakeEnemy2" parent="Enemies" unique_id=1343577645 instance=ExtResource("21_2d4ur")]
+position = Vector2(649, 1385)
+enemy_id = &"snake02"
+max_health = 2
+
+[node name="SnakeEnemy3" parent="Enemies" unique_id=2140226252 instance=ExtResource("21_2d4ur")]
+position = Vector2(840, 1111)
+enemy_id = &"snake03"
+start_facing = 1
+max_health = 2
+
+[node name="SnakeEnemy4" parent="Enemies" unique_id=787144481 instance=ExtResource("21_2d4ur")]
+position = Vector2(557, 653)
+enemy_id = &"snake04"
+start_facing = 1
+max_health = 2
+
+[node name="SnakeEnemy5" parent="Enemies" unique_id=2085685920 instance=ExtResource("21_2d4ur")]
+position = Vector2(707, 320)
+enemy_id = &"snake05"
+max_health = 2
+
+[node name="ShadowOwl" parent="Enemies" unique_id=667068756 instance=ExtResource("21_ms0bv")]
+position = Vector2(312, 1163)
+
+[node name="ShadowOwl2" parent="Enemies" unique_id=758372325 instance=ExtResource("21_ms0bv")]
+position = Vector2(840, 414)
+
+[node name="FragmentoLibro" parent="." unique_id=587489609 instance=ExtResource("22_jpvhh")]
+position = Vector2(315, 598)
+
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)
 tile_map_data = PackedByteArray("AAACAPL/AAAyAB0AAAACAPP/AAATACYAAAADAPL/AAAzAB0AAAAHAPT/AAAYACcAAAAHAPf/AAAYACoAAAAAAPP/AAARACYAAAAAAPT/AAARACcAAAAAAPX/AAARACgAAAAAAPb/AAARACkAAAAAAPf/AAARACoAAAABAPL/AAASACUAAAABAPP/AAASACYAAAABAPT/AAASACcAAAABAPX/AAASACgAAAABAPb/AAASACkAAAABAPf/AAASACoAAAABAPj/AAASACsAAAACAPT/AAATACcAAAACAPX/AAATACgAAAACAPb/AAATACkAAAACAPf/AAATACoAAAACAPj/AAATACsAAAADAPP/AAAUACYAAAADAPT/AAAUACcAAAADAPX/AAAUACgAAAADAPb/AAAUACkAAAADAPf/AAAUACoAAAADAPj/AAAUACsAAAAEAPP/AAAVACYAAAAEAPT/AAAVACcAAAAEAPX/AAAVACgAAAAEAPb/AAAVACkAAAAEAPf/AAAVACoAAAAEAPj/AAAVACsAAAAFAPL/AAAWACUAAAAFAPP/AAAWACYAAAAFAPT/AAAWACcAAAAFAPX/AAAWACgAAAAFAPb/AAAWACkAAAAFAPf/AAAWACoAAAAFAPj/AAAWACsAAAAGAPL/AAAXACUAAAAGAPP/AAAXACYAAAAGAPT/AAAXACcAAAAGAPX/AAAXACgAAAAGAPb/AAAXACkAAAAGAPf/AAAXACoAAAAGAPj/AAAXACsAAAAHAPP/AAAYACYAAAAHAPX/AAAYACgAAAAHAPb/AAAYACkAAAA=")
@@ -15177,42 +15218,14 @@ position = Vector2(538.5, 875.5)
 shape = SubResource("RectangleShape2D_8w0r3")
 debug_color = Color(1.6364455e-06, 0.6042749, 0.6767223, 0.41960785)
 
-[node name="SnakeEnemy" parent="." unique_id=383943052 instance=ExtResource("21_2d4ur")]
-position = Vector2(146, 1707)
-enemy_id = &"snake01"
-start_facing = 1
-max_health = 2
-
-[node name="SnakeEnemy2" parent="." unique_id=1343577645 instance=ExtResource("21_2d4ur")]
-position = Vector2(649, 1385)
-enemy_id = &"snake02"
-max_health = 2
-
-[node name="SnakeEnemy3" parent="." unique_id=2140226252 instance=ExtResource("21_2d4ur")]
-position = Vector2(840, 1111)
-enemy_id = &"snake03"
-start_facing = 1
-max_health = 2
-
-[node name="SnakeEnemy4" parent="." unique_id=787144481 instance=ExtResource("21_2d4ur")]
-position = Vector2(557, 653)
-enemy_id = &"snake04"
-start_facing = 1
-max_health = 2
-
-[node name="SnakeEnemy5" parent="." unique_id=2085685920 instance=ExtResource("21_2d4ur")]
-position = Vector2(707, 320)
-enemy_id = &"snake05"
-max_health = 2
-
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("22_4dr0a")]
 position = Vector2(889, -74)
-target_scene_path = "uid://drehrd4yly6oj"
+script = null
 
 [node name="SceneTransitionArea2" parent="." unique_id=949283958 instance=ExtResource("22_4dr0a")]
 position = Vector2(584, 1824)
-target_scene_path = "uid://3nag83g3qfyp"
+script = null
 
 [node name="SceneTransitionArea3" parent="." unique_id=44791832 instance=ExtResource("23_pmn7b")]
 position = Vector2(1142, 108)
-target_scene_path = "uid://bjruohx06abro"
+script = null
