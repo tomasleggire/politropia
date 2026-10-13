@@ -15206,7 +15206,9 @@ shape = SubResource("RectangleShape2D_wakga")
 
 [node name="SceneTransitionArea" parent="." unique_id=651564701 instance=ExtResource("25_j468d")]
 position = Vector2(2212, -217)
-script = null
+target_scene_path = "uid://3nag83g3qfyp"
+target_door_id = 2
+door_id = 1
 
 [node name="SpawnPoint" type="Marker2D" parent="." unique_id=1300084273 groups=["spawn_points"]]
 position = Vector2(2162, -142)

@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_2.tscn" id="6_cxp8p"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="6_eglro"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="7_cxp8p"]
+[ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_710r8"]
 
 [sub_resource type="TileSet" id="TileSet_r6boj"]
 
@@ -13960,7 +13961,7 @@ position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("4_cxp8p")]
-position = Vector2(36, 198)
+position = Vector2(1848, 732)
 
 [node name="BookFlyer" parent="." unique_id=899168196 instance=ExtResource("6_eglro")]
 position = Vector2(1374, 162)
@@ -13997,3 +13998,13 @@ limite_inferior = 780
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=2065692465]
 position = Vector2(963, 394)
 shape = SubResource("RectangleShape2D_wakga")
+
+[node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("10_710r8")]
+position = Vector2(-26, 125)
+target_scene_path = "uid://del2ypua786qc"
+
+[node name="SceneTransitionArea2" parent="." unique_id=308062238 instance=ExtResource("10_710r8")]
+position = Vector2(1949, 673)
+target_scene_path = "uid://cq3j5o0ey5cvx"
+target_door_id = 3
+door_id = 4
