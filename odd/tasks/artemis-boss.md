@@ -242,7 +242,7 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
 - 2026-10-12: Merged origin/main 54f64a8 (teammate HUD.gd, no overlap) at 049b378.
   - The final slice review was APPROVED (lineage review-6c27a7eb7f6a6bda) and acknowledged.
   - Pushed `feat/artemis-boss` at 049b378 (the pre-push GGA hook passed).
-  - Follow-up (ours, minor): `_resolve_reward` connects to `node_added` with no teardown and can connect twice.
+  - Follow-up fixed: `_resolve_reward` no longer connects to `node_added` twice and stops waiting when the arena leaves the tree (2 new checks).
   - Team notes: `HUD.gd` and the shadow_owl uid change came from main; the real levels lack the Luz HUD.
 
 ## Open questions (raise with user when relevant)
@@ -260,4 +260,4 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
 - Moon dive: keep it vertical (current, the clearest read) or make it diagonal as originally designed? Check during the T6 playtest.
 
 ## Next step
-Open the PR when the user decides, and handle the `_resolve_reward` follow-up.
+Open the PR when the user decides.

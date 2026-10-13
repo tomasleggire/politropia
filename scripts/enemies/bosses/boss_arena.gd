@@ -173,6 +173,7 @@ func _exit_tree() -> void:
 	# Never leave the camera locked on an arena that is going away.
 	if not Engine.is_editor_hint():
 		_unlock_camera(0.0)
+		_stop_waiting_for_luz()
 
 
 func _get_configuration_warnings() -> PackedStringArray:
@@ -612,9 +613,12 @@ func _leave_checkpoint_contract() -> void:
 func _resolve_reward() -> void:
 	if not reward_enabled or _progress().is_reward_claimed(_boss_id):
 		return
+	if not is_inside_tree():
+		return
 	var player := get_tree().get_first_node_in_group(PLAYER_GROUP)
 	if player == null:
-		get_tree().node_added.connect(_on_node_added_for_reward)
+		if not get_tree().node_added.is_connected(_on_node_added_for_reward):
+			get_tree().node_added.connect(_on_node_added_for_reward)
 	elif not _can_double_jump(player):
 		_spawn_reward()
 
@@ -622,9 +626,16 @@ func _resolve_reward() -> void:
 func _on_node_added_for_reward(node: Node) -> void:
 	if not node.is_in_group(PLAYER_GROUP):
 		return
-	get_tree().node_added.disconnect(_on_node_added_for_reward)
+	_stop_waiting_for_luz()
 	# Deferred: the player is still entering the tree and its state is not final.
 	_resolve_reward.call_deferred()
+
+
+## Drops the pending reward decision; safe to call when nothing is pending.
+func _stop_waiting_for_luz() -> void:
+	var tree := get_tree()
+	if tree != null and tree.node_added.is_connected(_on_node_added_for_reward):
+		tree.node_added.disconnect(_on_node_added_for_reward)
 
 
 func _can_double_jump(player: Node) -> bool:

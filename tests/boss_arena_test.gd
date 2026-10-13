@@ -50,7 +50,7 @@ const CHECKS := {
 	"case_corpse_is_inert": 8,
 	"case_corpse_reloads_where_she_fell": 18,
 	"case_boss_progress_round_trip": 10,
-	"case_reward_waits_for_luz": 4,
+	"case_reward_waits_for_luz": 6,
 	"case_arena_cues_and_door_shake": 6,
 	"case_prefab_is_one_drag": 8,
 }
@@ -689,6 +689,26 @@ func case_reward_waits_for_luz() -> void:
 	await h.secs(0.3)
 	h.check(not is_instance_valid(stray) and not _progress().is_reward_claimed(BOSS_ID), "and a pickup that reaches her frees itself without claiming")
 	_end_case()
+	_reset_world()
+	_progress().from_dict({"version": 1, "bosses": {String(BOSS_ID): {"defeated": true, "x": 120.0, "y": 0.0, "facing": 1, "reward_claimed": false}}})
+	_arena = _make_arena()
+	_boss = _arena.get_boss() as ArtemisBoss
+	await h.frames(5)
+	_arena._resolve_reward()
+	h.check(_reward_waiters() == 1, "a repeated decision while Luz is missing waits only once (%d)" % _reward_waiters())
+	var parent := _arena.get_parent()
+	parent.remove_child(_arena)
+	h.check(_reward_waiters() == 0, "an arena that leaves the tree stops waiting for Luz")
+	parent.add_child(_arena)
+	_end_case()
+
+
+func _reward_waiters() -> int:
+	var count := 0
+	for connection: Dictionary in (Engine.get_main_loop() as SceneTree).node_added.get_connections():
+		if (connection["callable"] as Callable).get_object() == _arena:
+			count += 1
+	return count
 
 
 func case_arena_cues_and_door_shake() -> void:
