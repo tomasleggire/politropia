@@ -118,6 +118,18 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - (l) Test interrupting the dive leap and the stag cast: visual height restored, no marker or column, no stag spawned.
   - (m) Track arena engagement explicitly. Today any IDLE period under manual engage, including the opening delay, makes her silently immune.
   - Route: delegated.
+- [x] **T13 Hardening from the 1ddcd0f..0aaf6af review** (APPROVED, lineage review-3e407937ef28b972, acknowledged; boundary now 0aaf6af):
+  - (n) `_reset_ai` must restore `Visual.z_index` after the corpse pose.
+  - (o) `BossProgress.from_dict` must validate field types before applying anything, so it is all-or-nothing.
+  - (p) Strengthen the free sub-case of `case_rearm_survives_free`.
+  - (q) The reward re-spawn check must not count a missing player as "cannot double jump" (defer the check or re-check on pickup).
+  - Route: delegated.
+- [ ] **T14 Playtest 3 fixes** (user, 2026-10-12):
+  - (a) The camera framing at fight start drops the floor slab out of view. Cause: the prefab `arena_rect` bottom sits exactly on the floor line (T10). Restore the framing the user liked in 526f60c and document the rule in BOSS_ARENA.md.
+  - (b) Keep only the middle platform in the test arena.
+  - (c) Luz's attack must NOT break Artemis arrows. Today `EnemyProjectile.receive_hit` deactivates them; this applies to Artemis arrows only.
+  - (d) Dash through arrows and through Artemis. Already correct: arrows pass a dashing Luz and keep flying (enemy_projectile.gd:115), and contact damage respects the dash i-frames. Add regression tests.
+  - Route: delegated.
 - [ ] **T11 Push** `feat/artemis-boss` to the remote, ONLY after the user approves an iPhone build of the finished T7-T10 work (user instruction 2026-10-12). Route: inline.
 
 ## Progress

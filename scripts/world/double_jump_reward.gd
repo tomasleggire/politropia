@@ -10,6 +10,7 @@ signal collected(player: Node)
 
 const PLAYER_GROUP := &"player"
 const UNLOCK_METHOD := &"unlock_double_jump"
+const HAS_METHOD := &"has_double_jump"
 const APPEAR_START_SCALE := 0.05
 
 @export_group("Feel")
@@ -34,6 +35,10 @@ func is_collected() -> bool:
 
 func _on_body_entered(body: Node2D) -> void:
 	if _collected or not body.is_in_group(PLAYER_GROUP) or not body.has_method(UNLOCK_METHOD):
+		return
+	if body.has_method(HAS_METHOD) and body.call(HAS_METHOD):
+		# Nothing to give: she already has it (e.g. a late-spawned pickup).
+		queue_free()
 		return
 	_collected = true
 	body.call(UNLOCK_METHOD)

@@ -11,6 +11,7 @@ extends "res://tests/support/ritual_suite.gd"
 const ShakeSpy := preload("res://tests/support/shake_spy_camera.gd")
 const ARENA_SCENE := "res://scenes/enemies/bosses/boss_arena.tscn"
 const PREFAB_SCENE := "res://scenes/enemies/bosses/artemis_boss_arena.tscn"
+const REWARD_SCENE := preload("res://scenes/world/double_jump_reward.tscn")
 const BOSS_SCENE := "res://scenes/enemies/bosses/artemis.tscn"
 const TEST_ARENA_SCENE := "res://scenes/levels/test/artemis_arena.tscn"
 const HUD_SCENE := "res://scenes/ui/health_hud.tscn"
@@ -43,12 +44,13 @@ const CHECKS := {
 	"case_arena_limits_bound_boss": 5,
 	"case_armed_boss_is_untouchable": 3,
 	"case_dead_boss_while_armed_never_locks": 7,
-	"case_rearm_survives_free": 4,
+	"case_rearm_survives_free": 6,
 	"case_engaged_boss_always_hittable": 6,
 	"case_test_arena_shows_luz_hud": 3,
 	"case_corpse_is_inert": 8,
 	"case_corpse_reloads_where_she_fell": 18,
-	"case_boss_progress_round_trip": 8,
+	"case_boss_progress_round_trip": 10,
+	"case_reward_waits_for_luz": 4,
 	"case_arena_cues_and_door_shake": 6,
 	"case_prefab_is_one_drag": 8,
 }
@@ -476,10 +478,13 @@ func case_rearm_survives_free() -> void:
 	await _build()
 	var arena := _arena
 	arena._trigger.monitoring = false
+	var finished: Array[bool] = []
+	arena.rearm_finished.connect(func(armed: bool) -> void: finished.append(armed))
 	arena._rearm_trigger()
 	await h.tree.physics_frame
 	_rig.remove_child(arena)
 	await h.frames(5)
+	h.check(finished == [false], "the re-arm routine ended through its early return, not armed (%s)" % [finished])
 	h.check(not arena.is_inside_tree(), "the arena left the tree between the re-arm awaits")
 	h.check(not arena.is_trigger_armed() and arena.get_state() == BossArena.FightState.ARMED, "so the trigger did not re-arm and the state is unchanged")
 	arena.free()
@@ -488,9 +493,13 @@ func case_rearm_survives_free() -> void:
 	_end_case()
 	await _build()
 	var freed := _arena
+	var freed_finished: Array[bool] = []
+	freed.rearm_finished.connect(func(armed: bool) -> void: freed_finished.append(armed))
 	freed._rearm_trigger()
+	await h.tree.physics_frame
 	_free_rig()
 	await h.frames(5)
+	h.check(freed_finished.is_empty(), "the dropped routine never reached an outcome (%s)" % [freed_finished])
 	h.check(not is_instance_valid(freed), "freeing the arena during re-arm leaves it gone")
 	h.check(not is_instance_valid(_arena), "with no dangling await or error")
 	_end_case()
@@ -643,10 +652,43 @@ func case_boss_progress_round_trip() -> void:
 	progress.from_dict({"version": 99, "bosses": {"a": {"defeated": true}}})
 	h.check(not progress.is_defeated(&"a"), "an unknown version leaves a clean slate")
 	progress.from_dict({"version": 1, "bosses": {"x": 5, "y": {"defeated": true, "x": 1.0, "y": 2.0, "facing": 1}}})
-	h.check(not progress.is_defeated(&"x") and progress.is_defeated(&"y"), "bad entries are skipped, good ones kept")
+	h.check(not progress.is_defeated(&"x") and not progress.is_defeated(&"y"), "a bad entry voids the whole save, good ones included")
+	var good := {"defeated": true, "x": 1.0, "y": 2.0, "facing": 1, "reward_claimed": false}
+	progress.from_dict({"version": 1, "bosses": {"ok": good, "bad": good.merged({"defeated": "yes"}, true)}})
+	h.check(not progress.is_defeated(&"ok") and not progress.is_defeated(&"bad"), "a string for `defeated` leaves a clean slate, nothing half applied")
+	progress.from_dict({"version": 1, "bosses": {"ok": good, "bad": good.merged({"x": "far"}, true)}})
+	h.check(not progress.is_defeated(&"ok") and progress.get_corpse(&"bad").is_empty(), "a non-numeric coordinate does too")
 	progress.from_dict({})
 	h.check(not progress.is_defeated(&"y"), "an empty dictionary is a clean slate")
 	progress.clear()
+
+
+func case_reward_waits_for_luz() -> void:
+	_reset_world()
+	_progress().from_dict({"version": 1, "bosses": {String(BOSS_ID): {"defeated": true, "x": 120.0, "y": 0.0, "facing": 1, "reward_claimed": false}}})
+	_arena = _make_arena()
+	_boss = _arena.get_boss() as ArtemisBoss
+	await h.frames(5)
+	h.check(_arena.get_reward() == null, "with no Luz yet the arena does not guess: no reward spawned")
+	_add_luz()
+	await h.frames(5)
+	h.check(_arena.get_reward() != null, "once Luz joins without the double jump the reward appears")
+	_end_case()
+	_reset_world()
+	_progress().from_dict({"version": 1, "bosses": {String(BOSS_ID): {"defeated": true, "x": 120.0, "y": 0.0, "facing": 1, "reward_claimed": false}}})
+	_arena = _make_arena()
+	_boss = _arena.get_boss() as ArtemisBoss
+	await h.frames(5)
+	_add_luz()
+	_player.unlock_double_jump()
+	await h.frames(5)
+	h.check(_arena.get_reward() == null, "a Luz that already double jumps gets no reward, even when she joins late")
+	var stray := REWARD_SCENE.instantiate() as DoubleJumpReward
+	_rig.add_child(stray)
+	stray.global_position = _player.global_position + Vector2(0.0, -28.0)
+	await h.secs(0.3)
+	h.check(not is_instance_valid(stray) and not _progress().is_reward_claimed(BOSS_ID), "and a pickup that reaches her frees itself without claiming")
+	_end_case()
 
 
 func case_arena_cues_and_door_shake() -> void:

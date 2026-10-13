@@ -31,6 +31,10 @@ signal fight_started
 signal fight_reset
 signal arena_cleared
 signal reward_spawned(reward: DoubleJumpReward)
+## The trigger re-arm routine ended: `armed` is true when the trigger came back
+## on, false when it gave up (the arena left the tree or the fight state changed).
+## Never emitted if the arena is freed mid-wait (the routine is simply dropped).
+signal rearm_finished(armed: bool)
 ## A sound cue fired (`DoorsClose`, `DoorsOpen`, `BossIntro`), even with an empty stream.
 signal sfx_cue(cue: StringName)
 
@@ -477,12 +481,13 @@ func _reset_fight() -> void:
 func _rearm_trigger() -> void:
 	for _step: int in 2:
 		if not is_inside_tree():
+			rearm_finished.emit(false)
 			return
 		await get_tree().physics_frame
-	if not is_inside_tree():
-		return
-	if _state == FightState.ARMED:
+	var armed := is_inside_tree() and _state == FightState.ARMED
+	if armed:
 		_trigger.monitoring = true
+	rearm_finished.emit(armed)
 
 
 func _reset_boss() -> void:
@@ -578,8 +583,7 @@ func _enter_defeated_state() -> void:
 	var corpse: Dictionary = _progress().get_corpse(_boss_id)
 	_boss.make_corpse_at(corpse["position"], corpse["facing"])
 	_leave_checkpoint_contract()
-	if _should_respawn_reward():
-		_spawn_reward()
+	_resolve_reward()
 
 
 ## Out of the checkpoint contract: a desk rest or Luz's death must not revive her.
@@ -587,12 +591,29 @@ func _leave_checkpoint_contract() -> void:
 	_boss.remove_from_group(Enemy.GROUP_RESETTABLE)
 
 
-## Defeated but never claimed, and Luz still cannot double jump.
-func _should_respawn_reward() -> bool:
+## Defeated but never claimed: the reward comes back unless Luz already double
+## jumps. Without a Luz in the tree yet (the arena can be ready first) the decision
+## waits for her, never assuming she lacks the ability.
+func _resolve_reward() -> void:
 	if not reward_enabled or _progress().is_reward_claimed(_boss_id):
-		return false
+		return
 	var player := get_tree().get_first_node_in_group(PLAYER_GROUP)
-	return player == null or not player.has_method(&"has_double_jump") or not player.call(&"has_double_jump")
+	if player == null:
+		get_tree().node_added.connect(_on_node_added_for_reward)
+	elif not _can_double_jump(player):
+		_spawn_reward()
+
+
+func _on_node_added_for_reward(node: Node) -> void:
+	if not node.is_in_group(PLAYER_GROUP):
+		return
+	get_tree().node_added.disconnect(_on_node_added_for_reward)
+	# Deferred: the player is still entering the tree and its state is not final.
+	_resolve_reward.call_deferred()
+
+
+func _can_double_jump(player: Node) -> bool:
+	return player.has_method(&"has_double_jump") and player.call(&"has_double_jump")
 
 
 func _kill(tween: Tween) -> void:

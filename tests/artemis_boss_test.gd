@@ -76,6 +76,7 @@ const CHECKS := {
 	"case_never_stands_on_a_platform": 3,
 	"case_final_blow_restores_time_scale": 8,
 	"case_corpse_stays": 9,
+	"case_corpse_reset_restores_visual": 6,
 	"case_audio_cue_slots": 3,
 	"case_cues_ranged_attacks": 4,
 	"case_cues_phase_two_and_shakes": 6,
@@ -1606,6 +1607,34 @@ func case_corpse_stays() -> void:
 	_hit(30)
 	await h.secs(_boss.defeat_time + 0.8)
 	h.check(settled == [1] and absf(_boss.global_position.y) < 2.0, "killed in mid-air she falls first, then rests on the floor (y %.1f)" % _boss.global_position.y)
+	_end_case()
+
+
+func _visual_state() -> Dictionary:
+	var visual := _boss.get_node("Visual") as Node2D
+	var bow := _boss.get_node("Visual/Bow") as Node2D
+	return {
+		"z": visual.z_index, "modulate": visual.modulate, "scale_y": visual.scale.y, "rotation": visual.rotation,
+		"bow_position": bow.position, "bow_rotation": bow.rotation,
+	}
+
+
+func case_corpse_reset_restores_visual() -> void:
+	await _build_rig()
+	await _add_boss(Vector2(300.0, 0.0), {"stagger_hits": 0})
+	var fresh := _visual_state()
+	_hit(30)
+	await h.secs(_boss.defeat_time + 0.4)
+	var corpse := _visual_state()
+	h.check(corpse["z"] == -1 and not _boss.is_physics_processing(), "she is settled with the corpse drawn behind (z %d)" % corpse["z"])
+	h.cps.reset_resettable_enemies()
+	var revived := _visual_state()
+	h.check(revived["z"] == fresh["z"] and revived["modulate"] == fresh["modulate"], "a checkpoint reset restores the draw order and the tint")
+	h.check(is_equal_approx(revived["scale_y"], fresh["scale_y"]) and is_equal_approx(revived["rotation"], fresh["rotation"]), "and the squash and the tilt")
+	h.check((revived["bow_position"] as Vector2).is_equal_approx(fresh["bow_position"]) and is_equal_approx(revived["bow_rotation"], fresh["bow_rotation"]), "and the bow back in her hand")
+	await h.frames(3)
+	h.check(_visual_state()["z"] == fresh["z"] and (_visual_state()["modulate"] as Color).is_equal_approx(Color.WHITE), "and it stays that way once she acts again")
+	h.check(_boss.is_physics_processing() and not _boss.is_dead(), "she is alive and processing")
 	_end_case()
 
 

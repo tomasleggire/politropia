@@ -72,24 +72,42 @@ func to_dict() -> Dictionary:
 	return {"version": SAVE_VERSION, "bosses": bosses}
 
 
-## Replaces everything with `data`. Anything unreadable (wrong version, wrong
-## types) is skipped, never half-applied: a bad save leaves a clean slate.
+## Replaces everything with `data`. All or nothing: if the version, the layout or
+## any entry's field types are wrong nothing is applied and the result is a clean
+## slate. Missing fields take their defaults; present ones must be well typed.
 func from_dict(data: Dictionary) -> void:
 	_bosses.clear()
-	if int(data.get("version", 0)) != SAVE_VERSION or not data.get("bosses") is Dictionary:
+	if not _is_number(data.get("version")) or int(data["version"]) != SAVE_VERSION or not data.get("bosses") is Dictionary:
 		return
 	var saved: Dictionary = data["bosses"]
 	for key: Variant in saved:
-		if saved[key] is Dictionary:
-			_restore(StringName(str(key)), saved[key])
+		if not saved[key] is Dictionary or not _entry_is_valid(saved[key]):
+			return
+	for key: Variant in saved:
+		_restore(StringName(str(key)), saved[key])
+
+
+func _entry_is_valid(entry: Dictionary) -> bool:
+	for flag: String in ["defeated", "reward_claimed"]:
+		if entry.has(flag) and not entry[flag] is bool:
+			return false
+	for axis: String in ["x", "y"]:
+		if entry.has(axis) and not _is_number(entry[axis]):
+			return false
+	# JSON turns integers into floats, so 1.0 and -1.0 are valid.
+	return not entry.has("facing") or (_is_number(entry["facing"]) and absf(float(entry["facing"])) == 1.0)
+
+
+func _is_number(value: Variant) -> bool:
+	return value is int or value is float
 
 
 func _restore(boss_id: StringName, saved: Dictionary) -> void:
 	var record := _record(boss_id)
-	record["defeated"] = bool(saved.get("defeated", false))
+	record["defeated"] = saved.get("defeated", false)
 	record["position"] = Vector2(float(saved.get("x", 0.0)), float(saved.get("y", 0.0)))
-	record["facing"] = 1 if int(saved.get("facing", 1)) >= 0 else -1
-	record["reward_claimed"] = bool(saved.get("reward_claimed", false))
+	record["facing"] = int(saved.get("facing", 1))
+	record["reward_claimed"] = saved.get("reward_claimed", false)
 
 
 func _record(boss_id: StringName) -> Dictionary:

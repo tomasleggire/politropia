@@ -678,6 +678,9 @@ func _reset_ai() -> void:
 	set_physics_process(true)
 	_visual.position = Vector2.ZERO
 	_visual.rotation = 0.0
+	_visual.z_index = 0
+	_visual.modulate = Color.WHITE
+	_visual.scale = Vector2(float(_facing), 1.0)
 	_bow.position = _bow_rest
 	_bow.rotation = 0.0
 	clear_arrows()
