@@ -59,10 +59,17 @@ const EDITOR_DOOR_COLOR := Color(1.0, 0.3, 0.3)
 
 @export_group("Arena")
 ## Local rect of the fight. Its left and right edges are the walls the boss
-## clamps to, and the whole rect is what the camera is locked to.
+## clamps to. Its bottom edge is the floor line (the reward spot sits on it).
 @export var arena_rect := Rect2(-434.0, -340.0, 868.0, 400.0):
 	set(value):
 		arena_rect = value
+		_refresh()
+## Extra pixels the locked camera may show below the arena rect. The camera is
+## clamped to the arena rect grown by this margin, so keep it at least as tall
+## as the floor tiles: with 0 the floor slab drops out of view.
+@export_range(0.0, 300.0, 1.0, "suffix:px") var camera_floor_margin := 60.0:
+	set(value):
+		camera_floor_margin = value
 		_refresh()
 
 @export_group("Trigger")
@@ -179,6 +186,8 @@ func _draw() -> void:
 	if not Engine.is_editor_hint():
 		return
 	draw_rect(arena_rect, EDITOR_ARENA_COLOR, false, 2.0)
+	var camera_rect := arena_rect.grow_individual(0.0, 0.0, 0.0, camera_floor_margin)
+	draw_rect(camera_rect, Color(EDITOR_ARENA_COLOR, 0.5), false, 1.0)
 	draw_rect(trigger_rect, Color(EDITOR_TRIGGER_COLOR, 0.15), true)
 	draw_rect(trigger_rect, EDITOR_TRIGGER_COLOR, false, 1.0)
 	for foot: Vector2 in [left_door, right_door]:
@@ -228,6 +237,12 @@ func is_trigger_armed() -> bool:
 ## The arena rect in world space.
 func get_world_rect() -> Rect2:
 	return Rect2(to_global(arena_rect.position), arena_rect.size)
+
+
+## The rect the locked camera is clamped to, in world space: the arena rect
+## plus `camera_floor_margin` below its floor line.
+func get_camera_world_rect() -> Rect2:
+	return get_world_rect().grow_individual(0.0, 0.0, 0.0, camera_floor_margin)
 
 
 ## How many times the arena itself had to reset the boss after Luz woke up. Zero
@@ -333,7 +348,7 @@ func _lock_camera() -> void:
 		return
 	_camera = camera
 	_camera_locked = true
-	var rect := get_world_rect()
+	var rect := get_camera_world_rect()
 	if camera is RoomCamera:
 		var room := camera as RoomCamera
 		_had_room_bounds = room.has_room_bounds()

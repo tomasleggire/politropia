@@ -32,6 +32,9 @@ const CHECKS := {
 	"case_aimed_shot_telegraph_and_arrow": 9,
 	"case_arrow_hurts_luz": 2,
 	"case_arrow_ignored_during_dash": 2,
+	"case_dash_arrow_keeps_flying": 4,
+	"case_dash_through_body_and_after": 4,
+	"case_slash_does_not_break_arrows": 4,
 	"case_backstep_when_close": 3,
 	"case_backstep_refused_at_walls_and_ledges": 4,
 	"case_stagger": 8,
@@ -283,6 +286,69 @@ func case_arrow_ignored_during_dash() -> void:
 	_boss._launch_arrow(_player.global_position + Vector2(80.0, -29.0), Vector2.LEFT)
 	await h.secs(0.6)
 	h.check(_player.get_health() == 2, "the same arrow hurts once the dash is over (%d)" % _player.get_health())
+	_end_case()
+
+
+func case_dash_arrow_keeps_flying() -> void:
+	await _build_rig(Vector2.ZERO)
+	await _add_boss(Vector2(300.0, 0.0), {"wake_distance": 0.0})
+	_player.request_dash()
+	await h.secs(0.05)
+	_boss._launch_arrow(_player.global_position + Vector2(20.0, -29.0), Vector2.LEFT)
+	var arrow := _boss._pool[0] as EnemyProjectile
+	var passed := false
+	for i: int in int(0.3 / _dt()):
+		await h.tree.physics_frame
+		passed = passed or (_player.is_dash_invulnerable() and arrow.global_position.x < _player.global_position.x)
+	h.check(passed, "the arrow crossed Luz while her dash i-frames were up")
+	h.check(arrow.is_active() and arrow.get_velocity().x < 0.0, "and it keeps flying, still active")
+	await h.secs(0.8)
+	h.check(_player.get_health() == 3, "without costing her a pip (%d)" % _player.get_health())
+	_boss._launch_arrow(_player.global_position + Vector2(80.0, -29.0), Vector2.LEFT)
+	await h.secs(0.6)
+	h.check(_player.get_health() == 2, "the same arrow hurts when she is not dashing (%d)" % _player.get_health())
+	_end_case()
+
+
+func case_dash_through_body_and_after() -> void:
+	await _build_rig(Vector2(-30.0, 0.0))
+	await _add_boss(Vector2.ZERO, QUIET)
+	_player.request_dash()
+	var overlapped := false
+	var hurt_in_dash := false
+	var dash_frames := 0
+	for i: int in int(0.5 / _dt()):
+		await h.tree.physics_frame
+		if _player.is_dash_invulnerable():
+			dash_frames += 1
+			overlapped = overlapped or absf(_player.global_position.x - _boss.global_position.x) < 20.0
+			hurt_in_dash = hurt_in_dash or _player.get_health() < 3
+	h.check(dash_frames > 0 and overlapped, "Luz dashed through her body (%d i-frame steps)" % dash_frames)
+	h.check(not hurt_in_dash, "and the dash i-frames blocked every contact hit")
+	_player.global_position = _boss.global_position
+	_player.velocity = Vector2.ZERO
+	await h.secs(0.4)
+	h.check(not _player.is_dash_invulnerable(), "the dash is over")
+	h.check(_player.get_health() == 2, "ending it on top of her costs a pip from contact (%d)" % _player.get_health())
+	_end_case()
+
+
+func case_slash_does_not_break_arrows() -> void:
+	await _build_rig(Vector2.ZERO)
+	await _add_boss(Vector2(300.0, 0.0), QUIET)
+	_boss._launch_arrow(Vector2(45.0, -29.0), Vector2.RIGHT, 10.0)
+	var arrow := _boss._pool[0] as EnemyProjectile
+	var soul := _player.get_soul()
+	_player.request_attack(1)
+	await h.secs(0.5)
+	h.check(arrow.is_active(), "slashing an Artemis arrow leaves it active")
+	h.check(_player.get_soul() == soul, "and grants no soul (%d)" % _player.get_soul())
+	h.check(not arrow.receive_hit(1, Vector2.ZERO), "receive_hit reports nothing struck")
+	var plain := (load("res://scenes/enemies/enemy_projectile.tscn") as PackedScene).instantiate() as EnemyProjectile
+	_rig.add_child(plain)
+	plain.launch(Vector2(0.0, -100.0), Vector2.RIGHT, 10.0)
+	plain.receive_hit(1, Vector2.ZERO)
+	h.check(not plain.is_active(), "other shooters' projectiles are still cut")
 	_end_case()
 
 

@@ -3,7 +3,7 @@ extends Area2D
 
 ## A shot fired by the Shooter. It flies straight, costs Luz one pip when it
 ## touches her and dies on solids, on her, after `lifetime` seconds, or when
-## her slash cuts it. `receive_hit` destroys it and returns false, so cutting it
+## her slash cuts it (`breakable_by_attacks`). `receive_hit` destroys it and returns false, so cutting it
 ## gives no soul.
 ##
 ## Instances are pooled by their shooter: `launch()` revives one and
@@ -20,6 +20,9 @@ const SHOT_RADIUS := 5.0
 ## Stops on the top of a one-way platform when moving down, like Luz's feet do.
 ## Moving up or sideways it passes. Off for plain shooters.
 @export var stops_on_one_ways := false
+## Luz's slash cuts the shot. Off for shots she must dodge (Artemis arrows): the
+## slash neither destroys them nor registers a hit on them.
+@export var breakable_by_attacks := true
 
 var _active := false
 var _velocity := Vector2.ZERO
@@ -28,7 +31,8 @@ var _one_way_probe: RayCast2D
 
 
 func _ready() -> void:
-	collision_layer = ENEMY_LAYER
+	# Off the enemy layer, her slash cannot even see an unbreakable shot.
+	collision_layer = ENEMY_LAYER if breakable_by_attacks else 0
 	collision_mask = SOLIDS_AND_PLAYER_MASK
 	top_level = true
 	body_entered.connect(_on_body_entered)
@@ -80,7 +84,7 @@ func deactivate() -> void:
 ## Luz's slash lands here (see Player's attack hit seam). False on purpose:
 ## it is not a target that recoils or bounces her.
 func receive_hit(_damage: int, _source_position: Vector2, _attack_name: StringName = &"") -> bool:
-	if _active:
+	if _active and breakable_by_attacks:
 		deactivate()
 	return false
 

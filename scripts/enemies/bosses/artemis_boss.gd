@@ -1813,6 +1813,7 @@ func _acquire_arrow() -> EnemyProjectile:
 func _make_arrow() -> EnemyProjectile:
 	var arrow := ARROW_SCENE.instantiate() as EnemyProjectile
 	arrow.stops_on_one_ways = true
+	arrow.breakable_by_attacks = false
 	add_child(arrow)
 	_rehome_arrow.call_deferred(arrow)
 	return arrow

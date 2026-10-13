@@ -142,7 +142,7 @@ func _camera_limits() -> Array[int]:
 
 
 func _arena_limits() -> Array[int]:
-	return [int(ARENA_RECT.position.x), int(ARENA_RECT.position.y), int(ARENA_RECT.end.x), int(ARENA_RECT.end.y)]
+	return [int(ARENA_RECT.position.x), int(ARENA_RECT.position.y), int(ARENA_RECT.end.x), int(ARENA_RECT.end.y + 60.0)]
 
 
 func _place_luz(at: Vector2) -> void:
@@ -398,7 +398,7 @@ func case_room_camera_lock() -> void:
 	var room := Rect2(-2000.0, -1000.0, 4000.0, 2000.0)
 	camera.set_room_bounds(room, 0.0)
 	await _enter_trigger()
-	h.check(h.tree.root.get_viewport().get_camera_2d() == camera and camera.get_room_bounds() == _arena.get_world_rect(), "a RoomCamera is clamped to the arena rect (%s)" % [camera.get_room_bounds()])
+	h.check(h.tree.root.get_viewport().get_camera_2d() == camera and camera.get_room_bounds() == _arena.get_camera_world_rect(), "a RoomCamera is clamped to the camera rect (%s)" % [camera.get_room_bounds()])
 	_kill_luz()
 	_player.respawn()
 	await h.secs(0.1)

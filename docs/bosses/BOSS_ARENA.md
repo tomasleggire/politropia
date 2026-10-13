@@ -16,12 +16,13 @@ Audience: level designers. One scene gives you a complete Artemis fight.
 
 1. Drag the scene into your level.
 2. Put its origin on the **floor line**, at the horizontal **centre of the room**. The prefab is sized for a 936x480 room (Greece T3): the arena rect runs from the floor up 480 px and 468 px to each side.
-3. In the editor you see the debug draw: **cyan** arena (the camera lock and the walls Artemis clamps to), **yellow** trigger (Luz entering it starts the fight), **red** doors, **white dot** the reward spot.
+3. In the editor you see the debug draw: **cyan** arena (the walls Artemis clamps to; the thin cyan line below it is the camera rect, the arena grown by `camera_floor_margin`), **yellow** trigger (Luz entering it starts the fight), **red** doors, **white dot** the reward spot.
 4. Resize in the inspector, group by group: `Arena`, `Trigger`, `Doors`. Keep the trigger away from the doors. Do not scale or rotate the arena node: resize the rects instead.
 5. The doors must sit just inside real walls, so Luz cannot leave. Their height should cover the room's doorways.
 
 ## Rules
 
+- **The camera rect bottom must include the floor tiles.** The locked camera is clamped to `arena_rect` plus `camera_floor_margin` (default 60 px) below the floor line. `arena_rect`'s bottom edge is the floor line, so with a margin of 0 the floor slab drops out of view when the fight starts. Keep the margin at least as tall as your floor tiles.
 - **`enemy_id` must be unique per level.** The defeat is remembered by it. Two bosses with the same id share one corpse.
 - Give the arena a different `boss_name` if you localize it.
 - One-way platforms inside the arena are fine. Artemis never stands on them; her arrows, the rain and the moon dive all respect their physics.
@@ -37,7 +38,7 @@ Audience: level designers. One scene gives you a complete Artemis fight.
 
 ## Test it
 
-Open `scenes/levels/test/artemis_arena.tscn` (this prefab plus three platforms and the HUD) and run the scene. Headless coverage lives in `tests/boss_arena_test.gd` and `tests/artemis_boss_test.gd`.
+Open `scenes/levels/test/artemis_arena.tscn` (this prefab plus one middle platform and the HUD) and run the scene. Headless coverage lives in `tests/boss_arena_test.gd` and `tests/artemis_boss_test.gd`.
 
 ## Tuning and art
 

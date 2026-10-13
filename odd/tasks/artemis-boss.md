@@ -124,7 +124,7 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - (p) Strengthen the free sub-case of `case_rearm_survives_free`.
   - (q) The reward re-spawn check must not count a missing player as "cannot double jump" (defer the check or re-check on pickup).
   - Route: delegated.
-- [ ] **T14 Playtest 3 fixes** (user, 2026-10-12):
+- [x] **T14 Playtest 3 fixes** (user, 2026-10-12):
   - (a) The camera framing at fight start drops the floor slab out of view. Cause: the prefab `arena_rect` bottom sits exactly on the floor line (T10). Restore the framing the user liked in 526f60c and document the rule in BOSS_ARENA.md.
   - (b) Keep only the middle platform in the test arena.
   - (c) Luz's attack must NOT break Artemis arrows. Today `EnemyProjectile.receive_hit` deactivates them; this applies to Artemis arrows only.
@@ -230,6 +230,12 @@ Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --scri
   - (k) Rain markers are cleared on interrupt.
   - (l) Dive-leap and stag-cast interrupt tests added; the existing behavior was already correct.
   - (m) An explicit `_engaged` flag, so she is hittable from `engage()` onward, including the opening delay.
+
+- 2026-10-12: T14 done (delegated writer).
+  - `camera_floor_margin` (60) grows the camera rect below the floor; `arena_rect` stays the play bounds. The frame matches the framing the user liked in 526f60c.
+  - The test arena keeps only the middle platform.
+  - `EnemyProjectile.breakable_by_attacks` is false for Artemis arrows: they sit on layer 0 and are not slashable.
+  - 3 dash regression cases added.
 
 ## Open questions (raise with user when relevant)
 - Is `feint_stop_distance` 80 outside Luz's reach? Tune on device.
