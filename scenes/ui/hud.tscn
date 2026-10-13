@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bgcrqvw5wnk6x"]
 
-[ext_resource type="Script" uid="uid://4a8j2xq5tbqg" path="res://scenes/ui/HUD.gd" id="1_0mwgc"]
+[ext_resource type="Script" uid="uid://4a8j2xq5tbqg" path="res://scripts/ui/HUD.gd" id="1_8qguk"]
 [ext_resource type="Texture2D" uid="uid://u1hfkd38jbj" path="res://assets/ui/portrait_luz.png" id="2_8qguk"]
 [ext_resource type="Texture2D" uid="uid://chob7py1tcflm" path="res://assets/ui/heart_full.png" id="2_oj5la"]
 [ext_resource type="Texture2D" uid="uid://buaghjvb74jbi" path="res://assets/ui/energy_under.png" id="3_136eg"]
@@ -8,7 +8,7 @@
 [ext_resource type="Texture2D" uid="uid://dghb8tgyy5sjr" path="res://assets/ui/energy_progress.png" id="4_oj5la"]
 
 [node name="HUD" type="CanvasLayer" unique_id=835378023]
-script = ExtResource("1_0mwgc")
+script = ExtResource("1_8qguk")
 heart_full_texture = ExtResource("2_oj5la")
 heart_empty_texture = ExtResource("3_gss2c")
 
@@ -17,6 +17,14 @@ layout_mode = 3
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
+
+[node name="HeartsContainer" type="HBoxContainer" parent="PlayerUI" unique_id=1453801795]
+custom_minimum_size = Vector2(150, 32)
+layout_mode = 0
+offset_left = 127.0
+offset_top = 24.0
+offset_right = 277.0
+offset_bottom = 56.0
 
 [node name="Portrait" type="TextureRect" parent="PlayerUI" unique_id=1790400001]
 texture_filter = 1
@@ -30,14 +38,6 @@ scale = Vector2(2, 2)
 texture = ExtResource("2_8qguk")
 expand_mode = 1
 stretch_mode = 5
-
-[node name="HeartsContainer" type="HBoxContainer" parent="PlayerUI" unique_id=1453801795]
-custom_minimum_size = Vector2(150, 32)
-layout_mode = 0
-offset_left = 127.0
-offset_top = 24.0
-offset_right = 277.0
-offset_bottom = 56.0
 
 [node name="EnergyBar" type="TextureProgressBar" parent="PlayerUI" unique_id=461525524]
 texture_filter = 1
