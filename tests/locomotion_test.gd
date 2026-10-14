@@ -44,6 +44,8 @@ func run() -> void:
 	await _case_every_dust_kind_draws_and_frees()
 	await _case_bad_dust_scene_does_not_leak()
 	await _case_wall_cling_and_wall_jump()
+	await _case_wall_cling_while_rising()
+	await _case_chained_wall_jumps_climb()
 	_rig.free()
 	print("PASS %d/%d" % [checks - failed.size(), checks] if failed.is_empty() else "FAIL %d/%d" % [failed.size(), checks])
 	for message in failed:
@@ -333,6 +335,62 @@ func _case_wall_cling_and_wall_jump() -> void:
 	check(_player._state == Player.State.JUMP and _player.velocity.x < 0.0 and _player.velocity.y < 0.0, "jumping away from the wall launches a wall jump")
 	Input.action_release(&"jump")
 	Input.action_release(&"move_left")
+
+## Pressing into a tall wall while still rising fast must grab it, not only at the apex.
+func _case_wall_cling_while_rising() -> void:
+	await _fresh_rig()
+	LevelGeometry.add_solid(_rig, Rect2(24.0, -1000.0, 24.0, 1200.0), Color.DIM_GRAY)
+	Input.action_press(&"move_right")
+	Input.action_press(&"jump")
+	var previous_vy := 0.0
+	var rising_vy := 0.0
+	var engaged_frame := -1
+	for i in 90:
+		await physics_frame
+		if _player._state == Player.State.WALL_CLING:
+			rising_vy = previous_vy
+			engaged_frame = i
+			break
+		previous_vy = _player.velocity.y
+	Input.action_release(&"jump")
+	Input.action_release(&"move_right")
+	check(_player._state == Player.State.WALL_CLING, "touching a wall while rising engages the cling (%s)" % Player.State.keys()[_player._state])
+	check(engaged_frame >= 0 and engaged_frame <= 12 and rising_vy < -_player.wall_cling_apex_threshold, "the cling engaged early, while rising fast (frame %d, vy %.0f)" % [engaged_frame, rising_vy])
+	check(_player.velocity.y >= -_player.wall_cling_max_rise_speed - 0.01, "the upward speed is capped when grabbing (%.0f)" % _player.velocity.y)
+
+
+## Wall jumps between two close walls must carry Luz up a shaft.
+func _case_chained_wall_jumps_climb() -> void:
+	await _fresh_rig()
+	LevelGeometry.add_solid(_rig, Rect2(36.0, -2000.0, 24.0, 2200.0), Color.DIM_GRAY)
+	LevelGeometry.add_solid(_rig, Rect2(-60.0, -2000.0, 24.0, 2200.0), Color.DIM_GRAY)
+	var start_y := _player.global_position.y
+	Input.action_press(&"move_right")
+	Input.action_press(&"jump")
+	var hops := 0
+	var highest_y := start_y
+	for i in 400:
+		await process_frame
+		highest_y = minf(highest_y, _player.global_position.y)
+		if _player._state == Player.State.WALL_CLING:
+			var toward := &"move_right" if _player._wall_direction > 0 else &"move_left"
+			var away := &"move_left" if _player._wall_direction > 0 else &"move_right"
+			Input.action_release(toward)
+			Input.action_press(away)
+			# Let go, then tap again and keep holding through the push-off, as a finger
+			# would: letting go early cuts the jump.
+			Input.action_release(&"jump")
+			await process_frame
+			await process_frame
+			Input.action_press(&"jump")
+			hops += 1
+	Input.action_release(&"jump")
+	Input.action_release(&"move_left")
+	Input.action_release(&"move_right")
+	var gained := start_y - highest_y
+	check(hops >= 4, "Luz keeps catching the opposite wall (%d wall jumps)" % hops)
+	print("HOPS ", hops, " GAIN ", gained)
+	check(gained > 250.0, "chained wall jumps gain height (%.0f px)" % gained)
 
 
 ## Runs at full speed, releases and waits until the player is in `state`.

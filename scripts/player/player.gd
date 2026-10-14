@@ -245,7 +245,15 @@ var current_health: int:
 
 @export_group("Wall")
 @export var wall_ray_length := 16.5
+## Rising faster than this (px/s) counts as "still launching" for the cling
+## rules below. Before the tuning this was the only speed at which a wall grabbed.
 @export var wall_cling_apex_threshold := 60.0
+## Touching a wall in the air while holding toward it grabs it even while still
+## rising (Hollow Knight feel). Off: it only grabs when falling or near the apex.
+@export var wall_cling_while_rising := true
+## Upward speed (px/s) kept when the cling grabs during a rise; anything faster
+## is cut to this, so Luz sticks to the wall instead of sliding up past it.
+@export var wall_cling_max_rise_speed := 100.0
 ## A collider only counts as a clingable wall when its shape is at least this
 ## tall and is not wider than it is tall — filters out horizontal platforms.
 @export var min_wall_height := 80.0
@@ -1702,13 +1710,19 @@ func _is_holding_toward_wall(direction: int) -> bool:
 func _try_start_wall_cling() -> bool:
 	if _wall_recling_lock > 0.0:
 		return false
-	if velocity.y < -wall_cling_apex_threshold:
+	var rising_fast := velocity.y < -wall_cling_apex_threshold
+	if rising_fast and not wall_cling_while_rising:
+		return false
+	# Right after a kick the wall is still within reach: do not grab it back
+	# until the push-off has played out.
+	if rising_fast and _wall_kick_lock_left > 0.0:
 		return false
 	if not _is_against_climbable_wall():
 		return false
 	if not _is_holding_toward_wall(_facing):
 		return false
 	_wall_direction = _facing
+	velocity.y = maxf(velocity.y, -wall_cling_max_rise_speed)
 	_restore_air_actions()
 	_enter_state(State.WALL_CLING)
 	return true
