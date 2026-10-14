@@ -89,6 +89,20 @@ SHEETS = {
             "vault_land": [6, 7],
         },
     },
+    "rainfan": {
+        "raw": "artemis_rainfan_raw.png",
+        "grid": (4, 4),
+        "ref": 13,
+        "clips": {
+            "rain_draw": [0, 1, 2, 3, 4],
+            "rain_release": [5, 6],
+            "rain_recover": [7, 8, 9],
+            "fan_draw": [10, 11, 12],
+            "fan_hold": [13, 13],
+            "fan_release": [14, 15],
+        },
+        "events": {"rain_release": 0, "fan_release": 0},
+    },
     "defeat": {
         "raw": "artemis_defeat_raw.png",
         "grid": (4, 3),
