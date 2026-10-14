@@ -26,6 +26,12 @@ const EDGE_MARGIN := 48.0
 		_rebuild()
 ## Hides the zone's own background sprite and uses its picture as the far layer.
 @export var adopt_zone_background := true
+## Turn off the silhouette layer in a zone where it does not fit (open sky,
+## clouds), whatever the style says.
+@export var mid_enabled := true:
+	set(value):
+		mid_enabled = value
+		_rebuild()
 
 @export_group("Area")
 ## Camera area used when the zone has no CameraRegion and no tiles.
@@ -144,7 +150,7 @@ func _find_zone_background() -> Sprite2D:
 func _build_mid(look: ParallaxStyle, view: Vector2) -> void:
 	for child in _mid.get_children():
 		child.queue_free()
-	_mid.visible = not look.mid_textures.is_empty()
+	_mid.visible = mid_enabled and not look.mid_textures.is_empty()
 	if not _mid.visible:
 		return
 	var scroll := look.mid_scroll_scale

@@ -1,21 +1,18 @@
-[gd_resource type="Resource" script_class="ParallaxStyle" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="ParallaxStyle" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/parallax_style.gd" id="1_style"]
-[ext_resource type="Texture2D" path="res://assets/art/greece/Plants/Tree-1.png" id="2_tree"]
-[ext_resource type="Texture2D" path="res://assets/art/greece/Plants/Bush-1.png" id="3_bush"]
 [ext_resource type="Texture2D" path="res://assets/art/greece/Backgrounds/file_00000000fa70820ea35d2497dee97bac.png" id="4_bg"]
 
 [resource]
 script = ExtResource("1_style")
 far_default_texture = ExtResource("4_bg")
 far_scroll_scale = Vector2(0.45, 0.55)
-mid_textures = Array[Texture2D]([ExtResource("2_tree"), ExtResource("2_tree"), ExtResource("3_bush"), ExtResource("2_tree")])
 mid_tint = Color(0.2, 0.28, 0.32, 0.82)
 mid_detail = 0.4
 mid_fade_top = 0.0
 mid_scroll_scale = Vector2(0.72, 0.78)
 mid_spacing = 260.0
 mid_scale_range = Vector2(1.0, 2.0)
-fog_color = Color(0.92, 0.84, 0.76, 0.28)
+fog_color = Color(0.9, 0.84, 0.78, 0.1)
 fog_screen_y = 0.7
-haze_color = Color(0.2, 0.16, 0.22, 0.16)
+haze_color = Color(0.2, 0.16, 0.22, 0.06)

@@ -369,27 +369,38 @@ func _case_chained_wall_jumps_climb() -> void:
 	Input.action_press(&"jump")
 	var hops := 0
 	var highest_y := start_y
-	for i in 400:
-		await process_frame
+	# Stepped on physics ticks, not rendered frames: the player reads input on the
+	# physics tick, so the outcome no longer depends on the machine's frame rate.
+	for i in 600:
+		await physics_frame
 		highest_y = minf(highest_y, _player.global_position.y)
-		if _player._state == Player.State.WALL_CLING:
-			var toward := &"move_right" if _player._wall_direction > 0 else &"move_left"
-			var away := &"move_left" if _player._wall_direction > 0 else &"move_right"
-			Input.action_release(toward)
-			Input.action_press(away)
-			# Let go, then tap again and keep holding through the push-off, as a finger
-			# would: letting go early cuts the jump.
-			Input.action_release(&"jump")
-			await process_frame
-			await process_frame
-			Input.action_press(&"jump")
-			hops += 1
+		if _player._state != Player.State.WALL_CLING:
+			continue
+		var toward := &"move_right" if _player._wall_direction > 0 else &"move_left"
+		var away := &"move_left" if _player._wall_direction > 0 else &"move_right"
+		# A finger lets go of jump first, then taps jump while pushing away from the
+		# wall. Both inputs land on the same tick, so the push-off never depends on
+		# how many ticks the wall cling would have survived without it. They are
+		# injected on the process frame, between two physics ticks: a press made
+		# inside the physics_frame callback is not seen as "just pressed" by the
+		# next tick.
+		Input.action_release(&"jump")
+		await physics_frame
+		await process_frame
+		Input.action_release(toward)
+		Input.action_press(away)
+		Input.action_press(&"jump")
+		for _tick in 30:
+			await physics_frame
+			highest_y = minf(highest_y, _player.global_position.y)
+			if _player._state != Player.State.WALL_CLING:
+				hops += 1
+				break
 	Input.action_release(&"jump")
 	Input.action_release(&"move_left")
 	Input.action_release(&"move_right")
 	var gained := start_y - highest_y
 	check(hops >= 4, "Luz keeps catching the opposite wall (%d wall jumps)" % hops)
-	print("HOPS ", hops, " GAIN ", gained)
 	check(gained > 250.0, "chained wall jumps gain height (%.0f px)" % gained)
 
 
