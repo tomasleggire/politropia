@@ -64,6 +64,9 @@ enum ID {
 	# --- Greece: zone 1 shortcut <-> Artemis room ---
 	ZONE_1_TO_ARTEMIS,
 	ARTEMIS_TO_ZONE_1,
+
+	# --- Demo shortcut (one way): library zone 1 -> Artemis room ---
+	LIBRARY_TO_ARTEMIS_DEMO,
 }
 
 

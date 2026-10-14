@@ -43,6 +43,10 @@ const ARRIVAL_EDGE_MARGIN := 24.0
 const ARRIVAL_FLOOR_INSET := 2.0
 const _DEFAULT_BODY_SIZE := Vector2(29.0, 46.0)
 
+## Turns the door off without deleting it (e.g. a demo shortcut). A disabled door never
+## triggers, but it can still be arrived at.
+@export var enabled: bool = true
+
 @export_group("Target Scene")
 ## Scene (.tscn) this door leads to.
 @export_file("*.tscn") var target_scene_path: String = ""
@@ -85,7 +89,7 @@ func _ready() -> void:
 	add_to_group(&"scene_transition_area")
 	collision_layer = 0
 	collision_mask = player_collision_mask
-	monitoring = true
+	monitoring = enabled
 	monitorable = false
 
 	# Duplica el recurso de CollisionShape2D para que cambiar el tamaño en una instancia
@@ -104,7 +108,7 @@ func _on_body_exited(body: Node2D) -> void:
 
 
 func _on_body_entered(body: Node2D) -> void:
-	if _triggered:
+	if _triggered or not enabled:
 		return
 	if not _is_player(body):
 		return

@@ -19,6 +19,11 @@ const FLOOR_PROBE := 4.0
 ## entry while a zone is linked from one side only (its exit then lands at the target
 ## scene start and warns) and remove it as soon as the other door exists.
 const PENDING_ARRIVAL_DOORS: Array[String] = []
+## Deliberate ONE-WAY demo shortcuts, keyed "<level> <zone>/<node>". Their target door
+## must exist and Luz must arrive safely, but the target door does not lead back to
+## the source (Artemis' right door continues to Greece). Remove the entry when the
+## shortcut is deleted; every other door keeps the full pairing check.
+const ONE_WAY_DEMO_DOORS: Array[String] = ["library zone_1/DemoShortcutToArtemis"]
 
 var checks := 0
 var failed: Array[String] = []
@@ -156,7 +161,7 @@ func _check_door(door: Dictionary, arrivals: Dictionary) -> void:
 	check(not report.is_empty(), "%s: the target scene has door %s" % [label, DoorID.get_id_name(door.target_door)])
 	if report.is_empty():
 		return
-	if report.has("leads_to"):
+	if report.has("leads_to") and label not in ONE_WAY_DEMO_DOORS:
 		check(report.leads_to == door.source, "%s: the arrival door leads back to the source scene" % label)
 		check(report.points_at == door.door_id, "%s: the arrival door points back at door %s" % [label, DoorID.get_id_name(door.door_id)])
 	var feet: Vector2 = report.feet
