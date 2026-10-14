@@ -184,6 +184,39 @@ def to_cell(frame: np.ndarray, scale: float, label: str) -> Image.Image:
     return cell
 
 
+ARROW_RAW = "artemis_arrow_raw.png"
+ARROW_GAME_LENGTH = 31.0  # px on screen, tip at +14 / tail at -17 of the projectile origin
+
+
+def build_arrows() -> None:
+    """Key the two arrows (normal, moon) of the raw prop sheet and write them
+    at SPRITE_SCALE so the Sprite2D uses the same scale as Artemis."""
+    raw = key_magenta(Image.open(RAW_DIR / ARROW_RAW))
+    height, width = raw.shape[:2]
+    names = {0: "artemis_arrow.png", 1: "artemis_arrow_moon.png"}
+    target_w = round(ARROW_GAME_LENGTH / SPRITE_SCALE)
+    for col, file_name in names.items():
+        sub = raw[: height // 2, col * width // 2 : (col + 1) * width // 2]
+        ys, xs = np.where(sub[..., 3] > 20)
+        crop = sub[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1].copy()
+        scale = target_w / crop.shape[1]
+        premult = crop.copy()
+        premult[..., :3] *= premult[..., 3:4] / 255.0
+        img = Image.fromarray(premult.astype(np.uint8), "RGBA")
+        img = img.resize((target_w, max(1, round(crop.shape[0] * scale))), Image.LANCZOS)
+        arr = np.asarray(img).astype(np.float32)
+        a = arr[..., 3:4]
+        arr[..., :3] = np.where(a > 0, np.minimum(arr[..., :3] * 255.0 / np.maximum(a, 1.0), 255.0), 0)
+        out = Image.fromarray(arr.astype(np.uint8), "RGBA")
+        # even height keeps the shaft on the projectile's axis
+        if out.height % 2:
+            padded = Image.new("RGBA", (out.width, out.height + 1), (0, 0, 0, 0))
+            padded.alpha_composite(out, (0, 0))
+            out = padded
+        out.save(OUT_DIR / file_name, optimize=True)
+        print(f"  {file_name}: {out.size}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview", type=Path, default=None)
@@ -233,6 +266,7 @@ def main() -> None:
             bg = Image.new("RGBA", sheet.size, (24, 32, 56, 255))
             bg.alpha_composite(sheet)
             bg.save(args.preview / file_name)
+    build_arrows()
     (OUT_DIR / "animation_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print("wrote", OUT_DIR)
 
