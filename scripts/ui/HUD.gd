@@ -7,12 +7,27 @@ extends CanvasLayer
 @export var heart_full_texture: Texture2D
 @export var heart_empty_texture: Texture2D
 
+@export_group("Layout")
+## Scales the whole top-left block (portrait, hearts, energy bar, counter).
+## 1.0 is the original art size; hearts stay legible on a phone down to ~0.6.
+@export_range(0.5, 1.5, 0.05) var hud_scale := 0.75:
+	set(value):
+		hud_scale = value
+		_apply_scale()
+
 func _ready() -> void:
+	_apply_scale()
 	var progress := get_node_or_null("/root/FragmentProgress")
 	if progress == null:
 		return
 	progress.fragment_collected.connect(_on_fragment_collected)
 	_show_fragments(progress.count(), progress.total())
+
+
+func _apply_scale() -> void:
+	var player_ui := get_node_or_null("PlayerUI") as Control
+	if player_ui != null:
+		player_ui.scale = Vector2.ONE * hud_scale
 
 
 func _on_fragment_collected(_id: int, count: int, total: int) -> void:

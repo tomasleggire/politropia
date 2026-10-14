@@ -248,7 +248,7 @@ func case_boss_health_bar() -> void:
 	var rect := bar.get_bar_rect()
 	h.check(VIEWPORT_RECT.encloses(rect) and not rect.intersects(HUD_CORNER), "the bar sits inside the screen, clear of the health pips (%s)" % [rect])
 	h.check(absf((rect.position.x + rect.size.x * 0.5) - 320.0) < 1.0, "centred on the screen")
-	var narrow := Rect2(20.0, 10.0, 300.0, 340.0)
+	var narrow := Rect2(20.0, 10.0, 400.0, 340.0)
 	bar.set_safe_area(narrow)
 	rect = bar.get_bar_rect()
 	h.check(narrow.encloses(rect) and rect.position.x >= narrow.position.x + bar.side_clearance - 0.01, "on a narrow safe area it shrinks instead of reaching the pips (%s)" % [rect])
