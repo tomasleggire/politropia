@@ -14,6 +14,9 @@ const LAYOUT_DIR := "res://data/maps"
 ## Level name shown at the top of the map ("Biblioteca", "Grecia").
 @export var level_name := ""
 @export var rooms: Array[MapRoom] = []
+## Draws every room of the level, the ones Luz has not visited as a dim outline,
+## so she can see where to go. Turn it off to show only visited rooms.
+@export var reveal_unvisited := true
 
 
 ## The room for `scene_path`, or null when this layout does not draw it.
@@ -22,6 +25,16 @@ func find_room(scene_path: String) -> MapRoom:
 		if room != null and room.scene_path == scene_path:
 			return room
 	return null
+
+
+## Landmark kinds present in the layout (without NONE), in enum order.
+func landmark_kinds() -> Array[int]:
+	var kinds: Array[int] = []
+	for room in rooms:
+		if room != null and room.landmark != MapRoom.Landmark.NONE and not kinds.has(room.landmark):
+			kinds.append(room.landmark)
+	kinds.sort()
+	return kinds
 
 
 func has_scene(scene_path: String) -> bool:

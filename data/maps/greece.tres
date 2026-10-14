@@ -49,14 +49,16 @@ connects_to = Array[String](["res://scenes/levels/greece/zone_5.tscn"])
 script = ExtResource("2_room")
 scene_path = "res://scenes/levels/greece/zone_healing.tscn"
 display_name = "Sanación"
-map_rect = Rect2(20, -30, 9, 7)
+map_rect = Rect2(73, -30, 10, 8)
+landmark = 2
 connects_to = Array[String](["res://scenes/levels/greece/zone_4.tscn", "res://scenes/levels/greece/zone_artemis.tscn"])
 
 [sub_resource type="Resource" id="Room_8"]
 script = ExtResource("2_room")
 scene_path = "res://scenes/levels/greece/zone_artemis.tscn"
 display_name = "Sala de Artemisa"
-map_rect = Rect2(7, -30, 12, 6)
+map_rect = Rect2(85, -30, 13, 8)
+landmark = 1
 connects_to = Array[String](["res://scenes/levels/greece/zone_healing.tscn"])
 
 [resource]

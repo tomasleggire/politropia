@@ -37,6 +37,8 @@ func _run() -> void:
 		return
 	_check_progress(progress)
 	_check_layouts(progress)
+	_check_landmarks()
+	_check_reveal(progress, screen)
 	await _check_screen(progress, screen, pause)
 
 
@@ -80,6 +82,46 @@ func _check_layouts(_progress: Node) -> void:
 			check(MapLayout.find_for_scene(path) != null, "%s/%s is on the map" % [level, zone])
 	var artemis := MapLayout.find_for_scene("res://scenes/levels/greece/zone_artemis.tscn")
 	check(artemis != null and artemis.level_name == "Grecia", "greece/zone_artemis is on the map")
+
+
+func _landmark_of(scene_path: String) -> int:
+	var layout := MapLayout.find_for_scene(scene_path)
+	var room := layout.find_room(scene_path) if layout != null else null
+	return room.landmark if room != null else -1
+
+
+func _check_landmarks() -> void:
+	var greece := "res://scenes/levels/greece/"
+	var library := "res://scenes/levels/library/"
+	check(_landmark_of(greece + "zone_artemis.tscn") == MapRoom.Landmark.BOSS, "artemis room is the boss landmark")
+	check(_landmark_of(greece + "zone_healing.tscn") == MapRoom.Landmark.REST, "greece healing room is a rest landmark")
+	check(_landmark_of(library + "zone_healing.tscn") == MapRoom.Landmark.REST, "library healing room is a rest landmark")
+	check(_landmark_of(library + "zone_lectern.tscn") == MapRoom.Landmark.LECTERN, "lectern room is the lectern landmark")
+	check(_landmark_of(greece + "zone_2.tscn") == MapRoom.Landmark.NONE, "plain rooms have no landmark")
+	var kinds := MapLayout.find_for_scene(greece + "zone_artemis.tscn").landmark_kinds()
+	check(kinds.size() == 2 and kinds[0] == MapRoom.Landmark.BOSS and kinds[1] == MapRoom.Landmark.REST, "greece legend kinds")
+	# The drawn graph follows the real route: zone_4 -> healing -> artemis, left to right.
+	var layout := MapLayout.find_for_scene(greece + "zone_4.tscn")
+	var zone_4 := layout.find_room(greece + "zone_4.tscn").map_rect
+	var healing := layout.find_room(greece + "zone_healing.tscn").map_rect
+	var artemis := layout.find_room(greece + "zone_artemis.tscn").map_rect
+	check(zone_4.end.x <= healing.position.x and healing.end.x <= artemis.position.x, "greece route reads zone_4, healing, artemis to the right")
+	check(not zone_4.intersects(healing) and not healing.intersects(artemis), "greece route rooms do not overlap")
+
+
+func _check_reveal(progress: Node, screen: Node) -> void:
+	var view := screen.get_node("Root/Frame/Box/MapView") as MapView
+	var layout := MapLayout.find_for_scene(LIBRARY_Z1)
+	var visited := {LIBRARY_Z1: true, LIBRARY_Z2: true}
+	check(layout.reveal_unvisited, "reveal_unvisited defaults on")
+	view.show_map(layout, visited, LIBRARY_Z2)
+	check(view.shown_room_count() == layout.rooms.size(), "revealing draws every room of the level")
+	layout.reveal_unvisited = false
+	view.show_map(layout, visited, LIBRARY_Z2)
+	check(view.shown_room_count() == 2, "toggle off restores visited rooms only")
+	layout.reveal_unvisited = true
+	view.show_map(null, {}, "")
+	progress.clear()
 
 
 func _check_screen(progress: Node, screen: Node, pause: Node) -> void:

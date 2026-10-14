@@ -50,6 +50,7 @@ script = ExtResource("2_room")
 scene_path = "res://scenes/levels/library/zone_healing.tscn"
 display_name = "Sanación"
 map_rect = Rect2(110, -2, 18, 9)
+landmark = 2
 connects_to = Array[String](["res://scenes/levels/library/zone_4.tscn"])
 
 [sub_resource type="Resource" id="Room_8"]
@@ -57,6 +58,7 @@ script = ExtResource("2_room")
 scene_path = "res://scenes/levels/library/zone_lectern.tscn"
 display_name = "Atril"
 map_rect = Rect2(150, 2, 16, 9)
+landmark = 3
 connects_to = Array[String](["res://scenes/levels/library/zone_5.tscn"])
 
 [resource]

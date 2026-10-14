@@ -1,7 +1,8 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/map_screen.gd" id="1_screen"]
 [ext_resource type="Script" path="res://scripts/ui/map_view.gd" id="2_view"]
+[ext_resource type="Script" path="res://scripts/ui/map_legend.gd" id="4_legend"]
 [ext_resource type="Theme" path="res://assets/ui/gothic_theme.tres" id="3_theme"]
 
 [node name="MapScreen" type="CanvasLayer"]
@@ -77,6 +78,11 @@ size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.91, 0.851, 0.659, 0.8)
 theme_override_font_sizes/font_size = 12
 text = ""
+
+[node name="Legend" type="Control" parent="Root/Frame/Box/Footer"]
+layout_mode = 2
+size_flags_vertical = 4
+script = ExtResource("4_legend")
 
 [node name="Back" type="Button" parent="Root/Frame/Box/Footer"]
 custom_minimum_size = Vector2(96, 28)

@@ -9,6 +9,9 @@ extends Resource
 ## in map units (about 1 unit = 60 world pixels), only the proportions matter:
 ## the map screen scales the whole layout to fit.
 
+## Icon drawn on a room so Luz can find it on the map.
+enum Landmark { NONE, BOSS, REST, LECTERN, SECRET }
+
 ## Zone scene (.tscn) this room stands for. Luz "visits" it by loading it.
 @export_file("*.tscn") var scene_path := ""
 ## Name shown on the map when it fits inside the room.
@@ -19,3 +22,6 @@ extends Resource
 ## Scenes of the rooms this one has a door to. The connector is drawn once both
 ## ends have been visited.
 @export_file("*.tscn") var connects_to: Array[String] = []
+## Icon shown on the room: the boss arena, a stillness desk, a lectern. `SECRET`
+## stays hidden until Luz has visited the room.
+@export var landmark := Landmark.NONE

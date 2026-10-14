@@ -1,8 +1,10 @@
 extends CanvasLayer
 
-## Map screen (autoload `MapScreen`), Hollow Knight style: only rooms Luz has
-## visited are drawn, her room is highlighted, and the level name and the
-## fragments found are shown.
+## Map screen (autoload `MapScreen`), Hollow Knight style: the whole level is
+## drawn (rooms not visited yet as a dim outline, see `MapLayout.reveal_unvisited`),
+## visited rooms are filled, her room is highlighted, landmarks (boss, rest,
+## lectern) carry an icon with a legend, and the level name and the fragments
+## found are shown.
 ##
 ## USAGE: nothing to place. It enables the "Mapa" button of the pause menu and
 ## opens on top of it; "Volver" or Escape return to the pause menu. To add rooms
@@ -26,6 +28,7 @@ var _layout: MapLayout
 @onready var _fragments: Label = $Root/Frame/Box/Header/Fragments
 @onready var _view: MapView = $Root/Frame/Box/MapView
 @onready var _hint: Label = $Root/Frame/Box/Footer/Hint
+@onready var _legend: MapLegend = $Root/Frame/Box/Footer/Legend
 @onready var _back: Button = $Root/Frame/Box/Footer/Back
 
 
@@ -87,6 +90,10 @@ func _refresh() -> void:
 				visited[room.scene_path] = true
 	_title.text = _layout.level_name if _layout != null and not _layout.level_name.is_empty() else default_title
 	_view.show_map(_layout, visited, current)
+	var kinds: Array[int] = []
+	if _layout != null:
+		kinds = _layout.landmark_kinds()
+	_legend.show_kinds(kinds)
 	var room := _layout.find_room(current) if _layout != null else null
 	_hint.text = room.display_name if room != null else unknown_text
 	var fragment_progress := get_node_or_null("/root/FragmentProgress")
