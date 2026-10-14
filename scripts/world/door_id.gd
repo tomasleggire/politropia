@@ -60,6 +60,10 @@ enum ID {
 	# --- Greece: healing room <-> Artemis room ---
 	HEALING_TO_ARTEMIS,
 	ARTEMIS_TO_HEALING,
+
+	# --- Greece: zone 1 shortcut <-> Artemis room ---
+	ZONE_1_TO_ARTEMIS,
+	ARTEMIS_TO_ZONE_1,
 }
 
 

@@ -9,6 +9,7 @@ extends SceneTree
 
 const ZONE_PATH := "res://scenes/levels/greece/zone_artemis.tscn"
 const HEALING_PATH := "res://scenes/levels/greece/zone_healing.tscn"
+const ZONE_1_PATH := "res://scenes/levels/greece/zone_1.tscn"
 const BOSS_ID := &"greece_artemis"
 const WATCHDOG_SECONDS := 90.0
 const SOLID_MASK := 1
@@ -48,6 +49,7 @@ func _run() -> void:
 	await _case_room_contents()
 	await _case_tiles_close_the_arena()
 	_case_door_pairs_with_healing()
+	_case_door_pairs_with_zone_1()
 	await _case_victory_grants_double_jump_once()
 	await _case_reload_keeps_defeat_and_ability()
 	await _case_new_game_forgets()
@@ -119,8 +121,8 @@ func _case_room_contents() -> void:
 
 
 ## The arena rect must sit inside real tiles: the floor holds at its centre, both
-## side walls close it, the ceiling closes it, and the doorway on the left is open
-## at body height but closed above.
+## side walls close it, the ceiling closes it, and the doorways on both sides are
+## open at body height but closed above.
 func _case_tiles_close_the_arena() -> void:
 	var rect := _arena.arena_rect
 	var origin := _arena.global_position
@@ -129,11 +131,13 @@ func _case_tiles_close_the_arena() -> void:
 	check(not _solid_at(Vector2(origin.x, floor_y - 4.0)), "and the air above it is free")
 	# The top row of every surface tile is a collision-free lip, so the walls and the
 	# ceiling start one tile (8 px) beyond the arena rect.
-	check(_solid_at(Vector2(origin.x + rect.end.x + 12.0, floor_y - 60.0)), "the right wall closes the arena")
+	check(_solid_at(Vector2(origin.x + rect.end.x + 12.0, floor_y - 300.0)), "the right wall closes the arena above the doorway")
 	check(_solid_at(Vector2(origin.x + rect.position.x - 12.0, floor_y - 300.0)), "the left wall closes the arena above the doorway")
 	check(_solid_at(Vector2(origin.x, origin.y + rect.position.y - 20.0)), "the ceiling closes the arena")
 	check(not _solid_at(Vector2(origin.x + rect.position.x - 12.0, floor_y - 40.0)), "the doorway is open at body height")
 	check(not _solid_at(Vector2(origin.x + rect.position.x - 36.0, floor_y - 80.0)), "and open along the whole passage")
+	check(not _solid_at(Vector2(origin.x + rect.end.x + 12.0, floor_y - 40.0)), "the right doorway (to zone_1) is open at body height")
+	check(not _solid_at(Vector2(origin.x + rect.end.x + 36.0, floor_y - 80.0)), "and open along the whole right passage")
 	var passage_x := origin.x + rect.position.x - 36.0
 	check(_ray_hits(Vector2(passage_x, floor_y - 40.0), Vector2(passage_x, floor_y - 320.0)), "with a lintel above it")
 	# Luz stands on the floor at the start.
@@ -152,6 +156,25 @@ func _case_door_pairs_with_healing() -> void:
 	check(back != null and (back as SceneTransitionArea).target_scene_path == ZONE_PATH, "the healing room has the door back to this room")
 	check(back != null and (back as SceneTransitionArea).target_door_id == DoorID.ID.ARTEMIS_TO_HEALING, "and it targets this room's door")
 	healing.free()
+
+
+## The shortcut near the start of Greece: the right doorway pairs with a door in zone_1
+## and Luz arrives inside the arena side of it, clear of the arena's sealing doors.
+func _case_door_pairs_with_zone_1() -> void:
+	var door := _zone.get_node("ZoneOneDoor") as SceneTransitionArea
+	check(door.door_id == DoorID.ID.ARTEMIS_TO_ZONE_1 and door.target_door_id == DoorID.ID.ZONE_1_TO_ARTEMIS, "the right door pairs ARTEMIS_TO_ZONE_1 with ZONE_1_TO_ARTEMIS")
+	check(door.target_scene_path == ZONE_1_PATH, "it leads to greece zone_1")
+	var zone_1 := (load(ZONE_1_PATH) as PackedScene).instantiate()
+	var back: Variant = null
+	for node: Node in zone_1.find_children("*", "SceneTransitionArea", true, false):
+		if (node as SceneTransitionArea).door_id == DoorID.ID.ZONE_1_TO_ARTEMIS:
+			back = node
+	check(back != null and (back as SceneTransitionArea).target_scene_path == ZONE_PATH, "zone_1 has the door back to this room")
+	check(back != null and (back as SceneTransitionArea).target_door_id == DoorID.ID.ARTEMIS_TO_ZONE_1, "and it targets this room's right door")
+	var arrival := SceneTransitionArea.resolve_arrival(door, Vector2(2060.0, 480.0))
+	var right_seal := _arena.global_position.x + _arena.right_door.x - _arena.door_size.x * 0.5
+	check(arrival.position.x < right_seal and arrival.facing == -1, "Luz arrives inside the arena, left of the right sealing door, facing in")
+	zone_1.free()
 
 
 func _place_luz(at: Vector2) -> void:
