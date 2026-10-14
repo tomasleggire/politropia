@@ -221,6 +221,13 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
   - New `SceneTransitionArea.enabled` export, to switch the shortcut off.
   - `door_links_test` has an `ONE_WAY_DEMO_DOORS` allow-list: 371/371.
   - Dying in the fight respawns Luz at the arena door. There is no softlock.
+- [x] D18 Artemis full art batch 1 (4 Codex runs, no regenerations)
+  - Commit `b074cd6`: the final arrow sprite.
+  - Commit `62848a8`: rain draw, release and recover, plus fan draw, hold and release.
+  - Commit `5f7c2c8`: dagger windup, slash, flip and recover, plus dive leap, fall and stuck.
+  - Still on fallback: `fan_recover`, `feint_*`, `stag_*`, `phase_transition`, the phase 2 skin, the spectral stag art, and the telegraph and impact VFX.
+  - Tests: `artemis_room` 49/49 and `door_links` 371/371 (the parent re-ran both). The `stillness_desk_ritual` runner failures are identical on `29d93c9`.
+  - Pushed: `62848a8` before the demo, and the iPhone runs `62848a8`.
 - [ ] D12 iPhone deploy and user playtest; fixes from feedback (route: inline/delegated)
 
 ## Progress
