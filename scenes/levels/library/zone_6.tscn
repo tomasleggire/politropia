@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_4.tscn" id="8_e58f3"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="9_nxnoi"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="11_t7su0"]
+[ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="30_door"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fcwr3"]
 texture = ExtResource("2_e58f3")
@@ -14334,3 +14335,9 @@ limite_inferior = 760
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=553159762]
 position = Vector2(983, 403)
 shape = SubResource("RectangleShape2D_w12jv")
+
+[node name="SceneTransitionArea" parent="." instance=ExtResource("30_door")]
+position = Vector2(-35, 620)
+target_scene_path = "uid://b6qrv51dde5ob"
+target_door_id = 13
+door_id = 14
