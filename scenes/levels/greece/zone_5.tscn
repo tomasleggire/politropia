@@ -15102,10 +15102,12 @@ texture = ExtResource("5_f1j3f")
 [node name="SceneTransitionArea" parent="TilemapLayers/Background" unique_id=1518630621 instance=ExtResource("2_kdxh3")]
 position = Vector2(3890, -3078)
 target_scene_path = "uid://crlljgoutm1lu"
+target_door_id = 15
 
 [node name="SceneTransitionArea2" parent="TilemapLayers/Background" unique_id=1678416142 instance=ExtResource("3_njreu")]
-position = Vector2(3612, -3223)
+position = Vector2(3636, -3239)
 target_scene_path = "uid://4qdhshe8hq63"
+door_id = 16
 
 [node name="Ground" type="TileMapLayer" parent="TilemapLayers" unique_id=606604179]
 modulate = Color(0.90359825, 0.90359825, 0.903598, 1)
