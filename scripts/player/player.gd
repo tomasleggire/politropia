@@ -494,7 +494,7 @@ var _attack_segment_anchored := false
 
 var _soul := 0
 var _focus_left := 0.0
-var _focus_requested := false
+var _focus_tapped := false
 var _focus_vfx: FocusHealVfx
 var _focus_end_animating := false
 
@@ -563,6 +563,7 @@ func _physics_process(delta: float) -> void:
 		_update_return(delta)
 		return
 	if is_input_locked():
+		_focus_tapped = false
 		_update_locked(delta)
 		return
 
@@ -571,19 +572,19 @@ func _physics_process(delta: float) -> void:
 	_update_facing()
 	_update_facing_rays()
 
-	_poll_focus_cancel()
-
-	if Input.is_action_just_pressed(&"attack"):
+	var channeling := _state == State.FOCUS
+	if Input.is_action_just_pressed(&"attack") and not channeling:
 		_queue_attack(_held_vertical_direction())
 	if _attack_buffer_left > 0.0 and _can_start_attack():
 		var buffered_direction := _attack_buffer_direction
 		_attack_buffer_left = 0.0
 		_queue_attack(buffered_direction)
 
-	if Input.is_action_just_pressed(&"dash"):
+	if Input.is_action_just_pressed(&"dash") and not channeling:
 		_try_start_dash()
 
 	_try_start_focus()
+	_focus_tapped = false
 
 	var fall_speed_before_move := velocity.y
 
@@ -876,6 +877,8 @@ func _held_vertical_direction() -> int:
 ## on-screen joystick is currently holding, same as the keyboard path.
 ## Called immediately on touch-down by the touch UI (zero added latency).
 func request_attack(direction: int) -> void:
+	if _state == State.FOCUS:
+		return
 	if is_input_locked():
 		_request_rest_exit()
 		return
@@ -909,6 +912,8 @@ func request_attack_upgrade(direction: int) -> void:
 ## (see touch_controls.gd) so the held-release variable jump height keeps
 ## working.
 func request_jump() -> void:
+	if _state == State.FOCUS:
+		return
 	if is_input_locked():
 		_request_rest_exit()
 		return
@@ -920,6 +925,8 @@ func request_jump() -> void:
 ## request_jump above, calling the same start path the keyboard/gamepad
 ## dash uses (ground or air, respects cooldown/state/one-air-dash).
 func request_dash() -> void:
+	if _state == State.FOCUS:
+		return
 	if is_input_locked():
 		_request_rest_exit()
 		return
@@ -2190,47 +2197,38 @@ func is_focusing() -> bool:
 	return _state == State.FOCUS
 
 
-## Touch UI entry point: holding the Focus button means focus, same as the
-## keyboard and gamepad `focus` action.
+## Touch UI entry point: one tap of the Focus button starts a heal, same as one
+## press of the keyboard and gamepad `focus` action. Releasing does nothing.
 func request_focus(pressed: bool) -> void:
-	_focus_requested = pressed
+	if pressed:
+		_focus_tapped = true
 
 
-func _focus_held() -> bool:
-	return _focus_requested or Input.is_action_pressed(&"focus")
+func _focus_pressed() -> bool:
+	return _focus_tapped or Input.is_action_just_pressed(&"focus")
 
 
+## A tap starts the channel; from then on Luz is locked until it completes.
 func _try_start_focus() -> void:
 	if _state != State.IDLE and _state != State.RUN:
 		return
-	if not _focus_held() or not is_focus_available() or not is_on_floor():
+	if not _focus_pressed() or not is_focus_available() or not is_on_floor():
 		return
-	if is_input_locked() or _jump_buffer_left > 0.0 or not is_zero_approx(_horizontal_input()):
-		return
+	_attack_buffer_left = 0.0
+	_jump_buffer_left = 0.0
+	_jump_press_pending = false
 	_enter_state(State.FOCUS)
 
 
-## Acting cancels focus, like Hollow Knight: move, jump, attack or dash.
-func _poll_focus_cancel() -> void:
-	if _state != State.FOCUS:
-		return
-	var acted := (
-		_jump_pressed_now
-		or Input.is_action_just_pressed(&"attack")
-		or Input.is_action_just_pressed(&"dash")
-		or not is_zero_approx(_horizontal_input())
-	)
-	if acted:
-		_enter_state(State.IDLE)
-
-
+## The channel ignores move, jump, attack and dash. Only damage (hurt flow) or
+## leaving the floor interrupts it.
 func _update_focus(delta: float) -> void:
 	velocity = Vector2.ZERO
+	_attack_buffer_left = 0.0
+	_jump_buffer_left = 0.0
+	_jump_press_pending = false
 	if not is_on_floor():
 		_enter_state(State.FALL)
-		return
-	if not _focus_held() or not is_focus_available():
-		_enter_state(State.IDLE)
 		return
 	_focus_left -= delta
 	_update_focus_glow()
@@ -2241,18 +2239,11 @@ func _update_focus(delta: float) -> void:
 func _complete_focus() -> void:
 	_set_soul(_soul - focus_cost)
 	heal(1)
-	if _focus_held() and is_focus_available():
-		_focus_left = focus_time
-		_state_time = 0.0
-		_play_focus_animation(&"heal_loop")
-		if _focus_vfx != null:
-			_focus_vfx.complete_channel()
-	else:
-		_focus_end_animating = true
-		_play_focus_animation(&"heal_end")
-		_enter_state(State.IDLE)
-		if _focus_vfx != null:
-			_focus_vfx.complete_channel()
+	_focus_end_animating = true
+	_play_focus_animation(&"heal_end")
+	_enter_state(State.IDLE)
+	if _focus_vfx != null:
+		_focus_vfx.complete_channel()
 
 
 func _begin_focus() -> void:

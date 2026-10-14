@@ -15,16 +15,15 @@ func bind_player(player: Player) -> void:
 	if not player.health_changed.is_connected(_on_player_health_changed):
 		player.health_changed.connect(_on_player_health_changed)
 		
-	if player.has_signal("energy_changed") and not player.energy_changed.is_connected(_on_player_energy_changed):
-		player.energy_changed.connect(_on_player_energy_changed)
+	if not player.soul_changed.is_connected(_on_player_soul_changed):
+		player.soul_changed.connect(_on_player_soul_changed)
 
 	# DIBUJAR DE ENTRADA (Esto es lo que te faltaba):
 	var cur_hp: int = player.get_health() if player.has_method("get_health") else player._health
 	var max_hp: int = player.get_max_health() if player.has_method("get_max_health") else player.max_health
 	_on_player_health_changed(cur_hp, max_hp)
 
-	if "current_energy" in player and "max_energy" in player:
-		_on_player_energy_changed(player.current_energy, player.max_energy)
+	_on_player_soul_changed(player.get_soul(), player.get_max_soul())
 
 func _on_player_health_changed(current_health: int, max_health: int) -> void:
 	if hearts_container == null:
@@ -53,10 +52,12 @@ func _on_player_health_changed(current_health: int, max_health: int) -> void:
 
 		hearts_container.add_child(heart)
 
-func _on_player_energy_changed(current_energy: float, max_energy: float) -> void:
+## The energy bar is the soul meter: it fills with enemy hits and is spent by
+## the focus heal.
+func _on_player_soul_changed(current_soul: int, max_soul: int) -> void:
 	if energy_bar == null:
 		energy_bar = get_node_or_null("PlayerUI/EnergyBar") as TextureProgressBar
 
 	if is_instance_valid(energy_bar):
-		energy_bar.max_value = max_energy
-		energy_bar.value = current_energy
+		energy_bar.max_value = max_soul
+		energy_bar.value = current_soul

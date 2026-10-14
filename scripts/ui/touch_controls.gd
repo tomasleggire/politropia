@@ -66,6 +66,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if not is_instance_valid(_player):
+		_bind_found_player()
 	if _attack_touch_id < 0 or _attack_upgraded:
 		return
 	_attack_timer += delta
@@ -310,7 +312,7 @@ func _end_interact() -> void:
 ## The button follows the player's soul and health, like the interact button
 ## follows its sources.
 func bind_player(player: Player) -> void:
-	if _player != null and _player.health_changed.is_connected(_on_player_changed):
+	if is_instance_valid(_player) and _player.health_changed.is_connected(_on_player_changed):
 		_player.health_changed.disconnect(_on_player_changed)
 		_player.soul_changed.disconnect(_on_player_changed)
 	_player = player
@@ -320,9 +322,12 @@ func bind_player(player: Player) -> void:
 	_refresh_focus_available()
 
 
+## This autoload outlives every scene, so it follows whichever Luz is alive:
+## the one in the current zone, not the one that existed at boot.
 func _bind_found_player() -> void:
-	if _player == null:
-		bind_player(get_tree().get_first_node_in_group(&"player") as Player)
+	var found := get_tree().get_first_node_in_group(&"player") as Player
+	if found != _player:
+		bind_player(found)
 
 
 func _on_player_changed(_current: int, _maximum: int) -> void:
@@ -330,7 +335,7 @@ func _on_player_changed(_current: int, _maximum: int) -> void:
 
 
 func _refresh_focus_available() -> void:
-	var available : bool = _player != null and _player.is_focus_available()
+	var available := is_instance_valid(_player) and _player.is_focus_available()
 	if is_instance_valid(_focus_button):
 		_focus_button.visible = available
 	if not available and _focus_touch_id >= 0:
@@ -339,15 +344,12 @@ func _refresh_focus_available() -> void:
 
 func _begin_focus(index: int) -> void:
 	_focus_touch_id = index
-	Input.action_press(&"focus")
 	get_tree().call_group(&"player", &"request_focus", true)
 	_focus_button.call(&"set_button_state", true)
 
 
 func _end_focus() -> void:
 	_focus_touch_id = -1
-	Input.action_release(&"focus")
-	get_tree().call_group(&"player", &"request_focus", false)
 	if is_instance_valid(_focus_button):
 		_focus_button.call(&"set_button_state", false)
 
