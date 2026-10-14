@@ -6,6 +6,8 @@ extends RefCounted
 ## ambience and parallax prefabs so they need no per-zone numbers.
 
 const MIN_SIZE := Vector2(400.0, 200.0)
+## Half of the largest view the camera shows.
+const VIEW_HALF := Vector2(400.0, 250.0)
 
 
 ## Union of the camera limits of every region under `zone`. A zone without
@@ -34,7 +36,8 @@ static func find_rect(zone: Node, fallback: Rect2) -> Rect2:
 	return rect
 
 
-## Bounding box of every non-empty TileMapLayer, in the zone's local space.
+## Bounding box of every non-empty TileMapLayer, grown by half a view so it
+## matches what a camera following Luz can see.
 static func _tile_rect(zone: Node, fallback: Rect2) -> Rect2:
 	var rect := Rect2()
 	var any := false
@@ -50,4 +53,4 @@ static func _tile_rect(zone: Node, fallback: Rect2) -> Rect2:
 		any = true
 	if not any or rect.size.x < MIN_SIZE.x or rect.size.y < MIN_SIZE.y:
 		return fallback
-	return rect
+	return rect.grow_individual(VIEW_HALF.x, VIEW_HALF.y, VIEW_HALF.x, VIEW_HALF.y)

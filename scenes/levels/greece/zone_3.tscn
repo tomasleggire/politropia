@@ -27,6 +27,8 @@
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/pollen_motes.tscn" id="amb_pollen"]
 [ext_resource type="PackedScene" path="res://scenes/world/firefly_swarm.tscn" id="amb_fly"]
+[ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
+[ext_resource type="Resource" path="res://data/parallax/greece.tres" id="par_style"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("6_qqn8h")
@@ -15089,6 +15091,9 @@ texture = ExtResource("14_bhx2l")
 sources/0 = SubResource("TileSetAtlasSource_211o3")
 
 [node name="LevelGreece" type="Node2D" unique_id=424136144]
+
+[node name="ParallaxBackdrop" parent="." instance=ExtResource("par_back")]
+style = ExtResource("par_style")
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(-6471, 1272)

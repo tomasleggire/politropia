@@ -14,6 +14,7 @@
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
+[ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fcwr3"]
 texture = ExtResource("2_rbapt")
@@ -14237,6 +14238,8 @@ sources/0 = SubResource("TileSetAtlasSource_211o3")
 size = Vector2(1986, 769)
 
 [node name="LibraryZone5" type="Node2D" unique_id=424136144]
+
+[node name="ParallaxBackdrop" parent="." instance=ExtResource("par_back")]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(2, 683)
