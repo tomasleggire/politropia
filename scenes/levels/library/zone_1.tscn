@@ -10,6 +10,7 @@
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="10_0j26h"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_n3h83"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_6keu4"]
+[ext_resource type="PackedScene" path="res://scenes/world/tutorial_sign.tscn" id="20_tutsign"]
 
 [sub_resource type="TileSet" id="TileSet_r6boj"]
 
@@ -14186,3 +14187,33 @@ position = Vector2(2025, 270)
 target_scene_path = "uid://6p2if0b5nylt"
 target_door_id = 2
 door_id = 1
+
+[node name="SignMove" parent="." instance=ExtResource("20_tutsign")]
+position = Vector2(160, 697)
+title = "Movimiento"
+text = "Mantené el dedo sobre la [color=#e0b94f]mitad izquierda[/color] de la pantalla y deslizalo para moverte."
+show_once = true
+
+[node name="SignJump" parent="." instance=ExtResource("20_tutsign")]
+position = Vector2(260, 697)
+title = "Saltar"
+text = "Tocá el botón de [color=#e0b94f]salto[/color]. Mantenelo apretado para saltar más alto."
+show_once = true
+
+[node name="SignAttack" parent="." instance=ExtResource("20_tutsign")]
+position = Vector2(470, 697)
+title = "Atacar"
+text = "Tocá el botón de [color=#e0b94f]ataque[/color] para golpear a tus enemigos."
+show_once = true
+
+[node name="SignDash" parent="." instance=ExtResource("20_tutsign")]
+position = Vector2(650, 697)
+title = "Esquivar"
+text = "Tocá el botón de [color=#e0b94f]dash[/color] para lanzarte hacia adelante. Mientras dura, nada te daña."
+show_once = true
+
+[node name="SignHeal" parent="." instance=ExtResource("20_tutsign")]
+position = Vector2(1000, 697)
+title = "Curación"
+text = "Golpeá enemigos para llenar la [color=#e0b94f]energía[/color]. Tocá el botón de [color=#e0b94f]curar[/color] para recuperar vida."
+show_once = true
