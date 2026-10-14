@@ -19,6 +19,7 @@
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="18_0qcfa"]
 [ext_resource type="PackedScene" path="res://scenes/world/atril_libro.tscn" id="19_p3mau"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_vmi51"]
+[ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="21_tnp6q"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="22_ydx24"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
 [ext_resource type="Resource" path="res://data/ambience/greece.tres" id="amb_style"]
@@ -15176,3 +15177,9 @@ light_color = Color(1, 0.78, 0.45, 1)
 base_energy = 0.9
 radius = 170.0
 flicker_amount = 0.05
+
+[node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("21_tnp6q")]
+position = Vector2(700, 268)
+target_scene_path = "uid://crlljgoutm1lu"
+target_door_id = 22
+door_id = 22

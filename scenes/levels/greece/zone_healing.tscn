@@ -20,6 +20,7 @@
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="18_5tfg1"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_wweps"]
 [ext_resource type="PackedScene" path="res://scenes/world/stillness_desk.tscn" id="20_54evs"]
+[ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="22_bf0c4"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="22_u43bu"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="30_door"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
@@ -15177,7 +15178,7 @@ position = Vector2(970.9766, 400.02905)
 shape = SubResource("RectangleShape2D_54evs")
 
 [node name="SceneTransitionArea" parent="." instance=ExtResource("30_door")]
-position = Vector2(-28, 308)
+position = Vector2(-25, 307)
 target_scene_path = "uid://crlljgoutm1lu"
 target_door_id = 23
 door_id = 21

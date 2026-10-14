@@ -15168,7 +15168,7 @@ target_door_id = 1
 door_id = 2
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("24_kvk6j")]
-position = Vector2(1061, 72)
+position = Vector2(-20, 131)
 
 [node name="Enemies" type="Node2D" parent="." unique_id=217469104]
 
@@ -15205,7 +15205,6 @@ tile_map_data = PackedByteArray("AAATAOv/AAALADEAAAAUAOj/AAAMAC4AAAAUAOn/AAAMAC8
 tile_set = SubResource("TileSet_4nc6c")
 
 [node name="Area2D" type="Area2D" parent="." unique_id=422267764]
-visible = false
 script = ExtResource("19_5qkyi")
 limite_superior = -20
 limite_derecho = 2525
@@ -15222,7 +15221,7 @@ target_door_id = 10
 door_id = 9
 
 [node name="SceneTransitionArea2" parent="." unique_id=1016494036 instance=ExtResource("21_e2d28")]
-position = Vector2(2558, 743)
+position = Vector2(2542, 743)
 target_scene_path = "uid://sa4mtebqbp50"
 target_door_id = 4
 door_id = 3

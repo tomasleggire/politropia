@@ -15154,7 +15154,7 @@ position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("2_player")]
-position = Vector2(345, 352)
+position = Vector2(260, 363)
 
 [node name="Enemies" type="Node2D" parent="." unique_id=1451389218]
 

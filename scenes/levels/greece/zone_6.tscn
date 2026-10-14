@@ -15223,7 +15223,7 @@ position = Vector2(1195, 452)
 shape = SubResource("RectangleShape2D_8w0r3")
 
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("21_jrq8j")]
-position = Vector2(2486, 739)
+position = Vector2(2464, 716)
 target_scene_path = "uid://drehrd4yly6oj"
 target_door_id = 25
 door_id = 26

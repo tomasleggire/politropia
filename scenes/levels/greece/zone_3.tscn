@@ -18,7 +18,7 @@
 [ext_resource type="Texture2D" uid="uid://b5dtp4mw8wlgs" path="res://assets/art/greece/Columns/Column-2.png" id="20_mg46f"]
 [ext_resource type="Texture2D" uid="uid://dxwi3jklo0ner" path="res://assets/art/greece/Decorations/decorations_tileset.png" id="21_572uh"]
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_3lilu"]
-[ext_resource type="PackedScene" path="res://scenes/world/change_scene_vertical.tscn" id="22_klrie"]
+[ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="22_klrie"]
 [ext_resource type="Texture2D" uid="uid://d1xpgcxfi0pbm" path="res://assets/art/greece/Decorations/stone_block.png" id="23_f6gw0"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_rk2vs"]
 [ext_resource type="Texture2D" uid="uid://dmpi3suyvdpci" path="res://assets/art/greece/chest.png" id="26_crtr7"]

@@ -29,7 +29,7 @@ script = ExtResource("2_room")
 scene_path = "res://scenes/levels/greece/zone_4.tscn"
 display_name = "Gran ascenso"
 map_rect = Rect2(30, -46, 41, 43)
-connects_to = Array[String](["res://scenes/levels/greece/zone_2.tscn", "res://scenes/levels/greece/zone_5.tscn", "res://scenes/levels/greece/zone_healing.tscn"])
+connects_to = Array[String](["res://scenes/levels/greece/zone_2.tscn", "res://scenes/levels/greece/zone_5.tscn", "res://scenes/levels/greece/zone_healing.tscn", "res://scenes/levels/greece/zone_lectern.tscn"])
 
 [sub_resource type="Resource" id="Room_5"]
 script = ExtResource("2_room")
@@ -61,7 +61,15 @@ map_rect = Rect2(85, -30, 13, 8)
 landmark = 1
 connects_to = Array[String](["res://scenes/levels/greece/zone_healing.tscn"])
 
+[sub_resource type="Resource" id="Room_9"]
+script = ExtResource("2_room")
+scene_path = "res://scenes/levels/greece/zone_lectern.tscn"
+display_name = "Atril"
+map_rect = Rect2(17, -22, 11, 7)
+landmark = 3
+connects_to = Array[String](["res://scenes/levels/greece/zone_4.tscn"])
+
 [resource]
 script = ExtResource("1_layout")
 level_name = "Grecia"
-rooms = Array[ExtResource("2_room")]([SubResource("Room_1"), SubResource("Room_2"), SubResource("Room_3"), SubResource("Room_4"), SubResource("Room_5"), SubResource("Room_6"), SubResource("Room_7"), SubResource("Room_8")])
+rooms = Array[ExtResource("2_room")]([SubResource("Room_1"), SubResource("Room_2"), SubResource("Room_3"), SubResource("Room_4"), SubResource("Room_5"), SubResource("Room_6"), SubResource("Room_7"), SubResource("Room_8"), SubResource("Room_9")])

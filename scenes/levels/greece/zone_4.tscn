@@ -15240,7 +15240,7 @@ target_door_id = 9
 door_id = 10
 
 [node name="SceneTransitionArea3" parent="." unique_id=44791832 instance=ExtResource("23_pmn7b")]
-position = Vector2(1123, 102)
+position = Vector2(1103, 95)
 target_scene_path = "uid://bjruohx06abro"
 target_door_id = 21
 door_id = 23
@@ -15250,3 +15250,9 @@ style = ExtResource("amb_style")
 [node name="PollenMotes" parent="." instance=ExtResource("amb_pollen")]
 [node name="Fireflies1" parent="." instance=ExtResource("amb_fly")]
 position = Vector2(790, 1733)
+
+[node name="SceneTransitionArea4" parent="." unique_id=1668227683 instance=ExtResource("23_pmn7b")]
+position = Vector2(-81, 769)
+target_scene_path = "uid://dovqeqmmtdbxe"
+target_door_id = 22
+door_id = 22

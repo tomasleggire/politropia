@@ -99,7 +99,8 @@ func _check_landmarks() -> void:
 	check(_landmark_of(library + "zone_lectern.tscn") == MapRoom.Landmark.LECTERN, "lectern room is the lectern landmark")
 	check(_landmark_of(greece + "zone_2.tscn") == MapRoom.Landmark.NONE, "plain rooms have no landmark")
 	var kinds := MapLayout.find_for_scene(greece + "zone_artemis.tscn").landmark_kinds()
-	check(kinds.size() == 2 and kinds[0] == MapRoom.Landmark.BOSS and kinds[1] == MapRoom.Landmark.REST, "greece legend kinds")
+	check(kinds.size() == 3 and kinds[0] == MapRoom.Landmark.BOSS and kinds[1] == MapRoom.Landmark.REST and kinds[2] == MapRoom.Landmark.LECTERN, "greece legend kinds")
+	check(_landmark_of(greece + "zone_lectern.tscn") == MapRoom.Landmark.LECTERN, "greece lectern room is the lectern landmark")
 	# The drawn graph follows the real route: zone_4 -> healing -> artemis, left to right.
 	var layout := MapLayout.find_for_scene(greece + "zone_4.tscn")
 	var zone_4 := layout.find_room(greece + "zone_4.tscn").map_rect
