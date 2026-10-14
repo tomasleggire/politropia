@@ -24,7 +24,7 @@ func _on_nueva_partida() -> void:
 
 
 func _reset_new_game_progress() -> void:
-	for service_path in ["/root/CheckpointService", "/root/EnemyRegistry", "/root/BossProgress", "/root/FragmentProgress"]:
+	for service_path in ["/root/CheckpointService", "/root/EnemyRegistry", "/root/BossProgress", "/root/FragmentProgress", "/root/MapProgress"]:
 		var service := get_node_or_null(service_path)
 		if service != null and service.has_method("clear"):
 			service.call("clear")

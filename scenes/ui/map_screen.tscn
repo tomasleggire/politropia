@@ -1,0 +1,84 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/map_screen.gd" id="1_screen"]
+[ext_resource type="Script" path="res://scripts/ui/map_view.gd" id="2_view"]
+[ext_resource type="Theme" path="res://assets/ui/gothic_theme.tres" id="3_theme"]
+
+[node name="MapScreen" type="CanvasLayer"]
+process_mode = 3
+layer = 115
+script = ExtResource("1_screen")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("3_theme")
+
+[node name="Dim" type="ColorRect" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.012, 0.025, 0.06, 0.97)
+
+[node name="Frame" type="PanelContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 36.0
+offset_top = 14.0
+offset_right = -36.0
+offset_bottom = -14.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Box" type="VBoxContainer" parent="Root/Frame"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Header" type="HBoxContainer" parent="Root/Frame/Box"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Root/Frame/Box/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.878, 0.725, 0.31, 1)
+theme_override_font_sizes/font_size = 20
+text = "Mapa"
+
+[node name="Fragments" type="Label" parent="Root/Frame/Box/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.851, 0.659, 1)
+theme_override_font_sizes/font_size = 13
+text = "Fragmentos 0/4"
+
+[node name="Rule" type="HSeparator" parent="Root/Frame/Box"]
+layout_mode = 2
+
+[node name="MapView" type="Control" parent="Root/Frame/Box"]
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+size_flags_vertical = 3
+script = ExtResource("2_view")
+
+[node name="Footer" type="HBoxContainer" parent="Root/Frame/Box"]
+layout_mode = 2
+
+[node name="Hint" type="Label" parent="Root/Frame/Box/Footer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.91, 0.851, 0.659, 0.8)
+theme_override_font_sizes/font_size = 12
+text = ""
+
+[node name="Back" type="Button" parent="Root/Frame/Box/Footer"]
+custom_minimum_size = Vector2(96, 28)
+layout_mode = 2
+text = "Volver"

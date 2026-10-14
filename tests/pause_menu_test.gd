@@ -59,7 +59,9 @@ func _run() -> void:
 	check(pause.get_node("Menu").visible, "menu visible")
 	check(not Input.is_action_pressed(&"move_left"), "touch layer released what it held")
 	check(touch.get("_input_blocked") == true, "touch layer blocked while paused")
-	check(pause.get_node("Menu/Center/Panel/Margin/Box/Map").disabled, "Mapa disabled by default")
+	check(pause.get_node("Menu/Center/Panel/Margin/Box/Map").disabled == not pause.map_enabled, "Mapa follows map_enabled")
+	pause.set_map_enabled(false)
+	check(pause.get_node("Menu/Center/Panel/Margin/Box/Map").disabled, "Mapa can be disabled")
 	check(not pause.get_node("PauseButton").visible, "pause button hidden while open")
 
 	var map_requests := [0]
@@ -69,6 +71,7 @@ func _run() -> void:
 	check(not map_button.disabled, "Mapa enabled through the hook")
 	map_button.pressed.emit()
 	check(map_requests[0] == 1, "Mapa emits map_requested")
+	root.get_node("MapScreen").close()
 	pause.set_map_enabled(false)
 
 	var esc := InputEventAction.new()
