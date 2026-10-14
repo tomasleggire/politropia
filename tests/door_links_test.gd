@@ -14,11 +14,10 @@ const WATCHDOG_SECONDS := 240.0
 ## The farthest from its door Luz may arrive.
 const MAX_ARRIVAL_DISTANCE := 200.0
 const FLOOR_PROBE := 4.0
-## Doors whose arrival door does not exist yet, keyed "<level> <zone>/<node>". Library
-## zone_6 has no door from zone_4 leading into it (nobody links to it yet); until zone_4
-## gets a ZONE_4_TO_ZONE_6 door its exit lands at the zone_4 start and warns. Remove the
-## entry as soon as that door exists.
-const PENDING_ARRIVAL_DOORS: Array[String] = ["library zone_6/SceneTransitionArea"]
+## Doors whose arrival door does not exist yet, keyed "<level> <zone>/<node>". Add an
+## entry while a zone is linked from one side only (its exit then lands at the target
+## scene start and warns) and remove it as soon as the other door exists.
+const PENDING_ARRIVAL_DOORS: Array[String] = []
 
 var checks := 0
 var failed: Array[String] = []
