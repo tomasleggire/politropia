@@ -177,6 +177,15 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
     - The boss bar sits tight above the HUD hearts.
 - RDD: the slice from `38b9d3f` to HEAD is about 20k lines (mostly tile data). It is still deferred, and its consent needs the user.
 - [x] D11 Wall cling tuning: see the entry under D6
+- [x] D13 User feedback (2026-10-14 morning): no fragment gating for the demo, boss bar cohesive with Luz HUD
+  - Commit `35ba6c2` (inline): the library lectern is back to the default `require_all_fragments = false`.
+  - Commit `8d6d249` (delegated, +86/-33):
+    - HUD.gd gets `hud_scale` (default 0.75).
+    - The boss bar uses Luz's gold frame with a crimson fill and a Cinzel name, at the bottom centre between the touch clusters, with the exports `bar_size`, `bottom_margin` and `side_clearance`.
+    - The intro title is in Cinzel gold.
+    - `boss_arena_test` changed its narrow safe area from 300 to 400. The suite hangs on the base, so this is unverified.
+  - Commit `1204fa1` (inline): the arena `VegetationFront` alpha drops to 0.35, because the black silhouettes hid Luz. The parent checked it with a screenshot. `artemis_room` 42/42.
+  - A transient `npc.tscn:14` parse error was seen once while two Godot processes ran at the same time. It did not reproduce: `map_test` 101/101 is clean.
 - [ ] D12 iPhone deploy and user playtest; fixes from feedback (route: inline/delegated)
 
 ## Progress
