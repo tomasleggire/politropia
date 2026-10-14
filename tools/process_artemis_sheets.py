@@ -131,6 +131,19 @@ SHEETS = {
         "ref": 1,
         "clips": {"defeat": list(range(0, 12))},
     },
+    # Batch 2. `body_feet` aligns the soles on the largest component only, so the
+    # sparkles and shards drawn around her never move the feet row.
+    "feint": {
+        "raw": "artemis_feint_raw.png",
+        "grid": (4, 3),
+        "ref": 11,
+        "body_feet": True,
+        "clips": {
+            "feint_dash": [0, 1, 2, 3, 4, 5],
+            "feint_stop": [6, 7],
+            "feint_retreat": [8, 9, 10, 11],
+        },
+    },
 }
 
 
@@ -151,7 +164,7 @@ def key_magenta(raw: Image.Image) -> np.ndarray:
     return rgba
 
 
-def split_frames(rgba: np.ndarray, cols: int, rows: int, name: str) -> list[np.ndarray]:
+def split_frames(rgba: np.ndarray, cols: int, rows: int, name: str, needed: set[int] | None = None) -> list[np.ndarray | None]:
     height, width = rgba.shape[:2]
     cell_w, cell_h = width / cols, height / rows
     mask = rgba[..., 3] > 20
@@ -168,6 +181,9 @@ def split_frames(rgba: np.ndarray, cols: int, rows: int, name: str) -> list[np.n
     for cell in range(cols * rows):
         keep = [label for label, c in owner.items() if c == cell]
         if not keep:
+            if needed is not None and cell not in needed:
+                frames.append(None)
+                continue
             raise ValueError(f"{name}: cell {cell} has no art")
         sel = np.isin(labels, keep)
         ys, xs = np.where(sel)
@@ -196,7 +212,18 @@ def feet_center_x(frame: np.ndarray, bottom: int) -> float:
     return float((np.arange(len(weights)) * weights).sum() / max(weights.sum(), 1.0)) if len(xs) else frame.shape[1] / 2
 
 
-def to_cell(frame: np.ndarray, scale: float, label: str) -> Image.Image:
+def body_mask_bottom(arr: np.ndarray) -> tuple[int, float]:
+    """Sole row and feet centre of the largest component (the body, not the sparkles)."""
+    labels, count = ndimage.label(arr[..., 3] > 128, structure=np.ones((3, 3)))
+    sizes = ndimage.sum(np.ones_like(labels), labels, range(1, count + 1))
+    body = labels == (int(np.argmax(sizes)) + 1)
+    solo = np.zeros_like(arr)
+    solo[..., 3] = np.where(body, 255.0, 0.0)
+    bottom = sole_bottom(solo)
+    return bottom, feet_center_x(solo, bottom)
+
+
+def to_cell(frame: np.ndarray, scale: float, label: str, body_feet: bool = False, out_cell: int = OUT_CELL, feet_row: int = FEET_ROW) -> Image.Image:
     premult = frame.copy()
     premult[..., :3] *= premult[..., 3:4] / 255.0
     img = Image.fromarray(premult.astype(np.uint8), "RGBA")
@@ -206,12 +233,15 @@ def to_cell(frame: np.ndarray, scale: float, label: str) -> Image.Image:
     a = arr[..., 3:4]
     arr[..., :3] = np.where(a > 0, np.minimum(arr[..., :3] * 255.0 / np.maximum(a, 1.0), 255.0), 0)
     arr = arr.astype(np.uint8)
-    bottom = sole_bottom(arr.astype(np.float32))
-    cx = feet_center_x(arr.astype(np.float32), bottom)
-    left = round(OUT_CELL / 2 - cx)
-    top = FEET_ROW - bottom
-    cell = Image.new("RGBA", (OUT_CELL, OUT_CELL), (0, 0, 0, 0))
-    if left < 0 or top < 0 or left + w > OUT_CELL:
+    if body_feet:
+        bottom, cx = body_mask_bottom(arr.astype(np.float32))
+    else:
+        bottom = sole_bottom(arr.astype(np.float32))
+        cx = feet_center_x(arr.astype(np.float32), bottom)
+    left = round(out_cell / 2 - cx)
+    top = feet_row - bottom
+    cell = Image.new("RGBA", (out_cell, out_cell), (0, 0, 0, 0))
+    if left < 0 or top < 0 or left + w > out_cell:
         # nudge to keep inside the cell rather than crop
         left = min(max(left, 0), OUT_CELL - w)
         top = max(top, 0)
@@ -263,7 +293,8 @@ def main() -> None:
     for name, spec in SHEETS.items():
         cols, rows = spec["grid"]
         rgba = key_magenta(Image.open(RAW_DIR / spec["raw"]))
-        prepared[name] = split_frames(rgba, cols, rows, name)
+        needed = {i for clip in spec["clips"].values() for i in clip}
+        prepared[name] = split_frames(rgba, cols, rows, name, needed)
 
     # One scale for the whole set, from the locomotion idle frame.
     ref = prepared["locomotion"][SHEETS["locomotion"]["ref"]]
@@ -285,7 +316,7 @@ def main() -> None:
         frames = prepared[name]
         used = sorted({i for clip in spec["clips"].values() for i in clip})
         remap = {src: dst for dst, src in enumerate(used)}
-        cells = [to_cell(frames[src], scales[name], f"{name}[{src}]") for src in used]
+        cells = [to_cell(frames[src], scales[name], f"{name}[{src}]", spec.get("body_feet", False)) for src in used]
         rows = (len(cells) + COLUMNS - 1) // COLUMNS
         sheet = Image.new("RGBA", (COLUMNS * OUT_CELL, rows * OUT_CELL), (0, 0, 0, 0))
         for index, cell in enumerate(cells):

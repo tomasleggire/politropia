@@ -49,11 +49,14 @@ const CLIP_SPEEDS := {
 	"vault_air": 8.0,
 	"vault_land": 12.0,
 	"defeat": 10.0,
+	"feint_dash": 14.0,
+	"feint_stop": 20.0,
+	"feint_retreat": 14.0,
 }
 
 ## Clips that repeat while their state lasts; every other clip plays once and
 ## holds its last frame.
-const LOOPING_CLIPS := ["idle", "walk_fwd", "walk_back", "stagger_loop", "dive_fall"]
+const LOOPING_CLIPS := ["idle", "walk_fwd", "walk_back", "stagger_loop", "dive_fall", "feint_dash"]
 
 ## Clips built by playing another clip's frames backwards (no extra art): she
 ## retreats while facing Luz.
@@ -62,15 +65,12 @@ const REVERSED_CLIPS := {"walk_back": "walk_fwd"}
 ## Contract clip -> candidates, closest first. Names without an entry use the clip
 ## itself, then DEFAULT_CLIP.
 const FALLBACKS := {
-	"feint_dash": ["walk_fwd"],
-	"feint_stop": ["shot_recover", "idle"],
-	"feint_retreat": ["backstep"],
-	"phase_transition": ["idle"],
-	"fan_recover": ["shot_recover"],
-	"shot_hold": ["shot_draw"],
 	"stag_cast": ["idle"],
 	"stag_summon": ["shot_release"],
 	"stag_recover": ["shot_recover"],
+	"phase_transition": ["idle"],
+	"fan_recover": ["shot_recover"],
+	"shot_hold": ["shot_draw"],
 	"stagger_in": ["stagger_loop"],
 	"dodge": ["backstep"],
 }

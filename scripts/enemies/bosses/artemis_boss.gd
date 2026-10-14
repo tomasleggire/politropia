@@ -93,6 +93,8 @@ const TRANSITION_PULSE_RATE := 10.0
 const CROUCH_SCALE := 0.8
 ## Artemis's sprite scale: the same on-screen pixel size as Luz (tools/process_artemis_sheets.py).
 const SPRITE_SCALE := 0.2896
+## Length of the feint brake clip (it plays over the start of the retreat).
+const FEINT_STOP_TIME := 0.1
 ## Length of the stagger recoil clip.
 const STAGGER_IN_TIME := 0.15
 ## A vault that has not landed this long after its computed flight is cut short.
@@ -827,7 +829,7 @@ func _clip_request() -> Array:
 		State.DODGE:
 			return [&"dodge", 0.0]
 		State.FEINT:
-			return [&"feint_stop", 0.0] if _feint_retreating else [&"feint_dash", 0.0]
+			return _feint_clip_request()
 		State.VAULT:
 			return _vault_clip_request()
 		State.ATTACK:
@@ -837,6 +839,16 @@ func _clip_request() -> Array:
 				return [&"idle", 0.0]
 			return [&"walk_fwd" if signf(velocity.x) == float(_facing) else &"walk_back", 0.0]
 	return [&"idle", 0.0]
+
+
+## Dash, then the hard brake over the first `FEINT_STOP_TIME` of the retreat, then the
+## glide back for the rest of `feint_retreat_time`.
+func _feint_clip_request() -> Array:
+	if not _feint_retreating:
+		return [&"feint_dash", 0.0]
+	if _state_left > feint_retreat_time - FEINT_STOP_TIME:
+		return [&"feint_stop", FEINT_STOP_TIME]
+	return [&"feint_retreat", maxf(_state_left, 0.1)]
 
 
 func _vault_clip_request() -> Array:

@@ -270,6 +270,35 @@
         ]
       },
       "events": {}
+    },
+    "artemis_feint_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "feint_dash": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "feint_stop": [
+          6,
+          7
+        ],
+        "feint_retreat": [
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "events": {}
     }
   }
 }
