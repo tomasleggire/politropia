@@ -13961,7 +13961,7 @@ position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("4_cxp8p")]
-position = Vector2(1848, 732)
+position = Vector2(35, 193)
 
 [node name="BookFlyer" parent="." unique_id=899168196 instance=ExtResource("6_eglro")]
 position = Vector2(1374, 162)

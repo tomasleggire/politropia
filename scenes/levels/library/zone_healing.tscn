@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="6_d85p6"]
 [ext_resource type="PackedScene" path="res://scenes/world/stillness_desk.tscn" id="7_j4ml1"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="8_hsarn"]
+[ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="9_vw8bd"]
 
 [sub_resource type="TileSet" id="TileSet_r6boj"]
 
@@ -14072,6 +14073,9 @@ texture = ExtResource("2_j4ml1")
 [sub_resource type="TileSet" id="TileSet_4nc6c"]
 sources/0 = SubResource("TileSetAtlasSource_211o3")
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_3n1fk"]
+size = Vector2(942, 391)
+
 [node name="LibraryHealing" type="Node2D" unique_id=424136144]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
@@ -14160,3 +14164,14 @@ tile_set = SubResource("TileSet_4nc6c")
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("8_hsarn")]
 position = Vector2(1116, 659)
 target_scene_path = "uid://b6qrv51dde5ob"
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1926147682]
+script = ExtResource("9_vw8bd")
+limite_izquierdo = 150
+limite_superior = 390
+limite_derecho = 1080
+limite_inferior = 775
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1279308137]
+position = Vector2(620, 583.5)
+shape = SubResource("RectangleShape2D_3n1fk")

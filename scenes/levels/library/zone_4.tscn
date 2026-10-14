@@ -14355,7 +14355,6 @@ tile_map_data = PackedByteArray("AAACAPf/AAAbACIAAAACAPj/AAAbACMAAAADAPT/AAAcAB8
 tile_set = SubResource("TileSet_4nc6c")
 
 [node name="Area2D" type="Area2D" parent="." unique_id=1229086981]
-visible = false
 position = Vector2(0, -2)
 script = ExtResource("10_y8mnw")
 limite_izquierdo = 1

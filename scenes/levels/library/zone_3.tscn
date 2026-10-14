@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="8_ctd55"]
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro.tscn" id="8_vrfrn"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="11_cne4m"]
+[ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="12_a30ts"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fcwr3"]
 texture = ExtResource("2_vrfrn")
@@ -14230,6 +14231,9 @@ texture = ExtResource("4_a30ts")
 [sub_resource type="TileSet" id="TileSet_4nc6c"]
 sources/0 = SubResource("TileSetAtlasSource_211o3")
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_vrudw"]
+size = Vector2(1043, 1445)
+
 [node name="LibraryZone3" type="Node2D" unique_id=424136144]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
@@ -14340,3 +14344,13 @@ target_scene_path = "uid://b6qrv51dde5ob"
 [node name="SceneTransitionArea2" parent="." unique_id=2015933086 instance=ExtResource("11_cne4m")]
 position = Vector2(548, 1482)
 target_scene_path = "uid://6p2if0b5nylt"
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1428454548]
+script = ExtResource("12_a30ts")
+limite_superior = 2
+limite_derecho = 1043
+limite_inferior = 1448
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=120011534]
+position = Vector2(521.5, 725.5)
+shape = SubResource("RectangleShape2D_vrudw")
