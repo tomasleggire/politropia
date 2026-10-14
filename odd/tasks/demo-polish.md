@@ -186,6 +186,15 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
     - `boss_arena_test` changed its narrow safe area from 300 to 400. The suite hangs on the base, so this is unverified.
   - Commit `1204fa1` (inline): the arena `VegetationFront` alpha drops to 0.35, because the black silhouettes hid Luz. The parent checked it with a screenshot. `artemis_room` 42/42.
   - A transient `npc.tscn:14` parse error was seen once while two Godot processes ran at the same time. It did not reproduce: `map_test` 101/101 is clean.
+- [x] D14 Playtest feedback: Artemis hard to find, signposts look interactable
+  - Commit `41f6166` (+250/-18):
+    - The map draws every room. `MapLayout.reveal_unvisited` defaults to true. Unvisited rooms are dim outlines.
+    - The `MapRoom.landmark` icons (BOSS, REST, LECTERN; SECRET only once visited) come with a legend.
+    - The Greece positions are fixed: zone_4 → healing → Artemis, left to right.
+    - `map` 112/112.
+  - Commit `65cde54` (+70/-2): `TutorialSign.marker_style` has FIREFLIES as the default, plus SIGNPOST and NONE. The text panel still shows. `guidance` 26/26.
+  - Commit `424c200` (inline): the Move and Jump sign triggers are narrowed to 90 px because their panels overlapped. `guidance` 26/26.
+  - The parent viewed the Greece map screenshot: the route and icons are clear.
 - [ ] D12 iPhone deploy and user playtest; fixes from feedback (route: inline/delegated)
 
 ## Progress
