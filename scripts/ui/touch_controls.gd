@@ -27,6 +27,7 @@ extends CanvasLayer
 ## upgrade while its own startup phase is still active, ~attack_startup_time).
 @export var attack_upgrade_window := 0.10
 
+var _input_blocked := false
 var _pad_touch_id := -1
 var _pad_center := Vector2.ZERO
 var _knob_offset := Vector2.ZERO
@@ -74,7 +75,7 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not visible:
+	if not visible or _input_blocked:
 		return
 	if event is InputEventScreenTouch:
 		_handle_touch(event as InputEventScreenTouch)
@@ -354,17 +355,30 @@ func _end_focus() -> void:
 		_focus_button.call(&"set_button_state", false)
 
 
+## While blocked (pause menu open) no touch reaches the pad or the buttons, and
+## anything held is released so nothing leaks into the paused or resumed game.
+func set_input_blocked(blocked: bool) -> void:
+	_input_blocked = blocked
+	if blocked and is_node_ready():
+		release_all()
+
+
+## Ends every touch this layer is tracking and releases the actions it holds.
+func release_all() -> void:
+	_end_pad()
+	if _jump_touch_id >= 0:
+		_end_jump()
+	if _dash_touch_id >= 0:
+		_end_dash()
+	if _attack_touch_id >= 0:
+		_end_attack()
+	if _interact_touch_id >= 0:
+		_end_interact()
+	if _focus_touch_id >= 0:
+		_end_focus()
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		if is_node_ready():
-			_end_pad()
-			if _jump_touch_id >= 0:
-				_end_jump()
-			if _dash_touch_id >= 0:
-				_end_dash()
-			if _attack_touch_id >= 0:
-				_end_attack()
-			if _interact_touch_id >= 0:
-				_end_interact()
-			if _focus_touch_id >= 0:
-				_end_focus()
+			release_all()

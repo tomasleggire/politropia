@@ -24,10 +24,13 @@ func _on_nueva_partida() -> void:
 
 
 func _reset_new_game_progress() -> void:
-	for service_path in ["/root/CheckpointService", "/root/EnemyRegistry", "/root/BossProgress"]:
+	for service_path in ["/root/CheckpointService", "/root/EnemyRegistry", "/root/BossProgress", "/root/FragmentProgress"]:
 		var service := get_node_or_null(service_path)
 		if service != null and service.has_method("clear"):
 			service.call("clear")
+	TutorialSign.reset_seen()
 
 func _on_coleccionables() -> void:
-	print("Coleccionables: pendiente")
+	var toast := get_node_or_null("/root/PickupToast")
+	if toast != null:
+		toast.show_toast("Próximamente")

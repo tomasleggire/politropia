@@ -25,7 +25,9 @@ TouchControls="*res://scenes/ui/touch_controls.tscn"
 CheckpointService="*res://scripts/world/checkpoint_service.gd"
 EnemyRegistry="*res://scripts/enemies/enemy_registry.gd"
 BossProgress="*res://scripts/world/boss_progress.gd"
+FragmentProgress="*res://scripts/world/fragment_progress.gd"
 PickupToast="*res://scenes/ui/pickup_toast.tscn"
+PauseMenu="*res://scenes/ui/pause_menu.tscn"
 
 [display]
 

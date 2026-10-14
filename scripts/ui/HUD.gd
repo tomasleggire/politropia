@@ -2,9 +2,26 @@ extends CanvasLayer
 
 @onready var hearts_container: HBoxContainer = $PlayerUI/HeartsContainer
 @onready var energy_bar: TextureProgressBar = $PlayerUI/EnergyBar
+@onready var fragment_count: Label = $PlayerUI/FragmentCounter/Count
 
 @export var heart_full_texture: Texture2D
 @export var heart_empty_texture: Texture2D
+
+func _ready() -> void:
+	var progress := get_node_or_null("/root/FragmentProgress")
+	if progress == null:
+		return
+	progress.fragment_collected.connect(_on_fragment_collected)
+	_show_fragments(progress.count(), progress.total())
+
+
+func _on_fragment_collected(_id: int, count: int, total: int) -> void:
+	_show_fragments(count, total)
+
+
+func _show_fragments(count: int, total: int) -> void:
+	fragment_count.text = "%d/%d" % [count, total]
+
 
 ## Función que conecta al jugador y dibuja la interfaz de entrada
 func bind_player(player: Player) -> void:

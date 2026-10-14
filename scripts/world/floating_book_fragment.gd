@@ -1,12 +1,30 @@
 class_name FloatingBookFragment
 extends Node2D
 
+## A floating book page. Drop `scenes/world/fragmento_libro*.tscn` into a zone.
+## Luz collects it by touching it: the fragment is recorded in `FragmentProgress`
+## (so it stays gone when she re-enters the room) and fades out. Each scene
+## carries its own `fragment_id` (1-4); do not place the same id twice in a
+## run. The lectern builds its own copies with `collectible = false`.
+
+signal collected(id: int)
+
 const FLOAT_DISTANCE := 4.0
 const FLOAT_HALF_CYCLE := 1.0
 const GLOW_LOW_ALPHA := 0.35
 const GLOW_HIGH_ALPHA := 0.62
 const GLOW_HALF_CYCLE := 1.5
 const PARTICLE_COLORS := [Color("ffe9a6"), Color("ffd070"), Color("fff7df")]
+
+@export_group("Collection")
+## Which of the book's four fragments this is (1-4).
+@export_range(1, 4) var fragment_id := 1
+## Off for display copies (the pedestal's), which must never be picked up.
+@export var collectible := true
+## Radius of the pickup area around the fragment, in pixels.
+@export var pickup_radius := 22.0
+## Seconds the fragment takes to fade away after being collected.
+@export_range(0.05, 1.5, 0.05) var collect_fade_time := 0.35
 
 var _float_tween: Tween
 var _glow_tween: Tween
@@ -17,10 +35,49 @@ var _particle_rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
+	if collectible and _already_collected():
+		queue_free()
+		return
 	_particle_rng.randomize()
 	_start_float_animation()
 	_start_glow_pulse()
 	_start_particle_loop()
+	if collectible:
+		_build_pickup_area()
+
+
+func _already_collected() -> bool:
+	var progress := get_node_or_null("/root/FragmentProgress")
+	return progress != null and progress.has_fragment(fragment_id)
+
+
+func _build_pickup_area() -> void:
+	var area := Area2D.new()
+	area.collision_layer = 0
+	area.collision_mask = 1
+	area.position = Vector2(0, -12.5)
+	var shape := CollisionShape2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = pickup_radius
+	shape.shape = circle
+	area.add_child(shape)
+	area.body_entered.connect(_on_pickup_body_entered)
+	add_child(area)
+
+
+func _on_pickup_body_entered(body: Node2D) -> void:
+	if not collectible or not body.is_in_group(&"player"):
+		return
+	collectible = false
+	var progress := get_node_or_null("/root/FragmentProgress")
+	if progress != null:
+		progress.collect(fragment_id)
+	collected.emit(fragment_id)
+	stop_idle_motion()
+	var fade := create_tween().set_parallel(true)
+	fade.tween_property(self, "modulate:a", 0.0, collect_fade_time).set_trans(Tween.TRANS_SINE)
+	fade.tween_property(self, "scale", Vector2(1.4, 1.4), collect_fade_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	fade.chain().tween_callback(queue_free)
 
 
 func _start_float_animation() -> void:

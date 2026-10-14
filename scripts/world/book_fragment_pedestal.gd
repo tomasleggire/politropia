@@ -27,6 +27,12 @@ const SIDE_AURA_ALPHA_BY_FRAGMENT := [0.28, 0.4, 0.54, 0.68]
 const ORBIT_DURATION := 1.8
 const TRANSITION_SCENE := preload("res://scenes/ui/level_transition.tscn")
 
+@export_group("Fragments")
+## When on, the lectern only accepts fragments once Luz has collected all four
+## (`FragmentProgress`). Off by default so the demo flow works even while one
+## fragment is unreachable.
+@export var require_all_fragments := false
+
 @onready var _area: Area2D = $InteractionArea
 @onready var _prompt: InteractionPrompt = $InteractionPrompt
 @onready var _book_marker: Marker2D = $Marker2D
@@ -80,9 +86,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Place one fragment per keyboard or touch interaction.
 func request_interact() -> bool:
-	if _reconstruction_started or _fragments_placed >= FRAGMENT_SCENES.size() or not is_instance_valid(_player):
+	if not _can_place():
 		return false
-	var fragment := FRAGMENT_SCENES[_fragments_placed].instantiate() as Node2D
+	var fragment := FRAGMENT_SCENES[_fragments_placed].instantiate() as FloatingBookFragment
+	fragment.collectible = false
 	fragment.position = _book_marker.position + FRAGMENT_OFFSETS[_fragments_placed]
 	add_child(fragment)
 	_fragment_nodes.append(fragment)
@@ -300,8 +307,17 @@ func _on_body_exited(body: Node2D) -> void:
 		_refresh_prompt()
 
 
+func _can_place() -> bool:
+	if _reconstruction_started or _fragments_placed >= FRAGMENT_SCENES.size() or not is_instance_valid(_player):
+		return false
+	if require_all_fragments:
+		var progress := get_node_or_null("/root/FragmentProgress")
+		return progress != null and progress.is_complete()
+	return true
+
+
 func _refresh_prompt() -> void:
-	var available := _fragments_placed < FRAGMENT_SCENES.size() and is_instance_valid(_player) and not _reconstruction_started
+	var available := _can_place()
 	if available and not TouchControls.visible:
 		_prompt.show_prompt()
 	else:
