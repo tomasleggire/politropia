@@ -91,6 +91,10 @@ const WALL_MARGIN := 4.0
 ## Beat pulse of the transition glow, radians per second.
 const TRANSITION_PULSE_RATE := 10.0
 const CROUCH_SCALE := 0.8
+## Artemis's sprite scale: the same on-screen pixel size as Luz (tools/process_artemis_sheets.py).
+const SPRITE_SCALE := 0.2896
+## Length of the stagger recoil clip.
+const STAGGER_IN_TIME := 0.15
 ## A vault that has not landed this long after its computed flight is cut short.
 const VAULT_FLIGHT_SLACK := 0.5
 ## Attack -> [follow-up attack, hop back first]. Only attacks with a short punish
@@ -348,6 +352,8 @@ const CUE_DEFEAT := &"Defeat"
 @onready var _stag: SpectralStag = $SpectralStag
 @onready var _bow: Node2D = $Visual/Bow
 @onready var _sfx: Node = $Sfx
+## The final art (null in a scene without it: the rest of the boss keeps working).
+@onready var _sprite: AnimatedSprite2D = get_node_or_null("Visual/AnimatedSprite2D") as AnimatedSprite2D
 @onready var _flash_layer: ScreenFlash = $FinalFlash
 
 var rng := RandomNumberGenerator.new()
@@ -413,6 +419,8 @@ var _has_arena_limits := false
 var _arena_left := 0.0
 var _arena_right := 0.0
 var _interrupt_left := 0.0
+## The contract clip last requested through `_play` (not the fallback it resolved to).
+var _clip: StringName = &""
 var _surface_ray := PhysicsRayQueryParameters2D.new()
 var _rain_markers: Array[Rect2] = []
 var _rain_marker_count := 0
@@ -441,6 +449,7 @@ func _ready() -> void:
 	_bow_rest = _bow.position
 	for cue: Node in _sfx.get_children():
 		_cues[cue.name] = cue
+	_setup_sprite()
 	if _dead:
 		_enter_state(State.DEFEATED)
 	else:
@@ -450,6 +459,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	super._physics_process(delta)
+	_sync_sprite()
 
 
 ## -- Public API --------------------------------------------------------------
@@ -740,6 +750,8 @@ func _apply_visual() -> void:
 			_pose_corpse(_defeat_progress())
 		_:
 			_visual.modulate = Color.WHITE
+	_cancel_visual_pose()
+	_sync_sprite()
 
 
 ## Slumps while `_defeat_left` runs down, then rests once on the floor (a kill in
@@ -752,6 +764,147 @@ func _update_corpse(delta: float) -> void:
 	_apply_visual()
 	if _defeat_left <= 0.0 and is_on_floor():
 		_settle_corpse()
+
+
+## -- Sprite ---------------------------------------------------------------------
+
+func _setup_sprite() -> void:
+	if _sprite == null:
+		return
+	_sprite.sprite_frames = ArtemisAnimationCatalog.build_sprite_frames()
+	_clip = &""
+	_sync_sprite()
+
+
+## The single hook between logic and art: show the contract clip `clip`, or the
+## closest drawn one (ArtemisAnimationCatalog.FALLBACKS). `duration` > 0 stretches
+## the clip to last exactly that long (the timer it illustrates); 0 plays it at its
+## default speed. A no-op without a sprite, so the placeholder scene keeps working.
+func _play(clip: StringName, duration := 0.0) -> void:
+	if _sprite == null or _sprite.sprite_frames == null:
+		return
+	_clip = clip
+	var frames := _sprite.sprite_frames
+	var resolved := ArtemisAnimationCatalog.resolve_clip(frames, clip)
+	if resolved.is_empty():
+		return
+	var count := frames.get_frame_count(resolved)
+	var fps := frames.get_animation_speed(resolved)
+	var scale_to_fit := 1.0
+	if duration > 0.0 and count > 0 and fps > 0.0:
+		scale_to_fit = (float(count) / fps) / duration
+	_sprite.play(resolved, scale_to_fit)
+	if _state == State.DEFEATED and _defeat_left <= 0.0:
+		# A corpse restored from an earlier run: the last frame at once.
+		_sprite.pause()
+		_sprite.frame = count - 1
+
+
+## Picks the contract clip for what the state machine is doing now and plays it when
+## it changes. Pure read of the logic: no state or timer is touched.
+func _sync_sprite() -> void:
+	if _sprite == null or _sprite.sprite_frames == null:
+		return
+	var request := _clip_request()
+	if request[0] != _clip:
+		_play(request[0], request[1])
+
+
+## [clip, duration] for the current state; duration 0 = clip default speed.
+func _clip_request() -> Array:
+	match _state:
+		State.DEFEATED:
+			return [&"defeat", defeat_time]
+		State.STAGGER:
+			var entering := _state_left > stagger_time - STAGGER_IN_TIME
+			return [&"stagger_in", STAGGER_IN_TIME] if entering else [&"stagger_loop", 0.0]
+		State.FLINCH:
+			return [&"interrupt_flinch", interrupt_flinch_time]
+		State.TRANSITION:
+			return [&"phase_transition", phase_two_transition_time]
+		State.BACKSTEP:
+			return [&"backstep", 0.0]
+		State.DODGE:
+			return [&"dodge", 0.0]
+		State.FEINT:
+			return [&"feint_stop", 0.0] if _feint_retreating else [&"feint_dash", 0.0]
+		State.VAULT:
+			return _vault_clip_request()
+		State.ATTACK:
+			return _attack_clip_request()
+		State.REPOSITION:
+			if absf(velocity.x) < 1.0:
+				return [&"idle", 0.0]
+			return [&"walk_fwd" if signf(velocity.x) == float(_facing) else &"walk_back", 0.0]
+	return [&"idle", 0.0]
+
+
+func _vault_clip_request() -> Array:
+	match _vault_phase:
+		VaultPhase.CROUCH:
+			return [&"vault_crouch", maxf(vault_telegraph_time, MIN_TELEGRAPH)]
+		VaultPhase.AIR:
+			return [&"vault_air", maxf(_state_left - VAULT_FLIGHT_SLACK, 0.1)]
+	return [&"vault_land", vault_recover_time]
+
+
+func _attack_clip_request() -> Array:
+	var prefix := "shot"
+	match _attack:
+		Attack.FAN:
+			prefix = "fan"
+		Attack.RAIN:
+			prefix = "rain"
+		Attack.DAGGER:
+			prefix = "dagger"
+		Attack.MOON_DIVE:
+			prefix = "dive"
+		Attack.STAG:
+			prefix = "stag"
+	match _attack_phase:
+		AttackPhase.TELEGRAPH:
+			return _telegraph_clip_request(prefix)
+		AttackPhase.ACTIVE:
+			var active := {"shot": "shot_release", "fan": "fan_release", "rain": "rain_release", "dagger": "dagger_slash", "dive": "dive_fall", "stag": "stag_summon"}
+			return [StringName(active[prefix]), _active_time(_attack)]
+	var recover := {"shot": "shot_recover", "fan": "fan_recover", "rain": "rain_recover", "dagger": "dagger_recover", "dive": "dive_stuck", "stag": "stag_recover"}
+	return [StringName(recover[prefix]), _recover_time(_attack) * _recover_scale(_attack)]
+
+
+## The tracking part of a draw, then the frozen aim (the hold pose) for the last
+## `*_aim_lock_time`.
+func _telegraph_clip_request(prefix: String) -> Array:
+	var lock := 0.0
+	match _attack:
+		Attack.AIMED_SHOT:
+			lock = shot_aim_lock_time
+		Attack.FAN:
+			lock = fan_aim_lock_time
+	var total := _telegraph_time(_attack)
+	if lock > 0.0:
+		if _state_left <= lock:
+			return [StringName(prefix + "_hold"), lock]
+		return [StringName(prefix + "_draw"), maxf(total - lock, 0.1)]
+	match _attack:
+		Attack.MOON_DIVE:
+			return [&"dive_leap", dive_leap_time]
+		Attack.STAG:
+			return [&"stag_cast", total]
+		Attack.DAGGER:
+			return [&"dagger_windup", total]
+	return [StringName(prefix + "_draw"), total]
+
+
+## The drawn clips already carry the squash (crouch) and the slump (corpse), so the
+## sprite undoes `Visual`'s tilt and squash (the logic and its tests keep driving
+## `Visual`); only the facing flip is left on it.
+func _cancel_visual_pose() -> void:
+	if _sprite == null or _visual == null:
+		return
+	var pose := Transform2D(_visual.rotation, _visual.scale, 0.0, Vector2.ZERO)
+	var wanted := Transform2D(0.0, Vector2(_visual.scale.x, 1.0), 0.0, Vector2.ZERO)
+	var basis := pose.affine_inverse() * wanted
+	_sprite.transform = Transform2D(basis.x * SPRITE_SCALE, basis.y * SPRITE_SCALE, _sprite.position)
 
 
 ## -- State machine ---------------------------------------------------------------

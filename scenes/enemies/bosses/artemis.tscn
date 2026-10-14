@@ -32,50 +32,19 @@ shape = SubResource("RectangleShape2D_body")
 
 [node name="Visual" type="Node2D" parent="."]
 
-[node name="Cloak" type="Polygon2D" parent="Visual"]
-z_index = -1
-color = Color(0.18, 0.36, 0.3, 1)
-polygon = PackedVector2Array(-3, -43, -9, -42, -17, -12, -13, 0, -4, -8)
-
-[node name="Quiver" type="Polygon2D" parent="Visual"]
-z_index = -1
-color = Color(0.5, 0.36, 0.2, 1)
-polygon = PackedVector2Array(-8, -49, -5, -50, -1, -36, -4, -35)
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Visual"]
+texture_filter = 4
+scale = Vector2(0.2896, 0.2896)
+offset = Vector2(0, -96)
 
 [node name="Body" type="Polygon2D" parent="Visual"]
+visible = false
 color = Color(0.84, 0.88, 0.82, 1)
-polygon = PackedVector2Array(-10, 0, 10, 0, 6, -22, 5, -44, -5, -44, -6, -22)
-
-[node name="Belt" type="Polygon2D" parent="Visual"]
-color = Color(0.78, 0.6, 0.25, 1)
-polygon = PackedVector2Array(-6, -24, 6, -24, 6, -21, -6, -21)
-
-[node name="Head" type="Polygon2D" parent="Visual"]
-position = Vector2(0, -50)
-color = Color(0.93, 0.8, 0.68, 1)
-polygon = PackedVector2Array(-5, -3, -2, -6, 2, -6, 5, -3, 5, 2, 2, 6, -2, 6, -5, 2)
-
-[node name="Hair" type="Polygon2D" parent="Visual/Head"]
-z_index = 1
-color = Color(0.82, 0.84, 0.92, 1)
-polygon = PackedVector2Array(-5, -3, -2, -7, 3, -7, 5, -3, 1, -4, -3, -2, -5, 1, -12, 10, -14, 6)
-
-[node name="Arm" type="Polygon2D" parent="Visual"]
-z_index = 1
-color = Color(0.93, 0.8, 0.68, 1)
-polygon = PackedVector2Array(2, -42, 12, -35, 12, -32, 2, -39)
+polygon = PackedVector2Array(-10, 0, 10, 0, 9, -20, 12, -38, 8, -50, 3, -56, -5, -56, -9, -48, -11, -34, -8, -20)
 
 [node name="Bow" type="Node2D" parent="Visual"]
 position = Vector2(13, -34)
 z_index = 1
-
-[node name="Limbs" type="Polygon2D" parent="Visual/Bow"]
-color = Color(0.8, 0.62, 0.25, 1)
-polygon = PackedVector2Array(0, -20, 7, -10, 9, 0, 7, 10, 0, 20, 2, 10, 3, 0, 2, -10)
-
-[node name="String" type="Polygon2D" parent="Visual/Bow"]
-color = Color(0.92, 0.92, 0.85, 1)
-polygon = PackedVector2Array(-0.5, -20, 0.5, -20, 0.5, 20, -0.5, 20)
 
 [node name="Muzzle" type="Marker2D" parent="Visual/Bow"]
 position = Vector2(4, 0)

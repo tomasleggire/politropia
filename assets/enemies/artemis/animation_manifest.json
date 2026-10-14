@@ -1,0 +1,170 @@
+{
+  "cell": 256,
+  "feet_row": 224,
+  "sprite_scale": 0.2896,
+  "sheets": {
+    "artemis_locomotion_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "idle": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "walk_fwd": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "events": {}
+    },
+    "artemis_shot_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "shot_draw": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "shot_hold": [
+          5,
+          5
+        ],
+        "shot_release": [
+          6,
+          7
+        ],
+        "shot_recover": [
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "events": {
+        "shot_release": 0
+      }
+    },
+    "artemis_move_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "backstep": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "interrupt_flinch": [
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "dodge": [
+          10,
+          11
+        ]
+      },
+      "events": {}
+    },
+    "artemis_stagger_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "stagger_in": [
+          6,
+          7
+        ],
+        "stagger_loop": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "events": {}
+    },
+    "artemis_vault_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "vault_crouch": [
+          0,
+          1
+        ],
+        "vault_air": [
+          2,
+          3,
+          4,
+          5
+        ],
+        "vault_land": [
+          6,
+          7
+        ]
+      },
+      "events": {}
+    },
+    "artemis_defeat_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "defeat": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "events": {}
+    }
+  }
+}
