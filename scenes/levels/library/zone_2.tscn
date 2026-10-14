@@ -9,6 +9,9 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="6_eglro"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="7_cxp8p"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_710r8"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 
 [sub_resource type="TileSet" id="TileSet_r6boj"]
 
@@ -14006,3 +14009,34 @@ position = Vector2(1949, 673)
 target_scene_path = "uid://cq3j5o0ey5cvx"
 target_door_id = 4
 door_id = 3
+
+[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+[node name="DustMotes" parent="." instance=ExtResource("amb_dust")]
+[node name="LanternLight1" parent="." instance=ExtResource("amb_light")]
+position = Vector2(536, 111)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 0.0
+[node name="LanternLight2" parent="." instance=ExtResource("amb_light")]
+position = Vector2(954, 204)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 2.3
+[node name="LanternLight3" parent="." instance=ExtResource("amb_light")]
+position = Vector2(276, 619)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 4.6
+[node name="LanternLight4" parent="." instance=ExtResource("amb_light")]
+position = Vector2(1475, 642)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 6.8999999999999995

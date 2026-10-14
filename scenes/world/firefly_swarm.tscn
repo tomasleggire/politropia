@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/firefly_swarm.gd" id="1_script"]
+
+[node name="FireflySwarm" type="Node2D"]
+z_index = 3
+script = ExtResource("1_script")
+autonomous = true
+brightness = 1.0
+wander_radii = Vector2(70, 40)
+base_active = 5
+glow_color = Color(1, 0.8, 0.35, 0.95)
+glow_scale = 0.55

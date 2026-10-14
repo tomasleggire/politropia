@@ -9,6 +9,9 @@
 [ext_resource type="PackedScene" path="res://scenes/world/stillness_desk.tscn" id="7_j4ml1"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="8_hsarn"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="9_vw8bd"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 
 [sub_resource type="TileSet" id="TileSet_r6boj"]
 
@@ -14177,3 +14180,12 @@ limite_inferior = 775
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1279308137]
 position = Vector2(620, 583.5)
 shape = SubResource("RectangleShape2D_3n1fk")
+
+[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+[node name="DustMotes" parent="." instance=ExtResource("amb_dust")]
+[node name="DeskLight" parent="." instance=ExtResource("amb_light")]
+position = Vector2(415, 700)
+light_color = Color(1, 0.78, 0.45, 1)
+base_energy = 0.9
+radius = 170.0
+flicker_amount = 0.05

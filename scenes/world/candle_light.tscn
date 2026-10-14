@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="1_light"]
+
+[node name="CandleLight" instance=ExtResource("1_light")]
+light_color = Color(1, 0.62, 0.28, 1)
+base_energy = 0.9
+radius = 80.0
+flicker_amount = 0.16
+flicker_speed = 6.0

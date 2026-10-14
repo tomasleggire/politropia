@@ -4,12 +4,22 @@ extends Node2D
 ## Warm fireflies around the altar: they drift as a beacon while the desk
 ## waits, gather in orbit around the seated Luz on activation and disperse when
 ## she leaves. The three extra fireflies only join a first celebration.
+##
+## As a zone decoration, drop `scenes/world/firefly_swarm.tscn`: with
+## `autonomous` on it animates itself (a small drifting group). Move it next to
+## bushes or ruins and tune the groups below.
 
 const EXTRA_COUNT := 3
 const WANDER_MIN_Y := -120.0
 const WANDER_MAX_Y := -8.0
 const NOISE_GAIN := 1.5
 const DISPERSE_TIME := 1.2
+
+@export_group("Ambient")
+## Animates the swarm by itself; leave off when a desk FX drives it.
+@export var autonomous := false
+## Overall brightness 0..1.
+@export_range(0.0, 1.0, 0.05) var brightness := 0.6
 
 @export_group("Wander")
 @export var wander_center := Vector2(0.0, -64.0)
@@ -54,8 +64,6 @@ const DISPERSE_TIME := 1.2
 
 ## Fireflies allocated out of the base group; set before the node is ready.
 var base_count := 7
-## Overall brightness 0..1, higher when this desk is the active checkpoint.
-var brightness := 0.6
 var gather_level := 0.0
 var resting_level := 0.0
 var extras_level := 0.0
@@ -82,6 +90,7 @@ var _home := PackedVector2Array()
 var _rise_amp := PackedFloat32Array()
 var _rise_period := PackedFloat32Array()
 var _rise_phase := PackedFloat32Array()
+var _clock := 0.0
 
 
 func _ready() -> void:
@@ -91,6 +100,12 @@ func _ready() -> void:
 		_glows.append(AltarFxKit.make_sprite(self, AltarFxKit.glow_texture(), true))
 		_cores.append(AltarFxKit.make_sprite(self, AltarFxKit.dot_texture(), false))
 	setup(0)
+	set_process(autonomous)
+
+
+func _process(delta: float) -> void:
+	_clock += delta
+	step(delta, _clock, 0.5)
 
 
 ## Rebuilds every per-firefly parameter from `seed_value`; same seed, same swarm.

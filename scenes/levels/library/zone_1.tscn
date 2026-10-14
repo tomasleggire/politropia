@@ -11,6 +11,10 @@
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_n3h83"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_6keu4"]
 [ext_resource type="PackedScene" path="res://scenes/world/tutorial_sign.tscn" id="20_tutsign"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
+[ext_resource type="PackedScene" path="res://scenes/world/gothic_candle.tscn" id="amb_candle"]
 
 [sub_resource type="TileSet" id="TileSet_r6boj"]
 
@@ -14217,3 +14221,15 @@ position = Vector2(1000, 697)
 title = "Curación"
 text = "Golpeá enemigos para llenar la [color=#e0b94f]energía[/color]. Tocá el botón de [color=#e0b94f]curar[/color] para recuperar vida."
 show_once = true
+
+[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+[node name="DustMotes" parent="." instance=ExtResource("amb_dust")]
+[node name="Candle1" parent="." instance=ExtResource("amb_candle")]
+position = Vector2(110, 697)
+phase_offset = 0.0
+[node name="Candle2" parent="." instance=ExtResource("amb_candle")]
+position = Vector2(400, 697)
+phase_offset = 1.7
+[node name="Candle3" parent="." instance=ExtResource("amb_candle")]
+position = Vector2(1130, 697)
+phase_offset = 3.4

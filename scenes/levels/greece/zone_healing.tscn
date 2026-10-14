@@ -22,6 +22,10 @@
 [ext_resource type="PackedScene" path="res://scenes/world/stillness_desk.tscn" id="20_54evs"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="22_u43bu"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="30_door"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
+[ext_resource type="Resource" path="res://data/ambience/greece.tres" id="amb_style"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/pollen_motes.tscn" id="amb_pollen"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("2_3hmw2")
@@ -15172,3 +15176,13 @@ position = Vector2(-28, 308)
 target_scene_path = "uid://crlljgoutm1lu"
 target_door_id = 23
 door_id = 21
+
+[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+style = ExtResource("amb_style")
+[node name="PollenMotes" parent="." instance=ExtResource("amb_pollen")]
+[node name="DeskLight" parent="." instance=ExtResource("amb_light")]
+position = Vector2(509, 350)
+light_color = Color(1, 0.78, 0.45, 1)
+base_energy = 0.9
+radius = 170.0
+flicker_amount = 0.05

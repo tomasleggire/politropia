@@ -11,6 +11,9 @@
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="8_sbedd"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_rbapt"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="11_expoe"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fcwr3"]
 texture = ExtResource("2_rbapt")
@@ -14342,3 +14345,41 @@ limite_inferior = 760
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1197031481]
 position = Vector2(993, 382.5)
 shape = SubResource("RectangleShape2D_srqf7")
+
+[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+[node name="DustMotes" parent="." instance=ExtResource("amb_dust")]
+[node name="LanternLight1" parent="." instance=ExtResource("amb_light")]
+position = Vector2(821, 292)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 0.0
+[node name="LanternLight2" parent="." instance=ExtResource("amb_light")]
+position = Vector2(1152, 289)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 2.3
+[node name="LanternLight3" parent="." instance=ExtResource("amb_light")]
+position = Vector2(1267, 289)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 4.6
+[node name="LanternLight4" parent="." instance=ExtResource("amb_light")]
+position = Vector2(1596, 476)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 6.8999999999999995
+[node name="LanternLight5" parent="." instance=ExtResource("amb_light")]
+position = Vector2(282, 509)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 9.2

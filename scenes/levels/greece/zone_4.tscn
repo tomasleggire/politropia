@@ -25,6 +25,11 @@
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_xbgl8"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="23_pmn7b"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_5bejm"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
+[ext_resource type="Resource" path="res://data/ambience/greece.tres" id="amb_style"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/pollen_motes.tscn" id="amb_pollen"]
+[ext_resource type="PackedScene" path="res://scenes/world/firefly_swarm.tscn" id="amb_fly"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("6_4naxb")
@@ -15234,3 +15239,9 @@ position = Vector2(1123, 102)
 target_scene_path = "uid://bjruohx06abro"
 target_door_id = 21
 door_id = 23
+
+[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+style = ExtResource("amb_style")
+[node name="PollenMotes" parent="." instance=ExtResource("amb_pollen")]
+[node name="Fireflies1" parent="." instance=ExtResource("amb_fly")]
+position = Vector2(790, 1733)
