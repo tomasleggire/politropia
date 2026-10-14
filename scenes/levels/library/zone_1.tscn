@@ -14197,12 +14197,14 @@ door_id = 1
 
 [node name="SignMove" parent="." instance=ExtResource("20_tutsign")]
 position = Vector2(160, 697)
+trigger_size = Vector2(90, 90)
 title = "Movimiento"
 text = "Mantené el dedo sobre la [color=#e0b94f]mitad izquierda[/color] de la pantalla y deslizalo para moverte."
 show_once = true
 
 [node name="SignJump" parent="." instance=ExtResource("20_tutsign")]
 position = Vector2(260, 697)
+trigger_size = Vector2(90, 90)
 title = "Saltar"
 text = "Tocá el botón de [color=#e0b94f]salto[/color]. Mantenelo apretado para saltar más alto."
 show_once = true
