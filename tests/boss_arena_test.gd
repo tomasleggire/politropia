@@ -82,6 +82,7 @@ func _reset_world() -> void:
 	h.cps.clear()
 	_registry().clear()
 	_progress().clear()
+	h.tree.root.get_node("AbilityProgress").clear()
 	_rig = Node2D.new()
 	h.tree.root.add_child(_rig)
 	LevelGeometry.add_solid(_rig, FLOOR_RECT, Color.DIM_GRAY)

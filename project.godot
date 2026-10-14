@@ -31,6 +31,7 @@ PauseMenu="*res://scenes/ui/pause_menu.tscn"
 MapProgress="*res://scripts/world/map_progress.gd"
 MapScreen="*res://scenes/ui/map_screen.tscn"
 SecretProgress="*res://scripts/world/secret_progress.gd"
+AbilityProgress="*res://scripts/world/ability_progress.gd"
 
 [display]
 

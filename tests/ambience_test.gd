@@ -9,6 +9,7 @@ extends SceneTree
 const LEVELS: Array[String] = ["library", "greece"]
 const ZONES: Array[String] = [
 	"zone_1", "zone_2", "zone_3", "zone_4", "zone_5", "zone_6", "zone_healing", "zone_lectern",
+	"zone_artemis",
 ]
 const WATCHDOG_SECONDS := 180.0
 ## Most PointLight2D a zone may hold, Luz's own light included.
@@ -87,6 +88,8 @@ func _check_light_prefab() -> void:
 
 ## `full` also runs the ambience checks, which do not depend on the view size.
 func _check_zone(path: String, full: bool) -> void:
+	if not ResourceLoader.exists(path):
+		return
 	var zone := (load(path) as PackedScene).instantiate()
 	root.add_child(zone)
 	for i in 4:

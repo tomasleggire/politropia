@@ -56,6 +56,10 @@ enum ID {
 	ZONE_5_TO_LECTERN,
 	ZONE_5_TO_ZONE_6,
 	ZONE_6_TO_ZONE_5,
+
+	# --- Greece: healing room <-> Artemis room ---
+	HEALING_TO_ARTEMIS,
+	ARTEMIS_TO_HEALING,
 }
 
 

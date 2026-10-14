@@ -15,6 +15,10 @@ check names.
   its target scene and leads back, Luz arrives standing on the floor just inside the
   room (never on a trigger), and a real fade transition, respawn and checkpoint run.
   Slow (about two minutes): it loads every zone.
+- `artemis_room_test.gd`: the real Artemis room (greece/zone_artemis): arena and boss
+  present, tiles close the arena, the door pairs with the healing room, beating Artemis
+  grants the double jump once, and a reload or a zone change keeps it
+  (`AbilityProgress`). About ten seconds.
 - `ambience_test.gd`: every library and Greece zone has one `ZoneAmbience` and one
   `ParallaxBackdrop`, the tint never reaches the HUD layers, a zone holds at most
   8 lights, and the far parallax layer covers the view at the corners of the camera

@@ -11,6 +11,7 @@ signal collected(player: Node)
 const PLAYER_GROUP := &"player"
 const UNLOCK_METHOD := &"unlock_double_jump"
 const HAS_METHOD := &"has_double_jump"
+const ABILITY_ID := &"double_jump"
 const APPEAR_START_SCALE := 0.05
 
 @export_group("Feel")
@@ -42,8 +43,17 @@ func _on_body_entered(body: Node2D) -> void:
 		return
 	_collected = true
 	body.call(UNLOCK_METHOD)
+	_remember_unlock()
 	collected.emit(body)
 	queue_free()
+
+
+## The Player nodes are per zone: the run-wide record keeps the ability when Luz
+## walks into another scene.
+func _remember_unlock() -> void:
+	var progress := get_node_or_null("/root/AbilityProgress")
+	if progress != null:
+		progress.call(&"record", ABILITY_ID)
 
 
 func _start_bob() -> void:

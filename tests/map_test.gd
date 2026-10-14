@@ -75,9 +75,11 @@ func _check_layouts(_progress: Node) -> void:
 	check(MapLayout.find_for_scene(LIBRARY_Z1).level_name == "Biblioteca", "find_for_scene")
 	check(MapLayout.find_for_scene("res://nope.tscn") == null, "unknown scene has no layout")
 	for level in ["library", "greece"]:
-		for zone in ["zone_1", "zone_2", "zone_3", "zone_4", "zone_5", "zone_6"]:
+		for zone in ["zone_1", "zone_2", "zone_3", "zone_4", "zone_5", "zone_6", "zone_healing"]:
 			var path := "res://scenes/levels/%s/%s.tscn" % [level, zone]
 			check(MapLayout.find_for_scene(path) != null, "%s/%s is on the map" % [level, zone])
+	var artemis := MapLayout.find_for_scene("res://scenes/levels/greece/zone_artemis.tscn")
+	check(artemis != null and artemis.level_name == "Grecia", "greece/zone_artemis is on the map")
 
 
 func _check_screen(progress: Node, screen: Node, pause: Node) -> void:

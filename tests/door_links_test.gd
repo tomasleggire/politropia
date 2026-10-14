@@ -9,6 +9,7 @@ extends SceneTree
 const LEVELS: Array[String] = ["library", "greece"]
 const ZONES: Array[String] = [
 	"zone_1", "zone_2", "zone_3", "zone_4", "zone_5", "zone_6", "zone_healing", "zone_lectern",
+	"zone_artemis",
 ]
 const WATCHDOG_SECONDS := 240.0
 ## The farthest from its door Luz may arrive.

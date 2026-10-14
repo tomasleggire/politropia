@@ -509,6 +509,7 @@ var _focus_end_animating := false
 
 func _ready() -> void:
 	add_to_group(&"player")
+	_restore_saved_abilities()
 	_sprite.sprite_frames = _animation_sprite_frames
 	_sprite.animation_finished.connect(_on_sprite_animation_finished)
 	_sprite.frame_changed.connect(_on_sprite_frame_changed)
@@ -1495,6 +1496,14 @@ func unlock_double_jump() -> void:
 
 func has_double_jump() -> bool:
 	return can_double_jump
+
+
+## Abilities earned earlier in the run (AbilityProgress) come back with each new
+## Player, so a change of zone never takes them away. No signal: nothing new unlocks.
+func _restore_saved_abilities() -> void:
+	var progress := get_node_or_null("/root/AbilityProgress")
+	if progress != null and progress.call(&"is_unlocked", &"double_jump"):
+		can_double_jump = true
 
 
 ## -- Dash / slide -------------------------------------------------------------
