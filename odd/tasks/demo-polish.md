@@ -163,7 +163,19 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
     - Greece zone_3: the lower-left ledge face, (2314,519).
   - Tests: `secret_test` 47/47. The rest are green.
   - Device check: the reachability of both walls, the attack lining up with the wall, and that Luz fits through the tunnel. No hint exists; consider a subtle crack.
-- [ ] D10 Map connection with tiles: reach an Artemis arena room and a healing room from the Greece chain (route: delegated)
+- [x] D10 Map connection with tiles: reach an Artemis arena room and a healing room from the Greece chain (route: delegated)
+  - Commits: `8f8458a` (+13/-7), `e7917e1` (+15531/-7, of which about 15200 lines are tile data), `2746247` (+120/-1).
+  - Library: a tile-carved door `ZONE_4_TO_ZONE_6` into zone_4. `require_all_fragments = true` is set on the library lectern. The platforming was NOT simulated, so verify on the device first; if fragment 4 is unreachable, flip it back to false.
+  - Greece: the route is zone_4 → zone_healing (desk; tile-carved right door) → the new `zone_artemis` (Greece tiles, arena prefab, BossProgress, real DoubleJumpReward).
+  - The new `AbilityProgress` autoload keeps the double jump across zone changes. Before this, it was lost when leaving the room.
+  - The `DemoEndToast` prefab shows "Fin de la demo / Gracias por jugar" after the double jump.
+  - Greece zone_lectern still has no doors; it is a copy of the library lectern.
+  - Tests: `artemis_room` 42/42 (the parent re-ran it: 42/42), `door_links` 318/318, `map` 101/101, `ambience` 498/498. The rest are green. `double_jump` fails 4/30, the same count as the base.
+  - Parent screenshot check:
+    - The arena looks cohesive and the camera is clamped.
+    - Minor: there are dark blocky tile patches at the bottom right of the arena arrival view.
+    - The boss bar sits tight above the HUD hearts.
+- RDD: the slice from `38b9d3f` to HEAD is about 20k lines (mostly tile data). It is still deferred, and its consent needs the user.
 - [x] D11 Wall cling tuning: see the entry under D6
 - [ ] D12 iPhone deploy and user playtest; fixes from feedback (route: inline/delegated)
 
