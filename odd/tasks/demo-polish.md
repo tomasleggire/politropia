@@ -195,6 +195,14 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
   - Commit `65cde54` (+70/-2): `TutorialSign.marker_style` has FIREFLIES as the default, plus SIGNPOST and NONE. The text panel still shows. `guidance` 26/26.
   - Commit `424c200` (inline): the Move and Jump sign triggers are narrowed to 90 px because their panels overlapped. `guidance` 26/26.
   - The parent viewed the Greece map screenshot: the route and icons are clear.
+- [x] Merge of origin/main 780a873 (PR #160, a teammate's Greece door rewiring): merge commit `34d357c` (delegated)
+  - The teammate's int ids map to the same DoorID names on this branch, because our entries were appended.
+  - We adopted their topology and positions: the new zone_4 ↔ zone_lectern door, plus the healing and zone_5/zone_6 door positions.
+  - We kept our named pairs where they used DOOR_A, DOOR_B or a repeated HEALING, so the pairing test holds.
+  - The healing → Artemis door is kept.
+  - The map gains "Atril" with LECTERN, connected to zone_4.
+  - Tests: `door_links` 340/340 (the parent re-ran it: 340/340), `map` 117/117. The rest are green.
+  - Device check: zone_4 → lectern door at (-81,769), which is the teammate's placement.
 - [ ] D12 iPhone deploy and user playtest; fixes from feedback (route: inline/delegated)
 
 ## Progress
