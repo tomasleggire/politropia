@@ -203,6 +203,18 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
   - The map gains "Atril" with LECTERN, connected to zone_4.
   - Tests: `door_links` 340/340 (the parent re-ran it: 340/340), `map` 117/117. The rest are green.
   - Device check: zone_4 → lectern door at (-81,769), which is the teammate's placement.
+- [x] D15 Artemis shortcut: commit `1c25d8a` (+49/-9)
+  - The door is tile-carved at the end of the Greece zone_1 lower terrace, (2060,480), and leads to the new right doorway of zone_artemis, (1034,268), with `arrival_offset` (-100,75).
+  - New DoorIDs: ZONE_1_TO_ARTEMIS (29) and ARTEMIS_TO_ZONE_1 (30).
+  - Tests: `door_links` 362/362, `map` 119/119, `artemis_room` 49/49.
+- [x] D16 Artemis minimal art (the user approved the concept v2)
+  - Commits: `3a4c1e3` (+115, art sources and the Codex prompts), `d4ee69e` (+965/-37).
+  - 6 Codex sheets were processed by `tools/process_artemis_sheets.py` into `assets/enemies/artemis/`.
+  - `ArtemisAnimationCatalog`: clips with FALLBACKS that never fall back to polygons.
+  - The `_play` hook drives `Visual/AnimatedSprite2D`. The polygon limbs are removed. Collision, telegraph and muzzle are unchanged.
+  - Parent screenshot check: the shot sequence reads well and the style is consistent with Luz.
+  - Pending for the full set: rain, fan, dagger, dive, stag, feint, phase 2 skin and intro, plus arrow, stag and VFX art.
+  - Tests: `artemis_room` 49/49. The `stillness_desk_ritual` runner failures are identical on the base.
 - [ ] D12 iPhone deploy and user playtest; fixes from feedback (route: inline/delegated)
 
 ## Progress
