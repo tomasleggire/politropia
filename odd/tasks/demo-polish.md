@@ -87,8 +87,28 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
 - RDD slice from `38b9d3f` to `cdc96e9`:
   - Medium, `slice_budget_reached` (909 lines), so a review is due.
   - Deferred to the morning: the user is asleep, and the consent needs the human. Run the preflight STATUS with `--base-ref=38b9d3f --committed-only` then.
-- [ ] D4 Guidance prefabs: `TutorialSign` (world sign with text, shows near player) and pickup toast ("Fragmento 2/4"), placed in library zone_1 and on fragments/double jump (route: delegated)
-- [ ] D5 HUD and UI: fragment counter, touch pause button with pause menu (Reanudar / Menu principal), menu buttons never break (route: delegated)
+- [x] D4 Guidance prefabs: `TutorialSign` (world sign with text, shows near player) and pickup toast ("Fragmento 2/4"), placed in library zone_1 and on fragments/double jump (route: delegated)
+  - Commit: `65ba227` (+660/-0).
+  - `scenes/world/tutorial_sign.tscn` is a polygon signpost whose panel fades in on proximity. It has `show_once`, and New Game resets it.
+  - `PickupToast` is an autoload: call `PickupToast.show_toast(title, subtitle)`. It reacts to `fragment_collected` and to `ability_unlocked`.
+  - `assets/ui/gothic_theme.tres` is a shared theme (Cinzel and the menu palette).
+  - Five signs in library zone_1: move, jump, attack, dash, heal. There is no wall-jump sign, because no early wall exists.
+  - Tests: `guidance_test` 15/15 (the parent re-ran it: 15/15).
+- [x] D5 HUD and UI: fragment counter, touch pause button with pause menu (Reanudar / Menu principal), menu buttons never break (route: delegated)
+  - Commit: `90691ac` (+763/-17).
+  - Fragments:
+    - The `FragmentProgress` autoload provides `collect`, `count`, `fragment_collected`, and the to/from dict methods.
+    - Each fragment has `fragment_id` 1-4 and collects on touch. A collected fragment stays gone when the room reloads.
+    - The pedestal has `require_all_fragments := false`.
+  - The HUD shows an "n/4" counter.
+  - The `PauseMenu` autoload adds an "II" touch button in the safe area plus Escape. It offers Reanudar, Mapa (disabled; `map_enabled` and `map_requested` hook it up for D6) and Menú principal. It blocks and releases touch input.
+  - Collectables shows a "Próximamente" toast.
+  - Fragment ids are shared between library and Greece. Greece has no fragment 2.
+  - Tests: `fragment_progress` 22/22 and `pause_menu` 20/20 (the parent re-ran both). The rest match the base.
+  - Device test:
+    - The signs are readable.
+    - Pause opens and closes, input does not leak, and nothing stays stuck after resume.
+    - The fragment toast and counter work, and a collected fragment stays gone.
 - [ ] D6 Map screen: static map with "you are here" marker per zone, opened from pause/touch (route: delegated)
 - [ ] D7 Ambience prefabs: `ZoneAmbience` (CanvasModulate tint), light prefab for candles/desk/pedestal, place dust/firefly/candle particles per zone (route: delegated)
 - [ ] D8 Parallax prefab with provisional layers per zone (far, mid, fog) and a Codex request for final layers (route: delegated)
