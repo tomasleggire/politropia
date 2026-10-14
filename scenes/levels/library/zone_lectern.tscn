@@ -14147,7 +14147,6 @@ position = Vector2(67, 323)
 [node name="Lectern" parent="." unique_id=1057357694 instance=ExtResource("7_o5po4")]
 physics_interpolation_mode = 2
 position = Vector2(443, 386)
-require_all_fragments = true
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)
