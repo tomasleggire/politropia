@@ -62,8 +62,31 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
     - The heal button shows at 33 or more soul when not at full health.
     - One tap heals.
     - The button still binds after a zone change and after a respawn.
-- [ ] D2 Room transitions: every zone exit/entry pair uses door ids so Luz returns to the door she used, library and Greece (route: delegated)
-- [ ] D3 Content fixes: duplicate fragment 2 in library zone_4, library zone_6 exit (route: delegated, with D2)
+- [x] D2 Room transitions: every zone exit/entry pair uses door ids so Luz returns to the door she used, library and Greece (route: delegated)
+  - Commit: `3cf80a8` (+505/-70).
+  - What changed:
+    - Every door is now paired.
+    - Arrival lands inside the room on the floor, facing in. Floor and ceiling holes land Luz on the ledge beside them.
+    - The arrival door sets the respawn point, but an active checkpoint wins.
+    - A missing target door logs `push_warning`.
+    - Fixed: the swapped and wrong ids, Greece zone_healing (which was a softlock), and the zone_6 null script.
+  - Greece zone_4's bottom exit now goes to zone_2. This needs a device check.
+  - New `tests/door_links_test.gd`: 279/279 (the parent re-ran it: 279/279, about 110 s). The other suites match the base.
+  - Device test:
+    - Walk every door both ways.
+    - Check the floor and ceiling holes.
+    - Death respawn: at the arrival door without a desk, at the desk with one.
+- [x] D3 Content fixes: duplicate fragment 2 in library zone_4, library zone_6 exit (route: delegated, with D2)
+  - Commit: `cdc96e9` (+7/-4).
+  - The `zone_1.tscn:10501` parse error is not a defect. `--quit-after 120` kills the menu's threaded load; with `--quit-after 3000` the boot is clean.
+  - The library fragments are now 1 (zone_3), 2 (zone_4), 3 (zone_5) and 4 (zone_6), once each. The copy in zone_2 was removed.
+  - Zone_6 got an exit to zone_4.
+  - BLOCKED, moved to D10: library zone_6 has no way in, so fragment 4 cannot be collected. Zone_4 needs an entry door `ZONE_4_TO_ZONE_6`, tracked in `PENDING_ARRIVAL_DOORS`.
+  - Finding: fragments are decorative. Nothing collects them, and Greece has no fragment 2. This feeds D4 and D5.
+  - Pre-existing warning: duplicate `enemy_id 'book_flyer'` in a library zone.
+- RDD slice from `38b9d3f` to `cdc96e9`:
+  - Medium, `slice_budget_reached` (909 lines), so a review is due.
+  - Deferred to the morning: the user is asleep, and the consent needs the human. Run the preflight STATUS with `--base-ref=38b9d3f --committed-only` then.
 - [ ] D4 Guidance prefabs: `TutorialSign` (world sign with text, shows near player) and pickup toast ("Fragmento 2/4"), placed in library zone_1 and on fragments/double jump (route: delegated)
 - [ ] D5 HUD and UI: fragment counter, touch pause button with pause menu (Reanudar / Menu principal), menu buttons never break (route: delegated)
 - [ ] D6 Map screen: static map with "you are here" marker per zone, opened from pause/touch (route: delegated)
