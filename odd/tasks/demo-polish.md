@@ -144,8 +144,25 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
     - Bright yellow blobs appear near the cliffs.
     - These go to D7b.
   - `locomotion_test` is flaky: the D11 wall-jump chain checks failed 2/68 once. This also goes to D7b.
-- [ ] D7b Visual fix pass: Greece tint/haze less washed, Luz light not glowing her hair, remove bright blobs, stabilise flaky locomotion wall-chain checks (route: delegated)
-- [ ] D9 Secret rooms: `BreakableWall` prefab (breaks on hits, hides a room) with a reward, placed in at least one library and one Greece zone (route: delegated)
+- [x] D7b Visual fix pass: Greece tint/haze less washed, Luz light not glowing her hair, remove bright blobs, stabilise flaky locomotion wall-chain checks (route: delegated)
+  - Commit: `9a640ff` (+46/-31).
+  - Greece: the tint is lighter and the fog and haze are thinner. The Luz light energy is 0 in Greece.
+  - The firefly prefab defaults were softened; they were the blobs.
+  - New `mid_enabled` export. Greece has no mid layer.
+  - The locomotion inputs are now injected on the process frame: 5/5 runs at 68/68.
+  - Parent screenshot check: the blobs are gone and the hair looks natural. Greece is still a bit less saturated than the original; the user should judge it.
+- [x] D9 Secret rooms: `BreakableWall` prefab (breaks on hits, hides a room) with a reward, placed in at least one library and one Greece zone (route: delegated)
+  - Commit: `44739a5` (+953/-3).
+  - Prefabs:
+    - `breakable_wall.tscn`. `source_layer` adopts the zone tiles under it. It breaks after 3 hits, gives no soul, and its hits reach it through `wall_hurtbox.gd`.
+    - `secret_chamber.tscn`, a cover that fades on reveal.
+    - `soul_cache.tscn`, a chest that fills soul once and shows the toast "Secreto encontrado".
+  - The `SecretProgress` autoload resets on New Game.
+  - Secrets:
+    - Library zone_5: the left wall at the spawn balcony, (634,305).
+    - Greece zone_3: the lower-left ledge face, (2314,519).
+  - Tests: `secret_test` 47/47. The rest are green.
+  - Device check: the reachability of both walls, the attack lining up with the wall, and that Luz fits through the tunnel. No hint exists; consider a subtle crack.
 - [ ] D10 Map connection with tiles: reach an Artemis arena room and a healing room from the Greece chain (route: delegated)
 - [x] D11 Wall cling tuning: see the entry under D6
 - [ ] D12 iPhone deploy and user playtest; fixes from feedback (route: inline/delegated)
