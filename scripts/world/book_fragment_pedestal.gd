@@ -25,6 +25,7 @@ const LIGHT_ALPHA_BY_FRAGMENT := [0.48, 0.62, 0.78, 0.95]
 const LIGHT_STRENGTH_BY_FRAGMENT := [0.48, 0.64, 0.82, 1.0]
 const SIDE_AURA_ALPHA_BY_FRAGMENT := [0.28, 0.4, 0.54, 0.68]
 const ORBIT_DURATION := 1.8
+const TRANSITION_SCENE := preload("res://scenes/ui/level_transition.tscn")
 
 @onready var _area: Area2D = $InteractionArea
 @onready var _prompt: InteractionPrompt = $InteractionPrompt
@@ -170,6 +171,11 @@ func reconstruir_libro() -> void:
 	_reveal_flash.emitting = false
 	_book_reconstructed = true
 	_start_completed_effects()
+	_start_greece_transition()
+
+
+func _start_greece_transition() -> void:
+	get_tree().change_scene_to_packed(TRANSITION_SCENE)
 
 
 func _start_completed_effects() -> void:

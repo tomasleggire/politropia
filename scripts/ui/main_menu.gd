@@ -1,6 +1,7 @@
 extends Control
 
-const ESCENA_JUEGO := "res://scenes/levels/greece/zone_1.tscn"
+const ESCENA_JUEGO := "res://scenes/levels/library/zone_1.tscn"
+const ESCENA_INTRO := "res://scenes/ui/new_game_intro.tscn"
 
 @onready var btn_nueva: Button = %NewGame
 @onready var btn_continuar: Button = %Continue
@@ -18,13 +19,15 @@ func _ready() -> void:
 
 func _on_nueva_partida() -> void:
 	btn_nueva.disabled = true  # evita tocar dos veces
-	# Si todavía no terminó de cargar, espera  lo que falte
-	var escena: PackedScene = ResourceLoader.load_threaded_get(ESCENA_JUEGO)
-	if escena != null:
-		get_tree().change_scene_to_packed(escena)
-	else:
-		# Fallback por si la carga diferida falla
-		get_tree().change_scene_to_file(ESCENA_JUEGO)
+	_reset_new_game_progress()
+	get_tree().change_scene_to_file(ESCENA_INTRO)
+
+
+func _reset_new_game_progress() -> void:
+	for service_path in ["/root/CheckpointService", "/root/EnemyRegistry", "/root/BossProgress"]:
+		var service := get_node_or_null(service_path)
+		if service != null and service.has_method("clear"):
+			service.call("clear")
 
 func _on_coleccionables() -> void:
 	print("Coleccionables: pendiente")
