@@ -126,8 +126,25 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
   - The cling is not allowed during the wall-kick lock.
   - Tests: `locomotion_test` 68/68 (the parent re-ran it: 68/68).
   - Device test: jump into a tall wall holding toward it, she grabs while rising; chained wall jumps work in a shaft.
-- [ ] D7 Ambience prefabs: `ZoneAmbience` (CanvasModulate tint), light prefab for candles/desk/pedestal, place dust/firefly/candle particles per zone (route: delegated)
-- [ ] D8 Parallax prefab with provisional layers per zone (far, mid, fog) and a Codex request for final layers (route: delegated)
+- [x] D7 Ambience prefabs: `ZoneAmbience` (CanvasModulate tint), light prefab for candles/desk/pedestal, place dust/firefly/candle particles per zone (route: delegated)
+  - Commit: `003b9a1` (+824/-34).
+  - `ZoneAmbience` takes an `AmbienceStyle` from `data/ambience/{library,greece}.tres`. It adds a tint, a vignette on CanvasLayer 20 (the HUD at 40 stays untinted) and a light that follows Luz.
+  - `AmbientLight` and `CandleLight` have flicker.
+  - Particle prefabs: dust, pollen, fireflies, candle.
+  - At most 6 lights per zone.
+  - Tests: `ambience_test` 471/471.
+- [x] D8 Parallax prefab with provisional layers per zone (far, mid, fog) and a Codex request for final layers (route: delegated)
+  - Commit: `630f619` (+696/-15).
+  - `ParallaxBackdrop` has four Parallax2D layers: far (adopts the zone background), mid silhouettes, fog and haze. A `ParallaxStyle` in `data/parallax/*.tres` holds texture slots for Codex.
+  - The Codex request is `docs/art/parallax_codex_request.md`.
+  - Parent review of the screenshots:
+    - The library looks clearly better.
+    - Greece looks washed and flatter than before.
+    - Luz's hair glows orange in Greece, from the Luz light.
+    - Bright yellow blobs appear near the cliffs.
+    - These go to D7b.
+  - `locomotion_test` is flaky: the D11 wall-jump chain checks failed 2/68 once. This also goes to D7b.
+- [ ] D7b Visual fix pass: Greece tint/haze less washed, Luz light not glowing her hair, remove bright blobs, stabilise flaky locomotion wall-chain checks (route: delegated)
 - [ ] D9 Secret rooms: `BreakableWall` prefab (breaks on hits, hides a room) with a reward, placed in at least one library and one Greece zone (route: delegated)
 - [ ] D10 Map connection with tiles: reach an Artemis arena room and a healing room from the Greece chain (route: delegated)
 - [x] D11 Wall cling tuning: see the entry under D6
