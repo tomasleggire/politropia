@@ -109,12 +109,28 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
     - The signs are readable.
     - Pause opens and closes, input does not leak, and nothing stays stuck after resume.
     - The fragment toast and counter work, and a collected fragment stays gone.
-- [ ] D6 Map screen: static map with "you are here" marker per zone, opened from pause/touch (route: delegated)
+- [x] D6 Map screen: static map with "you are here" marker per zone, opened from pause/touch (route: delegated)
+  - Commit: `341019a` (+709/-2).
+  - Progressive map in the Hollow Knight style:
+    - The `MapProgress` autoload records visited scenes and resets on New Game.
+    - `MapLayout` and `MapRoom` resources live in `data/maps/library.tres` and `greece.tres`, built from the door graph and the tile used-rects.
+    - The `MapScreen` autoload is opened from Pausa → Mapa and closed with "Volver" or Escape. It shows only visited rooms, a pulsing marker on Luz, and the fragment count n/4.
+  - To add a room, add a `MapRoom` to the level's `.tres`. A new level means a new `.tres` in `data/maps/`.
+  - Room names are invented and need the user's check. Greece zone_lectern is left out because it has no links.
+  - Tests: `map_test` 94/94 (the parent re-ran it: 94/94). `pause_menu` 21/21.
+- [x] D11 (done early) Wall cling engages while rising
+  - Commit: `a83358b` (+73/-1).
+  - New exports:
+    - `wall_cling_while_rising := true`.
+    - `wall_cling_max_rise_speed := 100.0`, which caps the upward speed when the cling grabs.
+  - The cling is not allowed during the wall-kick lock.
+  - Tests: `locomotion_test` 68/68 (the parent re-ran it: 68/68).
+  - Device test: jump into a tall wall holding toward it, she grabs while rising; chained wall jumps work in a shaft.
 - [ ] D7 Ambience prefabs: `ZoneAmbience` (CanvasModulate tint), light prefab for candles/desk/pedestal, place dust/firefly/candle particles per zone (route: delegated)
 - [ ] D8 Parallax prefab with provisional layers per zone (far, mid, fog) and a Codex request for final layers (route: delegated)
 - [ ] D9 Secret rooms: `BreakableWall` prefab (breaks on hits, hides a room) with a reward, placed in at least one library and one Greece zone (route: delegated)
 - [ ] D10 Map connection with tiles: reach an Artemis arena room and a healing room from the Greece chain (route: delegated)
-- [ ] D11 Wall cling tuning so it engages reliably when touching a wall in the air (route: delegated)
+- [x] D11 Wall cling tuning: see the entry under D6
 - [ ] D12 iPhone deploy and user playtest; fixes from feedback (route: inline/delegated)
 
 ## Progress
