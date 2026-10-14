@@ -33,6 +33,13 @@ const CLIP_SPEEDS := {
 	"fan_draw": 12.0,
 	"fan_hold": 8.0,
 	"fan_release": 20.0,
+	"dagger_windup": 12.0,
+	"dagger_slash": 24.0,
+	"dagger_flip": 14.0,
+	"dagger_recover": 12.0,
+	"dive_leap": 12.0,
+	"dive_fall": 12.0,
+	"dive_stuck": 10.0,
 	"backstep": 14.0,
 	"dodge": 14.0,
 	"interrupt_flinch": 20.0,
@@ -46,7 +53,7 @@ const CLIP_SPEEDS := {
 
 ## Clips that repeat while their state lasts; every other clip plays once and
 ## holds its last frame.
-const LOOPING_CLIPS := ["idle", "walk_fwd", "walk_back", "stagger_loop"]
+const LOOPING_CLIPS := ["idle", "walk_fwd", "walk_back", "stagger_loop", "dive_fall"]
 
 ## Clips built by playing another clip's frames backwards (no extra art): she
 ## retreats while facing Luz.
@@ -61,13 +68,6 @@ const FALLBACKS := {
 	"phase_transition": ["idle"],
 	"fan_recover": ["shot_recover"],
 	"shot_hold": ["shot_draw"],
-	"dagger_windup": ["vault_crouch"],
-	"dagger_slash": ["shot_release"],
-	"dagger_flip": ["backstep"],
-	"dagger_recover": ["shot_recover"],
-	"dive_leap": ["vault_air"],
-	"dive_fall": ["vault_air"],
-	"dive_stuck": ["stagger_loop"],
 	"stag_cast": ["idle"],
 	"stag_summon": ["shot_release"],
 	"stag_recover": ["shot_recover"],

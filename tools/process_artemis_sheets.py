@@ -103,6 +103,28 @@ SHEETS = {
         },
         "events": {"rain_release": 0, "fan_release": 0},
     },
+    "dagger": {
+        "raw": "artemis_dagger_raw.png",
+        "grid": (4, 3),
+        "ref": 5,
+        "clips": {
+            "dagger_windup": [0, 1, 2],
+            "dagger_slash": [3, 4, 5],
+            "dagger_flip": [6, 7, 8, 9, 10, 11],
+            "dagger_recover": [11, 11],
+        },
+    },
+    "dive": {
+        "raw": "artemis_dive_raw.png",
+        "grid": (4, 3),
+        "ref": 7,
+        "scale_mult": 0.89,
+        "clips": {
+            "dive_leap": [0, 1, 2],
+            "dive_fall": [3, 4],
+            "dive_stuck": [5, 6, 7, 8, 9, 10, 11],
+        },
+    },
     "defeat": {
         "raw": "artemis_defeat_raw.png",
         "grid": (4, 3),

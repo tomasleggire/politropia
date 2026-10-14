@@ -184,6 +184,68 @@
         "fan_release": 0
       }
     },
+    "artemis_dagger_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "dagger_windup": [
+          0,
+          1,
+          2
+        ],
+        "dagger_slash": [
+          3,
+          4,
+          5
+        ],
+        "dagger_flip": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "dagger_recover": [
+          11,
+          11
+        ]
+      },
+      "events": {}
+    },
+    "artemis_dive_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "dive_leap": [
+          0,
+          1,
+          2
+        ],
+        "dive_fall": [
+          3,
+          4
+        ],
+        "dive_stuck": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "events": {}
+    },
     "artemis_defeat_sheet.png": {
       "grid": {
         "columns": 4,
