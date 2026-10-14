@@ -215,6 +215,12 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
   - Parent screenshot check: the shot sequence reads well and the style is consistent with Luz.
   - Pending for the full set: rain, fan, dagger, dive, stag, feint, phase 2 skin and intro, plus arrow, stag and VFX art.
   - Tests: `artemis_room` 49/49. The `stillness_desk_ritual` runner failures are identical on the base.
+- [x] D17 Demo shortcut from library zone_1 to the Artemis fight: commit `169cf81` (+26/-5)
+  - `DemoShortcutToArtemis` sits at (-22,620), about 45 px left of the spawn, as a dark alcove with a candle. It is one-way, using `LIBRARY_TO_ARTEMIS_DEMO` (31), and arrives at `ARTEMIS_TO_ZONE_1`.
+  - The camera `limite_izquierdo` changed from 11 to -30 so the alcove shows.
+  - New `SceneTransitionArea.enabled` export, to switch the shortcut off.
+  - `door_links_test` has an `ONE_WAY_DEMO_DOORS` allow-list: 371/371.
+  - Dying in the fight respawns Luz at the arena door. There is no softlock.
 - [ ] D12 iPhone deploy and user playtest; fixes from feedback (route: inline/delegated)
 
 ## Progress
