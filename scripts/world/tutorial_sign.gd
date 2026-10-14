@@ -4,6 +4,8 @@ extends Node2D
 ## A world signpost that teaches something. Drag `scenes/world/tutorial_sign.tscn`
 ## into a zone, put its base on the floor, then fill in the Inspector:
 ##   - Content: `title` and `text` (BBCode ok, e.g. [color=#e0b94f]word[/color]).
+##   - Look: `marker_style` picks what marks the spot: a small firefly swarm
+##     (default, it does not look interactable), the old signpost, or nothing.
 ##   - Trigger: size and offset of the area that makes the panel appear.
 ##   - Behavior: `show_once` makes it appear only the first time Luz reads it
 ##     during a run (reset by New Game).
@@ -14,6 +16,18 @@ extends Node2D
 @export_group("Content")
 @export var title := ""
 @export_multiline var text := ""
+
+@export_group("Look")
+## What marks the spot in the world. The panel works the same in every style.
+@export var marker_style := MarkerStyle.FIREFLIES
+@export_group("Fireflies")
+## How many fireflies of the small swarm are shown.
+@export_range(1, 7) var firefly_count := 4
+## Size of the area the fireflies drift in (pixels).
+@export var firefly_radii := Vector2(26.0, 11.0)
+## Height of the swarm above the sign's base (pixels, positive is up).
+@export var firefly_height := 30.0
+@export_range(0.0, 1.0, 0.05) var firefly_brightness := 0.85
 
 @export_group("Trigger")
 ## Size of the area (pixels) that shows the panel. The origin is the sign's base.
@@ -32,6 +46,10 @@ extends Node2D
 @export var panel_top := 100.0
 @export var center_text := true
 
+enum MarkerStyle { FIREFLIES, SIGNPOST, NONE }
+
+const FIREFLY_SWARM := preload("res://scenes/world/firefly_swarm.tscn")
+
 ## `sign key -> true` for every show-once sign already read this run.
 static var _seen: Dictionary = {}
 
@@ -41,6 +59,7 @@ var _hint_tween: Tween
 
 @onready var _area: Area2D = $TriggerArea
 @onready var _shape: CollisionShape2D = $TriggerArea/CollisionShape2D
+@onready var _visual: Node2D = $Visual
 @onready var _hint: Polygon2D = $Visual/Hint
 @onready var _root: Control = $PanelLayer/Root
 @onready var _panel: PanelContainer = $PanelLayer/Root/Panel
@@ -67,12 +86,30 @@ func _ready() -> void:
 	_panel.offset_top = panel_top
 	_root.modulate.a = 0.0
 	_root.visible = false
-	if show_once and is_seen():
+	_visual.visible = marker_style == MarkerStyle.SIGNPOST
+	if marker_style == MarkerStyle.FIREFLIES:
+		_add_fireflies()
+	if marker_style != MarkerStyle.SIGNPOST or (show_once and is_seen()):
 		_hint.visible = false
 	else:
 		_start_hint_pulse()
 	_area.body_entered.connect(_on_body_entered)
 	_area.body_exited.connect(_on_body_exited)
+
+
+func _add_fireflies() -> void:
+	var swarm := FIREFLY_SWARM.instantiate() as FireflySwarm
+	swarm.name = "Fireflies"
+	swarm.base_active = firefly_count
+	swarm.brightness = firefly_brightness
+	swarm.wander_center = Vector2(0.0, -firefly_height)
+	swarm.wander_radii = firefly_radii
+	add_child(swarm)
+	swarm.setup(hash(name))
+
+
+func has_fireflies() -> bool:
+	return get_node_or_null("Fireflies") != null
 
 
 func is_seen() -> bool:

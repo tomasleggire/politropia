@@ -34,6 +34,7 @@ func check(ok: bool, label: String) -> void:
 func _run() -> void:
 	await _case_sign()
 	await _case_show_once()
+	await _case_marker_style()
 	await _case_toast()
 
 
@@ -65,11 +66,12 @@ func _wait(seconds: float) -> void:
 	await create_timer(seconds).timeout
 
 
-func _make_sign(show_once: bool) -> TutorialSign:
+func _make_sign(show_once: bool, style := TutorialSign.MarkerStyle.FIREFLIES) -> TutorialSign:
 	var sign_node := SIGN_SCENE.instantiate() as TutorialSign
 	sign_node.title = "Titulo"
 	sign_node.text = "Cuerpo [color=#e0b94f]uno[/color]"
 	sign_node.show_once = show_once
+	sign_node.marker_style = style
 	sign_node.fade_time = 0.1
 	sign_node.position = Vector2(0.0, 0.0)
 	_rig.add_child(sign_node)
@@ -112,6 +114,35 @@ func _case_show_once() -> void:
 	check(not sign_node.is_panel_visible(), "show-once stays hidden afterwards")
 	TutorialSign.reset_seen()
 	check(not sign_node.is_seen(), "reset_seen forgets")
+
+
+func _case_marker_style() -> void:
+	await _build_rig()
+	TutorialSign.reset_seen()
+	var fireflies := _make_sign(false)
+	check(fireflies.marker_style == TutorialSign.MarkerStyle.FIREFLIES, "fireflies are the default marker")
+	var signpost := _make_sign(false, TutorialSign.MarkerStyle.SIGNPOST)
+	var none := _make_sign(false, TutorialSign.MarkerStyle.NONE)
+	await _frames(3)
+	check(fireflies.has_fireflies() and not (fireflies.get_node("Visual") as Node2D).visible, "fireflies marker hides the signpost")
+	check(signpost.get_node("Visual").visible and not signpost.has_fireflies(), "signpost style keeps the signpost")
+	check(not none.get_node("Visual").visible and not none.has_fireflies(), "none style draws nothing")
+	_player.global_position = Vector2(0.0, -10.0)
+	await _frames(4)
+	await _wait(0.25)
+	check(fireflies.is_panel_visible() and none.is_panel_visible(), "panel still shows with every marker style")
+	var library := load("res://scenes/levels/library/zone_1.tscn") as PackedScene
+	var state := library.get_state()
+	var signs := 0
+	for i in state.get_node_count():
+		var instance := state.get_node_instance(i)
+		if instance != null and instance.resource_path.ends_with("tutorial_sign.tscn"):
+			signs += 1
+			var overridden := false
+			for j in state.get_node_property_count(i):
+				overridden = overridden or state.get_node_property_name(i, j) == &"marker_style"
+			check(not overridden, "library sign %s keeps the default fireflies" % state.get_node_name(i))
+	check(signs == 5, "library zone_1 has five signs (%d)" % signs)
 
 
 func _case_toast() -> void:
