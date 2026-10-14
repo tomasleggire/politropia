@@ -1,33 +1,68 @@
 class_name SceneTransitionArea
 extends Area2D
 
-## Área de impacto (hitbox / trigger) para cambiar de escena con fundido a negro (fade in/out).
-## Diseñado para activarse cuando el jugador entra al área, realizando una transición
-## a pantalla completa totalmente por código (500 ms de fade out a negro, cambio de escena,
-## y 500 ms de fade in hacia la nueva escena).
+## Door between two scenes: fades to black, loads the target scene and places
+## Luz at the matching door of that scene, just inside the room and facing in.
 ##
-## Soporta puntos de aparición (SpawnPoint) colocados libremente en cada escena:
-## - 'target_door_id': ID del SpawnPoint al que debe llegar el jugador en la escena destino.
-##   Si se deja en NONE (o no existe SpawnPoint con ese ID en la escena destino),
-##   el jugador aparecerá en la posición por defecto configurada en esa escena en Godot.
-## - 'door_id': ID propio de esta puerta por si se desea usar como destino directo.
+## HOW TO USE (drag and drop):
+## 1. Instance `scenes/world/change_scene_vertical.tscn` (tall strip: a doorway in a
+##    left or right wall) or `change_scene_horizontal.tscn` (wide strip: an opening in
+##    a floor or ceiling) and place it on the exit. Resize its CollisionShape2D to
+##    cover the opening.
+## 2. Set `Target Scene Path` to the room it leads to.
+## 3. Pair the doors: give this door a `Door Id` and set `Target Door Id` to the
+##    `Door Id` of the door you want to arrive at in the target scene. The target
+##    scene must hold that door (another SceneTransitionArea, or a SpawnPoint with
+##    the same id). Both ends of a connection use mirrored ids, e.g.
+##        in zone 2: door_id = ZONE_2_TO_ZONE_3, target_door_id = ZONE_3_TO_ZONE_2
+##        in zone 3: door_id = ZONE_3_TO_ZONE_2, target_door_id = ZONE_2_TO_ZONE_3
+## 4. If Luz lands in the wrong spot, set `Arrival Offset` on the door she arrives
+##    at (the one whose `Door Id` is the target): it moves her relative to that door.
+##
+## A missing target door id is reported with push_warning and Luz then stays at the
+## default position of the target scene. Run tests/door_links_test.gd to check every
+## door of the game.
 
 signal transition_started(target_name: String)
 signal screen_faded_out
 signal screen_faded_in
 
+## How far past the edge of the door's trigger Luz appears when the door is left on
+## automatic arrival, so she does not touch the trigger she just came through.
+const ARRIVAL_CLEARANCE := 40.0
+## How far the arrival spot may be moved up or down to find free ground under it.
+const ARRIVAL_MAX_LIFT := 96.0
+const ARRIVAL_MAX_DROP := 200.0
+const ARRIVAL_STEP := 8.0
+## How far it may slide sideways, toward the inside of the room, when the door opens
+## onto a hole in the floor (the arrival spot is then the ledge beside the hole).
+const ARRIVAL_MAX_SLIDE := 240.0
+## Extra room kept between Luz and the edge of that ledge.
+const ARRIVAL_EDGE_MARGIN := 24.0
+## A doorway in a wall is meant to end at the floor; Luz is placed this far above it.
+const ARRIVAL_FLOOR_INSET := 2.0
+const _DEFAULT_BODY_SIZE := Vector2(29.0, 46.0)
+
 @export_group("Target Scene")
-## Ruta de la escena destino (.tscn) a cargar.
+## Scene (.tscn) this door leads to.
 @export_file("*.tscn") var target_scene_path: String = ""
-## Alternativamente, puedes asignar directamente una PackedScene en este campo.
+## Alternatively, assign the target PackedScene directly.
 @export var target_scene: PackedScene
 
-@export_group("Spawn Target")
-## Identificador de la puerta o SpawnPoint al que se debe llegar en la escena destino.
-## Si se deja en NONE, se utilizará la posición por defecto del Player en la escena destino.
-@export var target_door_id: DoorID.ID = DoorID.ID.NONE
-## Identificador propio de esta puerta en la escena actual (opcional).
+@export_group("Door Pairing")
+## Id of THIS door in its own scene. The door you arrive from in the other scene
+## points its `Target Door Id` at this value. Convention: ZONE_<this>_TO_<neighbour>.
 @export var door_id: DoorID.ID = DoorID.ID.NONE
+## Id of the door (or SpawnPoint) in the TARGET scene where Luz must arrive.
+## Convention: ZONE_<neighbour>_TO_<this>. NONE = she appears at the default
+## position of the target scene.
+@export var target_door_id: DoorID.ID = DoorID.ID.NONE
+
+@export_group("Arrival")
+## Where Luz appears when she ARRIVES through this door, relative to this node.
+## ZERO = automatic: just inside the room (toward where the scene starts), standing on
+## the floor and facing into the room. Set it only when the automatic spot is wrong.
+@export var arrival_offset: Vector2 = Vector2.ZERO
 
 @export_group("Transition Settings")
 ## Duración del fade out a negro y del fade in a la nueva escena (en segundos). 0.5s = 500ms.
@@ -130,44 +165,128 @@ static func _find_player(tree: SceneTree) -> Node2D:
 	return null
 
 
-## Busca la posición de spawn según el target_id en la nueva escena:
-## 1. Prioriza nodos SpawnPoint colocados en la escena.
-## 2. Si no hay SpawnPoint, busca una SceneTransitionArea con ese ID.
-## 3. Si no existe ninguno o target_id es NONE, retorna null (usa posición por defecto de la escena).
-static func _find_spawn_position(tree: SceneTree, target_id: DoorID.ID) -> Variant:
+## Finds the door Luz must arrive at in the current scene: a SpawnPoint wins over a
+## SceneTransitionArea with the same `door_id`. Returns null when `target_id` is NONE
+## or the scene has no such door.
+static func find_door(tree: SceneTree, target_id: DoorID.ID) -> Node2D:
 	if target_id == DoorID.ID.NONE or tree == null:
 		return null
-
-	# 1. Buscar entre los nodos del grupo 'spawn_points'
-	var spawn_nodes := tree.get_nodes_in_group(&"spawn_points")
-	for node in spawn_nodes:
-		if node is SpawnPoint and node.spawn_id == target_id:
-			return node.global_position
-		elif node is Marker2D and node.get("spawn_id") == target_id:
-			return node.global_position
-
-	# Búsqueda recursiva en la escena por si el grupo no sincronizó
-	if tree.current_scene != null:
-		var markers := tree.current_scene.find_children("*", "Marker2D", true, false)
-		for marker in markers:
-			if marker is SpawnPoint and marker.spawn_id == target_id:
-				return marker.global_position
-			elif marker.get("spawn_id") == target_id:
-				return marker.global_position
-
-	# 2. Alternativa: buscar SceneTransitionArea con ese door_id
-	var areas := tree.get_nodes_in_group(&"scene_transition_area")
-	for area in areas:
-		if area is SceneTransitionArea and area.door_id == target_id:
-			return area.global_position
-
-	if tree.current_scene != null:
-		var areas_rec := tree.current_scene.find_children("*", "Area2D", true, false)
-		for area in areas_rec:
-			if area is SceneTransitionArea and area.door_id == target_id:
-				return area.global_position
-
+	for node in tree.get_nodes_in_group(&"spawn_points"):
+		if node is Node2D and node.get("spawn_id") == target_id:
+			return node
+	for node in tree.get_nodes_in_group(&"scene_transition_area"):
+		if node is SceneTransitionArea and node.door_id == target_id:
+			return node
 	return null
+
+
+## Where Luz appears when she arrives through `door`, as {position: Vector2, facing: int,
+## slide: float} (facing 0 = leave it as is; slide = side to search toward, see settle_position). `origin` is the default position of the scene's player,
+## which tells which side of the door is inside the room.
+static func resolve_arrival(door: Node2D, origin: Vector2) -> Dictionary:
+	if not door is SceneTransitionArea:
+		return {"position": door.global_position, "facing": 0, "slide": 0.0}
+	var area := door as SceneTransitionArea
+	var half := area._half_extents()
+	var to_origin := origin - area.global_position
+	var through_wall := half.y >= half.x
+	var inward := Vector2.ZERO
+	if through_wall:
+		inward.x = 1.0 if to_origin.x >= 0.0 else -1.0
+	else:
+		inward.y = 1.0 if to_origin.y >= 0.0 else -1.0
+	var slide := 1.0 if to_origin.x >= 0.0 else -1.0
+	var facing := int(inward.x) if through_wall else int(slide)
+	if area.arrival_offset != Vector2.ZERO:
+		if not is_zero_approx(area.arrival_offset.x):
+			facing = 1 if area.arrival_offset.x > 0.0 else -1
+		return {"position": area.global_position + area.arrival_offset, "facing": facing, "slide": 0.0}
+	var center := area._shape_center()
+	var distance := (half.x if through_wall else half.y) + ARRIVAL_CLEARANCE
+	var spot := center + inward * distance
+	if through_wall:
+		# The bottom of a doorway in a wall is its floor: arrive standing there.
+		spot.y = center.y + half.y - ARRIVAL_FLOOR_INSET
+	return {"position": spot, "facing": facing, "slide": slide}
+
+
+## Finds the standing spot for the body near `wanted`: free of solid geometry and on the
+## floor. It tries the vertical neighbourhood first (up, then down) and, when `slide` is
+## -1 or 1, then slides that way until it finds ground (the ledge beside a hole in the
+## floor). Returns `wanted` unchanged when nothing fits, so Luz falls from there.
+## Needs the physics space to know the scene's colliders (wait two physics frames after
+## the scene loads).
+static func settle_position(body: CharacterBody2D, wanted: Vector2, slide: float = 0.0) -> Vector2:
+	var shape_node := body.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	var shape: Shape2D = RectangleShape2D.new()
+	(shape as RectangleShape2D).size = _DEFAULT_BODY_SIZE
+	var local := Vector2(0.0, -_DEFAULT_BODY_SIZE.y * 0.5)
+	if shape_node != null and shape_node.shape != null:
+		shape = shape_node.shape
+		local = shape_node.position
+	var params := PhysicsShapeQueryParameters2D.new()
+	params.shape = shape
+	params.collision_mask = body.collision_mask
+	params.exclude = [body.get_rid()]
+	var space := body.get_world_2d().direct_space_state
+	var side := signf(slide)
+	var steps := int(ARRIVAL_MAX_SLIDE / ARRIVAL_STEP) if side != 0.0 else 0
+	for i in range(steps + 1):
+		var dx := float(i) * ARRIVAL_STEP * side
+		var spot: Variant = _stand_near(space, params, local, wanted + Vector2(dx, 0.0))
+		if spot == null:
+			continue
+		if i == 0:
+			return spot
+		# Keep clear of the ledge edge: stand a little further along it.
+		var clear: Variant = _stand_near(space, params, local, wanted + Vector2(dx + side * ARRIVAL_EDGE_MARGIN, 0.0))
+		if clear != null and absf((clear as Vector2).y - (spot as Vector2).y) <= ARRIVAL_STEP:
+			return clear
+	return wanted
+
+
+## Free spot with floor under `at`, within the vertical reach of the arrival, or null.
+static func _stand_near(space: PhysicsDirectSpaceState2D, params: PhysicsShapeQueryParameters2D, local: Vector2, at: Vector2) -> Variant:
+	for shift: float in _arrival_shifts():
+		params.motion = Vector2.ZERO
+		params.transform = Transform2D(0.0, at + Vector2(0.0, shift) + local)
+		if not space.intersect_shape(params, 1).is_empty():
+			continue
+		params.motion = Vector2(0.0, ARRIVAL_MAX_DROP)
+		var fractions := space.cast_motion(params)
+		if fractions.size() != 2 or fractions[0] >= 1.0:
+			continue
+		var spot := at + Vector2(0.0, shift + ARRIVAL_MAX_DROP * fractions[0])
+		if spot.y - at.y <= ARRIVAL_MAX_DROP and at.y - spot.y <= ARRIVAL_MAX_LIFT:
+			return spot
+	return null
+
+
+## Vertical shifts to try, in order: none, up to ARRIVAL_MAX_LIFT, then down to ARRIVAL_MAX_DROP.
+static func _arrival_shifts() -> Array[float]:
+	var shifts: Array[float] = [0.0]
+	var up := ARRIVAL_STEP
+	while up <= ARRIVAL_MAX_LIFT:
+		shifts.append(-up)
+		up += ARRIVAL_STEP
+	var down := ARRIVAL_STEP
+	while down <= ARRIVAL_MAX_DROP:
+		shifts.append(down)
+		down += ARRIVAL_STEP
+	return shifts
+
+
+## Half size of this door's trigger in world units.
+func _half_extents() -> Vector2:
+	var shape_node := get_node_or_null("CollisionShape2D") as CollisionShape2D
+	if shape_node != null and shape_node.shape is RectangleShape2D:
+		return (shape_node.shape as RectangleShape2D).size * shape_node.global_scale.abs() * 0.5
+	return Vector2(32.0, 32.0)
+
+
+func _shape_center() -> Vector2:
+	var shape_node := get_node_or_null("CollisionShape2D") as CollisionShape2D
+	return shape_node.global_position if shape_node != null else global_position
 
 
 ## Resetea el suavizado y encuadre de las cámaras para evitar sacudidas al cambiar de coordenadas.
@@ -250,6 +369,14 @@ class ScreenFadeOverlay extends CanvasLayer:
 		add_child(color_rect)
 
 
+	func _place_player(player: Node2D, at: Vector2) -> void:
+		player.global_position = at
+		if player is CharacterBody2D:
+			player.velocity = Vector2.ZERO
+		if player.has_method(&"reset_physics_interpolation"):
+			player.reset_physics_interpolation()
+
+
 	func run_transition() -> void:
 		var tree := get_tree()
 		if tree == null:
@@ -292,23 +419,29 @@ class ScreenFadeOverlay extends CanvasLayer:
 		if new_player != null and should_lock_player:
 			SceneTransitionArea.apply_player_lock(new_player)
 
-		# 2.5 Buscar punto de aparición (SpawnPoint / puerta destino)
-		# Si target_door es NONE o no existe punto con ese ID, el jugador
-		# conserva la posición por defecto con la que se configuró la escena en Godot.
-		var spawn_pos: Variant = SceneTransitionArea._find_spawn_position(tree, target_door)
-		if spawn_pos != null and new_player != null:
-			new_player.global_position = spawn_pos
-			if new_player is CharacterBody2D:
-				new_player.velocity = Vector2.ZERO
-			if new_player.has_method(&"reset_physics_interpolation"):
-				new_player.reset_physics_interpolation()
-			if new_player.has_method(&"set_checkpoint"):
-				new_player.set_checkpoint(spawn_pos)
-			SceneTransitionArea._reset_cameras(new_player)
+		# 2.5 Find the matching door of the target scene. With target_door NONE Luz keeps the
+		# default position of the scene; a missing id is reported instead of failing silently.
+		var door := SceneTransitionArea.find_door(tree, target_door)
+		if target_door != DoorID.ID.NONE and door == null:
+			push_warning("SceneTransitionArea: door '%s' not found in '%s'; Luz stays at the scene start." % [DoorID.get_id_name(target_door), tree.current_scene.scene_file_path])
+		var arrival := {}
+		if door != null and new_player != null:
+			arrival = SceneTransitionArea.resolve_arrival(door, new_player.global_position)
+			_place_player(new_player, arrival.position)
 
-		# Esperar dos frames de física para sincronizar colisiones en negro antes de abrir la vista
+		# Wait two physics frames so the new scene's colliders exist before touching the floor
 		await tree.physics_frame
 		await tree.physics_frame
+
+		if not arrival.is_empty() and new_player is CharacterBody2D:
+			var settled := SceneTransitionArea.settle_position(new_player, arrival.position, arrival.slide)
+			_place_player(new_player, settled)
+			if arrival.facing != 0 and new_player.has_method(&"place_for_transition"):
+				new_player.place_for_transition(settled, arrival.facing)
+			if new_player.has_method(&"set_checkpoint"):
+				new_player.set_checkpoint(settled)
+			SceneTransitionArea._reset_cameras(new_player)
+			await tree.physics_frame
 
 		# Desarmar SOLAMENTE los triggers que realmente solapan con el jugador en su posición de aparición
 		if new_player != null:

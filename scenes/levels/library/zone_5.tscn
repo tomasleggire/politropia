@@ -14323,10 +14323,14 @@ tile_set = SubResource("TileSet_4nc6c")
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("10_rbapt")]
 position = Vector2(-28, 92)
 target_scene_path = "uid://b6qrv51dde5ob"
+target_door_id = 7
+door_id = 8
 
 [node name="SceneTransitionArea2" parent="." unique_id=271792519 instance=ExtResource("10_rbapt")]
 position = Vector2(2007, 444)
 target_scene_path = "uid://dv0i34v7aiwto"
+target_door_id = 22
+door_id = 24
 
 [node name="Area2D" type="Area2D" parent="." unique_id=613879412]
 script = ExtResource("11_expoe")

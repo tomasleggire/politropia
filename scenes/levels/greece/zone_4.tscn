@@ -15220,11 +15220,17 @@ debug_color = Color(1.6364455e-06, 0.6042749, 0.6767223, 0.41960785)
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("22_4dr0a")]
 position = Vector2(891, -23)
 target_scene_path = "uid://drehrd4yly6oj"
+target_door_id = 8
+door_id = 7
 
 [node name="SceneTransitionArea2" parent="." unique_id=949283958 instance=ExtResource("22_4dr0a")]
 position = Vector2(584, 1824)
-target_scene_path = "uid://sa4mtebqbp50"
+target_scene_path = "uid://3nag83g3qfyp"
+target_door_id = 9
+door_id = 10
 
 [node name="SceneTransitionArea3" parent="." unique_id=44791832 instance=ExtResource("23_pmn7b")]
 position = Vector2(1123, 102)
 target_scene_path = "uid://bjruohx06abro"
+target_door_id = 21
+door_id = 23

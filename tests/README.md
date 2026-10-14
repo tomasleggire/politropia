@@ -11,6 +11,10 @@ check names.
 ## Layout
 
 - `stillness_desk_ritual_test.gd`: the single entrypoint (runner and reporter).
+- `door_links_test.gd`: every library and Greece door points at a door that exists in
+  its target scene and leads back, Luz arrives standing on the floor just inside the
+  room (never on a trigger), and a real fade transition, respawn and checkpoint run.
+  Slow (about two minutes): it loads every zone.
 - `greece_layout_test.gd`: Greece layout data, reachability model and physics
   probes (including the medal alcove); helpers in `support/greece_*.gd`.
 - `double_jump_test.gd`: the gated double jump (off by default, air jump count,

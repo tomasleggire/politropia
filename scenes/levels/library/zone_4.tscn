@@ -14368,11 +14368,17 @@ shape = SubResource("RectangleShape2D_wakga")
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("12_gkqv4")]
 position = Vector2(357, 925)
 target_scene_path = "uid://cq3j5o0ey5cvx"
+target_door_id = 5
+door_id = 6
 
 [node name="SceneTransitionArea2" parent="." unique_id=2095922671 instance=ExtResource("13_rh6b6")]
 position = Vector2(-19, 420)
 target_scene_path = "uid://bei32b4g8xot4"
+target_door_id = 21
+door_id = 23
 
 [node name="SceneTransitionArea3" parent="." unique_id=141268669 instance=ExtResource("13_rh6b6")]
 position = Vector2(2206, 172)
 target_scene_path = "uid://bt3m0cf4sgq7r"
+target_door_id = 8
+door_id = 7
