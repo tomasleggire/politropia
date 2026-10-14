@@ -51,6 +51,7 @@ func _run() -> void:
 	await _case_victory_grants_double_jump_once()
 	await _case_reload_keeps_defeat_and_ability()
 	await _case_new_game_forgets()
+	await _case_toast_can_be_turned_off()
 	_case_ability_progress_round_trip()
 	_zone.free()
 	_forget_run()
@@ -113,6 +114,7 @@ func _case_room_contents() -> void:
 	check(_zone.find_children("*", "ZoneAmbience", false, false).size() == 1, "one ZoneAmbience")
 	check(_zone.find_children("*", "ParallaxBackdrop", false, false).size() == 1, "one ParallaxBackdrop")
 	check(_zone.find_children("*", "PointLight2D", true, false).size() <= 8, "at most 8 lights")
+	check(_zone.get_node_or_null("DemoEndToast") is DemoEndToast, "the room holds the demo-end toast")
 	check(_arena.get_state() == BossArena.FightState.ARMED, "the fight starts armed")
 
 
@@ -168,6 +170,10 @@ func _case_victory_grants_double_jump_once() -> void:
 	_forget_run()
 	await _load_zone(true)
 	check(not _player.has_double_jump(), "Luz has no double jump before the fight")
+	var toast := _zone.get_node("DemoEndToast") as DemoEndToast
+	toast.delay = 0.1
+	var shown: Array[int] = []
+	toast.toast_shown.connect(func() -> void: shown.append(1))
 	_place_luz(_arena.global_position)
 	await _wait(0.5)
 	check(_arena.get_state() == BossArena.FightState.ACTIVE, "entering the arena starts the fight")
@@ -178,6 +184,7 @@ func _case_victory_grants_double_jump_once() -> void:
 	check(root.get_node("BossProgress").is_defeated(BOSS_ID), "the defeat is remembered")
 	var reward := _arena.get_reward()
 	check(reward != null, "the double jump pickup appears")
+	check(shown.is_empty(), "the demo-end toast waits for the pickup")
 	if reward == null:
 		return
 	_place_luz(reward.global_position + Vector2(0.0, 28.0))
@@ -186,6 +193,8 @@ func _case_victory_grants_double_jump_once() -> void:
 	check(root.get_node("AbilityProgress").is_unlocked(&"double_jump"), "the run remembers the ability")
 	check(root.get_node("BossProgress").is_reward_claimed(BOSS_ID), "the reward is marked as claimed")
 	check(_zone.find_children("*", "DoubleJumpReward", true, false).is_empty(), "and the pickup is gone")
+	await _wait(0.4)
+	check(shown.size() == 1, "then the demo-end toast shows once (%d)" % shown.size())
 
 
 func _case_reload_keeps_defeat_and_ability() -> void:
@@ -200,6 +209,26 @@ func _case_new_game_forgets() -> void:
 	await _load_zone(false)
 	check(not _player.has_double_jump(), "after a new game Luz starts without the double jump")
 	check(_arena.get_state() == BossArena.FightState.ARMED, "and Artemis waits again")
+
+
+func _case_toast_can_be_turned_off() -> void:
+	_forget_run()
+	await _load_zone(true)
+	var toast := _zone.get_node("DemoEndToast") as DemoEndToast
+	toast.enabled = false
+	toast.delay = 0.1
+	var shown: Array[int] = []
+	toast.toast_shown.connect(func() -> void: shown.append(1))
+	_place_luz(_arena.global_position)
+	await _wait(0.5)
+	_place_luz(_arena.global_position + Vector2(-250.0, 0.0))
+	_kill_boss()
+	await _wait(_arena.defeat_beat + _boss.defeat_time + 0.5)
+	var reward := _arena.get_reward()
+	if reward != null:
+		_place_luz(reward.global_position + Vector2(0.0, 28.0))
+	await _wait(0.6)
+	check(_player.has_double_jump() and shown.is_empty(), "with Enabled off the reward still works and no message shows")
 
 
 func _case_ability_progress_round_trip() -> void:

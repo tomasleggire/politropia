@@ -25,6 +25,7 @@
 [ext_resource type="PackedScene" path="res://scenes/world/pollen_motes.tscn" id="amb_pollen"]
 [ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
 [ext_resource type="Resource" path="res://data/parallax/greece.tres" id="par_style"]
+[ext_resource type="PackedScene" path="res://scenes/world/demo_end_toast.tscn" id="demo_end"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/bosses/artemis_boss_arena.tscn" id="boss_arena"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="door_prefab"]
 
@@ -15192,6 +15193,8 @@ flicker_amount = 0.05
 
 [node name="ArtemisBossArena" parent="." instance=ExtResource("boss_arena")]
 position = Vector2(511, 354)
+
+[node name="DemoEndToast" parent="." instance=ExtResource("demo_end")]
 
 [node name="SceneTransitionArea" parent="." instance=ExtResource("door_prefab")]
 position = Vector2(-12, 268)

@@ -51,4 +51,5 @@ Open `scenes/levels/test/artemis_arena.tscn` (this prefab plus the HUD; platform
 The fight lives in a Greece room built with the zone tiles (floor, walls, ceiling, brick backdrop and banners). Route: `zone_4` -> `zone_healing` (Stillness Desk, the bench before the boss) -> `zone_artemis`. The only entrance is the doorway in the left wall, paired with the healing room's right doorway (`HEALING_TO_ARTEMIS` / `ARTEMIS_TO_HEALING`).
 
 - The prefab sits at the floor line, in the middle of the room. The top row of every surface tile has no collision, so the real floor and walls start one tile (8 px) inside the drawn ones: place the arena on the collision floor.
-- Headless coverage: `tests/artemis_room_test.gd` (room contents, tiles closing the arena, door pairing, one double jump, reload, new game).
+- `DemoEndToast` (`scenes/world/demo_end_toast.tscn`) shows "Fin de la demo / Gracias por jugar" after Luz takes the double jump. Turn `Enabled` off to remove it.
+- Headless coverage: `tests/artemis_room_test.gd` (room contents, tiles closing the arena, door pairing, one double jump, the end toast, reload, new game).
