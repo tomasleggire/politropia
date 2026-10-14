@@ -19,6 +19,7 @@
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="18_0qcfa"]
 [ext_resource type="PackedScene" path="res://scenes/world/atril_libro.tscn" id="19_p3mau"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_vmi51"]
+[ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="21_tnp6q"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="22_ydx24"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
@@ -15157,3 +15158,8 @@ limite_inferior = 400
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=743427131]
 position = Vector2(970.9766, 400.02905)
 shape = SubResource("RectangleShape2D_65vgs")
+
+[node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("21_tnp6q")]
+position = Vector2(700, 268)
+target_scene_path = "uid://crlljgoutm1lu"
+target_door_id = 22
