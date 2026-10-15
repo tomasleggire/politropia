@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/gothic_candle.gd" id="1_candle"]
+[ext_resource type="PackedScene" path="res://scenes/world/candle_light.tscn" id="2_light"]
+
+[node name="GothicCandle" type="Node2D"]
+script = ExtResource("1_candle")
+
+[node name="CandleLight" parent="." instance=ExtResource("2_light")]
+position = Vector2(0, -26)

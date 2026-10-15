@@ -5,7 +5,8 @@ extends RefCounted
 ## Al ser un enum en una clase registrada, Godot lo expone automáticamente como
 ## un menú desplegable (dropdown) en el Inspector, evitando errores de tipeo.
 ##
-## Para añadir nuevas puertas en el futuro, simplemente agrega nuevas entradas a este enum.
+## Para añadir nuevas puertas en el futuro, simplemente agrega nuevas entradas AL FINAL de este enum
+## (las escenas guardan el número, así que no reordenes ni borres entradas existentes).
 
 enum ID {
 	NONE,
@@ -45,8 +46,27 @@ enum ID {
 	DOOR_D,
 	DOOR_E,
 	DOOR_F,
+	## Door of the healing room (the one that leads back to the zone it hangs from).
 	HEALING,
+	## Door of the lectern room (the one that leads back to the zone it hangs from).
 	LECTERN,
+
+	# --- Healing / lectern rooms and Greece zone 5 <-> zone 6 ---
+	ZONE_4_TO_HEALING,
+	ZONE_5_TO_LECTERN,
+	ZONE_5_TO_ZONE_6,
+	ZONE_6_TO_ZONE_5,
+
+	# --- Greece: healing room <-> Artemis room ---
+	HEALING_TO_ARTEMIS,
+	ARTEMIS_TO_HEALING,
+
+	# --- Greece: zone 1 shortcut <-> Artemis room ---
+	ZONE_1_TO_ARTEMIS,
+	ARTEMIS_TO_ZONE_1,
+
+	# --- Demo shortcut (one way): library zone 1 -> Artemis room ---
+	LIBRARY_TO_ARTEMIS_DEMO,
 }
 
 

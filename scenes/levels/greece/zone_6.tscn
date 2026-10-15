@@ -27,6 +27,13 @@
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_6hx0b"]
 [ext_resource type="PackedScene" uid="uid://ctl0cunw2lanc" path="res://scenes/enemies/snake_enemy.tscn" id="24_xuuav"]
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_4.tscn" id="25_jmr35"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
+[ext_resource type="Resource" path="res://data/ambience/greece.tres" id="amb_style"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/pollen_motes.tscn" id="amb_pollen"]
+[ext_resource type="PackedScene" path="res://scenes/world/firefly_swarm.tscn" id="amb_fly"]
+[ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
+[ext_resource type="Resource" path="res://data/parallax/greece.tres" id="par_style"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("6_tc64u")
@@ -15093,6 +15100,9 @@ size = Vector2(2405, 881)
 
 [node name="GreeceZone6" type="Node2D" unique_id=424136144]
 
+[node name="ParallaxBackdrop" parent="." instance=ExtResource("par_back")]
+style = ExtResource("par_style")
+
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(-1261, 3955)
 
@@ -15215,4 +15225,11 @@ shape = SubResource("RectangleShape2D_8w0r3")
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("21_jrq8j")]
 position = Vector2(2464, 716)
 target_scene_path = "uid://drehrd4yly6oj"
-target_door_id = 16
+target_door_id = 25
+door_id = 26
+
+[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+style = ExtResource("amb_style")
+[node name="PollenMotes" parent="." instance=ExtResource("amb_pollen")]
+[node name="Fireflies1" parent="." instance=ExtResource("amb_fly")]
+position = Vector2(2309, 783)

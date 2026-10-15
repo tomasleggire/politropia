@@ -1,38 +1,47 @@
 class_name BossHealthBar
 extends CanvasLayer
 
-## Boss health at the top centre of the screen, inside the safe area: name,
-## bar, a notch where phase two starts, and a title card for the intro. It is
-## driven by calls (a BossArena forwards the boss's `hit` signal), never by
-## polling. A hit drains the bar at once and a lighter "damage chunk" trails
-## behind it. The row of health pips sits top-left and the touch controls at
-## the bottom, so the bar is kept clear of both: its width shrinks on narrow
-## screens before it would reach the pips.
+## Boss health at the bottom centre of the screen, inside the safe area (the
+## Blasphemous placement): name, an ornate gold bar that shares its frame art
+## with Luz's energy bar, a notch where phase two starts, and a title card for
+## the intro. It is driven by calls (a BossArena forwards the boss's `hit`
+## signal), never by polling. A hit drains the bar at once and a lighter
+## "damage chunk" trails behind it. Luz's HUD sits top-left, the pause button
+## top-right, the joystick bottom-left and the action buttons bottom-right, so
+## the bar lives in the free band between the two bottom clusters: its width
+## shrinks on narrow screens before it would reach them.
 
 const BAR_LAYER := 41
 const NO_NOTCH := -1.0
 
 @export_group("Layout")
-@export var bar_size := Vector2(300.0, 12.0)
-@export var top_margin := 16.0
-## Free space kept on each side of the bar (the pips and soul meter live there).
-@export var side_clearance := 90.0
+@export var bar_size := Vector2(280.0, 30.0)
+## Gap between the bar and the bottom edge of the safe area.
+@export var bottom_margin := 18.0
+## Free space kept on each side of the bar (the joystick and buttons live there).
+@export var side_clearance := 150.0
+## Where the fill starts inside the ornate frame, as a fraction of its size.
+@export var inner_margin := Vector2(0.095, 0.3)
 @export var notch_width := 2.0
 
 @export_group("Style")
-@export var back_color := Color(0.05, 0.06, 0.08, 0.85)
-@export var fill_color := Color(0.82, 0.24, 0.22)
-@export var phase_two_color := Color(0.8, 0.9, 1.0)
-@export var chunk_color := Color(0.98, 0.78, 0.45)
-@export var notch_color := Color(1.0, 1.0, 1.0, 0.9)
-@export var text_color := Color(0.96, 0.94, 0.88)
+@export var back_color := Color(0.1, 0.02, 0.04, 1.0)
+@export var fill_color := Color(0.62, 0.07, 0.11)
+@export var phase_two_color := Color(0.92, 0.36, 0.14)
+@export var chunk_color := Color(0.9, 0.55, 0.38)
+@export var shine_color := Color(1.0, 0.7, 0.7, 0.2)
+@export var notch_color := Color(0.96, 0.9, 0.7, 0.9)
+@export var text_color := Color(0.91, 0.85, 0.66)
+@export var title_color := Color(0.95, 0.86, 0.58)
+@export var outline_color := Color(0.02, 0.03, 0.08)
+@export var name_font_size := 13
 
 @export_group("Feedback")
 ## The chunk waits this long, then slides down to the real health.
 @export var chunk_delay := 0.35
 @export var chunk_time := 0.3
 @export var fade_time := 0.25
-@export var title_font_size := 30
+@export var title_font_size := 38
 
 var _max_health := 1
 var _health_ratio := 1.0
@@ -47,9 +56,11 @@ var _title_tween: Tween
 
 @onready var _root: Control = $Root
 @onready var _bar: Control = $Root/Bar
+@onready var _frame: TextureRect = $Root/Bar/Frame
 @onready var _back: ColorRect = $Root/Bar/Back
 @onready var _chunk: ColorRect = $Root/Bar/Chunk
 @onready var _fill: ColorRect = $Root/Bar/Fill
+@onready var _shine: ColorRect = $Root/Bar/Shine
 @onready var _notch: ColorRect = $Root/Bar/Notch
 @onready var _name: Label = $Root/Bar/Name
 @onready var _title: Label = $Root/Title
@@ -60,12 +71,18 @@ func _ready() -> void:
 	_back.color = back_color
 	_chunk.color = chunk_color
 	_notch.color = notch_color
+	_shine.color = shine_color
+	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_name.add_theme_font_size_override(&"font_size", name_font_size)
 	_name.add_theme_color_override(&"font_color", text_color)
-	_name.add_theme_color_override(&"font_outline_color", Color.BLACK)
-	_name.add_theme_constant_override(&"outline_size", 3)
-	_title.add_theme_color_override(&"font_color", text_color)
-	_title.add_theme_color_override(&"font_outline_color", Color.BLACK)
-	_title.add_theme_constant_override(&"outline_size", 6)
+	_name.add_theme_color_override(&"font_outline_color", outline_color)
+	_name.add_theme_constant_override(&"outline_size", 4)
+	_title.add_theme_color_override(&"font_color", title_color)
+	_title.add_theme_color_override(&"font_outline_color", outline_color)
+	_title.add_theme_constant_override(&"outline_size", 8)
+	_title.add_theme_color_override(&"font_shadow_color", Color(0.0, 0.0, 0.0, 0.7))
+	_title.add_theme_constant_override(&"shadow_offset_x", 0)
+	_title.add_theme_constant_override(&"shadow_offset_y", 3)
 	_title.add_theme_font_size_override(&"font_size", title_font_size)
 	_root.visible = false
 	_title.visible = false
@@ -206,8 +223,8 @@ func _place() -> void:
 	var safe := get_safe_rect()
 	var width := clampf(bar_size.x, 0.0, maxf(safe.size.x - 2.0 * side_clearance, 40.0))
 	_bar.size = Vector2(width, bar_size.y)
-	_bar.position = Vector2(safe.position.x + (safe.size.x - width) * 0.5, safe.position.y + top_margin)
-	_name.position = Vector2(0.0, -_name.size.y - 1.0)
+	_bar.position = Vector2(safe.position.x + (safe.size.x - width) * 0.5, safe.end.y - bottom_margin - bar_size.y)
+	_name.position = Vector2(0.0, -_name.size.y - 2.0)
 	_name.size.x = width
 	_title.size = Vector2(safe.size.x, _title.size.y)
 	_title.position = Vector2(safe.position.x, safe.position.y + safe.size.y * 0.3)
@@ -217,13 +234,20 @@ func _place() -> void:
 func _apply() -> void:
 	var width := _bar.size.x
 	var height := _bar.size.y
-	_back.size = Vector2(width, height)
-	_fill.size = Vector2(width * _health_ratio, height)
-	_chunk.size = Vector2(width * maxf(_chunk_ratio, _health_ratio), height)
+	var inner_pos := Vector2(width * inner_margin.x, height * inner_margin.y)
+	var inner := Vector2(width * (1.0 - 2.0 * inner_margin.x), height * (1.0 - 2.0 * inner_margin.y))
+	_frame.size = Vector2(width, height)
+	for part: ColorRect in [_back, _chunk, _fill]:
+		part.position = inner_pos
+	_back.size = inner
+	_fill.size = Vector2(inner.x * _health_ratio, inner.y)
+	_chunk.size = Vector2(inner.x * maxf(_chunk_ratio, _health_ratio), inner.y)
+	_shine.position = inner_pos
+	_shine.size = Vector2(_fill.size.x, inner.y * 0.35)
 	_fill.color = phase_two_color if is_phase_two_tint() else fill_color
 	_notch.visible = _notch_ratio >= 0.0
-	_notch.size = Vector2(notch_width, height + 4.0)
-	_notch.position = Vector2(width * _notch_ratio - notch_width * 0.5, -2.0)
+	_notch.size = Vector2(notch_width, inner.y + 4.0)
+	_notch.position = Vector2(inner_pos.x + inner.x * _notch_ratio - notch_width * 0.5, inner_pos.y - 2.0)
 
 
 func _set_chunk_ratio(value: float) -> void:

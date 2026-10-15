@@ -7,6 +7,9 @@
 [ext_resource type="Texture2D" uid="uid://bml14s7ddhnls" path="res://assets/ui/heart_empty.png" id="3_gss2c"]
 [ext_resource type="Texture2D" uid="uid://dghb8tgyy5sjr" path="res://assets/ui/energy_progress.png" id="4_oj5la"]
 
+[ext_resource type="Texture2D" path="res://assets/world/fragmento_libro.png" id="5_frag"]
+[ext_resource type="Theme" path="res://assets/ui/gothic_theme.tres" id="6_theme"]
+
 [node name="HUD" type="CanvasLayer" unique_id=835378023]
 script = ExtResource("1_8qguk")
 heart_full_texture = ExtResource("2_oj5la")
@@ -56,3 +59,29 @@ stretch_margin_right = 15
 stretch_margin_bottom = 5
 texture_under = ExtResource("3_136eg")
 texture_progress = ExtResource("4_oj5la")
+
+[node name="FragmentCounter" type="HBoxContainer" parent="PlayerUI"]
+layout_mode = 0
+offset_left = 127.0
+offset_top = 92.0
+offset_right = 207.0
+offset_bottom = 118.0
+theme = ExtResource("6_theme")
+theme_override_constants/separation = 4
+
+[node name="Icon" type="TextureRect" parent="PlayerUI/FragmentCounter"]
+texture_filter = 1
+custom_minimum_size = Vector2(26, 26)
+layout_mode = 2
+texture = ExtResource("5_frag")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Count" type="Label" parent="PlayerUI/FragmentCounter"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878, 0.725, 0.31, 1)
+theme_override_constants/outline_size = 3
+theme_override_colors/font_outline_color = Color(0.02, 0.03, 0.08, 1)
+theme_override_font_sizes/font_size = 13
+text = "0/4"
+vertical_alignment = 1

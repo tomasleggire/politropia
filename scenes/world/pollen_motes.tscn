@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="1_dust"]
+
+[node name="PollenMotes" instance=ExtResource("1_dust")]
+motes_per_screen = 7
+mote_color = Color(1, 0.95, 0.75, 0.38)
+mote_size = 1.2
+rise_speed = 0.7
+sway = 10.0

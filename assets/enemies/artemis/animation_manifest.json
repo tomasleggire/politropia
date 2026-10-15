@@ -1,0 +1,427 @@
+{
+  "cell": 256,
+  "feet_row": 224,
+  "sprite_scale": 0.2896,
+  "sheets": {
+    "artemis_locomotion_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "idle": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "walk_fwd": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "events": {}
+    },
+    "artemis_shot_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "shot_draw": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "shot_hold": [
+          5,
+          5
+        ],
+        "shot_release": [
+          6,
+          7
+        ],
+        "shot_recover": [
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "events": {
+        "shot_release": 0
+      }
+    },
+    "artemis_move_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "backstep": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "interrupt_flinch": [
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "dodge": [
+          10,
+          11
+        ]
+      },
+      "events": {}
+    },
+    "artemis_stagger_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "stagger_in": [
+          6,
+          7
+        ],
+        "stagger_loop": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "events": {}
+    },
+    "artemis_vault_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "vault_crouch": [
+          0,
+          1
+        ],
+        "vault_air": [
+          2,
+          3,
+          4,
+          5
+        ],
+        "vault_land": [
+          6,
+          7
+        ]
+      },
+      "events": {}
+    },
+    "artemis_rainfan_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 4,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "rain_draw": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "rain_release": [
+          5,
+          6
+        ],
+        "rain_recover": [
+          7,
+          8,
+          9
+        ],
+        "fan_draw": [
+          10,
+          11,
+          12
+        ],
+        "fan_hold": [
+          13,
+          13
+        ],
+        "fan_release": [
+          14,
+          15
+        ]
+      },
+      "events": {
+        "rain_release": 0,
+        "fan_release": 0
+      }
+    },
+    "artemis_dagger_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "dagger_windup": [
+          0,
+          1,
+          2
+        ],
+        "dagger_slash": [
+          3,
+          4,
+          5
+        ],
+        "dagger_flip": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "dagger_recover": [
+          11,
+          11
+        ]
+      },
+      "events": {}
+    },
+    "artemis_dive_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "dive_leap": [
+          0,
+          1,
+          2
+        ],
+        "dive_fall": [
+          3,
+          4
+        ],
+        "dive_stuck": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "events": {}
+    },
+    "artemis_defeat_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "defeat": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "events": {}
+    },
+    "artemis_feint_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "feint_dash": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "feint_stop": [
+          6,
+          7
+        ],
+        "feint_retreat": [
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "events": {}
+    },
+    "artemis_stagcast_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 4,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "stag_cast": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "stag_summon": [
+          8,
+          9
+        ],
+        "stag_recover": [
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "events": {
+        "stag_summon": 0
+      }
+    },
+    "artemis_trans_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 4,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "phase_transition": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "fan_recover": [
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "events": {
+        "phase_transition": 6
+      }
+    }
+  },
+  "stag": {
+    "sheet": "spectral_stag_sheet.png",
+    "sprite_scale": 0.2,
+    "feet_row": 340,
+    "grid": {
+      "columns": 4,
+      "rows": 3,
+      "cell_width": 384,
+      "cell_height": 384
+    },
+    "clips": {
+      "stag_appear": [
+        0,
+        1,
+        2
+      ],
+      "stag_run": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    }
+  },
+  "vfx": {
+    "sheet": "artemis_vfx_sheet.png",
+    "sprite_scale": 0.25,
+    "floor_row": 496,
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 512,
+      "cell_height": 512
+    },
+    "clips": {
+      "slash": [
+        0,
+        1,
+        2
+      ],
+      "dive_shaft": [
+        3,
+        4
+      ],
+      "dive_shockwave": [
+        5,
+        6,
+        7
+      ]
+    }
+  }
+}

@@ -245,7 +245,15 @@ var current_health: int:
 
 @export_group("Wall")
 @export var wall_ray_length := 16.5
+## Rising faster than this (px/s) counts as "still launching" for the cling
+## rules below. Before the tuning this was the only speed at which a wall grabbed.
 @export var wall_cling_apex_threshold := 60.0
+## Touching a wall in the air while holding toward it grabs it even while still
+## rising (Hollow Knight feel). Off: it only grabs when falling or near the apex.
+@export var wall_cling_while_rising := true
+## Upward speed (px/s) kept when the cling grabs during a rise; anything faster
+## is cut to this, so Luz sticks to the wall instead of sliding up past it.
+@export var wall_cling_max_rise_speed := 100.0
 ## A collider only counts as a clingable wall when its shape is at least this
 ## tall and is not wider than it is tall — filters out horizontal platforms.
 @export var min_wall_height := 80.0
@@ -494,13 +502,14 @@ var _attack_segment_anchored := false
 
 var _soul := 0
 var _focus_left := 0.0
-var _focus_requested := false
+var _focus_tapped := false
 var _focus_vfx: FocusHealVfx
 var _focus_end_animating := false
 
 
 func _ready() -> void:
 	add_to_group(&"player")
+	_restore_saved_abilities()
 	_sprite.sprite_frames = _animation_sprite_frames
 	_sprite.animation_finished.connect(_on_sprite_animation_finished)
 	_sprite.frame_changed.connect(_on_sprite_frame_changed)
@@ -563,6 +572,7 @@ func _physics_process(delta: float) -> void:
 		_update_return(delta)
 		return
 	if is_input_locked():
+		_focus_tapped = false
 		_update_locked(delta)
 		return
 
@@ -571,19 +581,19 @@ func _physics_process(delta: float) -> void:
 	_update_facing()
 	_update_facing_rays()
 
-	_poll_focus_cancel()
-
-	if Input.is_action_just_pressed(&"attack"):
+	var channeling := _state == State.FOCUS
+	if Input.is_action_just_pressed(&"attack") and not channeling:
 		_queue_attack(_held_vertical_direction())
 	if _attack_buffer_left > 0.0 and _can_start_attack():
 		var buffered_direction := _attack_buffer_direction
 		_attack_buffer_left = 0.0
 		_queue_attack(buffered_direction)
 
-	if Input.is_action_just_pressed(&"dash"):
+	if Input.is_action_just_pressed(&"dash") and not channeling:
 		_try_start_dash()
 
 	_try_start_focus()
+	_focus_tapped = false
 
 	var fall_speed_before_move := velocity.y
 
@@ -876,6 +886,8 @@ func _held_vertical_direction() -> int:
 ## on-screen joystick is currently holding, same as the keyboard path.
 ## Called immediately on touch-down by the touch UI (zero added latency).
 func request_attack(direction: int) -> void:
+	if _state == State.FOCUS:
+		return
 	if is_input_locked():
 		_request_rest_exit()
 		return
@@ -909,6 +921,8 @@ func request_attack_upgrade(direction: int) -> void:
 ## (see touch_controls.gd) so the held-release variable jump height keeps
 ## working.
 func request_jump() -> void:
+	if _state == State.FOCUS:
+		return
 	if is_input_locked():
 		_request_rest_exit()
 		return
@@ -920,6 +934,8 @@ func request_jump() -> void:
 ## request_jump above, calling the same start path the keyboard/gamepad
 ## dash uses (ground or air, respects cooldown/state/one-air-dash).
 func request_dash() -> void:
+	if _state == State.FOCUS:
+		return
 	if is_input_locked():
 		_request_rest_exit()
 		return
@@ -1482,6 +1498,14 @@ func has_double_jump() -> bool:
 	return can_double_jump
 
 
+## Abilities earned earlier in the run (AbilityProgress) come back with each new
+## Player, so a change of zone never takes them away. No signal: nothing new unlocks.
+func _restore_saved_abilities() -> void:
+	var progress := get_node_or_null("/root/AbilityProgress")
+	if progress != null and progress.call(&"is_unlocked", &"double_jump"):
+		can_double_jump = true
+
+
 ## -- Dash / slide -------------------------------------------------------------
 
 ## Centralized dash trigger (keyboard/gamepad "dash" just-pressed and the
@@ -1695,13 +1719,19 @@ func _is_holding_toward_wall(direction: int) -> bool:
 func _try_start_wall_cling() -> bool:
 	if _wall_recling_lock > 0.0:
 		return false
-	if velocity.y < -wall_cling_apex_threshold:
+	var rising_fast := velocity.y < -wall_cling_apex_threshold
+	if rising_fast and not wall_cling_while_rising:
+		return false
+	# Right after a kick the wall is still within reach: do not grab it back
+	# until the push-off has played out.
+	if rising_fast and _wall_kick_lock_left > 0.0:
 		return false
 	if not _is_against_climbable_wall():
 		return false
 	if not _is_holding_toward_wall(_facing):
 		return false
 	_wall_direction = _facing
+	velocity.y = maxf(velocity.y, -wall_cling_max_rise_speed)
 	_restore_air_actions()
 	_enter_state(State.WALL_CLING)
 	return true
@@ -2190,47 +2220,38 @@ func is_focusing() -> bool:
 	return _state == State.FOCUS
 
 
-## Touch UI entry point: holding the Focus button means focus, same as the
-## keyboard and gamepad `focus` action.
+## Touch UI entry point: one tap of the Focus button starts a heal, same as one
+## press of the keyboard and gamepad `focus` action. Releasing does nothing.
 func request_focus(pressed: bool) -> void:
-	_focus_requested = pressed
+	if pressed:
+		_focus_tapped = true
 
 
-func _focus_held() -> bool:
-	return _focus_requested or Input.is_action_pressed(&"focus")
+func _focus_pressed() -> bool:
+	return _focus_tapped or Input.is_action_just_pressed(&"focus")
 
 
+## A tap starts the channel; from then on Luz is locked until it completes.
 func _try_start_focus() -> void:
 	if _state != State.IDLE and _state != State.RUN:
 		return
-	if not _focus_held() or not is_focus_available() or not is_on_floor():
+	if not _focus_pressed() or not is_focus_available() or not is_on_floor():
 		return
-	if is_input_locked() or _jump_buffer_left > 0.0 or not is_zero_approx(_horizontal_input()):
-		return
+	_attack_buffer_left = 0.0
+	_jump_buffer_left = 0.0
+	_jump_press_pending = false
 	_enter_state(State.FOCUS)
 
 
-## Acting cancels focus, like Hollow Knight: move, jump, attack or dash.
-func _poll_focus_cancel() -> void:
-	if _state != State.FOCUS:
-		return
-	var acted := (
-		_jump_pressed_now
-		or Input.is_action_just_pressed(&"attack")
-		or Input.is_action_just_pressed(&"dash")
-		or not is_zero_approx(_horizontal_input())
-	)
-	if acted:
-		_enter_state(State.IDLE)
-
-
+## The channel ignores move, jump, attack and dash. Only damage (hurt flow) or
+## leaving the floor interrupts it.
 func _update_focus(delta: float) -> void:
 	velocity = Vector2.ZERO
+	_attack_buffer_left = 0.0
+	_jump_buffer_left = 0.0
+	_jump_press_pending = false
 	if not is_on_floor():
 		_enter_state(State.FALL)
-		return
-	if not _focus_held() or not is_focus_available():
-		_enter_state(State.IDLE)
 		return
 	_focus_left -= delta
 	_update_focus_glow()
@@ -2241,18 +2262,11 @@ func _update_focus(delta: float) -> void:
 func _complete_focus() -> void:
 	_set_soul(_soul - focus_cost)
 	heal(1)
-	if _focus_held() and is_focus_available():
-		_focus_left = focus_time
-		_state_time = 0.0
-		_play_focus_animation(&"heal_loop")
-		if _focus_vfx != null:
-			_focus_vfx.complete_channel()
-	else:
-		_focus_end_animating = true
-		_play_focus_animation(&"heal_end")
-		_enter_state(State.IDLE)
-		if _focus_vfx != null:
-			_focus_vfx.complete_channel()
+	_focus_end_animating = true
+	_play_focus_animation(&"heal_end")
+	_enter_state(State.IDLE)
+	if _focus_vfx != null:
+		_focus_vfx.complete_channel()
 
 
 func _begin_focus() -> void:

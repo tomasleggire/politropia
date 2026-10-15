@@ -12,6 +12,10 @@
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro.tscn" id="8_vrfrn"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="11_cne4m"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="12_a30ts"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
+[ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fcwr3"]
 texture = ExtResource("2_vrfrn")
@@ -14236,6 +14240,8 @@ size = Vector2(1043, 1445)
 
 [node name="LibraryZone3" type="Node2D" unique_id=424136144]
 
+[node name="ParallaxBackdrop" parent="." instance=ExtResource("par_back")]
+
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(2, 683)
 
@@ -14340,10 +14346,14 @@ tile_set = SubResource("TileSet_4nc6c")
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("11_cne4m")]
 position = Vector2(505, -22)
 target_scene_path = "uid://b6qrv51dde5ob"
+target_door_id = 6
+door_id = 5
 
 [node name="SceneTransitionArea2" parent="." unique_id=2015933086 instance=ExtResource("11_cne4m")]
 position = Vector2(548, 1482)
 target_scene_path = "uid://6p2if0b5nylt"
+target_door_id = 3
+door_id = 4
 
 [node name="Area2D" type="Area2D" parent="." unique_id=1428454548]
 script = ExtResource("12_a30ts")
@@ -14354,3 +14364,20 @@ limite_inferior = 1448
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=120011534]
 position = Vector2(521.5, 725.5)
 shape = SubResource("RectangleShape2D_vrudw")
+
+[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+[node name="DustMotes" parent="." instance=ExtResource("amb_dust")]
+[node name="LanternLight1" parent="." instance=ExtResource("amb_light")]
+position = Vector2(929, 542)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 0.0
+[node name="LanternLight2" parent="." instance=ExtResource("amb_light")]
+position = Vector2(228, 937)
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 2.3

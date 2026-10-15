@@ -27,6 +27,13 @@
 [ext_resource type="PackedScene" uid="uid://df7x5n262u3v1" path="res://scenes/enemies/lancet_enemy.tscn" id="23_3ceah"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_kvk6j"]
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro.tscn" id="25_e0xpp"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
+[ext_resource type="Resource" path="res://data/ambience/greece.tres" id="amb_style"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/pollen_motes.tscn" id="amb_pollen"]
+[ext_resource type="PackedScene" path="res://scenes/world/firefly_swarm.tscn" id="amb_fly"]
+[ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
+[ext_resource type="Resource" path="res://data/parallax/greece.tres" id="par_style"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_rvh4a"]
 texture = ExtResource("7_7eh3s")
@@ -15066,6 +15073,9 @@ size = Vector2(2613, 1320)
 [node name="GreeceZone2" type="Node2D" unique_id=424136144]
 metadata/_edit_horizontal_guides_ = [361.0]
 
+[node name="ParallaxBackdrop" parent="." instance=ExtResource("par_back")]
+style = ExtResource("par_style")
+
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(-2218, 966)
 
@@ -15154,6 +15164,8 @@ tile_set = SubResource("TileSet_7wplu")
 [node name="SceneTransitionArea" parent="TilemapLayers/Ground" unique_id=1518630621 instance=ExtResource("21_e2d28")]
 position = Vector2(2124, -864)
 target_scene_path = "uid://hlgyax3hjqhs"
+target_door_id = 1
+door_id = 2
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("24_kvk6j")]
 position = Vector2(-20, 131)
@@ -15213,3 +15225,9 @@ position = Vector2(2542, 743)
 target_scene_path = "uid://sa4mtebqbp50"
 target_door_id = 4
 door_id = 3
+
+[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+style = ExtResource("amb_style")
+[node name="PollenMotes" parent="." instance=ExtResource("amb_pollen")]
+[node name="Fireflies1" parent="." instance=ExtResource("amb_fly")]
+position = Vector2(1161, 72)

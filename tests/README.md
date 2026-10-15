@@ -11,6 +11,18 @@ check names.
 ## Layout
 
 - `stillness_desk_ritual_test.gd`: the single entrypoint (runner and reporter).
+- `door_links_test.gd`: every library and Greece door points at a door that exists in
+  its target scene and leads back, Luz arrives standing on the floor just inside the
+  room (never on a trigger), and a real fade transition, respawn and checkpoint run.
+  Slow (about two minutes): it loads every zone.
+- `artemis_room_test.gd`: the real Artemis room (greece/zone_artemis): arena and boss
+  present, tiles close the arena, the door pairs with the healing room, beating Artemis
+  grants the double jump once, and a reload or a zone change keeps it
+  (`AbilityProgress`). About ten seconds.
+- `ambience_test.gd`: every library and Greece zone has one `ZoneAmbience` and one
+  `ParallaxBackdrop`, the tint never reaches the HUD layers, a zone holds at most
+  8 lights, and the far parallax layer covers the view at the corners of the camera
+  area for a 640x360 and an 800x500 view. Slow (about three minutes).
 - `greece_layout_test.gd`: Greece layout data, reachability model and physics
   probes (including the medal alcove); helpers in `support/greece_*.gd`.
 - `double_jump_test.gd`: the gated double jump (off by default, air jump count,

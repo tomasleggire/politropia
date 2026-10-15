@@ -23,6 +23,13 @@
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_de354"]
 [ext_resource type="PackedScene" uid="uid://ctl0cunw2lanc" path="res://scenes/enemies/snake_enemy.tscn" id="23_pmixq"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_tolj8"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
+[ext_resource type="Resource" path="res://data/ambience/greece.tres" id="amb_style"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/pollen_motes.tscn" id="amb_pollen"]
+[ext_resource type="PackedScene" path="res://scenes/world/firefly_swarm.tscn" id="amb_fly"]
+[ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
+[ext_resource type="Resource" path="res://data/parallax/greece.tres" id="par_style"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("6_w5tkt")
@@ -15089,6 +15096,9 @@ size = Vector2(2413, 625)
 
 [node name="Zone5" type="Node2D" unique_id=424136144]
 
+[node name="ParallaxBackdrop" parent="." instance=ExtResource("par_back")]
+style = ExtResource("par_style")
+
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(-3693, 3949)
 
@@ -15102,12 +15112,14 @@ texture = ExtResource("5_f1j3f")
 [node name="SceneTransitionArea" parent="TilemapLayers/Background" unique_id=1518630621 instance=ExtResource("2_kdxh3")]
 position = Vector2(3890, -3078)
 target_scene_path = "uid://crlljgoutm1lu"
-target_door_id = 15
+target_door_id = 7
+door_id = 8
 
 [node name="SceneTransitionArea2" parent="TilemapLayers/Background" unique_id=1678416142 instance=ExtResource("3_njreu")]
 position = Vector2(3636, -3239)
 target_scene_path = "uid://4qdhshe8hq63"
-door_id = 16
+target_door_id = 26
+door_id = 25
 
 [node name="Ground" type="TileMapLayer" parent="TilemapLayers" unique_id=606604179]
 modulate = Color(0.90359825, 0.90359825, 0.903598, 1)
@@ -15189,3 +15201,9 @@ shape = SubResource("RectangleShape2D_8w0r3")
 position = Vector2(1018, 733)
 start_facing = 1
 max_health = 2
+
+[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+style = ExtResource("amb_style")
+[node name="PollenMotes" parent="." instance=ExtResource("amb_pollen")]
+[node name="Fireflies1" parent="." instance=ExtResource("amb_fly")]
+position = Vector2(405, 778)

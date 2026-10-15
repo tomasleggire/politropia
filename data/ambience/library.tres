@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AmbienceStyle" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/ambience_style.gd" id="1_style"]
+
+[resource]
+script = ExtResource("1_style")
+tint_color = Color(1, 0.9, 0.76, 1)
+vignette_color = Color(0.03, 0.015, 0, 1)
+vignette_strength = 0.5
+luz_light_color = Color(1, 0.82, 0.58, 1)
+luz_light_energy = 0.3
+luz_light_radius = 110.0

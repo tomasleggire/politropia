@@ -1,0 +1,95 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="1_script"]
+[ext_resource type="Theme" path="res://assets/ui/gothic_theme.tres" id="2_theme"]
+
+[node name="PauseMenu" type="CanvasLayer"]
+process_mode = 3
+layer = 110
+script = ExtResource("1_script")
+
+[node name="PauseButton" type="Button" parent="."]
+custom_minimum_size = Vector2(36, 32)
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -46.0
+offset_top = 8.0
+offset_right = -10.0
+offset_bottom = 40.0
+grow_horizontal = 0
+focus_mode = 0
+theme = ExtResource("2_theme")
+theme_override_font_sizes/font_size = 13
+text = "II"
+
+[node name="Menu" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+
+[node name="Dim" type="ColorRect" parent="Menu"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.01, 0.02, 0.05, 0.72)
+
+[node name="Center" type="CenterContainer" parent="Menu"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="Menu/Center"]
+custom_minimum_size = Vector2(190, 0)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="Menu/Center/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="Box" type="VBoxContainer" parent="Menu/Center/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="Title" type="Label" parent="Menu/Center/Panel/Margin/Box"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878, 0.725, 0.31, 1)
+theme_override_font_sizes/font_size = 17
+text = "Pausa"
+horizontal_alignment = 1
+
+[node name="Rule" type="HSeparator" parent="Menu/Center/Panel/Margin/Box"]
+layout_mode = 2
+
+[node name="Resume" type="Button" parent="Menu/Center/Panel/Margin/Box"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Reanudar"
+
+[node name="Map" type="Button" parent="Menu/Center/Panel/Margin/Box"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+disabled = true
+text = "Mapa"
+
+[node name="Quit" type="Button" parent="Menu/Center/Panel/Margin/Box"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Menú principal"

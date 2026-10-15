@@ -21,6 +21,7 @@ blend_mode = 1
 [node name="FragmentoLibro" type="Node2D"]
 z_index = 2
 script = ExtResource("2_script")
+fragment_id = 3
 
 [node name="Glow" type="Sprite2D" parent="."]
 position = Vector2(0, -12.5)

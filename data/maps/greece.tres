@@ -1,0 +1,75 @@
+[gd_resource type="Resource" script_class="MapLayout" format=3]
+
+[ext_resource type="Script" path="res://scripts/world/map_layout.gd" id="1_layout"]
+[ext_resource type="Script" path="res://scripts/world/map_room.gd" id="2_room"]
+
+[sub_resource type="Resource" id="Room_1"]
+script = ExtResource("2_room")
+scene_path = "res://scenes/levels/greece/zone_1.tscn"
+display_name = "Ágora"
+map_rect = Rect2(0, 0, 22, 13)
+connects_to = Array[String](["res://scenes/levels/greece/zone_2.tscn", "res://scenes/levels/greece/zone_artemis.tscn"])
+
+[sub_resource type="Resource" id="Room_2"]
+script = ExtResource("2_room")
+scene_path = "res://scenes/levels/greece/zone_2.tscn"
+display_name = "Camino de columnas"
+map_rect = Rect2(24, 0, 51, 18)
+connects_to = Array[String](["res://scenes/levels/greece/zone_1.tscn", "res://scenes/levels/greece/zone_3.tscn", "res://scenes/levels/greece/zone_4.tscn"])
+
+[sub_resource type="Resource" id="Room_3"]
+script = ExtResource("2_room")
+scene_path = "res://scenes/levels/greece/zone_3.tscn"
+display_name = "Mirador"
+map_rect = Rect2(77, 6, 12, 6)
+connects_to = Array[String](["res://scenes/levels/greece/zone_2.tscn"])
+
+[sub_resource type="Resource" id="Room_4"]
+script = ExtResource("2_room")
+scene_path = "res://scenes/levels/greece/zone_4.tscn"
+display_name = "Gran ascenso"
+map_rect = Rect2(30, -46, 41, 43)
+connects_to = Array[String](["res://scenes/levels/greece/zone_2.tscn", "res://scenes/levels/greece/zone_5.tscn", "res://scenes/levels/greece/zone_healing.tscn", "res://scenes/levels/greece/zone_lectern.tscn"])
+
+[sub_resource type="Resource" id="Room_5"]
+script = ExtResource("2_room")
+scene_path = "res://scenes/levels/greece/zone_5.tscn"
+display_name = "Terraza"
+map_rect = Rect2(73, -44, 26, 10)
+connects_to = Array[String](["res://scenes/levels/greece/zone_4.tscn", "res://scenes/levels/greece/zone_6.tscn"])
+
+[sub_resource type="Resource" id="Room_6"]
+script = ExtResource("2_room")
+scene_path = "res://scenes/levels/greece/zone_6.tscn"
+display_name = "Templo"
+map_rect = Rect2(101, -44, 39, 43)
+connects_to = Array[String](["res://scenes/levels/greece/zone_5.tscn"])
+
+[sub_resource type="Resource" id="Room_7"]
+script = ExtResource("2_room")
+scene_path = "res://scenes/levels/greece/zone_healing.tscn"
+display_name = "Sanación"
+map_rect = Rect2(73, -30, 10, 8)
+landmark = 2
+connects_to = Array[String](["res://scenes/levels/greece/zone_4.tscn", "res://scenes/levels/greece/zone_artemis.tscn"])
+
+[sub_resource type="Resource" id="Room_8"]
+script = ExtResource("2_room")
+scene_path = "res://scenes/levels/greece/zone_artemis.tscn"
+display_name = "Sala de Artemisa"
+map_rect = Rect2(85, -30, 13, 8)
+landmark = 1
+connects_to = Array[String](["res://scenes/levels/greece/zone_healing.tscn", "res://scenes/levels/greece/zone_1.tscn"])
+
+[sub_resource type="Resource" id="Room_9"]
+script = ExtResource("2_room")
+scene_path = "res://scenes/levels/greece/zone_lectern.tscn"
+display_name = "Atril"
+map_rect = Rect2(17, -22, 11, 7)
+landmark = 3
+connects_to = Array[String](["res://scenes/levels/greece/zone_4.tscn"])
+
+[resource]
+script = ExtResource("1_layout")
+level_name = "Grecia"
+rooms = Array[ExtResource("2_room")]([SubResource("Room_1"), SubResource("Room_2"), SubResource("Room_3"), SubResource("Room_4"), SubResource("Room_5"), SubResource("Room_6"), SubResource("Room_7"), SubResource("Room_8"), SubResource("Room_9")])

@@ -1,0 +1,38 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/parallax_backdrop.gd" id="1_script"]
+[ext_resource type="Shader" path="res://shaders/fog_band.gdshader" id="2_fog"]
+[ext_resource type="Resource" path="res://data/parallax/library.tres" id="3_style"]
+
+[sub_resource type="ShaderMaterial" id="FogMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("2_fog")
+
+[sub_resource type="ShaderMaterial" id="HazeMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("2_fog")
+
+[node name="ParallaxBackdrop" type="Node2D"]
+z_index = -20
+script = ExtResource("1_script")
+style = ExtResource("3_style")
+
+[node name="Far" type="Parallax2D" parent="."]
+
+[node name="Image" type="Sprite2D" parent="Far"]
+
+[node name="Mid" type="Parallax2D" parent="."]
+
+[node name="Fog" type="Parallax2D" parent="."]
+
+[node name="Band" type="Sprite2D" parent="Fog"]
+material = SubResource("FogMaterial")
+texture_filter = 2
+
+[node name="Haze" type="Parallax2D" parent="."]
+z_index = 48
+z_as_relative = false
+
+[node name="Band" type="Sprite2D" parent="Haze"]
+material = SubResource("HazeMaterial")
+texture_filter = 2

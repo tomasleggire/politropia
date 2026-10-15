@@ -1,0 +1,54 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/soul_cache.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/art/greece/chest.png" id="2_chest"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="3_light"]
+
+[sub_resource type="Gradient" id="GlowGradient"]
+offsets = PackedFloat32Array(0, 0.48, 1)
+colors = PackedColorArray(1, 0.82, 0.48, 0.62, 1, 0.72, 0.3, 0.35, 1, 0.55, 0.18, 0)
+
+[sub_resource type="GradientTexture2D" id="GlowTexture"]
+gradient = SubResource("GlowGradient")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="CanvasItemMaterial" id="GlowAdditive"]
+blend_mode = 1
+
+[sub_resource type="CircleShape2D" id="PickupShape"]
+radius = 26.0
+
+[node name="SoulCache" type="Area2D"]
+z_index = -1
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_script")
+
+[node name="Glow" type="Sprite2D" parent="."]
+position = Vector2(0, -12)
+z_index = 1
+scale = Vector2(0.7, 0.7)
+texture_filter = 2
+material = SubResource("GlowAdditive")
+texture = SubResource("GlowTexture")
+modulate = Color(1, 0.78, 0.42, 0.34)
+
+[node name="Chest" type="Sprite2D" parent="."]
+position = Vector2(0, -13)
+scale = Vector2(0.22, 0.22)
+texture_filter = 1
+texture = ExtResource("2_chest")
+
+[node name="Light" parent="." instance=ExtResource("3_light")]
+position = Vector2(0, -14)
+light_color = Color(1, 0.74, 0.42, 1)
+base_energy = 0.8
+radius = 70.0
+
+[node name="Pickup" type="CollisionShape2D" parent="."]
+position = Vector2(0, -12)
+shape = SubResource("PickupShape")

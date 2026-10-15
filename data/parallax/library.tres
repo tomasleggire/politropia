@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ParallaxStyle" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/parallax_style.gd" id="1_style"]
+[ext_resource type="Texture2D" path="res://assets/art/library/shelves_platform.png" id="2_shelf"]
+[ext_resource type="Texture2D" path="res://assets/art/library/Walls/window_library.png" id="3_window"]
+[ext_resource type="Texture2D" path="res://assets/art/library/Backgrounds/background1.png" id="4_bg"]
+
+[resource]
+script = ExtResource("1_style")
+far_default_texture = ExtResource("4_bg")
+far_tint = Color(0.96, 0.92, 0.88, 1)
+far_scroll_scale = Vector2(0.75, 0.8)
+mid_textures = Array[Texture2D]([ExtResource("2_shelf"), ExtResource("3_window"), ExtResource("2_shelf")])
+mid_tint = Color(0.07, 0.045, 0.04, 0.55)
+mid_scroll_scale = Vector2(0.72, 0.78)
+mid_spacing = 520.0
+mid_scale_range = Vector2(2.0, 2.0)
+fog_color = Color(0.9, 0.62, 0.34, 0.2)
+fog_screen_y = 0.74
+haze_color = Color(0.06, 0.035, 0.02, 0.2)
