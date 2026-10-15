@@ -228,6 +228,18 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
   - Still on fallback: `fan_recover`, `feint_*`, `stag_*`, `phase_transition`, the phase 2 skin, the spectral stag art, and the telegraph and impact VFX.
   - Tests: `artemis_room` 49/49 and `door_links` 371/371 (the parent re-ran both). The `stillness_desk_ritual` runner failures are identical on `29d93c9`.
   - Pushed: `62848a8` before the demo, and the iPhone runs `62848a8`.
+- [x] D19 Artemis full art batch 2 (6 Codex runs)
+  - Commit `625d539`: feint.
+  - Commit `c306a08`: stag cast, summon and recover, plus the translucent SpectralStag sprite.
+  - Commit `9ec8160`: `phase_transition` and `fan_recover`, plus the phase 2 silver skin shader.
+  - Commit `4781e3f`: the dagger slash and dive shaft/shockwave VFX.
+  - Not done: `intro` (no hook), `stag_vanish`, arrow impact art.
+  - Known nits:
+    - The stag is more painterly and wider than its hitbox.
+    - The gallop has no bob.
+    - The dive shaft overlaps the sprite.
+  - Tests: `artemis_room` 49/49 and `door_links` 371/371.
+  - Parent's boss runner check (`stillness_desk_ritual_test`): the failing cases are a subset of the base list, so there is no new failure. It stalls as on the base.
 - [ ] D12 iPhone deploy and user playtest; fixes from feedback (route: inline/delegated)
 
 ## Progress
