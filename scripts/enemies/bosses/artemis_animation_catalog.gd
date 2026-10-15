@@ -59,11 +59,14 @@ const CLIP_SPEEDS := {
 	"stag_recover": 10.0,
 	"stag_appear": 20.0,
 	"stag_run": 12.0,
+	"slash": 25.0,
+	"dive_shaft": 12.0,
+	"dive_shockwave": 12.0,
 }
 
 ## Clips that repeat while their state lasts; every other clip plays once and
 ## holds its last frame.
-const LOOPING_CLIPS := ["idle", "walk_fwd", "walk_back", "stagger_loop", "dive_fall", "feint_dash", "stag_run"]
+const LOOPING_CLIPS := ["idle", "walk_fwd", "walk_back", "stagger_loop", "dive_fall", "feint_dash", "stag_run", "dive_shaft"]
 
 ## Clips built by playing another clip's frames backwards (no extra art): she
 ## retreats while facing Luz.
@@ -110,6 +113,11 @@ static func build_sprite_frames() -> SpriteFrames:
 ## cell size and sprite scale). Empty when the manifest or the sheet is missing.
 static func build_stag_frames() -> SpriteFrames:
 	return _build_single_sheet("stag")
+
+
+## The combat VFX (manifest key "vfx"): slash, dive_shaft and dive_shockwave.
+static func build_vfx_frames() -> SpriteFrames:
+	return _build_single_sheet("vfx")
 
 
 static func _build_single_sheet(key: String) -> SpriteFrames:

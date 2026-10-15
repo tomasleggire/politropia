@@ -396,5 +396,32 @@
         10
       ]
     }
+  },
+  "vfx": {
+    "sheet": "artemis_vfx_sheet.png",
+    "sprite_scale": 0.25,
+    "floor_row": 496,
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 512,
+      "cell_height": 512
+    },
+    "clips": {
+      "slash": [
+        0,
+        1,
+        2
+      ],
+      "dive_shaft": [
+        3,
+        4
+      ],
+      "dive_shockwave": [
+        5,
+        6,
+        7
+      ]
+    }
   }
 }

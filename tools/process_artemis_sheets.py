@@ -345,6 +345,65 @@ def build_stag() -> dict:
     }
 
 
+# Combat VFX (dagger slash arc, moon dive shaft and shockwave): one sheet, one sprite
+# scale. Each group is sized on screen from its reference frame ("w" = bbox width,
+# "h" = bbox height, in game px) and anchored on the cell bottom ("floor") or centre.
+VFX_RAW = "artemis_vfx_raw.png"
+VFX_CELL = 512
+VFX_FLOOR_ROW = 496
+VFX_SPRITE_SCALE = 0.25
+VFX_GRID = (4, 3)
+VFX_GROUPS = {
+    "slash": {"cells": [0, 1, 2], "ref": 1, "axis": "w", "size": 56.0, "anchor": "center"},
+    "dive_shaft": {"cells": [4, 5], "ref": 5, "axis": "h", "size": 96.0, "anchor": "floor"},
+    "dive_shockwave": {"cells": [8, 9, 10], "ref": 9, "axis": "w", "size": 120.0, "anchor": "floor"},
+}
+
+
+def vfx_cell(frame: np.ndarray, scale: float, anchor: str) -> Image.Image:
+    premult = frame.copy()
+    premult[..., :3] *= premult[..., 3:4] / 255.0
+    img = Image.fromarray(premult.astype(np.uint8), "RGBA")
+    img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
+    arr = np.asarray(img).astype(np.float32)
+    a = arr[..., 3:4]
+    arr[..., :3] = np.where(a > 0, np.minimum(arr[..., :3] * 255.0 / np.maximum(a, 1.0), 255.0), 0)
+    out = Image.fromarray(arr.astype(np.uint8), "RGBA")
+    cell = Image.new("RGBA", (VFX_CELL, VFX_CELL), (0, 0, 0, 0))
+    left = (VFX_CELL - out.width) // 2
+    top = (VFX_CELL - out.height) // 2 if anchor == "center" else VFX_FLOOR_ROW - out.height
+    cell.alpha_composite(out, (left, max(top, 0)))
+    return cell
+
+
+def build_vfx() -> dict:
+    cols, rows = VFX_GRID
+    needed = {i for group in VFX_GROUPS.values() for i in group["cells"]}
+    frames = split_frames(key_magenta(Image.open(RAW_DIR / VFX_RAW)), cols, rows, "vfx", needed)
+    cells: list[Image.Image] = []
+    clips: dict[str, list[int]] = {}
+    for name, group in VFX_GROUPS.items():
+        ref = frames[group["ref"]]
+        measure = ref.shape[1] if group["axis"] == "w" else ref.shape[0]
+        scale = (group["size"] / VFX_SPRITE_SCALE) / measure
+        clips[name] = []
+        for src in group["cells"]:
+            clips[name].append(len(cells))
+            cells.append(vfx_cell(frames[src], scale, group["anchor"]))
+    rows_out = (len(cells) + COLUMNS - 1) // COLUMNS
+    sheet = Image.new("RGBA", (COLUMNS * VFX_CELL, rows_out * VFX_CELL), (0, 0, 0, 0))
+    for index, cell in enumerate(cells):
+        sheet.alpha_composite(cell, ((index % COLUMNS) * VFX_CELL, (index // COLUMNS) * VFX_CELL))
+    sheet.save(OUT_DIR / "artemis_vfx_sheet.png", optimize=True)
+    return {
+        "sheet": "artemis_vfx_sheet.png",
+        "sprite_scale": VFX_SPRITE_SCALE,
+        "floor_row": VFX_FLOOR_ROW,
+        "grid": {"columns": COLUMNS, "rows": rows_out, "cell_width": VFX_CELL, "cell_height": VFX_CELL},
+        "clips": clips,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview", type=Path, default=None)
@@ -398,6 +457,8 @@ def main() -> None:
     build_arrows()
     if (RAW_DIR / STAG_RAW).exists():
         manifest["stag"] = build_stag()
+    if (RAW_DIR / VFX_RAW).exists():
+        manifest["vfx"] = build_vfx()
     (OUT_DIR / "animation_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print("wrote", OUT_DIR)
 

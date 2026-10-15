@@ -92,6 +92,8 @@ const WALL_MARGIN := 4.0
 const TRANSITION_PULSE_RATE := 10.0
 ## Share of the transition left when the silver skin replaces the phase-one one.
 const TRANSITION_SKIN_SWAP := 0.5
+## Landing dust and shockwave never outlast 0.3 s (docs/bosses/ARTEMIS_ANIMATIONS.md, section 4).
+const SHOCKWAVE_TIME := 0.3
 const MOONLIT_SHADER := preload("res://shaders/artemis_moonlit.gdshader")
 const CROUCH_SCALE := 0.8
 ## Artemis's sprite scale: the same on-screen pixel size as Luz (tools/process_artemis_sheets.py).
@@ -358,6 +360,9 @@ const CUE_DEFEAT := &"Defeat"
 @onready var _bow: Node2D = $Visual/Bow
 @onready var _sfx: Node = $Sfx
 ## The final art (null in a scene without it: the rest of the boss keeps working).
+@onready var _slash_art: AnimatedSprite2D = get_node_or_null("DaggerHitbox/SlashArt") as AnimatedSprite2D
+@onready var _impact_art: AnimatedSprite2D = get_node_or_null("DiveHitbox/ImpactArt") as AnimatedSprite2D
+@onready var _shockwave_art: AnimatedSprite2D = get_node_or_null("ShockwaveArt") as AnimatedSprite2D
 @onready var _sprite: AnimatedSprite2D = get_node_or_null("Visual/AnimatedSprite2D") as AnimatedSprite2D
 @onready var _flash_layer: ScreenFlash = $FinalFlash
 
@@ -687,6 +692,8 @@ func _reset_ai() -> void:
 	var was_phase_two := _phase == PHASE_TWO
 	_phase = PHASE_ONE
 	_set_skin(PHASE_ONE)
+	if _shockwave_art != null:
+		_shockwave_art.hide()
 	_defeat_left = 0.0
 	_play_defeat = false
 	_rain_impact_left = 0.0
@@ -779,6 +786,7 @@ func _setup_sprite() -> void:
 	if _sprite == null:
 		return
 	_sprite.sprite_frames = ArtemisAnimationCatalog.build_sprite_frames()
+	_setup_vfx()
 	_clip = &""
 	_sync_sprite()
 
@@ -805,6 +813,35 @@ func _play(clip: StringName, duration := 0.0) -> void:
 		# A corpse restored from an earlier run: the last frame at once.
 		_sprite.pause()
 		_sprite.frame = count - 1
+
+
+## Slash arc, dive shaft and landing shockwave. Each effect falls back to its polygon
+## (`Slash`, `Impact`) when the art is missing.
+func _setup_vfx() -> void:
+	var frames := ArtemisAnimationCatalog.build_vfx_frames()
+	for art: AnimatedSprite2D in [_slash_art, _impact_art, _shockwave_art]:
+		if art != null:
+			art.sprite_frames = frames
+	if _shockwave_art != null:
+		_shockwave_art.animation_finished.connect(_shockwave_art.hide)
+
+
+func _has_vfx(art: AnimatedSprite2D, clip: StringName) -> bool:
+	return art != null and art.sprite_frames != null and art.sprite_frames.has_animation(clip)
+
+
+## Shows `art` playing `clip`, stretched to last `duration` (0 = default speed); hides it
+## when `on` is false.
+func _show_vfx(art: AnimatedSprite2D, clip: StringName, on: bool, duration := 0.0) -> void:
+	art.visible = on
+	if not on:
+		art.stop()
+		return
+	var frames := art.sprite_frames
+	var speed := 1.0
+	if duration > 0.0:
+		speed = (float(frames.get_frame_count(clip)) / frames.get_animation_speed(clip)) / duration
+	art.play(clip, speed)
 
 
 ## Phase two "Full Moon" skin: the silver shader over the same sheets (PHASE_TWO), or
@@ -1579,7 +1616,10 @@ func _swing_dagger() -> void:
 func _set_dagger(on: bool) -> void:
 	_dagger_on = on
 	_dagger.set_deferred(&"monitoring", on)
-	($DaggerHitbox/Slash as Polygon2D).visible = on
+	var art := _has_vfx(_slash_art, &"slash")
+	($DaggerHitbox/Slash as Polygon2D).visible = on and not art
+	if art:
+		_show_vfx(_slash_art, &"slash", on, dagger_active_time)
 
 
 ## Hurts Luz once per slash. Her own damage gate decides about dash i-frames
@@ -1763,11 +1803,16 @@ func _update_dive_fall(delta: float) -> void:
 		_dive_landed = true
 		play_cue(CUE_DIVE_IMPACT)
 		_shake(dive_shake_strength, dive_shake_time)
+		if _has_vfx(_shockwave_art, &"dive_shockwave"):
+			_show_vfx(_shockwave_art, &"dive_shockwave", true, SHOCKWAVE_TIME)
 
 
 func _set_dive_hitbox(on: bool) -> void:
 	_dive_hitbox.set_deferred(&"monitoring", on)
-	($DiveHitbox/Impact as Polygon2D).visible = on
+	var art := _has_vfx(_impact_art, &"dive_shaft")
+	($DiveHitbox/Impact as Polygon2D).visible = on and not art
+	if art:
+		_show_vfx(_impact_art, &"dive_shaft", on)
 
 
 ## Hurts Luz once per dive; her own damage gate handles dash i-frames.

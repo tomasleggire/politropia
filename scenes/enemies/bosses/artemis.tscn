@@ -71,6 +71,12 @@ monitorable = false
 [node name="CollisionShape2D" type="CollisionShape2D" parent="DaggerHitbox"]
 shape = SubResource("RectangleShape2D_dagger")
 
+[node name="SlashArt" type="AnimatedSprite2D" parent="DaggerHitbox"]
+visible = false
+z_index = 2
+texture_filter = 4
+scale = Vector2(0.25, 0.25)
+
 [node name="Slash" type="Polygon2D" parent="DaggerHitbox"]
 visible = false
 z_index = 2
@@ -87,11 +93,25 @@ monitorable = false
 [node name="CollisionShape2D" type="CollisionShape2D" parent="DiveHitbox"]
 shape = SubResource("RectangleShape2D_dive")
 
+[node name="ImpactArt" type="AnimatedSprite2D" parent="DiveHitbox"]
+visible = false
+z_index = 2
+texture_filter = 4
+scale = Vector2(0.25, 0.25)
+offset = Vector2(0, -128)
+
 [node name="Impact" type="Polygon2D" parent="DiveHitbox"]
 visible = false
 z_index = 2
 color = Color(0.8, 0.9, 1, 0.7)
 polygon = PackedVector2Array(-22, -28, 22, -28, 14, 28, -14, 28)
+
+[node name="ShockwaveArt" type="AnimatedSprite2D" parent="."]
+visible = false
+z_index = 2
+texture_filter = 4
+scale = Vector2(0.25, 0.25)
+offset = Vector2(0, -240)
 
 [node name="SpectralStag" type="Area2D" parent="."]
 collision_layer = 0
