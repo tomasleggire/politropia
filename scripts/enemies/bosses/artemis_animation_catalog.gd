@@ -52,11 +52,16 @@ const CLIP_SPEEDS := {
 	"feint_dash": 14.0,
 	"feint_stop": 20.0,
 	"feint_retreat": 14.0,
+	"stag_cast": 12.0,
+	"stag_summon": 20.0,
+	"stag_recover": 10.0,
+	"stag_appear": 20.0,
+	"stag_run": 12.0,
 }
 
 ## Clips that repeat while their state lasts; every other clip plays once and
 ## holds its last frame.
-const LOOPING_CLIPS := ["idle", "walk_fwd", "walk_back", "stagger_loop", "dive_fall", "feint_dash"]
+const LOOPING_CLIPS := ["idle", "walk_fwd", "walk_back", "stagger_loop", "dive_fall", "feint_dash", "stag_run"]
 
 ## Clips built by playing another clip's frames backwards (no extra art): she
 ## retreats while facing Luz.
@@ -65,9 +70,6 @@ const REVERSED_CLIPS := {"walk_back": "walk_fwd"}
 ## Contract clip -> candidates, closest first. Names without an entry use the clip
 ## itself, then DEFAULT_CLIP.
 const FALLBACKS := {
-	"stag_cast": ["idle"],
-	"stag_summon": ["shot_release"],
-	"stag_recover": ["shot_recover"],
 	"phase_transition": ["idle"],
 	"fan_recover": ["shot_recover"],
 	"shot_hold": ["shot_draw"],
@@ -101,6 +103,30 @@ static func build_sprite_frames() -> SpriteFrames:
 		var source: String = REVERSED_CLIPS[reversed_name]
 		if frames.has_animation(source) and not frames.has_animation(reversed_name):
 			_add_reversed(frames, reversed_name, source)
+	return frames
+
+
+## The spectral stag's own SpriteFrames (manifest key "stag": one sheet, its own
+## cell size and sprite scale). Empty when the manifest or the sheet is missing.
+static func build_stag_frames() -> SpriteFrames:
+	return _build_single_sheet("stag")
+
+
+static func _build_single_sheet(key: String) -> SpriteFrames:
+	var frames := SpriteFrames.new()
+	if frames.has_animation(&"default"):
+		frames.remove_animation(&"default")
+	var manifest := _read_manifest()
+	if not manifest.has(key):
+		return frames
+	var entry: Dictionary = manifest[key]
+	var atlas := load(ASSET_ROOT + String(entry["sheet"])) as Texture2D
+	if atlas == null:
+		push_warning("ArtemisAnimationCatalog: missing %s sheet" % key)
+		return frames
+	var clips: Dictionary = entry["clips"]
+	for clip_name: String in clips:
+		_add_clip(frames, clip_name, atlas, entry["grid"], clips[clip_name])
 	return frames
 
 

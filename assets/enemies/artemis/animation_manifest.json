@@ -299,6 +299,69 @@
         ]
       },
       "events": {}
+    },
+    "artemis_stagcast_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 4,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "stag_cast": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "stag_summon": [
+          8,
+          9
+        ],
+        "stag_recover": [
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "events": {
+        "stag_summon": 0
+      }
+    }
+  },
+  "stag": {
+    "sheet": "spectral_stag_sheet.png",
+    "sprite_scale": 0.2,
+    "feet_row": 340,
+    "grid": {
+      "columns": 4,
+      "rows": 3,
+      "cell_width": 384,
+      "cell_height": 384
+    },
+    "clips": {
+      "stag_appear": [
+        0,
+        1,
+        2
+      ],
+      "stag_run": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
     }
   }
 }

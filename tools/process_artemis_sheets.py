@@ -144,6 +144,19 @@ SHEETS = {
             "feint_retreat": [8, 9, 10, 11],
         },
     },
+    "stagcast": {
+        "raw": "artemis_stagcast_raw.png",
+        "grid": (4, 4),
+        "ref": 14,
+        "scale_mult": 1.13,
+        "body_feet": True,
+        "clips": {
+            "stag_cast": list(range(0, 8)),
+            "stag_summon": [8, 9],
+            "stag_recover": list(range(10, 16)),
+        },
+        "events": {"stag_summon": 0},
+    },
 }
 
 
@@ -283,6 +296,43 @@ def build_arrows() -> None:
         print(f"  {file_name}: {out.size}")
 
 
+# Spectral stag: its own sheet and sprite scale (the sprite node uses STAG_SPRITE_SCALE).
+STAG_RAW = "artemis_stag_raw.png"
+STAG_CELL = 384
+STAG_FEET_ROW = 340
+STAG_SPRITE_SCALE = 0.2
+STAG_BODY_WIDTH = 46.0  # on-screen px of the compact gallop pose; stretched poses reach about 80 (hitbox 60 wide)
+STAG_GRID = (4, 4)
+STAG_CLIPS = {
+    "stag_appear": [0, 1, 2],
+    "stag_run": list(range(3, 11)),
+}
+STAG_REF = 6
+
+
+def build_stag() -> dict:
+    cols, rows = STAG_GRID
+    needed = {i for clip in STAG_CLIPS.values() for i in clip}
+    frames = split_frames(key_magenta(Image.open(RAW_DIR / STAG_RAW)), cols, rows, "stag", needed)
+    ref = frames[STAG_REF]
+    scale = (STAG_BODY_WIDTH / STAG_SPRITE_SCALE) / ref.shape[1]
+    used = sorted(needed)
+    remap = {src: dst for dst, src in enumerate(used)}
+    cells = [to_cell(frames[src], scale, f"stag[{src}]", True, STAG_CELL, STAG_FEET_ROW) for src in used]
+    rows_out = (len(cells) + COLUMNS - 1) // COLUMNS
+    sheet = Image.new("RGBA", (COLUMNS * STAG_CELL, rows_out * STAG_CELL), (0, 0, 0, 0))
+    for index, cell in enumerate(cells):
+        sheet.alpha_composite(cell, ((index % COLUMNS) * STAG_CELL, (index // COLUMNS) * STAG_CELL))
+    sheet.save(OUT_DIR / "spectral_stag_sheet.png", optimize=True)
+    return {
+        "sheet": "spectral_stag_sheet.png",
+        "sprite_scale": STAG_SPRITE_SCALE,
+        "feet_row": STAG_FEET_ROW,
+        "grid": {"columns": COLUMNS, "rows": rows_out, "cell_width": STAG_CELL, "cell_height": STAG_CELL},
+        "clips": {clip: [remap[i] for i in idx] for clip, idx in STAG_CLIPS.items()},
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview", type=Path, default=None)
@@ -334,6 +384,8 @@ def main() -> None:
             bg.alpha_composite(sheet)
             bg.save(args.preview / file_name)
     build_arrows()
+    if (RAW_DIR / STAG_RAW).exists():
+        manifest["stag"] = build_stag()
     (OUT_DIR / "animation_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print("wrote", OUT_DIR)
 
