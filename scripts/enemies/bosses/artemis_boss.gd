@@ -90,6 +90,9 @@ const DIVE_BOX_Y := -28.0
 const WALL_MARGIN := 4.0
 ## Beat pulse of the transition glow, radians per second.
 const TRANSITION_PULSE_RATE := 10.0
+## Share of the transition left when the silver skin replaces the phase-one one.
+const TRANSITION_SKIN_SWAP := 0.5
+const MOONLIT_SHADER := preload("res://shaders/artemis_moonlit.gdshader")
 const CROUCH_SCALE := 0.8
 ## Artemis's sprite scale: the same on-screen pixel size as Luz (tools/process_artemis_sheets.py).
 const SPRITE_SCALE := 0.2896
@@ -423,6 +426,7 @@ var _arena_right := 0.0
 var _interrupt_left := 0.0
 ## The contract clip last requested through `_play` (not the fallback it resolved to).
 var _clip: StringName = &""
+var _moonlit := false
 var _surface_ray := PhysicsRayQueryParameters2D.new()
 var _rain_markers: Array[Rect2] = []
 var _rain_marker_count := 0
@@ -682,6 +686,7 @@ func _reset_ai() -> void:
 		return
 	var was_phase_two := _phase == PHASE_TWO
 	_phase = PHASE_ONE
+	_set_skin(PHASE_ONE)
 	_defeat_left = 0.0
 	_play_defeat = false
 	_rain_impact_left = 0.0
@@ -800,6 +805,20 @@ func _play(clip: StringName, duration := 0.0) -> void:
 		# A corpse restored from an earlier run: the last frame at once.
 		_sprite.pause()
 		_sprite.frame = count - 1
+
+
+## Phase two "Full Moon" skin: the silver shader over the same sheets (PHASE_TWO), or
+## the plain phase-one look. A no-op without a sprite.
+func _set_skin(phase: int) -> void:
+	_moonlit = phase == PHASE_TWO
+	if _sprite == null:
+		return
+	if not _moonlit:
+		_sprite.material = null
+		return
+	var material := ShaderMaterial.new()
+	material.shader = MOONLIT_SHADER
+	_sprite.material = material
 
 
 ## Picks the contract clip for what the state machine is doing now and plays it when
@@ -1658,6 +1677,8 @@ func _try_transition() -> void:
 func _update_transition(delta: float) -> void:
 	velocity.x = 0.0
 	_state_left -= delta
+	if not _moonlit and _state_left <= phase_two_transition_time * TRANSITION_SKIN_SWAP:
+		_set_skin(PHASE_TWO)
 	_telegraph.set_glow(BossTelegraph.MOON_COLOR, 0.5 + 0.5 * sin(_clock * TRANSITION_PULSE_RATE))
 	if _state_left <= 0.0:
 		_begin_reposition()

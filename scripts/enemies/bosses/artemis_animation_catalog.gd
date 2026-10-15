@@ -52,6 +52,8 @@ const CLIP_SPEEDS := {
 	"feint_dash": 14.0,
 	"feint_stop": 20.0,
 	"feint_retreat": 14.0,
+	"fan_recover": 10.0,
+	"phase_transition": 12.0,
 	"stag_cast": 12.0,
 	"stag_summon": 20.0,
 	"stag_recover": 10.0,
@@ -70,8 +72,6 @@ const REVERSED_CLIPS := {"walk_back": "walk_fwd"}
 ## Contract clip -> candidates, closest first. Names without an entry use the clip
 ## itself, then DEFAULT_CLIP.
 const FALLBACKS := {
-	"phase_transition": ["idle"],
-	"fan_recover": ["shot_recover"],
 	"shot_hold": ["shot_draw"],
 	"stagger_in": ["stagger_loop"],
 	"dodge": ["backstep"],

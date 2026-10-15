@@ -334,6 +334,39 @@
       "events": {
         "stag_summon": 0
       }
+    },
+    "artemis_trans_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 4,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "phase_transition": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "fan_recover": [
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "events": {
+        "phase_transition": 6
+      }
     }
   },
   "stag": {

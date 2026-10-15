@@ -157,6 +157,18 @@ SHEETS = {
         },
         "events": {"stag_summon": 0},
     },
+    "trans": {
+        "raw": "artemis_trans_raw.png",
+        "grid": (4, 4),
+        "ref": 15,
+        "scale_mult": 1.18,
+        "body_feet": True,
+        "clips": {
+            "phase_transition": list(range(0, 12)),
+            "fan_recover": [12, 13, 14, 15],
+        },
+        "events": {"phase_transition": 6},
+    },
 }
 
 
