@@ -244,6 +244,21 @@ See tasks. Placement work covers the real play path: `scenes/levels/library/zone
 
 ## Progress
 - 2026-10-14: feature document created; branch `feat/demo-polish`.
+- 2026-10-14 night: demo build `62848a8` on the iPhone. The branch is pushed to `origin/feat/demo-polish`.
+- 2026-10-15: art batch 2 pushed at `0715551`. No PR yet. The RDD review of the slice from `38b9d3f` is still deferred (the user's consent).
 
 ## Next step
-D1.
+Resume with the user's demo feedback, then continue with Artemis polish:
+- Spectral stag: scale it to its 60 px hitbox and restore the gallop bob.
+- Fix the dive shaft overlapping the sprite.
+- Add the `intro` hook and clip.
+- Add `stag_vanish`.
+- Add arrow impact art.
+- Add telegraph and floor-marker art.
+
+Device checks:
+- Foot slide while walking.
+- The arrow leaving the bow hand.
+- The vault, flinch, stagger and death flow.
+
+Then open the PR (single-pr) and run the deferred RDD review. Install `0715551` on the iPhone to test batch 2.
