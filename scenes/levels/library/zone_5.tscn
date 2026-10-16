@@ -14428,4 +14428,4 @@ source_layer = NodePath("../TilemapLayers/Ground/Platforms")
 debris_color = Color(0.78, 0.68, 0.5, 1)
 
 [node name="teacher_enemy" parent="." unique_id=1714237560 instance=ExtResource("19_lhyta")]
-position = Vector2(1497, 318)
+position = Vector2(1489, 326)

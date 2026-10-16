@@ -1,3 +1,4 @@
+class_name Teacher_enemy
 extends Enemy
 
 
@@ -5,19 +6,21 @@ extends Enemy
 @export var walk_speed: float = 40.0
 @export var turn_cooldown_duration: float = 0.25
 @export var ledge_check_distance: float = 14.0
-@export var ledge_check_depth: float = 50.0
+@export var ledge_check_depth: float = 20.0
 
 var turn_cooldown: float = 0.0
 
 @onready var ledge_ray: RayCast2D = get_node_or_null("LedgeRayCast")
 @onready var sprite: AnimatedSprite2D = get_node_or_null(
-	"Visual/AnimatedSprite2D"
+	"AnimatedSprite2D"
 )
 
 
 func _ready() -> void:
+	_facing = 1
+	start_facing = 1
 	super._ready()
-
+	
 	if ledge_ray:
 		ledge_ray.collision_mask = WORLD_MASK
 		ledge_ray.enabled = true
@@ -32,6 +35,7 @@ func _think(delta: float) -> void:
 		turn_cooldown -= delta
 
 	# Camina en la dirección actual.
+	
 	velocity.x = _facing * walk_speed
 
 	if turn_cooldown > 0.0:
