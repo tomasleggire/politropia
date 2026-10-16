@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://b5lf46acc08rl"]
+
+[ext_resource type="Script" uid="uid://t8807b31c0ey" path="res://scripts/enemies/teacher_enemy.gd" id="1_0p82c"]
+[ext_resource type="Texture2D" uid="uid://cef3b42cse5ta" path="res://assets/enemies/teacher_idle.png" id="1_pa5bu"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0p82c"]
+size = Vector2(44, 119)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_h4t55"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("1_pa5bu")
+}],
+"loop": 1,
+"name": &"idle",
+"speed": 5.0
+}]
+
+[node name="teacher_enemy" type="CharacterBody2D" unique_id=1714237560]
+script = ExtResource("1_0p82c")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=979156481]
+position = Vector2(1, -60.5)
+shape = SubResource("RectangleShape2D_0p82c")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=432298519]
+position = Vector2(1, -62)
+sprite_frames = SubResource("SpriteFrames_h4t55")
+animation = &"idle"
+
+[node name="RayCast2D" type="RayCast2D" parent="." unique_id=179930053]
+position = Vector2(30, -7)
+target_position = Vector2(0, 24)
+collision_mask = 3
