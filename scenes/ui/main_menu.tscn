@@ -2,8 +2,8 @@
 
 [ext_resource type="Texture2D" uid="uid://ckbmwhypoiawa" path="res://assets/ui/menu_background.png" id="1_fe2o3"]
 [ext_resource type="Script" uid="uid://1g13y64lrie6" path="res://scripts/ui/main_menu.gd" id="1_m1kxf"]
-[ext_resource type="Texture2D" uid="uid://cg3nqqqxgwak" path="res://assets/ui/logo.png" id="2_1g8jr"]
 [ext_resource type="FontFile" uid="uid://rcvj3nh8n7hb" path="res://assets/ui/Cinzel-Bold.ttf" id="3_1g8jr"]
+[ext_resource type="Texture2D" uid="uid://cpbf6h2xb5b5f" path="res://assets/ui/newLogo.png" id="3_m1kxf"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btxxm"]
 content_margin_left = 4.0
@@ -199,70 +199,6 @@ corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ayp64"]
-content_margin_left = 4.0
-content_margin_top = 2.0
-content_margin_right = 4.0
-content_margin_bottom = 2.0
-bg_color = Color(0.05882353, 0.12156863, 0.23921569, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.5411765, 0.44705883, 0.2509804, 1)
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-corner_radius_bottom_right = 2
-corner_radius_bottom_left = 2
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1g8jr"]
-content_margin_left = 4.0
-content_margin_top = 2.0
-content_margin_right = 4.0
-content_margin_bottom = 2.0
-bg_color = Color(0.101960786, 0.18431373, 0.34117648, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.8784314, 0.7254902, 0.30980393, 1)
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-corner_radius_bottom_right = 2
-corner_radius_bottom_left = 2
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_x2yvf"]
-content_margin_left = 4.0
-content_margin_top = 2.0
-content_margin_right = 4.0
-content_margin_bottom = 2.0
-bg_color = Color(0.03529412, 0.078431375, 0.15686275, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.8784314, 0.7254902, 0.30980393, 1)
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-corner_radius_bottom_right = 2
-corner_radius_bottom_left = 2
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_y2j7i"]
-content_margin_left = 4.0
-content_margin_top = 2.0
-content_margin_right = 4.0
-content_margin_bottom = 2.0
-bg_color = Color(0.078431375, 0.10980392, 0.16862746, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.22745098, 0.25882354, 0.32156864, 1)
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-corner_radius_bottom_right = 2
-corner_radius_bottom_left = 2
-
 [node name="MainMenu" type="Control" unique_id=1601635344]
 layout_mode = 3
 anchors_preset = 15
@@ -281,7 +217,7 @@ grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("1_fe2o3")
 expand_mode = 1
-stretch_mode = 5
+stretch_mode = 6
 
 [node name="CenterContainer" type="CenterContainer" parent="." unique_id=757380734]
 layout_mode = 1
@@ -291,33 +227,41 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=1297159635]
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer" unique_id=890795755]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/MarginContainer" unique_id=1297159635]
 layout_mode = 2
 
-[node name="Logo" type="TextureRect" parent="CenterContainer/VBoxContainer" unique_id=1908119491]
-custom_minimum_size = Vector2(70, 70)
+[node name="Logo" type="TextureRect" parent="CenterContainer/MarginContainer/VBoxContainer" unique_id=1908119491]
+custom_minimum_size = Vector2(240, 80)
 layout_mode = 2
-texture = ExtResource("2_1g8jr")
+texture = ExtResource("3_m1kxf")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Divider" type="Control" parent="CenterContainer/VBoxContainer" unique_id=1785952448]
+[node name="Divider" type="Control" parent="CenterContainer/MarginContainer/VBoxContainer" unique_id=1785952448]
 custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
 
-[node name="Buttons" type="VBoxContainer" parent="CenterContainer/VBoxContainer" unique_id=2102171972]
+[node name="Buttons" type="VBoxContainer" parent="CenterContainer/MarginContainer/VBoxContainer" unique_id=2102171972]
 layout_mode = 2
+theme_override_constants/separation = 12
 
-[node name="NewGame" type="Button" parent="CenterContainer/VBoxContainer/Buttons" unique_id=1508950441]
+[node name="NewGame" type="Button" parent="CenterContainer/MarginContainer/VBoxContainer/Buttons" unique_id=1508950441]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(160, 20)
+custom_minimum_size = Vector2(240, 40)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9098039, 0.8509804, 0.65882355, 1)
 theme_override_colors/font_focus_color = Color(0.9098039, 0.8509804, 0.65882355, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_colors/font_disabled_color = Color(0.41960785, 0.44705883, 0.5019608, 1)
 theme_override_fonts/font = ExtResource("3_1g8jr")
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 16
 theme_override_styles/normal = SubResource("StyleBoxFlat_btxxm")
 theme_override_styles/hover = SubResource("StyleBoxFlat_wb0q5")
 theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_q85j6")
@@ -325,15 +269,15 @@ theme_override_styles/disabled = SubResource("StyleBoxFlat_8g5eo")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_x2yvf")
 text = "NUEVA PARTIDA"
 
-[node name="Continue" type="Button" parent="CenterContainer/VBoxContainer/Buttons" unique_id=1047749922]
+[node name="Continue" type="Button" parent="CenterContainer/MarginContainer/VBoxContainer/Buttons" unique_id=1047749922]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(160, 20)
+custom_minimum_size = Vector2(240, 40)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9098039, 0.8509804, 0.65882355, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_colors/font_disabled_color = Color(0.41960785, 0.44705883, 0.5019608, 1)
 theme_override_fonts/font = ExtResource("3_1g8jr")
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 16
 theme_override_styles/normal = SubResource("StyleBoxFlat_7suek")
 theme_override_styles/hover = SubResource("StyleBoxFlat_otr3d")
 theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_8ekit")
@@ -343,35 +287,18 @@ disabled = true
 text = "CONTINUAR
 "
 
-[node name="Collectables" type="Button" parent="CenterContainer/VBoxContainer/Buttons" unique_id=567775096]
+[node name="Collectables" type="Button" parent="CenterContainer/MarginContainer/VBoxContainer/Buttons" unique_id=567775096]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(160, 20)
+custom_minimum_size = Vector2(240, 40)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9098039, 0.8509804, 0.65882355, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_colors/font_disabled_color = Color(0.41960785, 0.44705883, 0.5019608, 1)
 theme_override_fonts/font = ExtResource("3_1g8jr")
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 16
 theme_override_styles/normal = SubResource("StyleBoxFlat_m1kxf")
 theme_override_styles/hover = SubResource("StyleBoxFlat_uhagc")
 theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_n4uci")
 theme_override_styles/disabled = SubResource("StyleBoxFlat_877pj")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_x2yvf")
 text = "COLECCIONABLES"
-
-[node name="Exit" type="Button" parent="CenterContainer/VBoxContainer/Buttons" unique_id=1780122031]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(160, 20)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.9098039, 0.8509804, 0.65882355, 1)
-theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
-theme_override_colors/font_disabled_color = Color(0.41960785, 0.44705883, 0.5019608, 1)
-theme_override_fonts/font = ExtResource("3_1g8jr")
-theme_override_font_sizes/font_size = 9
-theme_override_styles/normal = SubResource("StyleBoxFlat_ayp64")
-theme_override_styles/hover = SubResource("StyleBoxFlat_1g8jr")
-theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_x2yvf")
-theme_override_styles/disabled = SubResource("StyleBoxFlat_y2j7i")
-theme_override_styles/focus = SubResource("StyleBoxEmpty_x2yvf")
-text = "SALIR
-"

@@ -1,17 +1,17 @@
 extends Control
 
-const ESCENA_JUEGO := "res://scenes/levels/library-level.tscn"
+const ESCENA_JUEGO := "res://scenes/levels/library/zone_1.tscn"
 
 @onready var btn_nueva: Button = %NewGame
 @onready var btn_continuar: Button = %Continue
 @onready var btn_coleccionables: Button = %Collectables
-@onready var btn_salir: Button = %Exit
+
 
 func _ready() -> void:
+	get_tree().call_group(&"touch_controls", &"set_controls_enabled", false)
 	btn_continuar.disabled = true  # sin guardado por ahora
 	btn_nueva.pressed.connect(_on_nueva_partida)
 	btn_coleccionables.pressed.connect(_on_coleccionables)
-	btn_salir.pressed.connect(get_tree().quit)
 	btn_nueva.grab_focus()
 	# Empieza a cargar el juego en segundo plano
 	ResourceLoader.load_threaded_request(ESCENA_JUEGO)
@@ -24,3 +24,7 @@ func _on_nueva_partida() -> void:
 
 func _on_coleccionables() -> void:
 	print("Coleccionables: pendiente")
+
+func _exit_tree() -> void:
+	# Al irse del menú (a cualquier nivel), se restauran los controles.
+	get_tree().call_group(&"touch_controls", &"set_controls_enabled", true)

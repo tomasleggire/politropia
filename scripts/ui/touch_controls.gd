@@ -60,9 +60,41 @@ var _held_actions := {
 
 func _ready() -> void:
 	layer = 100
-	visible = force_visible or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
+	add_to_group(&"touch_controls")
+	visible = _platform_wants_controls()
 	_position_pad_at_rest()
 	_bind_found_player.call_deferred()
+
+
+func _platform_wants_controls() -> bool:
+	return force_visible or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
+
+
+## Lo llaman el menú (false) y el juego (true).
+func set_controls_enabled(enabled: bool) -> void:
+	if not enabled:
+		_release_all()
+	visible = enabled and _platform_wants_controls()
+
+
+func _release_all() -> void:
+	_end_pad()
+	if _jump_touch_id >= 0:
+		_end_jump()
+	if _dash_touch_id >= 0:
+		_end_dash()
+	if _attack_touch_id >= 0:
+		_end_attack()
+	if _interact_touch_id >= 0:
+		_end_interact()
+	if _focus_touch_id >= 0:
+		_end_focus()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		if is_node_ready():
+			_release_all()
 
 
 func _process(delta: float) -> void:
@@ -352,17 +384,3 @@ func _end_focus() -> void:
 		_focus_button.call(&"set_button_state", false)
 
 
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
-		if is_node_ready():
-			_end_pad()
-			if _jump_touch_id >= 0:
-				_end_jump()
-			if _dash_touch_id >= 0:
-				_end_dash()
-			if _attack_touch_id >= 0:
-				_end_attack()
-			if _interact_touch_id >= 0:
-				_end_interact()
-			if _focus_touch_id >= 0:
-				_end_focus()
