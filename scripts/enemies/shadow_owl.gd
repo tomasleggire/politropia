@@ -4,7 +4,7 @@ extends Flyer
 
 ## Library owl that hunts Luz by flying into her, like the book flyer.
 
-const SHEET := preload("res://assets/art/library/enemies/shadow_owl_atlas.png")
+const SHEET := preload("res://assets/art/library/Enemies/shadow_owl_atlas.png")
 ## The source has six aligned rows, but individual owls spill across the
 ## nominal 10-column grid. These per-sprite X bounds keep adjacent frames out.
 const ROW_TOPS := [0.0, 170.0, 340.0, 510.0, 680.0, 850.0]

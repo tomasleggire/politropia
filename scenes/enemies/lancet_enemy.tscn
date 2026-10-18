@@ -1,0 +1,207 @@
+[gd_scene format=3 uid="uid://df7x5n262u3v1"]
+
+[ext_resource type="Script" uid="uid://bwwgy7x325x6a" path="res://scripts/enemies/lancet_enemy.gd" id="1_lancet"]
+[ext_resource type="Texture2D" uid="uid://cuxvli7mvrswe" path="res://assets/enemies/lancero_animation_02.png" id="2_lancero"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(32, 77)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a0"]
+atlas = ExtResource("2_lancero")
+region = Rect2(0, 0, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a1"]
+atlas = ExtResource("2_lancero")
+region = Rect2(332, 0, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a2"]
+atlas = ExtResource("2_lancero")
+region = Rect2(665, 0, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a3"]
+atlas = ExtResource("2_lancero")
+region = Rect2(997, 0, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a4"]
+atlas = ExtResource("2_lancero")
+region = Rect2(1330, 0, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a5"]
+atlas = ExtResource("2_lancero")
+region = Rect2(1662, 0, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a6"]
+atlas = ExtResource("2_lancero")
+region = Rect2(1995, 0, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a7"]
+atlas = ExtResource("2_lancero")
+region = Rect2(2327, 0, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_idle"]
+atlas = ExtResource("2_lancero")
+region = Rect2(0, 264, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_w0"]
+atlas = ExtResource("2_lancero")
+region = Rect2(0, 264, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_w1"]
+atlas = ExtResource("2_lancero")
+region = Rect2(332, 264, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_w2"]
+atlas = ExtResource("2_lancero")
+region = Rect2(665, 264, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_w3"]
+atlas = ExtResource("2_lancero")
+region = Rect2(997, 264, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_w4"]
+atlas = ExtResource("2_lancero")
+region = Rect2(1330, 264, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_w5"]
+atlas = ExtResource("2_lancero")
+region = Rect2(1662, 264, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_w6"]
+atlas = ExtResource("2_lancero")
+region = Rect2(1995, 264, 332, 264)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_w7"]
+atlas = ExtResource("2_lancero")
+region = Rect2(2327, 264, 332, 264)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_lancet"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a6")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_a7")
+}],
+"loop": 0,
+"name": &"attack",
+"speed": 10.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle")
+}],
+"loop": 0,
+"name": &"idle",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_w0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_w1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_w2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_w3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_w4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_w5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_w6")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_w7")
+}],
+"loop": 1,
+"name": &"walk",
+"speed": 8.0
+}]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_detection"]
+size = Vector2(160, 77)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hitbox"]
+size = Vector2(80, 50)
+
+[sub_resource type="Curve" id="Curve_particles"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), -1.5, 0.0, 0, 0]
+point_count = 2
+
+[node name="LancetEnemy" type="CharacterBody2D" unique_id=1519339315]
+collision_layer = 8
+collision_mask = 3
+script = ExtResource("1_lancet")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1508206923]
+position = Vector2(0, -38.5)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1601436999]
+position = Vector2(0.121212006, -50)
+scale = Vector2(0.37121212, 0.37121212)
+sprite_frames = SubResource("SpriteFrames_lancet")
+animation = &"walk"
+
+[node name="DetectionArea" type="Area2D" parent="." unique_id=391662243]
+collision_layer = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectionArea" unique_id=1715735958]
+position = Vector2(80, -38.5)
+shape = SubResource("RectangleShape2D_detection")
+
+[node name="HitboxArea" type="Area2D" parent="." unique_id=763977685]
+collision_layer = 0
+monitoring = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HitboxArea" unique_id=1697123688]
+position = Vector2(40, -35)
+shape = SubResource("RectangleShape2D_hitbox")
+
+[node name="LedgeRayCast" type="RayCast2D" parent="." unique_id=860310002]
+position = Vector2(20, -4)
+target_position = Vector2(0, 20)
+collision_mask = 3
+
+[node name="DeathParticles" type="CPUParticles2D" parent="." unique_id=2109296786]
+position = Vector2(0, -20)
+emitting = false
+amount = 24
+lifetime = 0.5
+one_shot = true
+explosiveness = 0.9
+lifetime_randomness = 0.3
+direction = Vector2(0, 0)
+spread = 180.0
+gravity = Vector2(0, 300)
+initial_velocity_min = 60.0
+initial_velocity_max = 140.0
+scale_amount_min = 2.0
+scale_amount_max = 4.0
+scale_amount_curve = SubResource("Curve_particles")
+color = Color(0.9, 0.7, 0.3, 1)

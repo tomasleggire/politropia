@@ -11,6 +11,18 @@ check names.
 ## Layout
 
 - `stillness_desk_ritual_test.gd`: the single entrypoint (runner and reporter).
+- `door_links_test.gd`: every library and Greece door points at a door that exists in
+  its target scene and leads back, Luz arrives standing on the floor just inside the
+  room (never on a trigger), and a real fade transition, respawn and checkpoint run.
+  Slow (about two minutes): it loads every zone.
+- `artemis_room_test.gd`: the real Artemis room (greece/zone_artemis): arena and boss
+  present, tiles close the arena, the door pairs with the healing room, beating Artemis
+  grants the double jump once, and a reload or a zone change keeps it
+  (`AbilityProgress`). About ten seconds.
+- `ambience_test.gd`: every library and Greece zone has one `ZoneAmbience` and one
+  `ParallaxBackdrop`, the tint never reaches the HUD layers, a zone holds at most
+  8 lights, and the far parallax layer covers the view at the corners of the camera
+  area for a 640x360 and an 800x500 view. Slow (about three minutes).
 - `greece_layout_test.gd`: Greece layout data, reachability model and physics
   probes (including the medal alcove); helpers in `support/greece_*.gd`.
 - `double_jump_test.gd`: the gated double jump (off by default, air jump count,
@@ -30,6 +42,18 @@ check names.
   pausing and the player's hit recoil.
 - `enemy_archetypes_test.gd`: the airborne and charging archetypes (flyer,
   charger, shooter) plus their persistence rules.
+- `artemis_boss_test.gd`: the Artemis boss (health and defeat, phase threshold,
+  aimed shot telegraph and arrow, dash i-frames, backstep, dodge, feint, kiting,
+  walls and ledges, stagger, checkpoint reset). Unlike the standalone suites it is
+  a ritual-style suite chained into the single runner, ahead of the level cases
+  (the boss targets the first Luz in the tree). It also covers the phase-two
+  chain and transition advisories (a plain hop never starts a string; a
+  threshold crossed during a stagger or a vault fires the beat exactly once).
+- `boss_arena_test.gd`: the BossArena (trigger, doors, camera lock for a plain
+  Camera2D and a RoomCamera, boss health bar and phase notch, reset when Luz
+  dies with and without the checkpoint contract, defeat, the double jump reward
+  and its options, permanent defeat across desk rests and re-instantiation, and
+  arena limits fed to the boss). Chained right after the Artemis suite.
 - `health_hud_test.gd`: the mask HUD (pips, loss and refill feedback, rebuild,
   safe area, presence in both levels).
 - `support/ritual_harness.gd`: shared state, game-clock waits, event recording.

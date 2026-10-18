@@ -1,0 +1,29 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/zone_ambience.gd" id="1_script"]
+[ext_resource type="Shader" path="res://shaders/screen_vignette.gdshader" id="2_shader"]
+[ext_resource type="Resource" path="res://data/ambience/library.tres" id="3_style"]
+
+[sub_resource type="ShaderMaterial" id="VignetteMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("2_shader")
+shader_parameter/level = 1.0
+shader_parameter/max_darkness = 0.4
+shader_parameter/tint = Vector3(0.02, 0.01, 0)
+
+[node name="ZoneAmbience" type="Node2D"]
+script = ExtResource("1_script")
+style = ExtResource("3_style")
+
+[node name="Tint" type="CanvasModulate" parent="."]
+
+[node name="VignetteLayer" type="CanvasLayer" parent="."]
+layer = 20
+
+[node name="Vignette" type="ColorRect" parent="VignetteLayer"]
+material = SubResource("VignetteMaterial")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(1, 1, 1, 1)

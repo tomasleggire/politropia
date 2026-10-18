@@ -1,0 +1,55 @@
+[gd_scene format=3 uid="uid://bq2h3mekduxqo"]
+
+[ext_resource type="Script" uid="uid://bsejovnipjog4" path="res://scripts/ui/speech_bubble.gd" id="1_ad2a6"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ts6vr"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.14117648, 0.0627451, 0.26666668, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="SpeechBubble" type="Node2D" unique_id=1025694301]
+scale = Vector2(0.5, 0.5)
+script = ExtResource("1_ad2a6")
+
+[node name="PanelContainer" type="PanelContainer" parent="." unique_id=918336572]
+propagate_maximum_size = false
+offset_right = 250.0
+offset_bottom = 183.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_ts6vr")
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer" unique_id=242546540]
+layout_mode = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 4
+
+[node name="RichTextLabel" type="RichTextLabel" parent="PanelContainer/MarginContainer" unique_id=1345014257]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+theme_override_constants/line_separation = 4
+theme_override_constants/text_highlight_h_padding = 4
+theme_override_constants/text_highlight_v_padding = 4
+bbcode_enabled = true
+text = "[bgcolor=#5c5470]No[/bgcolor]   [bgcolor=#2e5a44]todos[/bgcolor]   [bgcolor=#6b406b]los[/bgcolor]    [bgcolor=#8c7a50]secretos[/bgcolor]
+
+ [bgcolor=#8c7a50]están[/bgcolor]   [bgcolor=#2e5a44]ocultos[/bgcolor].
+
+[bgcolor=#6b406b]Algunos[/bgcolor]    [bgcolor=#8c7a50]solo[/bgcolor]    [bgcolor=#3f51b5]esperan[/bgcolor]
+
+[bgcolor=#2e5a44]ser[/bgcolor]    [bgcolor=#883949]revelados[/bgcolor]."
+fit_content = true
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Polygon2D" type="Polygon2D" parent="." unique_id=261829826]
+position = Vector2(54, 254)
+color = Color(0.14117648, 0.0627451, 0.26666668, 1)
+polygon = PackedVector2Array(-56.000298, -19.987398, 14, -48, -54, -48)
+uv = PackedVector2Array(-23.5, 1, 24.5, -30, -65.5, -31)

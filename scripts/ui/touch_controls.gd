@@ -27,6 +27,7 @@ extends CanvasLayer
 ## upgrade while its own startup phase is still active, ~attack_startup_time).
 @export var attack_upgrade_window := 0.10
 
+var _input_blocked := false
 var _pad_touch_id := -1
 var _pad_center := Vector2.ZERO
 var _knob_offset := Vector2.ZERO
@@ -70,41 +71,23 @@ func _platform_wants_controls() -> bool:
 	return force_visible or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
 
 
-## Lo llaman el menú (false) y el juego (true).
+## Lo llama el menú principal (false al entrar, true al salir).
 func set_controls_enabled(enabled: bool) -> void:
 	if not enabled:
-		_release_all()
+		release_all()
 	visible = enabled and _platform_wants_controls()
 
 
-func _release_all() -> void:
-	_end_pad()
-	if _jump_touch_id >= 0:
-		_end_jump()
-	if _dash_touch_id >= 0:
-		_end_dash()
-	if _attack_touch_id >= 0:
-		_end_attack()
-	if _interact_touch_id >= 0:
-		_end_interact()
-	if _focus_touch_id >= 0:
-		_end_focus()
-
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
-		if is_node_ready():
-			_release_all()
-
-
 func _process(delta: float) -> void:
+	if not is_instance_valid(_player):
+		_bind_found_player()
 	if _attack_touch_id < 0 or _attack_upgraded:
 		return
 	_attack_timer += delta
 
 
 func _input(event: InputEvent) -> void:
-	if not visible:
+	if not visible or _input_blocked:
 		return
 	if event is InputEventScreenTouch:
 		_handle_touch(event as InputEventScreenTouch)
@@ -342,7 +325,7 @@ func _end_interact() -> void:
 ## The button follows the player's soul and health, like the interact button
 ## follows its sources.
 func bind_player(player: Player) -> void:
-	if _player != null and _player.health_changed.is_connected(_on_player_changed):
+	if is_instance_valid(_player) and _player.health_changed.is_connected(_on_player_changed):
 		_player.health_changed.disconnect(_on_player_changed)
 		_player.soul_changed.disconnect(_on_player_changed)
 	_player = player
@@ -352,9 +335,12 @@ func bind_player(player: Player) -> void:
 	_refresh_focus_available()
 
 
+## This autoload outlives every scene, so it follows whichever Luz is alive:
+## the one in the current zone, not the one that existed at boot.
 func _bind_found_player() -> void:
-	if _player == null:
-		bind_player(get_tree().get_first_node_in_group(&"player") as Player)
+	var found := get_tree().get_first_node_in_group(&"player") as Player
+	if found != _player:
+		bind_player(found)
 
 
 func _on_player_changed(_current: int, _maximum: int) -> void:
@@ -362,7 +348,7 @@ func _on_player_changed(_current: int, _maximum: int) -> void:
 
 
 func _refresh_focus_available() -> void:
-	var available : bool = _player != null and _player.is_focus_available()
+	var available := is_instance_valid(_player) and _player.is_focus_available()
 	if is_instance_valid(_focus_button):
 		_focus_button.visible = available
 	if not available and _focus_touch_id >= 0:
@@ -371,16 +357,40 @@ func _refresh_focus_available() -> void:
 
 func _begin_focus(index: int) -> void:
 	_focus_touch_id = index
-	Input.action_press(&"focus")
 	get_tree().call_group(&"player", &"request_focus", true)
 	_focus_button.call(&"set_button_state", true)
 
 
 func _end_focus() -> void:
 	_focus_touch_id = -1
-	Input.action_release(&"focus")
-	get_tree().call_group(&"player", &"request_focus", false)
 	if is_instance_valid(_focus_button):
 		_focus_button.call(&"set_button_state", false)
 
 
+## While blocked (pause menu open) no touch reaches the pad or the buttons, and
+## anything held is released so nothing leaks into the paused or resumed game.
+func set_input_blocked(blocked: bool) -> void:
+	_input_blocked = blocked
+	if blocked and is_node_ready():
+		release_all()
+
+
+## Ends every touch this layer is tracking and releases the actions it holds.
+func release_all() -> void:
+	_end_pad()
+	if _jump_touch_id >= 0:
+		_end_jump()
+	if _dash_touch_id >= 0:
+		_end_dash()
+	if _attack_touch_id >= 0:
+		_end_attack()
+	if _interact_touch_id >= 0:
+		_end_interact()
+	if _focus_touch_id >= 0:
+		_end_focus()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		if is_node_ready():
+			release_all()

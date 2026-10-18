@@ -1,6 +1,7 @@
 extends Control
 
 const ESCENA_JUEGO := "res://scenes/levels/library/zone_1.tscn"
+const ESCENA_INTRO := "res://scenes/ui/new_game_intro.tscn"
 
 @onready var btn_nueva: Button = %NewGame
 @onready var btn_continuar: Button = %Continue
@@ -8,6 +9,7 @@ const ESCENA_JUEGO := "res://scenes/levels/library/zone_1.tscn"
 
 
 func _ready() -> void:
+	# Sin controles táctiles mientras estamos en el menú
 	get_tree().call_group(&"touch_controls", &"set_controls_enabled", false)
 	btn_continuar.disabled = true  # sin guardado por ahora
 	btn_nueva.pressed.connect(_on_nueva_partida)
@@ -16,15 +18,27 @@ func _ready() -> void:
 	# Empieza a cargar el juego en segundo plano
 	ResourceLoader.load_threaded_request(ESCENA_JUEGO)
 
-func _on_nueva_partida() -> void:
-	btn_nueva.disabled = true  # evita tocar dos veces
-	# Si todavía no terminó de cargar, espera  lo que falte
-	var escena: PackedScene = ResourceLoader.load_threaded_get(ESCENA_JUEGO)
-	get_tree().change_scene_to_packed(escena)
-
-func _on_coleccionables() -> void:
-	print("Coleccionables: pendiente")
 
 func _exit_tree() -> void:
 	# Al irse del menú (a cualquier nivel), se restauran los controles.
 	get_tree().call_group(&"touch_controls", &"set_controls_enabled", true)
+
+
+func _on_nueva_partida() -> void:
+	btn_nueva.disabled = true  # evita tocar dos veces
+	_reset_new_game_progress()
+	get_tree().change_scene_to_file(ESCENA_INTRO)
+
+
+func _reset_new_game_progress() -> void:
+	for service_path in ["/root/CheckpointService", "/root/EnemyRegistry", "/root/BossProgress", "/root/FragmentProgress", "/root/MapProgress", "/root/SecretProgress", "/root/AbilityProgress"]:
+		var service := get_node_or_null(service_path)
+		if service != null and service.has_method("clear"):
+			service.call("clear")
+	TutorialSign.reset_seen()
+
+
+func _on_coleccionables() -> void:
+	var toast := get_node_or_null("/root/PickupToast")
+	if toast != null:
+		toast.show_toast("Próximamente")

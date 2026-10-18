@@ -1,7 +1,8 @@
 extends SceneTree
-## Regression test for the soul meter and the focus heal: soul from enemy hits
-## only, the focus channel (cost, duration, chaining, every cancel rule and
-## refusal), the reset on death, the HUD soul vessel and the touch Focus button.
+## Regression test for the soul meter and the focus heal: soul from every enemy
+## type (hits only), the tap-to-heal channel (cost, fixed duration, input lock,
+## damage and floor cancels, refusals), the reset on death, the HUD soul vessel
+## and energy bar, and the touch Focus button (including after a scene swap).
 ## Run: godot --headless --path . --script res://tests/soul_focus_test.gd
 ## Exits 0 when every check passes, 1 otherwise.
 ##
@@ -13,6 +14,13 @@ const PLAYER_SCENE := "res://scenes/player/player.tscn"
 const WALKER_SCENE := "res://scenes/enemies/walker.tscn"
 const CONTACT_SCENE := "res://scenes/world/contact_damage.tscn"
 const PROJECTILE_SCENE := "res://scenes/enemies/enemy_projectile.tscn"
+const ENEMY_SCENES := [
+	"res://scenes/enemies/snake_enemy.tscn",
+	"res://scenes/enemies/lancet_enemy.tscn",
+	"res://scenes/enemies/shadow_owl.tscn",
+	"res://scenes/enemies/book_flyer.tscn",
+]
+const LEVEL_HUD_SCENE := "res://scenes/ui/hud.tscn"
 const HUD_SCENE := "res://scenes/ui/health_hud.tscn"
 const TOUCH_SCENE := "res://scenes/ui/touch_controls.tscn"
 const WATCHDOG_SECONDS := 120.0
@@ -24,17 +32,20 @@ const LAYOUT_FRAMES := 3
 
 const CHECKS := {
 	"case_enemy_hit_adds_soul": 4,
+	"case_every_enemy_type_adds_soul": 4,
 	"case_other_hits_add_nothing": 1,
 	"case_focus_heals_one": 9,
-	"case_release_cancels": 3,
+	"case_tap_needs_no_hold": 3,
 	"case_damage_cancels": 4,
 	"case_leaving_the_floor_cancels": 3,
-	"case_acting_cancels": 4,
+	"case_channel_ignores_input": 5,
 	"case_focus_is_refused": 4,
 	"case_focus_chains": 4,
 	"case_death_resets_soul": 2,
 	"case_hud_meter": 6,
+	"case_level_hud_energy_bar": 4,
 	"case_touch_button": 5,
+	"case_touch_button_follows_new_player": 3,
 	"case_player_scene_is_reusable": 3,
 }
 
@@ -188,6 +199,17 @@ func case_enemy_hit_adds_soul() -> void:
 	check(_soul_events.size() == announced, "a capped hit announces nothing")
 
 
+func case_every_enemy_type_adds_soul() -> void:
+	await _build_rig()
+	for path: String in ENEMY_SCENES:
+		var enemy := (load(path) as PackedScene).instantiate() as Node2D
+		_rig.add_child(enemy)
+		await process_frame
+		var before := _player.get_soul()
+		_player._resolve_attack_hit(enemy, &"attack_ground_1")
+		check(_player.get_soul() == before + 11, "a hit on %s gives soul (%d -> %d)" % [path.get_file(), before, _player.get_soul()])
+
+
 func case_other_hits_add_nothing() -> void:
 	await _build_rig()
 	var shot := (load(PROJECTILE_SCENE) as PackedScene).instantiate() as EnemyProjectile
@@ -201,8 +223,9 @@ func case_focus_heals_one() -> void:
 	await _build_rig()
 	_prepare(1, 33)
 	_player.request_focus(true)
+	_player.request_focus(false)
 	await _secs(0.2)
-	check(_player.is_focusing(), "holding focus starts the channel")
+	check(_player.is_focusing(), "a tap starts the channel")
 	check(_player._sprite.animation == &"heal_start", "focus plays its start clip")
 	check(_player.velocity == Vector2.ZERO, "she stands still")
 	await _secs(FOCUS_SECONDS - 0.5)
@@ -215,16 +238,16 @@ func case_focus_heals_one() -> void:
 	check(_player._sprite.animation == &"heal_end", "completed focus plays its recovery clip")
 
 
-func case_release_cancels() -> void:
+func case_tap_needs_no_hold() -> void:
 	await _build_rig()
 	_prepare(1, 33)
 	_player.request_focus(true)
-	await _secs(0.4)
 	_player.request_focus(false)
-	await _secs(0.8)
-	check(not _player.is_focusing(), "releasing ends the channel")
-	check(_player.get_health() == 1, "with no heal")
-	check(_player.get_soul() == 33, "and no soul spent")
+	await _secs(0.5)
+	check(_player.is_focusing(), "the channel keeps going after the tap ends")
+	await _secs(FOCUS_SECONDS)
+	check(_player.get_health() == 2, "and the heal still lands (%d)" % _player.get_health())
+	check(_player.get_soul() == 0, "paying 33 soul (%d)" % _player.get_soul())
 
 
 func case_damage_cancels() -> void:
@@ -235,7 +258,6 @@ func case_damage_cancels() -> void:
 	_hit_player()
 	await _frames(2)
 	check(_player._state == Player.State.HURT, "a hit follows the normal hurt flow")
-	_player.request_focus(false)
 	await _secs(1.5)
 	check(_player.get_health() == 1, "she lost the pip and gained none (%d)" % _player.get_health())
 	check(_player.get_soul() == 33, "no soul was spent")
@@ -253,32 +275,32 @@ func case_leaving_the_floor_cancels() -> void:
 	check(_player.get_health() == 1, "and nothing healed")
 
 
-func case_acting_cancels() -> void:
+func case_channel_ignores_input() -> void:
 	await _build_rig()
 	_prepare(1, 33)
 	_player.request_focus(true)
-	await _secs(0.3)
+	await _secs(0.2)
+	var start_x := _player.global_position.x
 	_player.request_jump()
-	await _frames(3)
-	check(not _player.is_focusing(), "jumping cancels the channel")
-	await _secs(1.0)
-	_player.request_focus(true)
-	await _secs(0.3)
-	check(_player.is_focusing(), "holding focus on the ground starts it again")
+	_player.request_attack(0)
+	_player.request_dash()
 	Input.action_press(&"move_right")
-	await _frames(3)
-	check(not _player.is_focusing(), "moving cancels the channel")
-	Input.action_release(&"move_right")
-	check(_player.get_soul() == 33 and _player.get_health() == 1, "and neither cost anything")
+	await _secs(0.3)
+	check(_player.is_focusing(), "jump, attack, dash and move do not cancel the channel")
+	check(is_equal_approx(_player.global_position.x, start_x), "she stays put (%.1f)" % (_player.global_position.x - start_x))
+	await _secs(FOCUS_SECONDS)
+	check(_player.get_health() == 2, "the heal lands anyway (%d)" % _player.get_health())
+	check(not _player.is_focusing(), "and control returns afterwards")
+	await _secs(0.5)
+	check(_player.global_position.x > start_x + 5.0, "she can move again (%.1f)" % (_player.global_position.x - start_x))
 
 
 func case_focus_is_refused() -> void:
 	await _build_rig()
-	_prepare(3, 99)
+	_prepare(_player.max_health, 99)
 	_player.request_focus(true)
 	await _secs(0.3)
 	check(not _player.is_focusing() and not _player.is_focus_available(), "focus is refused at full health")
-	_player.request_focus(false)
 	_free_rig()
 	await _build_rig()
 	_prepare(1, 22)
@@ -286,11 +308,11 @@ func case_focus_is_refused() -> void:
 	await _secs(0.3)
 	check(not _player.is_focusing() and not _player.is_focus_available(), "focus is refused with less than 33 soul")
 	_player.add_soul(11)
+	_player.request_focus(true)
 	await _secs(0.3)
-	check(_player.is_focusing(), "at exactly 33 soul it starts")
-	_player.request_focus(false)
+	check(_player.is_focusing(), "at exactly 33 soul a tap starts it")
 	await _secs(0.2)
-	check(_player.get_soul() == 33, "and releasing early still costs nothing")
+	check(_player.get_soul() == 33, "and nothing is spent before the channel ends")
 
 
 func case_focus_chains() -> void:
@@ -298,11 +320,12 @@ func case_focus_chains() -> void:
 	_prepare(1, 66)
 	_player.request_focus(true)
 	await _secs(FOCUS_SECONDS + 0.4)
-	check(_player.get_health() == 2 and _player.get_soul() == 33, "the first heal lands (%d, %d)" % [_player.get_health(), _player.get_soul()])
-	check(_player.is_focusing(), "and the next channel chains while held")
-	await _secs(FOCUS_SECONDS)
-	check(_player.get_health() == 3, "the second heal lands (%d)" % _player.get_health())
-	check(_player.get_soul() == 0 and not _player.is_focusing(), "66 soul paid for both and she stops")
+	check(_player.get_health() == 2 and _player.get_soul() == 33, "one tap pays one heal (%d, %d)" % [_player.get_health(), _player.get_soul()])
+	check(not _player.is_focusing(), "and it does not chain by itself")
+	_player.request_focus(true)
+	await _secs(FOCUS_SECONDS + 0.4)
+	check(_player.get_health() == 3, "a second tap heals again (%d)" % _player.get_health())
+	check(_player.get_soul() == 0 and not _player.is_focusing(), "66 soul paid for both taps")
 
 
 func case_death_resets_soul() -> void:
@@ -346,13 +369,50 @@ func case_touch_button() -> void:
 	_prepare(1, 33)
 	check(button.visible, "it shows once focus is possible")
 	_press_button(button, true)
-	await _secs(0.3)
-	check(_player.is_focusing(), "holding the button focuses")
 	_press_button(button, false)
 	await _secs(0.3)
-	check(not _player.is_focusing() and not Input.is_action_pressed(&"focus"), "releasing it stops, and the action is not stuck")
+	check(_player.is_focusing(), "tapping the button focuses")
+	await _secs(FOCUS_SECONDS)
+	check(_player.get_health() == 2 and not Input.is_action_pressed(&"focus"), "the heal lands and the action is not stuck")
 	_player.restore_full_health()
 	check(not button.visible, "it hides again at full health")
+
+
+func case_level_hud_energy_bar() -> void:
+	await _build_rig()
+	var hud := (load(LEVEL_HUD_SCENE) as PackedScene).instantiate() as CanvasLayer
+	_rig.add_child(hud)
+	hud.call(&"bind_player", _player)
+	var bar := hud.get_node("PlayerUI/EnergyBar") as TextureProgressBar
+	check(bar.value == 0.0 and bar.max_value == 99.0, "the level HUD bar starts empty with the soul maximum (%.0f/%.0f)" % [bar.value, bar.max_value])
+	_player.add_soul(33)
+	check(bar.value == 33.0, "an enemy hit fills it (%.0f)" % bar.value)
+	_prepare(1, 0)
+	_player.request_focus(true)
+	await _secs(FOCUS_SECONDS + 0.4)
+	check(bar.value == 0.0, "the heal spends it (%.0f)" % bar.value)
+	_player.add_soul(99)
+	check(bar.value == 99.0, "it fills up to the maximum (%.0f)" % bar.value)
+
+
+func case_touch_button_follows_new_player() -> void:
+	await _build_rig()
+	var touch := (load(TOUCH_SCENE) as PackedScene).instantiate()
+	touch.force_visible = true
+	_rig.add_child(touch)
+	await _frames(LAYOUT_FRAMES)
+	var button: Control = touch.get_node("Root/FocusButton")
+	check(not button.visible, "the button starts hidden")
+	_prepare(1, 33)
+	await _frames(LAYOUT_FRAMES)
+	check(button.visible, "it binds to the player that appeared after the autoload booted")
+	_player.free()
+	_player = (load(PLAYER_SCENE) as PackedScene).instantiate() as Player
+	_player.position = Vector2(START_X, 0.0)
+	_rig.add_child(_player)
+	await _frames(SETTLE_FRAMES)
+	_prepare(1, 33)
+	check(button.visible, "and rebinds when a zone swap replaces her")
 
 
 func case_player_scene_is_reusable() -> void:

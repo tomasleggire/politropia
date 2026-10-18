@@ -150,6 +150,16 @@ func clear_room_bounds(transition_time := -1.0) -> void:
 	_blend_bounds_to(Rect2(Vector2.ZERO, world_size), false, transition_time)
 
 
+## True while a per-room clamp rect is set (false: clamping to the whole world).
+func has_room_bounds() -> bool:
+	return _bounds_keep and _bounds_to.has_area()
+
+
+## The clamp rect the camera is heading to, a blend in progress finished.
+func get_target_room_bounds() -> Rect2:
+	return _bounds_to if has_room_bounds() else Rect2(Vector2.ZERO, world_size)
+
+
 ## The rect the camera is clamped to right now, mid-blend included.
 func get_room_bounds() -> Rect2:
 	if not _bounds_active:

@@ -1,12 +1,12 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://yt6s76xpakod"]
 
-[ext_resource type="Script" path="res://scripts/ui/health_hud.gd" id="1_hud"]
+[ext_resource type="Script" uid="uid://ystsc5787bnr" path="res://scripts/ui/health_hud.gd" id="1_hud"]
 
-[node name="HealthHud" type="CanvasLayer"]
+[node name="HealthHud" type="CanvasLayer" unique_id=1787392686]
 layer = 40
 script = ExtResource("1_hud")
 
-[node name="Root" type="Control" parent="."]
+[node name="Root" type="Control" parent="." unique_id=490698126]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -15,6 +15,6 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="Pips" type="HBoxContainer" parent="Root"]
+[node name="Pips" type="HBoxContainer" parent="Root" unique_id=1116446440]
 layout_mode = 0
 mouse_filter = 2

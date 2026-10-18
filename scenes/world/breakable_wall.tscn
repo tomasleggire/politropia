@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/breakable_wall.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/world/wall_hurtbox.gd" id="2_hurtbox"]
+
+[sub_resource type="RectangleShape2D" id="WallShape"]
+size = Vector2(24, 48)
+
+[sub_resource type="RectangleShape2D" id="HurtShape"]
+size = Vector2(24, 48)
+
+[node name="BreakableWall" type="StaticBody2D" groups=["breakable_walls"]]
+collision_layer = 1
+collision_mask = 0
+script = ExtResource("1_script")
+
+[node name="Shape" type="CollisionShape2D" parent="."]
+position = Vector2(12, 24)
+shape = SubResource("WallShape")
+
+[node name="Hurtbox" type="Area2D" parent="."]
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("2_hurtbox")
+
+[node name="HurtShape" type="CollisionShape2D" parent="Hurtbox"]
+position = Vector2(12, 24)
+shape = SubResource("HurtShape")
