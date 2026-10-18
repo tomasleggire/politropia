@@ -10,6 +10,8 @@ var _leaving_intro := false
 
 
 func _ready() -> void:
+	# Diferido: así corre después del _exit_tree del menú, que los prende.
+	get_tree().call_group.call_deferred(&"touch_controls", &"set_controls_enabled", false)
 	_video.finished.connect(_on_video_finished)
 	_skip_button.pressed.connect(_start_first_level)
 	var stream := VideoStreamTheora.new()
@@ -18,6 +20,10 @@ func _ready() -> void:
 	_video.play()
 	_skip_button.grab_focus()
 
+
+func _exit_tree() -> void:
+	# Al pasar al primer nivel se restauran los controles.
+	get_tree().call_group(&"touch_controls", &"set_controls_enabled", true)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
