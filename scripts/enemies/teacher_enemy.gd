@@ -35,7 +35,7 @@ func _think(delta: float) -> void:
 		turn_cooldown -= delta
 
 	# Camina en la dirección actual.
-	
+
 	velocity.x = _facing * walk_speed
 
 	if turn_cooldown > 0.0:
