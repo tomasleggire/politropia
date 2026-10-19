@@ -17,6 +17,9 @@ enum Direction {
 	COUNTER_CLOCKWISE = -1,
 }
 
+const DEFAULT_VENOM_PROJECTILE := preload("res://scenes/enemies/venom_projectile.tscn")
+const PLAYER_CENTER_OFFSET := Vector2(0.0, -24.0)
+
 @export_group("Crawling")
 @export var crawl_speed := 60.0
 @export var crawl_direction: Direction = Direction.CLOCKWISE
@@ -26,6 +29,21 @@ enum Direction {
 ## Rotation smoothing speed (radians/s).
 @export var rotation_speed := 16.0
 
+@export_group("Venom Attack")
+@export var venom_scene: PackedScene = DEFAULT_VENOM_PROJECTILE
+## Distance to player at which the snake triggers a shot.
+@export var shoot_range := 200.0
+## Minimum cooldown between shots (in seconds).
+@export var shoot_cooldown := 2.5
+## Flight speed of the venom projectile.
+@export var projectile_speed := 190.0
+## Delay from the start of the shoot animation until the venom projectile is released.
+@export var shoot_delay := 0.25
+## Maximum duration of the shooting stop if animation_finished does not fire.
+@export var shoot_duration := 0.6
+## Offset from snake center for the venom spawn point (local coordinates).
+@export var mouth_offset := Vector2(16.0, -14.0)
+
 @onready var _sprite: AnimatedSprite2D = get_node_or_null("Visual/AnimatedSprite2D") as AnimatedSprite2D
 @onready var _death_particles: CPUParticles2D = get_node_or_null("DeathParticles") as CPUParticles2D
 
@@ -34,6 +52,15 @@ var _surface_normal := Vector2.UP
 var _forward_dir := Vector2.RIGHT
 var _spawn_surface_normal := Vector2.UP
 
+## Venom shooting state
+var _is_shooting := false
+var _has_fired := false
+var _shoot_cooldown_left := 0.0
+var _shoot_delay_left := 0.0
+var _shoot_duration_left := 0.0
+var _shoot_target := Vector2.ZERO
+var _pool: Array[EnemyProjectile] = []
+var _sight_ray: RayCast2D
 
 ## Raycasts for robust surface detection
 @onready var _ray_down: RayCast2D = $RayDown
@@ -45,6 +72,15 @@ func _ready() -> void:
 	super._ready()
 	if Engine.is_editor_hint():
 		return
+	_setup_sight_ray()
+	if _sprite != null and not _sprite.animation_finished.is_connected(_on_animation_finished):
+		_sprite.animation_finished.connect(_on_animation_finished)
+
+	for i: int in 3:
+		var initial_shot := _make_projectile()
+		if initial_shot != null:
+			_pool.append(initial_shot)
+
 	if start_facing == 1:
 		crawl_direction = Direction.CLOCKWISE
 	elif start_facing == -1:
@@ -82,11 +118,31 @@ func _physics_process(delta: float) -> void:
 
 	# Al recibir un golpe, la serpiente se congela en seco en lugar de ser empujada fuera de la plataforma
 	if _recoil_left > 0.0:
+		if _is_shooting:
+			_cancel_shooting()
 		_recoil_left -= delta
 		velocity = -_surface_normal * adhesion_force
 		up_direction = _surface_normal
 		move_and_slide()
 		return
+
+	if _shoot_cooldown_left > 0.0:
+		_shoot_cooldown_left -= delta
+
+	if _is_shooting:
+		_update_shooting(delta)
+		velocity = -_surface_normal * adhesion_force
+		up_direction = _surface_normal
+		move_and_slide()
+		return
+
+	if _shoot_cooldown_left <= 0.0:
+		_check_shoot_trigger()
+		if _is_shooting:
+			velocity = -_surface_normal * adhesion_force
+			up_direction = _surface_normal
+			move_and_slide()
+			return
 
 	_crawl_step(delta)
 
@@ -216,10 +272,21 @@ func _on_player_found(player: Node) -> void:
 			_ray_forward.add_exception(col_obj)
 		if _ray_down_ahead != null:
 			_ray_down_ahead.add_exception(col_obj)
+		if _sight_ray != null:
+			_sight_ray.add_exception(col_obj)
+
+
+func set_ai_active(active: bool) -> void:
+	super.set_ai_active(active)
+	if not active:
+		_cancel_shooting()
+		clear_projectiles()
 
 
 ## Override: Overrides Enemy's corpse behavior to make the snake explode and vanish.
 func make_corpse_at(at: Vector2, _facing_dir: int) -> void:
+	_cancel_shooting()
+	clear_projectiles()
 	_dead = true
 	global_position = at
 	velocity = Vector2.ZERO
@@ -242,6 +309,8 @@ func make_corpse_at(at: Vector2, _facing_dir: int) -> void:
 
 
 func reset_to_spawn() -> void:
+	_cancel_shooting()
+	clear_projectiles()
 	super.reset_to_spawn()
 	if start_facing == 1:
 		crawl_direction = Direction.CLOCKWISE
@@ -256,8 +325,155 @@ func reset_to_spawn() -> void:
 
 
 func _play_walk() -> void:
+	if _is_shooting:
+		return
 	if _sprite != null and not _dead and _sprite.sprite_frames != null:
 		if _sprite.sprite_frames.has_animation(&"walk"):
 			_sprite.play(&"walk")
 		elif _sprite.sprite_frames.has_animation(&"default"):
 			_sprite.play(&"default")
+
+
+## -- Venom Attack System -----------------------------------------------------
+
+func _setup_sight_ray() -> void:
+	_sight_ray = RayCast2D.new()
+	_sight_ray.collision_mask = 1 # Only world geometry blocks sight
+	_sight_ray.enabled = false
+	_sight_ray.exclude_parent = true
+	add_child(_sight_ray)
+
+
+func _player_center() -> Vector2:
+	if is_instance_valid(_player_ref) and _player_ref is Node2D:
+		return (_player_ref as Node2D).global_position + PLAYER_CENTER_OFFSET
+	return Vector2.ZERO
+
+
+func _get_mouth_position() -> Vector2:
+	var dir_sign := 1.0 if crawl_direction == Direction.CLOCKWISE else -1.0
+	var offset: Vector2 = mouth_offset if mouth_offset != null else Vector2(16.0, -14.0)
+	var local_mouth := Vector2(dir_sign * offset.x, offset.y)
+	return to_global(local_mouth)
+
+
+func _has_line_of_sight(from: Vector2, target: Vector2) -> bool:
+	if _sight_ray == null:
+		return true
+	_sight_ray.global_position = from
+	_sight_ray.target_position = _sight_ray.to_local(target)
+	_sight_ray.force_raycast_update()
+	return not _sight_ray.is_colliding()
+
+
+func _check_shoot_trigger() -> void:
+	if not is_instance_valid(_player_ref):
+		return
+	var target := _player_center()
+	var mouth := _get_mouth_position()
+	var dist := mouth.distance_to(target)
+	var max_range: float = shoot_range if (shoot_range != null and shoot_range > 0.0) else 200.0
+	if dist > max_range:
+		return
+	if not _has_line_of_sight(mouth, target):
+		return
+
+	# Si el jugador está detrás del sentido de avance de la serpiente, girar hacia él
+	var to_player := target - global_position
+	if _forward_dir.dot(to_player) < -0.1:
+		_reverse_direction()
+
+	_start_shooting(target)
+
+
+func _start_shooting(target: Vector2) -> void:
+	_is_shooting = true
+	_has_fired = false
+	_shoot_target = target
+	_shoot_delay_left = shoot_delay if shoot_delay != null else 0.25
+	_shoot_duration_left = shoot_duration if shoot_duration != null else 0.6
+
+	if _sprite != null and _sprite.sprite_frames != null:
+		if _sprite.sprite_frames.has_animation(&"shoot"):
+			var frames := _sprite.sprite_frames.get_frame_count(&"shoot")
+			var fps := _sprite.sprite_frames.get_animation_speed(&"shoot")
+			if fps > 0.0 and frames > 0:
+				var anim_len: float = float(frames) / fps
+				_shoot_duration_left = anim_len
+				_shoot_delay_left = minf(_shoot_delay_left, anim_len * 0.5)
+			_sprite.play(&"shoot")
+
+
+func _update_shooting(delta: float) -> void:
+	_shoot_duration_left -= delta
+	if not _has_fired:
+		_shoot_delay_left -= delta
+		if _shoot_delay_left <= 0.0:
+			_has_fired = true
+			_fire_venom()
+
+	if _shoot_duration_left <= 0.0:
+		_finish_shooting()
+
+
+func _on_animation_finished() -> void:
+	if _is_shooting and _sprite != null and _sprite.animation == &"shoot":
+		if not _has_fired:
+			_has_fired = true
+			_fire_venom()
+		_finish_shooting()
+
+
+func _fire_venom() -> void:
+	if _dead or not _ai_active:
+		return
+	var from := _get_mouth_position()
+	var target := _player_center() if is_instance_valid(_player_ref) else _shoot_target
+	var dir := (target - from).normalized()
+	if dir == Vector2.ZERO:
+		dir = _forward_dir
+	var shot := _acquire_projectile()
+	var speed: float = projectile_speed if (projectile_speed != null and projectile_speed > 0.0) else 190.0
+	if shot != null:
+		shot.launch(from, dir, speed)
+
+
+func _acquire_projectile() -> EnemyProjectile:
+	for shot: EnemyProjectile in _pool:
+		if is_instance_valid(shot) and not shot.is_active():
+			return shot
+	var extra := _make_projectile()
+	if extra != null:
+		_pool.append(extra)
+	return extra
+
+
+func _make_projectile() -> EnemyProjectile:
+	var scene: PackedScene = venom_scene if venom_scene != null else DEFAULT_VENOM_PROJECTILE
+	if scene == null:
+		return null
+	var shot := scene.instantiate() as EnemyProjectile
+	add_child(shot)
+	return shot
+
+
+func clear_projectiles() -> void:
+	for shot: EnemyProjectile in _pool:
+		if is_instance_valid(shot):
+			shot.deactivate()
+
+
+func _finish_shooting() -> void:
+	_is_shooting = false
+	var cd: float = shoot_cooldown if (shoot_cooldown != null and shoot_cooldown > 0.0) else 2.5
+	_shoot_cooldown_left = cd
+	_play_walk()
+
+
+func _cancel_shooting() -> void:
+	_is_shooting = false
+	_has_fired = false
+	var cd: float = shoot_cooldown if (shoot_cooldown != null and shoot_cooldown > 0.0) else 2.5
+	_shoot_cooldown_left = cd * 0.5
+	_play_walk()
+
