@@ -115,6 +115,7 @@ func close() -> void:
 
 
 func _on_quit_pressed() -> void:
+	Player.clear_transition_state()
 	var path := main_menu_scene
 	if path.is_empty():
 		path = str(ProjectSettings.get_setting("application/run/main_scene"))

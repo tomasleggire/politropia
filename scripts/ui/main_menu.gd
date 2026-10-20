@@ -29,6 +29,7 @@ func _reset_new_game_progress() -> void:
 		if service != null and service.has_method("clear"):
 			service.call("clear")
 	TutorialSign.reset_seen()
+	Player.clear_transition_state()
 
 func _on_coleccionables() -> void:
 	var toast := get_node_or_null("/root/PickupToast")

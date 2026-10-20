@@ -46,6 +46,7 @@ const CHECKS := {
 	"case_level_hud_energy_bar": 4,
 	"case_touch_button": 5,
 	"case_touch_button_follows_new_player": 3,
+	"case_zone_transition_preserves_soul": 4,
 	"case_player_scene_is_reusable": 3,
 }
 
@@ -413,6 +414,22 @@ func case_touch_button_follows_new_player() -> void:
 	await _frames(SETTLE_FRAMES)
 	_prepare(1, 33)
 	check(button.visible, "and rebinds when a zone swap replaces her")
+
+
+func case_zone_transition_preserves_soul() -> void:
+	await _build_rig()
+	_player.add_soul(44)
+	check(_player.get_soul() == 44, "player has 44 soul before transition")
+	_player.save_for_transition()
+	_player.free()
+	_player = (load(PLAYER_SCENE) as PackedScene).instantiate() as Player
+	_rig.add_child(_player)
+	await _frames(LAYOUT_FRAMES)
+	check(_player.get_soul() == 44, "new player in new zone preserves 44 soul")
+	var hud := _player.hud_instance
+	check(hud != null, "player instantiated HUD")
+	var bar := hud.get_node("PlayerUI/EnergyBar") as TextureProgressBar
+	check(bar.value == 44.0, "HUD energy_bar preserves the 44 soul value (%.0f)" % bar.value)
 
 
 func case_player_scene_is_reusable() -> void:
