@@ -500,6 +500,31 @@ var _attack_origin := Vector2.ZERO
 var _attack_segment_rect := Rect2()
 var _attack_segment_anchored := false
 
+## Preserved across zone transitions so Luz retains soul, health and energy.
+static var _transition_soul: int = -1
+static var _transition_health: int = -1
+static var _transition_energy: float = -1.0
+
+static func clear_transition_state() -> void:
+	_transition_soul = -1
+	_transition_health = -1
+	_transition_energy = -1.0
+
+
+func save_for_transition() -> void:
+	_transition_soul = _soul
+	_transition_health = _health
+	_transition_energy = current_energy
+
+
+static func save_player_for_transition(tree: SceneTree) -> void:
+	if tree == null:
+		return
+	var p := tree.get_first_node_in_group(&"player") as Player
+	if p != null:
+		p.save_for_transition()
+
+
 var _soul := 0
 var _focus_left := 0.0
 var _focus_tapped := false
@@ -522,8 +547,23 @@ func _ready() -> void:
 	# cell, so this scale makes Luz exactly body_height px tall.
 	_sprite.scale = Vector2.ONE * (body_height / LUZ_BODY_PIXELS)
 	_spawn_position = global_position
-	current_energy = max_energy
-	_health = max_health
+	if _transition_energy >= 0.0:
+		current_energy = _transition_energy
+		_transition_energy = -1.0
+	else:
+		current_energy = max_energy
+
+	if _transition_health > 0:
+		_health = mini(_transition_health, max_health)
+		_transition_health = -1
+	else:
+		_health = max_health
+
+	if _transition_soul >= 0:
+		_soul = mini(_transition_soul, max_soul)
+		_transition_soul = -1
+	else:
+		_soul = 0
 	_base_alpha = _sprite.modulate.a
 	_default_process_mode = process_mode
 	_recompute_jump_physics()
@@ -2125,6 +2165,7 @@ func _begin_death() -> void:
 	_dead = true
 	_invuln_left = 0.0
 	_hurt_left = 0.0
+	clear_transition_state()
 	_set_soul(0)
 	_enter_state(State.DEAD)
 	died.emit()
@@ -2194,6 +2235,10 @@ func get_soul() -> int:
 
 func get_max_soul() -> int:
 	return max_soul
+
+
+func set_soul(value: int) -> void:
+	_set_soul(value)
 
 
 ## Adds soul up to the cap. Only hits that damage an enemy call this.
