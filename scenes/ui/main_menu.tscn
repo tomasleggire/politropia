@@ -302,3 +302,20 @@ theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_n4uci")
 theme_override_styles/disabled = SubResource("StyleBoxFlat_877pj")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_x2yvf")
 text = "COLECCIONABLES"
+
+[node name="Achievements" type="Button" parent="CenterContainer/MarginContainer/VBoxContainer/Buttons" unique_id=980247228]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 40)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9098039, 0.8509804, 0.65882355, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(0.41960785, 0.44705883, 0.5019608, 1)
+theme_override_fonts/font = ExtResource("3_1g8jr")
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxFlat_m1kxf")
+theme_override_styles/hover = SubResource("StyleBoxFlat_uhagc")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_n4uci")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_877pj")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_x2yvf")
+text = "LOGROS
+"
