@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CollectibleDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/collectibles/collectible_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+id = "friendly_letters"
+title = "Letras amables"
+category = "Aprendizaje"
+content = "Texto provisional.
+
+Las letras pueden bailar, cambiar de lugar o costar más de lo esperado. Lo importante es encontrar el formato que ayude a cada persona a leer con comodidad. Contenido provisional pendiente de revisión."
+image = null

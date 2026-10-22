@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="CollectibleDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/collectibles/collectible_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+id = "reading_own_rhythm"
+title = "Ritmo propio"
+category = "Aprendizaje"
+content = "Texto provisional.
+
+Leer no tiene un único compás. Hay quien avanza despacio, quien vuelve atrás y quien necesita escuchar las palabras. Ninguna de esas formas es un error. Este texto es un borrador: el contenido sobre dislexia se escribirá con el equipo pedagógico."

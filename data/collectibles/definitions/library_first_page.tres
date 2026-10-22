@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="CollectibleDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/collectibles/collectible_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+id = "library_first_page"
+title = "Primera página"
+category = "Historia"
+content = "Texto provisional.
+
+La biblioteca guarda miles de historias, pero esta es la primera que Luz leyó en voz alta. Todavía falta escribir el contenido definitivo de este coleccionable."

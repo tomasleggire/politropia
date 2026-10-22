@@ -33,6 +33,8 @@ MapScreen="*res://scenes/ui/map_screen.tscn"
 SecretProgress="*res://scripts/world/secret_progress.gd"
 AbilityProgress="*res://scripts/world/ability_progress.gd"
 MusicManager="*uid://5cfbl0ss3jw"
+Collectibles="*res://scripts/world/collectibles_manager.gd"
+
 
 [display]
 

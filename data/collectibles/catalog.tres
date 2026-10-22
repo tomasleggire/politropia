@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="CollectibleCatalog" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/collectibles/collectible_catalog.gd" id="1_catalog"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/library_first_page.tres" id="2_first_page"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/library_marginal_note.tres" id="3_marginal_note"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/reading_own_rhythm.tres" id="4_rhythm"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/friendly_letters.tres" id="5_letters"]
+
+[resource]
+script = ExtResource("1_catalog")
+items = Array[ExtResource("2_first_page")]([ExtResource("2_first_page"), ExtResource("3_marginal_note"), ExtResource("4_rhythm"), ExtResource("5_letters")])
