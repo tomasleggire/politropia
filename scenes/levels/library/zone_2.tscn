@@ -9,6 +9,8 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="6_eglro"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="7_cxp8p"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_710r8"]
+[ext_resource type="PackedScene" path="res://scenes/world/collectible_pickup.tscn" id="collectible_pickup"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/library_marginal_note.tres" id="collectible_marginal_note"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
@@ -14012,6 +14014,10 @@ position = Vector2(1949, 673)
 target_scene_path = "uid://cq3j5o0ey5cvx"
 target_door_id = 4
 door_id = 3
+
+[node name="CollectibleMarginalNote" parent="." instance=ExtResource("collectible_pickup")]
+position = Vector2(140, 180)
+definition = ExtResource("collectible_marginal_note")
 
 [node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
 [node name="DustMotes" parent="." instance=ExtResource("amb_dust")]

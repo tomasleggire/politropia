@@ -10,6 +10,8 @@
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="10_0j26h"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_n3h83"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_6keu4"]
+[ext_resource type="PackedScene" path="res://scenes/world/collectible_pickup.tscn" id="collectible_pickup"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/library_first_page.tres" id="collectible_first_page"]
 [ext_resource type="PackedScene" path="res://scenes/world/tutorial_sign.tscn" id="20_tutsign"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
@@ -14235,6 +14237,10 @@ position = Vector2(1000, 697)
 title = "Curación"
 text = "Golpeá enemigos para llenar la [color=#e0b94f]energía[/color]. Tocá el botón de [color=#e0b94f]curar[/color] para recuperar vida."
 show_once = true
+
+[node name="CollectibleFirstPage" parent="." instance=ExtResource("collectible_pickup")]
+position = Vector2(400, 672)
+definition = ExtResource("collectible_first_page")
 
 [node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
 [node name="DustMotes" parent="." instance=ExtResource("amb_dust")]
