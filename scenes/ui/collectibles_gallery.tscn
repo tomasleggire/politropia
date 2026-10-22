@@ -1,0 +1,262 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/collectibles_gallery.gd" id="1_gallery"]
+[ext_resource type="Theme" path="res://assets/ui/gothic_theme.tres" id="2_theme"]
+[ext_resource type="Script" path="res://scripts/ui/collectible_icon.gd" id="3_icon"]
+
+[sub_resource type="Gradient" id="Gradient_background"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0.012, 0.035, 0.08, 1, 0.025, 0.08, 0.15, 1, 0.035, 0.13, 0.2, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture_background"]
+gradient = SubResource("Gradient_background")
+width = 640
+height = 360
+fill_from = Vector2(0, 0)
+fill_to = Vector2(0, 1)
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_slots"]
+
+[node name="CollectiblesGallery" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+script = ExtResource("1_gallery")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture_background")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="Layout" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="Header" type="HBoxContainer" parent="Margin/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Back" type="Button" parent="Margin/Layout/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(62, 26)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Volver"
+
+[node name="Title" type="Label" parent="Margin/Layout/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.878, 0.725, 0.31, 1)
+theme_override_font_sizes/font_size = 18
+text = "COLECCIONABLES"
+vertical_alignment = 1
+
+[node name="Progress" type="Label" parent="Margin/Layout/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.85, 0.91, 1)
+theme_override_font_sizes/font_size = 12
+text = "0 / 0"
+vertical_alignment = 1
+
+[node name="Rule" type="HSeparator" parent="Margin/Layout"]
+layout_mode = 2
+
+[node name="Body" type="HBoxContainer" parent="Margin/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="LeftPanel" type="PanelContainer" parent="Margin/Layout/Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(262, 0)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Margin" type="MarginContainer" parent="Margin/Layout/Body/LeftPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 4
+
+[node name="Box" type="VBoxContainer" parent="Margin/Layout/Body/LeftPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Section" type="Label" parent="Margin/Layout/Body/LeftPanel/Margin/Box"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.47, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 9
+text = "COLECCIÓN"
+
+[node name="GridScroll" type="ScrollContainer" parent="Margin/Layout/Body/LeftPanel/Margin/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="Grid" type="GridContainer" parent="Margin/Layout/Body/LeftPanel/Margin/Box/GridScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 5
+theme_override_constants/v_separation = 5
+columns = 3
+
+[node name="SlotTemplate" type="Button" parent="Margin/Layout/Body/LeftPanel/Margin/Box/GridScroll/Grid"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(78, 84)
+layout_mode = 2
+toggle_mode = true
+button_group = SubResource("ButtonGroup_slots")
+
+[node name="Content" type="VBoxContainer" parent="Margin/Layout/Body/LeftPanel/Margin/Box/GridScroll/Grid/SlotTemplate"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_top = 3.0
+offset_right = -3.0
+offset_bottom = -3.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Icon" type="Control" parent="Margin/Layout/Body/LeftPanel/Margin/Box/GridScroll/Grid/SlotTemplate/Content"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+script = ExtResource("3_icon")
+
+[node name="Name" type="Label" parent="Margin/Layout/Body/LeftPanel/Margin/Box/GridScroll/Grid/SlotTemplate/Content"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.851, 0.659, 1)
+theme_override_font_sizes/font_size = 8
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+max_lines_visible = 2
+clip_text = true
+
+[node name="Divider" type="ColorRect" parent="Margin/Layout/Body"]
+custom_minimum_size = Vector2(2, 0)
+layout_mode = 2
+mouse_filter = 2
+color = Color(0.3, 0.8, 0.95, 0.38)
+
+[node name="RightPanel" type="PanelContainer" parent="Margin/Layout/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Margin" type="MarginContainer" parent="Margin/Layout/Body/RightPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="Box" type="VBoxContainer" parent="Margin/Layout/Body/RightPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="DetailIcon" type="Control" parent="Margin/Layout/Body/RightPanel/Margin/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(62, 62)
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+script = ExtResource("3_icon")
+
+[node name="Category" type="Label" parent="Margin/Layout/Body/RightPanel/Margin/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.47, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 9
+text = "Bloqueado"
+horizontal_alignment = 1
+
+[node name="DetailTitle" type="Label" parent="Margin/Layout/Body/RightPanel/Margin/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93, 0.83, 0.55, 1)
+theme_override_font_sizes/font_size = 15
+text = "???"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+max_lines_visible = 2
+
+[node name="Rule" type="HSeparator" parent="Margin/Layout/Body/RightPanel/Margin/Box"]
+layout_mode = 2
+
+[node name="DetailScroll" type="ScrollContainer" parent="Margin/Layout/Body/RightPanel/Margin/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="DetailText" type="RichTextLabel" parent="Margin/Layout/Body/RightPanel/Margin/Box/DetailScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/default_color = Color(0.94, 0.91, 0.82, 1)
+theme_override_constants/line_separation = 4
+theme_override_font_sizes/normal_font_size = 13
+text = ""
+fit_content = true
+scroll_active = false
+autowrap_mode = 3
+
+[node name="DetailHint" type="Label" parent="Margin/Layout/Body/RightPanel/Margin/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.47, 0.8, 0.9, 0.85)
+theme_override_font_sizes/font_size = 8
+text = "Encontralo en el mundo"
+horizontal_alignment = 1
+
+[node name="EmptyState" type="Label" parent="Margin/Layout/Body"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 13
+text = "El catálogo todavía no tiene coleccionables."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3

@@ -2,6 +2,7 @@ extends Control
 
 const GAME_SCENE := "res://scenes/levels/library/zone_1.tscn"
 const INTRO_SCENE := "res://scenes/ui/new_game_intro.tscn"
+const GALLERY_SCENE := "res://scenes/ui/collectibles_gallery.tscn"
 
 @onready var btn_new_game: Button = %NewGame
 @onready var btn_continue: Button = %Continue
@@ -53,7 +54,8 @@ func _reset_new_game_progress() -> void:
 		"/root/FragmentProgress",
 		"/root/MapProgress",
 		"/root/SecretProgress",
-		"/root/AbilityProgress"
+		"/root/AbilityProgress",
+		"/root/Collectibles"
 	]
 
 	for service_path in service_paths:
@@ -67,7 +69,7 @@ func _reset_new_game_progress() -> void:
 
 
 func _on_collectables_pressed() -> void:
-	_show_coming_soon_toast()
+	get_tree().change_scene_to_file(GALLERY_SCENE)
 
 
 func _on_achievements_pressed() -> void:
