@@ -61,9 +61,21 @@ var _held_actions := {
 
 func _ready() -> void:
 	layer = 100
-	visible = force_visible or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
+	add_to_group(&"touch_controls")
+	visible = _platform_wants_controls()
 	_position_pad_at_rest()
 	_bind_found_player.call_deferred()
+
+
+func _platform_wants_controls() -> bool:
+	return force_visible or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
+
+
+## Lo llama el menú principal (false al entrar, true al salir).
+func set_controls_enabled(enabled: bool) -> void:
+	if not enabled:
+		release_all()
+	visible = enabled and _platform_wants_controls()
 
 
 func _process(delta: float) -> void:
