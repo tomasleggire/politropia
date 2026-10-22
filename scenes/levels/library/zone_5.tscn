@@ -12,6 +12,7 @@
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="11_expoe"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="14_lhyta"]
 [ext_resource type="PackedScene" uid="uid://b5lf46acc08rl" path="res://scenes/enemies/teacher_enemy.tscn" id="19_lhyta"]
+[ext_resource type="PackedScene" uid="uid://dmth8yaq1mat2" path="res://scenes/enemies/mathematician_enemy.tscn" id="20_6por8"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
@@ -14435,3 +14436,11 @@ debris_color = Color(0.78, 0.68, 0.5, 1)
 
 [node name="teacher_enemy" parent="." unique_id=1714237560 instance=ExtResource("19_lhyta")]
 position = Vector2(1498, 320)
+
+[node name="MathematicianEnemy" parent="." unique_id=1401423410 instance=ExtResource("20_6por8")]
+position = Vector2(395, 215)
+max_health = 3
+
+[node name="MathematicianEnemy2" parent="." unique_id=94214092 instance=ExtResource("20_6por8")]
+position = Vector2(1242, 727)
+max_health = 3
