@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://52lnrs7hxbfp" path="res://scripts/player/player.gd" id="1_player"]
 [ext_resource type="AudioStream" uid="uid://41x7pxqvi70t" path="res://assets/audio/land_hup.wav" id="3_land"]
+[ext_resource type="Texture2D" uid="uid://bu5sfnwttur3b" path="res://assets/player/luz/luz_turn_skid_sheet.png" id="4_5gtgg"]
 [ext_resource type="AudioStream" uid="uid://cyd7l8tdmkk7x" path="res://assets/audio/footstep.wav" id="4_foot"]
 [ext_resource type="AudioStream" uid="uid://bio8aegkoaanu" path="res://assets/audio/jump_launch.wav" id="5_jump"]
 [ext_resource type="Script" uid="uid://dy77m7qh61ceh" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
@@ -22,6 +23,42 @@ shader_parameter/rim_color = Color(0.4, 0.46, 0.58, 1)
 shader_parameter/width = 5.0
 shader_parameter/light_direction = Vector2(-0.5, -1)
 shader_parameter/strength = 0.45
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_h17s1"]
+atlas = ExtResource("4_5gtgg")
+region = Rect2(512, 512, 512, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_je7p5"]
+atlas = ExtResource("4_5gtgg")
+region = Rect2(1536, 0, 512, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_fm80t"]
+atlas = ExtResource("4_5gtgg")
+region = Rect2(512, 0, 512, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_gx1jg"]
+atlas = ExtResource("4_5gtgg")
+region = Rect2(0, 512, 512, 512)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_g1plq"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_h17s1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_je7p5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_fm80t")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_gx1jg")
+}],
+"loop": 1,
+"name": &"hiperfoco",
+"speed": 5.0
+}]
 
 [node name="Player" type="CharacterBody2D" unique_id=1062555339 groups=["player"]]
 collision_mask = 3
@@ -62,6 +99,9 @@ disabled = true
 texture_filter = 4
 material = SubResource("ShaderMaterial_rim")
 scale = Vector2(0.1448, 0.1448)
+sprite_frames = SubResource("SpriteFrames_g1plq")
+animation = &"hiperfoco"
+frame_progress = 0.19053759
 
 [node name="SlashVfx" type="Node2D" parent="." unique_id=883827761]
 z_index = 1

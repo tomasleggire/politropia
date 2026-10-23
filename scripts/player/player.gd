@@ -631,6 +631,9 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed(&"dash") and not channeling:
 		_try_start_dash()
+	
+	if Input.is_action_just_pressed(&"skill"):
+		activar_revelacion()
 
 	_try_start_focus()
 	_focus_tapped = false
@@ -671,6 +674,12 @@ func _physics_process(delta: float) -> void:
 	_update_footsteps(delta)
 	_update_animation()
 	_update_afterimages(delta)
+
+func activar_revelacion() -> void:
+	if _state != State.IDLE and _state != State.RUN:
+		return 
+	hiperfocus_activated.emit()
+	
 
 
 func _update_shared_timers(delta: float) -> void:
@@ -2797,3 +2806,6 @@ func _play_animation(animation_name: StringName, speed_scale := 1.0) -> void:
 	if _sprite.animation != animation_name:
 		_sprite.play(animation_name)
 	_sprite.speed_scale = speed_scale
+	
+
+signal hiperfocus_activated
