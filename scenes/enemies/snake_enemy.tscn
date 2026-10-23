@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://b78u4u17al0u6" path="res://scripts/enemies/snake_enemy.gd" id="1_snake"]
 [ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="2_contact"]
 [ext_resource type="Texture2D" uid="uid://bubaciembpkrk" path="res://assets/enemies/snake_ajustado.png" id="2_ol78i"]
+[ext_resource type="AudioStream" uid="uid://bejqcwe4hynuh" path="res://assets/audio/snake_hissing.wav" id="4_3eqri"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(32, 32)
@@ -193,3 +194,7 @@ collision_mask = 3
 position = Vector2(20, -16)
 target_position = Vector2(0, 28)
 collision_mask = 3
+
+[node name="SfxAttack" type="AudioStreamPlayer" parent="." unique_id=910854326]
+stream = ExtResource("4_3eqri")
+volume_db = -5.0

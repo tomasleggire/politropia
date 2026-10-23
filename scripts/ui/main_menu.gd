@@ -25,6 +25,7 @@ func _ready() -> void:
 
 	btn_new_game.grab_focus()
 
+	MusicManager.play_menu_music()
 	# Start loading the game scene in the background.
 	ResourceLoader.load_threaded_request(GAME_SCENE)
 
@@ -42,6 +43,7 @@ func _on_new_game_pressed() -> void:
 	# Prevent multiple button presses.
 	btn_new_game.disabled = true
 	_reset_new_game_progress()
+	MusicManager.stop_music()
 	get_tree().change_scene_to_file(INTRO_SCENE)
 
 

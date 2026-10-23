@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://bwwgy7x325x6a" path="res://scripts/enemies/lancet_enemy.gd" id="1_lancet"]
 [ext_resource type="Texture2D" uid="uid://cuxvli7mvrswe" path="res://assets/enemies/lancero_animation_02.png" id="2_lancero"]
+[ext_resource type="AudioStream" uid="uid://cdfj3g36jexvt" path="res://assets/audio/shield_bash.wav" id="3_v8hsu"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(32, 77)
@@ -208,22 +209,21 @@ scale_amount_max = 4.0
 scale_amount_curve = SubResource("Curve_particles")
 color = Color(0.9, 0.7, 0.3, 1)
 
-[node name="PencilTip" type="Node2D" parent="." unique_id=2781930412]
+[node name="PencilTip" type="Node2D" parent="." unique_id=-1513036884]
 position = Vector2(76, -35)
 
-[node name="Gleam" type="Node2D" parent="PencilTip" unique_id=3194028114]
+[node name="Gleam" type="Node2D" parent="PencilTip" unique_id=-1100939182]
 visible = false
 
-[node name="OuterStar" type="Polygon2D" parent="PencilTip/Gleam"]
+[node name="OuterStar" type="Polygon2D" parent="PencilTip/Gleam" unique_id=1715408539]
 color = Color(1, 0.82, 0.2, 0.95)
 polygon = PackedVector2Array(0, -14, 3, -3, 14, 0, 3, 3, 0, 14, -3, 3, -14, 0, -3, -3)
 
-[node name="InnerDiamond" type="Polygon2D" parent="PencilTip/Gleam"]
+[node name="InnerDiamond" type="Polygon2D" parent="PencilTip/Gleam" unique_id=33655081]
 color = Color(1, 0.95, 0.6, 1)
 polygon = PackedVector2Array(0, -6, 6, 0, 0, 6, -6, 0)
 
-[node name="Core" type="Polygon2D" parent="PencilTip/Gleam"]
-color = Color(1, 1, 1, 1)
+[node name="Core" type="Polygon2D" parent="PencilTip/Gleam" unique_id=2070042879]
 polygon = PackedVector2Array(0, -2.5, 2.5, 0, 0, 2.5, -2.5, 0)
 
 [node name="Sparks" type="CPUParticles2D" parent="PencilTip" unique_id=1849201735]
@@ -243,3 +243,6 @@ scale_amount_max = 3.5
 scale_amount_curve = SubResource("Curve_particles")
 color = Color(1, 0.85, 0.3, 1)
 
+[node name="SfxChase" type="AudioStreamPlayer" parent="." unique_id=114552478]
+stream = ExtResource("3_v8hsu")
+volume_db = -20.0
