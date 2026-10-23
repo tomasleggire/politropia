@@ -31,6 +31,8 @@ enum AttackPhase { APPROACH, WINDUP, DIVE, CHARGE, RECOVER }
 
 var _owl_sprite: AnimatedSprite2D
 @onready var _attack_sfx: AudioStreamPlayer2D = $AttackSfx
+@onready var _sfx_chase: AudioStreamPlayer = $SfxChase
+
 var _attack_phase := AttackPhase.APPROACH
 var _phase_left := 0.0
 var _charge_direction := Vector2.RIGHT
@@ -89,7 +91,9 @@ func _engaged_think(delta: float) -> void:
 
 func _on_engaged() -> void:
 	super._on_engaged()
+	_sfx_chase.play()
 	_start_phase(AttackPhase.WINDUP, windup_duration, &"windup")
+	
 
 
 func make_corpse_at(at: Vector2, facing: int) -> void:

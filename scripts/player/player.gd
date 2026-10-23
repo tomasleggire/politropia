@@ -358,6 +358,9 @@ var current_health: int:
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
 @onready var _sfx_foot: AudioStreamPlayer = $SfxFoot
 @onready var _sfx_jump: AudioStreamPlayer = $SfxJump
+@onready var _sfx_dash: AudioStreamPlayer = $SfxDash
+@onready var _sfx_attack: AudioStreamPlayer = $SfxAttack
+@onready var _sfx_hurt: AudioStreamPlayer = $SfxHurt
 @onready var _collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var _wall_check_head: RayCast2D = $WallCheckHead
 @onready var _wall_check_chest: RayCast2D = $WallCheckChest
@@ -1017,6 +1020,8 @@ func _queue_attack(direction: int) -> void:
 		return
 
 	_start_ground_attack()
+	
+	_sfx_attack.play()
 
 
 func _end_generic_attack() -> void:
@@ -1559,6 +1564,7 @@ func _try_start_dash() -> bool:
 	if not is_on_floor() and _air_dash_used:
 		return false
 	_start_dash()
+	_sfx_dash.play()
 	return true
 
 
@@ -1940,6 +1946,7 @@ func set_max_health(value: int) -> void:
 ## knocks Luz away from the source, restores her air dash and air jump (like
 ## Hollow Knight), and starts the i-frames, control lock and hit-stop.
 func take_damage(amount: int, source_position: Vector2) -> bool:
+	_sfx_hurt.play()
 	return _apply_damage(amount, source_position, false)
 
 
@@ -1947,6 +1954,7 @@ func take_damage(amount: int, source_position: Vector2) -> bool:
 ## camera and then fades out, moves Luz to the last safe ground and fades back
 ## in, with input locked throughout. A lethal hit dies normally instead.
 func take_hazard_damage(amount: int, source_position: Vector2) -> bool:
+	_sfx_hurt.play()
 	return _apply_damage(amount, source_position, true)
 
 
@@ -2665,9 +2673,13 @@ func _update_footsteps(delta: float) -> void:
 		_dust_left = footstep_dust_interval
 		_spawn_dust(GroundDust.Kind.FOOTSTEP)
 	_footstep_left -= delta
-	if _footstep_left <= 0.0:
-		_sfx_foot.play()
-		_footstep_left = clampf(0.30 - absf(velocity.x) / 2600.0, 0.12, 0.26)
+	var is_walking := absf(velocity.x) > 10.0
+	if is_walking:
+		if not _sfx_foot.playing:
+			_sfx_foot.play()
+	else:
+		if _sfx_foot.playing:
+			_sfx_foot.stop()
 
 
 ## Drops a self-freeing dust effect at her feet, left behind in world space.

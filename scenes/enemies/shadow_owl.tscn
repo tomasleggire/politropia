@@ -2,7 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/enemies/shadow_owl.gd" id="1_owl"]
 [ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="2_contact"]
-[ext_resource type="AudioStream" path="res://assets/audio/owl_attack.mp3" id="3_attack_sfx"]
+[ext_resource type="AudioStream" uid="uid://dnbog4v0cct7g" path="res://assets/audio/owl_attack.mp3" id="3_attack_sfx"]
+[ext_resource type="AudioStream" uid="uid://cxhtxh351a5mg" path="res://assets/audio/owl_screech.wav" id="3_gbdac"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(42, 34)
@@ -41,10 +42,14 @@ position = Vector2(0, -18)
 target_position = Vector2(100, 0)
 collision_mask = 1
 
-[node name="AttackSfx" type="AudioStreamPlayer2D" parent="."]
+[node name="AttackSfx" type="AudioStreamPlayer2D" parent="." unique_id=1658147772]
 stream = ExtResource("3_attack_sfx")
 volume_db = -3.0
 max_distance = 700.0
 
-[node name="ContactDamage" parent="." instance=ExtResource("2_contact")]
+[node name="SfxChase" type="AudioStreamPlayer" parent="." unique_id=623351758]
+stream = ExtResource("3_gbdac")
+volume_db = -20.0
+
+[node name="ContactDamage" parent="." unique_id=976881237 instance=ExtResource("2_contact")]
 position = Vector2(0, -18)

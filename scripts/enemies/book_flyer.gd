@@ -5,6 +5,8 @@ extends Flyer
 ## Book-shaped Vengefly variant. It keeps the existing Flyer behaviour and
 ## builds its short flight loop from the first row of the supplied atlas.
 
+@onready var _sfx_chase: AudioStreamPlayer = $SfxChase
+
 const SHEET := preload("res://assets/art/greece/enemies/book_vengefly_sheet.png")
 const ATLAS_COLUMNS := 10.0
 const ATLAS_ROWS := 6.0
@@ -32,3 +34,8 @@ func _make_flight_frames() -> SpriteFrames:
 		atlas.region = Rect2(Vector2(float(column) * frame_size.x, 0.0), frame_size)
 		frames.add_frame(&"fly", atlas)
 	return frames
+
+
+func _on_engaged() -> void:
+	super._on_engaged()
+	_sfx_chase.play()

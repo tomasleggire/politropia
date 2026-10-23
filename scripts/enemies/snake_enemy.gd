@@ -46,6 +46,7 @@ const PLAYER_CENTER_OFFSET := Vector2(0.0, -24.0)
 
 @onready var _sprite: AnimatedSprite2D = get_node_or_null("Visual/AnimatedSprite2D") as AnimatedSprite2D
 @onready var _death_particles: CPUParticles2D = get_node_or_null("DeathParticles") as CPUParticles2D
+@onready var _sfx_attack: AudioStreamPlayer = $SfxAttack
 
 ## The current surface normal this crawler is attached to (defaults to floor up: Vector2.UP).
 var _surface_normal := Vector2.UP
@@ -436,6 +437,7 @@ func _fire_venom() -> void:
 	var speed: float = projectile_speed if (projectile_speed != null and projectile_speed > 0.0) else 190.0
 	if shot != null:
 		shot.launch(from, dir, speed)
+		_sfx_attack.play()
 
 
 func _acquire_projectile() -> EnemyProjectile:
@@ -476,4 +478,3 @@ func _cancel_shooting() -> void:
 	var cd: float = shoot_cooldown if (shoot_cooldown != null and shoot_cooldown > 0.0) else 2.5
 	_shoot_cooldown_left = cd * 0.5
 	_play_walk()
-
