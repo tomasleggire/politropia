@@ -14,12 +14,14 @@ func _ready() -> void:
 	btn_coleccionables.pressed.connect(_on_coleccionables)
 	btn_salir.pressed.connect(get_tree().quit)
 	btn_nueva.grab_focus()
+	MusicManager.play_menu_music()
 	# Empieza a cargar el juego en segundo plano
 	ResourceLoader.load_threaded_request(ESCENA_JUEGO)
 
 func _on_nueva_partida() -> void:
 	btn_nueva.disabled = true  # evita tocar dos veces
 	_reset_new_game_progress()
+	MusicManager.stop_music()
 	get_tree().change_scene_to_file(ESCENA_INTRO)
 
 
