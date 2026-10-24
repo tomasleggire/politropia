@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="MapLayout" format=3]
+[gd_resource type="Resource" script_class="MapLayout" format=3 uid="uid://dpngs3glk3v7i"]
 
-[ext_resource type="Script" path="res://scripts/world/map_layout.gd" id="1_layout"]
-[ext_resource type="Script" path="res://scripts/world/map_room.gd" id="2_room"]
+[ext_resource type="Script" uid="uid://21gvud824wpq" path="res://scripts/world/map_layout.gd" id="1_layout"]
+[ext_resource type="Script" uid="uid://dhj1rdo620ffd" path="res://scripts/world/map_room.gd" id="2_room"]
 
 [sub_resource type="Resource" id="Room_1"]
 script = ExtResource("2_room")
@@ -28,40 +28,49 @@ connects_to = Array[String](["res://scenes/levels/library/zone_2.tscn", "res://s
 script = ExtResource("2_room")
 scene_path = "res://scenes/levels/library/zone_4.tscn"
 display_name = "Gran sala"
-map_rect = Rect2(99, 14, 39, 18)
-connects_to = Array[String](["res://scenes/levels/library/zone_3.tscn", "res://scenes/levels/library/zone_5.tscn", "res://scenes/levels/library/zone_6.tscn", "res://scenes/levels/library/zone_healing.tscn"])
+map_rect = Rect2(68, -16, 39, 18)
+connects_to = Array[String](["uid://cq3j5o0ey5cvx", "uid://bt3m0cf4sgq7r", "uid://bei32b4g8xot4"])
 
 [sub_resource type="Resource" id="Room_5"]
 script = ExtResource("2_room")
-scene_path = "res://scenes/levels/library/zone_5.tscn"
-display_name = "Galería"
-map_rect = Rect2(141, 14, 34, 16)
-connects_to = Array[String](["res://scenes/levels/library/zone_4.tscn", "res://scenes/levels/library/zone_lectern.tscn"])
+scene_path = "uid://bt3m0cf4sgq7r"
+display_name = "Archivo"
+map_rect = Rect2(109, -20, 34, 16)
+connects_to = Array[String](["uid://b6qrv51dde5ob", "uid://dv0i34v7aiwto"])
 
 [sub_resource type="Resource" id="Room_6"]
 script = ExtResource("2_room")
-scene_path = "res://scenes/levels/library/zone_6.tscn"
-display_name = "Archivo"
-map_rect = Rect2(99, 36, 34, 14)
+scene_path = "uid://fvobcn8y45k4"
+display_name = "Galería"
+map_rect = Rect2(163, -16, 34, 14)
 connects_to = Array[String](["res://scenes/levels/library/zone_4.tscn"])
 
 [sub_resource type="Resource" id="Room_7"]
 script = ExtResource("2_room")
-scene_path = "res://scenes/levels/library/zone_healing.tscn"
+scene_path = "uid://bei32b4g8xot4"
 display_name = "Sanación"
-map_rect = Rect2(110, -2, 18, 9)
-landmark = 2
+map_rect = Rect2(48, -10, 18, 9)
 connects_to = Array[String](["res://scenes/levels/library/zone_4.tscn"])
+landmark = 2
 
 [sub_resource type="Resource" id="Room_8"]
 script = ExtResource("2_room")
-scene_path = "res://scenes/levels/library/zone_lectern.tscn"
+scene_path = "uid://dv0i34v7aiwto"
 display_name = "Atril"
-map_rect = Rect2(150, 2, 16, 9)
+map_rect = Rect2(145, -16, 16, 9)
+connects_to = Array[String](["uid://fvobcn8y45k4", "uid://bt3m0cf4sgq7r"])
 landmark = 3
-connects_to = Array[String](["res://scenes/levels/library/zone_5.tscn"])
+
+[sub_resource type="Resource" id="Resource_se022"]
+script = ExtResource("2_room")
+scene_path = "uid://ceuqjn8ipsey5"
+display_name = "Jefe"
+map_rect = Rect2(176, 0, 20, 12)
+connects_to = Array[String](["uid://fvobcn8y45k4"])
+landmark = 1
+metadata/_custom_type_script = "uid://dhj1rdo620ffd"
 
 [resource]
 script = ExtResource("1_layout")
 level_name = "Biblioteca"
-rooms = Array[ExtResource("2_room")]([SubResource("Room_1"), SubResource("Room_2"), SubResource("Room_3"), SubResource("Room_4"), SubResource("Room_5"), SubResource("Room_6"), SubResource("Room_7"), SubResource("Room_8")])
+rooms = Array[ExtResource("2_room")]([SubResource("Room_1"), SubResource("Room_2"), SubResource("Room_3"), SubResource("Room_4"), SubResource("Room_5"), SubResource("Room_6"), SubResource("Room_7"), SubResource("Room_8"), SubResource("Resource_se022")])

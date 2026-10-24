@@ -35,9 +35,9 @@ enum ID {
 	ZONE_3_TO_ZONE_5,
 	ZONE_5_TO_ZONE_3,
 
-	# --- Zona 4 <-> Zona 6 ---
-	ZONE_4_TO_ZONE_6,
-	ZONE_6_TO_ZONE_4,
+	# --- Lectern <-> Zona 6 ---
+	LECTERN_TO_ZONE_6,
+	ZONE_6_TO_LECTERN,
 
 	# --- Puertas Genéricas / Nuevas Zonas ---
 	DOOR_A,

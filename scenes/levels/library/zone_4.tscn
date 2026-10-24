@@ -14407,7 +14407,7 @@ position = Vector2(1093.5, 439.5)
 shape = SubResource("RectangleShape2D_wakga")
 
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("12_gkqv4")]
-position = Vector2(357, 925)
+position = Vector2(358, 888)
 target_scene_path = "uid://cq3j5o0ey5cvx"
 door_id = 6
 target_door_id = 5
