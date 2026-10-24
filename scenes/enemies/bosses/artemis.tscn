@@ -95,7 +95,7 @@ shape = SubResource("RectangleShape2D_dive")
 
 [node name="ImpactArt" type="AnimatedSprite2D" parent="DiveHitbox"]
 visible = false
-z_index = 2
+z_index = -1
 texture_filter = 4
 scale = Vector2(0.25, 0.25)
 offset = Vector2(0, -128)

@@ -30,7 +30,9 @@ Pending items from `odd/tasks/demo-polish.md` (D19 known nits), chosen by the us
   - The premise was inverted: measured stag_run body ~245 px wide × 0.2 = ~49 px, narrower than the 60 px hitbox. Scaled up to 0.245 (~60 px wide, ~42 px tall) in `artemis.tscn` (the real source) and the manifest `sprite_scale` (unused by code, kept consistent). Feet stay put (`offset` is in texture pixels).
   - Gallop bob: `bob_amplitude` export (3 px), `-abs(sin(TAU * phase))` over `stag_run`, sprite only. The two-arcs-per-loop cadence needs a device check.
   - Evidence: boss suite incomplete 452/702 with exactly the 13 known failures; case_spectral_stag 8/8, case_interrupt_stag_cast 5/5. zone_1 boot clean.
-- [ ] T2 — Dive shaft no longer covers Artemis. Route: delegated direct (preparation trigger: boss VFX code + scene).
+- [x] T2 — Dive shaft no longer covers Artemis. Route: delegated direct (preparation trigger: boss VFX code + scene).
+  - `DiveHitbox/ImpactArt` z_index 2 → -1, behind `Visual/AnimatedSprite2D` and above the arena background (-10). Alpha and width unchanged. Risk to check on device: in `zone_artemis` a tilemap drawn after Artemis could hide the floor part of the shaft.
+  - Evidence: boss suite same 13 known failures; case_moon_dive 6/6.
 - [ ] T3 — iPhone device check of T1 and T2 with the user.
 
 ## Acceptance criteria
