@@ -36,6 +36,7 @@ const CHECKS := {
 	"case_arrow_ignored_during_dash": 2,
 	"case_dash_arrow_keeps_flying": 4,
 	"case_dash_through_body_and_after": 4,
+	"case_arrow_impact": 5,
 	"case_slash_does_not_break_arrows": 4,
 	"case_backstep_when_close": 3,
 	"case_backstep_refused_at_walls_and_ledges": 4,
@@ -217,6 +218,46 @@ func case_intro_clip() -> void:
 	_boss.play_intro(0.5)
 	await _steps(5)
 	h.check(sprite.animation != &"intro", "a corpse never plays the intro (%s)" % sprite.animation)
+	_end_case()
+
+
+func _visible_impacts() -> Array[AnimatedSprite2D]:
+	var shown: Array[AnimatedSprite2D] = []
+	for burst: AnimatedSprite2D in _boss._impacts:
+		if burst.visible:
+			shown.append(burst)
+	return shown
+
+
+## The burst plays when an arrow lands on a surface, not when it expires or is recalled.
+func case_arrow_impact() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(-300.0, 0.0), QUIET)
+	for arrow: EnemyProjectile in _boss._pool:
+		arrow.lifetime = 0.1
+	_boss._launch_arrow(Vector2(0.0, -40.0), Vector2.RIGHT)
+	await _steps(int(0.5 / _dt()))
+	h.check(_visible_impacts().is_empty() and _boss.active_arrow_count() == 0, "an arrow that expires in the air leaves no burst")
+	for arrow: EnemyProjectile in _boss._pool:
+		arrow.lifetime = 3.0
+	_boss._launch_arrow(Vector2(0.0, -40.0), Vector2.RIGHT)
+	await _steps(5)
+	_boss.clear_arrows()
+	await _steps(5)
+	h.check(_visible_impacts().is_empty(), "a recalled arrow leaves no burst")
+	_boss._launch_arrow(Vector2(0.0, -40.0), Vector2.RIGHT)
+	var burst: AnimatedSprite2D = null
+	for i: int in int(2.0 / _dt()):
+		await h.tree.physics_frame
+		if not _visible_impacts().is_empty():
+			burst = _visible_impacts()[0]
+			break
+	h.check(burst != null, "an arrow that hits the wall plays a burst")
+	if burst == null:
+		_end_case()
+		return
+	h.check(absf(burst.global_position.x - 450.0) < 8.0, "at the wall (x %.1f)" % burst.global_position.x)
+	h.check(absf(burst.rotation) < 0.01, "opening back along the flight direction (%.2f rad)" % burst.rotation)
 	_end_case()
 
 

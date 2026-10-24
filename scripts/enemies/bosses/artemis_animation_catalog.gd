@@ -61,6 +61,8 @@ const CLIP_SPEEDS := {
 	"stag_appear": 20.0,
 	"stag_run": 12.0,
 	"stag_vanish": 20.0,
+	"arrow_impact": 20.0,
+	"arrow_impact_moon": 20.0,
 	"slash": 25.0,
 	"dive_shaft": 12.0,
 	"dive_shockwave": 12.0,
@@ -120,6 +122,19 @@ static func build_stag_frames() -> SpriteFrames:
 ## The combat VFX (manifest key "vfx"): slash, dive_shaft and dive_shockwave.
 static func build_vfx_frames() -> SpriteFrames:
 	return _build_single_sheet("vfx")
+
+
+## The arrow impact bursts (manifest key "impact"): arrow_impact (amber) and
+## arrow_impact_moon (silver).
+static func build_impact_frames() -> SpriteFrames:
+	return _build_single_sheet("impact")
+
+
+## One manifest key as a Dictionary (empty when missing): "impact" carries the
+## `sprite_scale` and the `anchor` (impact point, in texture pixels).
+static func manifest_entry(key: String) -> Dictionary:
+	var manifest := _read_manifest()
+	return manifest[key] if manifest.get(key) is Dictionary else {}
 
 
 static func _build_single_sheet(key: String) -> SpriteFrames:
