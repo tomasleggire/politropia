@@ -137,6 +137,29 @@ static func manifest_entry(key: String) -> Dictionary:
 	return manifest[key] if manifest.get(key) is Dictionary else {}
 
 
+## The telegraph glyphs (manifest key "glyphs"): StringName -> AtlasTexture of one
+## glyph, named rain, dive, stag, dot and the brighter "_hot" version of each.
+## White art meant to be tinted in code. Empty when the manifest or sheet is missing.
+static func build_glyph_textures() -> Dictionary:
+	var entry := manifest_entry("glyphs")
+	if entry.is_empty():
+		return {}
+	var atlas := load(ASSET_ROOT + String(entry["sheet"])) as Texture2D
+	if atlas == null:
+		push_warning("ArtemisAnimationCatalog: missing glyphs sheet")
+		return {}
+	var glyphs := {}
+	var regions: Dictionary = entry["regions"]
+	for glyph_name: String in regions:
+		var region: Array = regions[glyph_name]
+		var texture := AtlasTexture.new()
+		texture.atlas = atlas
+		texture.region = Rect2(float(region[0]), float(region[1]), float(region[2]), float(region[3]))
+		texture.filter_clip = true
+		glyphs[StringName(glyph_name)] = texture
+	return glyphs
+
+
 static func _build_single_sheet(key: String) -> SpriteFrames:
 	var frames := SpriteFrames.new()
 	if frames.has_animation(&"default"):

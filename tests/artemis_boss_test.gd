@@ -37,6 +37,7 @@ const CHECKS := {
 	"case_dash_arrow_keeps_flying": 4,
 	"case_dash_through_body_and_after": 4,
 	"case_arrow_impact": 5,
+	"case_telegraph_glyphs": 6,
 	"case_slash_does_not_break_arrows": 4,
 	"case_backstep_when_close": 3,
 	"case_backstep_refused_at_walls_and_ledges": 4,
@@ -258,6 +259,28 @@ func case_arrow_impact() -> void:
 		return
 	h.check(absf(burst.global_position.x - 450.0) < 8.0, "at the wall (x %.1f)" % burst.global_position.x)
 	h.check(absf(burst.rotation) < 0.01, "opening back along the flight direction (%.2f rad)" % burst.rotation)
+	_end_case()
+
+
+## Floor markers and the aim line use the glyph art when asked, and the polygons otherwise.
+func case_telegraph_glyphs() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(-300.0, 0.0), QUIET)
+	var telegraph := _boss.get_telegraph()
+	var strip := Rect2(0.0, -8.0, 56.0, 8.0)
+	telegraph.show_floor_marker(0, strip, BossTelegraph.RANGED_COLOR, 0.4, &"rain")
+	h.check(telegraph.is_floor_marker_visible(0) and telegraph._glyph_sprites[0].visible, "a named glyph shows its art on the marker slot")
+	h.check(absf(telegraph._glyph_sprites[0].scale.x * telegraph._glyph_sprites[0].texture.get_size().x - 56.0) < 0.5, "a strip glyph is as wide as its rect")
+	var rain_texture: Texture2D = telegraph._glyph_sprites[0].texture
+	telegraph.show_floor_marker(0, strip, BossTelegraph.RANGED_COLOR, 0.7, &"rain", true)
+	h.check(telegraph._glyph_sprites[0].texture != rain_texture, "the hot state swaps in the brighter glyph")
+	telegraph.show_floor_marker(0, strip, BossTelegraph.VAULT_COLOR, 0.4)
+	h.check(telegraph.is_floor_marker_visible(0) and not telegraph._glyph_sprites[0].visible, "a marker with no glyph keeps the polygon look")
+	telegraph.show_aim_line(Vector2.ZERO, Vector2.RIGHT, 100.0, BossTelegraph.RANGED_COLOR, false)
+	h.check(telegraph._lines[0].texture != null, "the aim line is dotted")
+	telegraph.show_floor_marker(0, strip, BossTelegraph.RANGED_COLOR, 0.4, &"rain")
+	telegraph.clear()
+	h.check(not telegraph.is_floor_marker_visible(0) and not telegraph._glyph_sprites[0].visible, "clearing hides the glyphs too")
 	_end_case()
 
 

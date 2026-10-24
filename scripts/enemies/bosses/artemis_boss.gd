@@ -96,6 +96,8 @@ const TRANSITION_SKIN_SWAP := 0.5
 const SHOCKWAVE_TIME := 0.3
 ## Bursts that can play at once (a rain can land a dozen arrows together); the oldest is reused.
 const IMPACT_POOL_SIZE := 8
+## Share of a telegraph after which its floor glyph switches to the "about to strike" art.
+const GLYPH_HOT_PROGRESS := 0.7
 const MOONLIT_SHADER := preload("res://shaders/artemis_moonlit.gdshader")
 const CROUCH_SCALE := 0.8
 ## Artemis's sprite scale: the same on-screen pixel size as Luz (tools/process_artemis_sheets.py).
@@ -1640,7 +1642,7 @@ func _animate_rain() -> void:
 	var pulse := 0.5 + 0.5 * sin(_clock * lerpf(8.0, 24.0, progress))
 	var alpha := lerpf(BossTelegraph.MARKER_ALPHA, 0.7, progress) * (0.75 + 0.25 * pulse)
 	for i: int in _rain_marker_count:
-		_telegraph.show_floor_marker(i, _rain_markers[i], BossTelegraph.RANGED_COLOR, alpha)
+		_telegraph.show_floor_marker(i, _rain_markers[i], BossTelegraph.RANGED_COLOR, alpha, &"rain", progress >= GLYPH_HOT_PROGRESS)
 
 
 func _fire_rain() -> void:
@@ -1834,7 +1836,7 @@ func _animate_moon_dive() -> void:
 	var pulse := 0.75 + 0.25 * sin(_clock * (24.0 if _dive_locked else 8.0))
 	var alpha := (0.8 if _dive_locked else BossTelegraph.MARKER_ALPHA) * pulse
 	var rect := Rect2(_dive_x - dive_marker_width * 0.5, global_position.y - RAIN_MARKER_HEIGHT, dive_marker_width, RAIN_MARKER_HEIGHT)
-	_telegraph.show_floor_marker(0, rect, BossTelegraph.MOON_COLOR, alpha)
+	_telegraph.show_floor_marker(0, rect, BossTelegraph.MOON_COLOR, alpha, &"dive", _dive_locked)
 	_telegraph.show_floor_marker(DIVE_COLUMN_SLOT, get_dive_column(), BossTelegraph.MOON_COLOR, alpha * DIVE_COLUMN_ALPHA_SCALE)
 
 
@@ -1936,7 +1938,7 @@ func _animate_stag() -> void:
 	var pulse := 0.75 + 0.25 * sin(_clock * lerpf(8.0, 24.0, progress))
 	var x := _stag_wall_x if _stag_dir > 0 else _stag_wall_x - SpectralStag.WIDTH
 	var rect := Rect2(x, global_position.y - SpectralStag.HEIGHT, SpectralStag.WIDTH, SpectralStag.HEIGHT)
-	_telegraph.show_floor_marker(0, rect, BossTelegraph.MOON_COLOR, lerpf(BossTelegraph.MARKER_ALPHA, 0.7, progress) * pulse)
+	_telegraph.show_floor_marker(0, rect, BossTelegraph.MOON_COLOR, lerpf(BossTelegraph.MARKER_ALPHA, 0.7, progress) * pulse, &"stag", progress >= GLYPH_HOT_PROGRESS)
 
 
 func _summon_stag() -> void:
