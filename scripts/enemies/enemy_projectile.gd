@@ -6,6 +6,9 @@ extends Area2D
 ## her slash cuts it (`breakable_by_attacks`). `receive_hit` destroys it and returns false, so cutting it
 ## gives no soul.
 ##
+## `impacted` fires only when the shot really lands (on Luz or on a surface), never
+## when its lifetime ends or it is parked, so an owner can add an impact effect.
+##
 ## Instances are pooled by their shooter: `launch()` revives one and
 ## `deactivate()` parks it, so nothing is allocated while enemies fight.
 
@@ -14,6 +17,9 @@ const SOLIDS_AND_PLAYER_MASK := 1
 const ONE_WAY_MASK := 2
 ## Matches the circle shape of the scene: the leading edge of the shot.
 const SHOT_RADIUS := 5.0
+
+## `point` is the leading edge of the shot at the hit, `direction` where it was heading.
+signal impacted(point: Vector2, direction: Vector2)
 
 @export var damage := 1
 @export var lifetime := 3.0
@@ -108,6 +114,7 @@ func _lands_on_one_way(step: Vector2) -> bool:
 	if not _one_way_probe.is_colliding():
 		return false
 	global_position = _one_way_probe.get_collision_point() - step.normalized() * SHOT_RADIUS
+	_emit_impact()
 	deactivate()
 	return true
 
@@ -123,4 +130,11 @@ func _on_body_entered(body: Node2D) -> void:
 		# Deferred: hurting her touches her own areas, which physics forbids
 		# while it is still flushing the query that raised this signal.
 		player.take_damage.call_deferred(damage, global_position)
+	_emit_impact()
 	deactivate()
+
+
+func _emit_impact() -> void:
+	if _velocity != Vector2.ZERO:
+		var direction := _velocity.normalized()
+		impacted.emit(global_position + direction * SHOT_RADIUS, direction)

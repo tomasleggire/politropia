@@ -27,6 +27,7 @@ const HIT_FROM := Vector2(100.0, 0.0)
 
 const CHECKS := {
 	"case_scene_basics": 4,
+	"case_intro_clip": 5,
 	"case_damage_and_defeat": 6,
 	"case_never_knocked_back": 2,
 	"case_phase_two_threshold": 5,
@@ -35,6 +36,8 @@ const CHECKS := {
 	"case_arrow_ignored_during_dash": 2,
 	"case_dash_arrow_keeps_flying": 4,
 	"case_dash_through_body_and_after": 4,
+	"case_arrow_impact": 5,
+	"case_telegraph_glyphs": 6,
 	"case_slash_does_not_break_arrows": 4,
 	"case_backstep_when_close": 3,
 	"case_backstep_refused_at_walls_and_ledges": 4,
@@ -55,7 +58,7 @@ const CHECKS := {
 	"case_moon_dive": 6,
 	"case_moon_dive_stuck_is_a_punish_window": 5,
 	"case_moon_dive_dash": 2,
-	"case_spectral_stag": 8,
+	"case_spectral_stag": 9,
 	"case_cornered_vault": 10,
 	"case_vault_on_hit_and_priority": 5,
 	"case_phase_two_selection": 2,
@@ -194,6 +197,90 @@ func case_scene_basics() -> void:
 	h.check(_boss.max_health == 30 and _boss.get_health() == 30, "accessible baseline: 30 health (%d)" % _boss.get_health())
 	h.check(_boss.get_node_or_null("Visual/Body") is Polygon2D, "the placeholder body exists for the hit flash")
 	h.check(_boss.get_state() == ArtemisBoss.State.IDLE and _boss.get_phase() == 1, "she starts idle in phase one")
+	_end_case()
+
+
+func case_intro_clip() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(300.0, 0.0))
+	var sprite := _boss.get_node("Visual/AnimatedSprite2D") as AnimatedSprite2D
+	_boss.set_manual_engage(true)
+	_boss.play_intro(0.5)
+	await _steps(10)
+	h.check(sprite.animation == &"intro", "the intro clip plays while she waits (%s)" % sprite.animation)
+	h.check(_boss.get_state() == ArtemisBoss.State.IDLE, "and she stays idle meanwhile")
+	await _steps(45)
+	h.check(sprite.animation == &"idle" and _boss.get_state() == ArtemisBoss.State.IDLE, "when it ends she is back to the idle clip (%s)" % sprite.animation)
+	_boss.play_intro(0.5)
+	_boss.engage()
+	await _steps(5)
+	h.check(sprite.animation != &"intro", "engaging cuts the intro short (%s)" % sprite.animation)
+	_boss.make_corpse_at(Vector2(300.0, 0.0), -1)
+	_boss.play_intro(0.5)
+	await _steps(5)
+	h.check(sprite.animation != &"intro", "a corpse never plays the intro (%s)" % sprite.animation)
+	_end_case()
+
+
+func _visible_impacts() -> Array[AnimatedSprite2D]:
+	var shown: Array[AnimatedSprite2D] = []
+	for burst: AnimatedSprite2D in _boss._impacts:
+		if burst.visible:
+			shown.append(burst)
+	return shown
+
+
+## The burst plays when an arrow lands on a surface, not when it expires or is recalled.
+func case_arrow_impact() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(-300.0, 0.0), QUIET)
+	for arrow: EnemyProjectile in _boss._pool:
+		arrow.lifetime = 0.1
+	_boss._launch_arrow(Vector2(0.0, -40.0), Vector2.RIGHT)
+	await _steps(int(0.5 / _dt()))
+	h.check(_visible_impacts().is_empty() and _boss.active_arrow_count() == 0, "an arrow that expires in the air leaves no burst")
+	for arrow: EnemyProjectile in _boss._pool:
+		arrow.lifetime = 3.0
+	_boss._launch_arrow(Vector2(0.0, -40.0), Vector2.RIGHT)
+	await _steps(5)
+	_boss.clear_arrows()
+	await _steps(5)
+	h.check(_visible_impacts().is_empty(), "a recalled arrow leaves no burst")
+	_boss._launch_arrow(Vector2(0.0, -40.0), Vector2.RIGHT)
+	var burst: AnimatedSprite2D = null
+	for i: int in int(2.0 / _dt()):
+		await h.tree.physics_frame
+		if not _visible_impacts().is_empty():
+			burst = _visible_impacts()[0]
+			break
+	h.check(burst != null, "an arrow that hits the wall plays a burst")
+	if burst == null:
+		_end_case()
+		return
+	h.check(absf(burst.global_position.x - 450.0) < 8.0, "at the wall (x %.1f)" % burst.global_position.x)
+	h.check(absf(burst.rotation) < 0.01, "opening back along the flight direction (%.2f rad)" % burst.rotation)
+	_end_case()
+
+
+## Floor markers and the aim line use the glyph art when asked, and the polygons otherwise.
+func case_telegraph_glyphs() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(-300.0, 0.0), QUIET)
+	var telegraph := _boss.get_telegraph()
+	var strip := Rect2(0.0, -8.0, 56.0, 8.0)
+	telegraph.show_floor_marker(0, strip, BossTelegraph.RANGED_COLOR, 0.4, &"rain")
+	h.check(telegraph.is_floor_marker_visible(0) and telegraph._glyph_sprites[0].visible, "a named glyph shows its art on the marker slot")
+	h.check(absf(telegraph._glyph_sprites[0].scale.x * telegraph._glyph_sprites[0].texture.get_size().x - 56.0) < 0.5, "a strip glyph is as wide as its rect")
+	var rain_texture: Texture2D = telegraph._glyph_sprites[0].texture
+	telegraph.show_floor_marker(0, strip, BossTelegraph.RANGED_COLOR, 0.7, &"rain", true)
+	h.check(telegraph._glyph_sprites[0].texture != rain_texture, "the hot state swaps in the brighter glyph")
+	telegraph.show_floor_marker(0, strip, BossTelegraph.VAULT_COLOR, 0.4)
+	h.check(telegraph.is_floor_marker_visible(0) and not telegraph._glyph_sprites[0].visible, "a marker with no glyph keeps the polygon look")
+	telegraph.show_aim_line(Vector2.ZERO, Vector2.RIGHT, 100.0, BossTelegraph.RANGED_COLOR, false)
+	h.check(telegraph._lines[0].texture != null, "the aim line is dotted")
+	telegraph.show_floor_marker(0, strip, BossTelegraph.RANGED_COLOR, 0.4, &"rain")
+	telegraph.clear()
+	h.check(not telegraph.is_floor_marker_visible(0) and not telegraph._glyph_sprites[0].visible, "clearing hides the glyphs too")
 	_end_case()
 
 
@@ -1000,7 +1087,11 @@ func _stag_run(react: String) -> Dictionary:
 		elif out["start_x"] != 0.0:
 			break
 	out["active_after"] = stag.is_active()
+	await _steps(2)
+	out["monitoring_after"] = stag.monitoring
 	out["visible_after"] = stag.visible
+	await _steps(int((SpectralStag.VANISH_TIME + 0.2) / _dt()))
+	out["hidden_after_vanish"] = not stag.visible
 	out["hit"] = stag.has_hit()
 	return out
 
@@ -1012,7 +1103,8 @@ func case_spectral_stag() -> void:
 	h.check(int(run["dir"]) == -1 and float(run["start_x"]) > 400.0, "it appears at the wall farthest from Luz (x %.0f)" % run["start_x"])
 	h.check(float(run["min_x"]) < -400.0, "it charges across the whole arena (to x %.0f)" % run["min_x"])
 	h.check(_player.get_health() == 29 and run["hit"], "a grounded Luz is hit exactly once (%d)" % _player.get_health())
-	h.check(not run["active_after"] and not run["visible_after"], "and it despawns at the far wall")
+	h.check(not run["active_after"] and not run["monitoring_after"], "and its hitbox is off at once at the far wall")
+	h.check(run["visible_after"] and run["hidden_after_vanish"], "while the drawn stag dissolves and is hidden once the vanish ends")
 	_end_case()
 	run = await _stag_run("jump")
 	h.check(float(run["clearance"]) > SpectralStag.HEIGHT and _player.get_health() == 30, "a normal jump clears it (%.0f px up, health %d)" % [run["clearance"], _player.get_health()])
