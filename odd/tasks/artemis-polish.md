@@ -35,6 +35,7 @@ Pending items from `odd/tasks/demo-polish.md` (D19 known nits), chosen by the us
   - `DiveHitbox/ImpactArt` z_index 2 → -1, behind `Visual/AnimatedSprite2D` and above the arena background (-10). Alpha and width unchanged. Risk to check on device: in `zone_artemis` a tilemap drawn after Artemis could hide the floor part of the shaft.
   - Evidence: boss suite same 13 known failures; case_moon_dive 6/6.
 - [ ] T3 — iPhone device check of T1-T9 with the user (user asked to test everything together after the art, 2026-10-24).
+  - Build `eca3260` installed and launched on the iPhone. The user asked to push and merge to main before reporting device feedback; the check stays open for follow-up tuning.
 - [x] T4 — Batch 3 art generation with Codex: 5 raw sheets (intro, walk back, stag vanish, arrow impact, telegraph glyphs). Prompts in `tools/art_sources/artemis/prompts/batch_3.md`. Route: inline (parent runs Codex).
   - All 5 runs exited 0 and were reviewed visually by the parent. Raw sheets are 1536x1024, 4x2 cells, magenta background.
   - Intro deviates from the prompt: cells 5-6 are a warning aim (arrow drawn, then released pose) instead of a bow spin; cell 4 jumps from kneeling to standing. Accepted: it still reads as a boss reveal and cell 8 is the idle pose.
@@ -46,7 +47,7 @@ Pending items from `odd/tasks/demo-polish.md` (D19 known nits), chosen by the us
 - [x] T9 — Telegraph glyph art: floor markers (rain, dive), stag wall marker and dotted aim line use the white glyphs tinted by the existing colours; `BossTelegraph` API unchanged, edges brighter than fill, accelerating pulse kept. Route: delegated direct. Commit `1229958`: `show_floor_marker(..., glyph := &"", hot := false)` (optional params), hot at 70% progress; strips capped at 2x rect height (dive ~16 px); aim lines dotted, width 6 instead of 3. `case_telegraph_glyphs` 6/6.
   - Evidence T5-T9 (parent re-ran the boss suite): incomplete 469/719 (base 452/702; +17 new checks), the same 13 known failing cases; zone_1 and zone_artemis boot clean.
   - Device checks: walk back and intro scale (matched by eye), first vanish frame slightly taller, heavier dotted aim line, slightly stretched rain strips.
-- RDD: assess `663b188..1229958` = high (`process_boundary`), review due. Preflight STATUS asks for an intended-untracked selection JSON whose exact schema is undocumented; blocked until `tools/art_sources/checkpoint/concept/` is resolved (ignore or commit) so no untracked file remains.
+- RDD: assess `663b188..1229958` = high (`process_boundary`), review due. Preflight STATUS asks for an intended-untracked selection JSON whose exact schema is undocumented; blocked until `tools/art_sources/checkpoint/concept/` is resolved (ignore or commit) so no untracked file remains. The native review did not run; delivery to main followed the user's explicit request (2026-10-24).
 
 ## Acceptance criteria
 - The stag's drawn body width roughly matches its hitbox; it bobs while galloping.
