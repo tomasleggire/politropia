@@ -21,6 +21,11 @@ const HEIGHT := 48.0
 const PLAYER_MASK := 1
 const DAMAGE := 1
 
+@export_group("Gallop")
+## Peak height, in game pixels, that the drawn stag rises per stride. The sheet frames
+## are aligned by the lowest hoof, so the bob is added here, on the visual only.
+@export_range(0.0, 8.0, 0.1) var bob_amplitude := 3.0
+
 var _active := false
 var _dir := 1
 var _speed := 0.0
@@ -46,6 +51,7 @@ func _physics_process(delta: float) -> void:
 		return
 	global_position.x += float(_dir) * _speed * delta
 	_poll_target()
+	_update_bob()
 	if (global_position.x - _end_x) * float(_dir) >= 0.0:
 		deactivate()
 
@@ -83,6 +89,7 @@ func launch(from: Vector2, dir: int, speed: float, end_x: float, target: Player)
 
 func deactivate() -> void:
 	_active = false
+	_reset_bob()
 	visible = false
 	set_deferred(&"monitoring", false)
 	set_physics_process(false)
@@ -98,6 +105,24 @@ func _setup_sprite() -> void:
 	else:
 		_sprite.visible = false
 		($Body as Polygon2D).visible = true
+
+
+## Lifts the sprite (never the hitbox) by a half sine over the gallop loop, using the
+## current frame plus its progress, so it follows the animation speed. The loop holds
+## two airborne arcs: sin(TAU * phase) is zero at both ends and abs() keeps it
+## upward, so the hooves touch down twice per cycle.
+func _update_bob() -> void:
+	if _sprite == null or _sprite.animation != &"stag_run":
+		_reset_bob()
+		return
+	var count := _sprite.sprite_frames.get_frame_count(&"stag_run")
+	var phase := (float(_sprite.frame) + _sprite.frame_progress) / float(count)
+	_sprite.position.y = -absf(sin(phase * TAU)) * bob_amplitude
+
+
+func _reset_bob() -> void:
+	if _sprite != null:
+		_sprite.position.y = 0.0
 
 
 ## It is already near full size on frame 0 and the hitbox is live from the start.

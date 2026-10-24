@@ -128,7 +128,7 @@ shape = SubResource("RectangleShape2D_stag")
 z_index = 2
 modulate = Color(1, 1, 1, 0.72)
 texture_filter = 4
-scale = Vector2(0.2, 0.2)
+scale = Vector2(0.245, 0.245)
 offset = Vector2(0, -148)
 
 [node name="Body" type="Polygon2D" parent="SpectralStag"]

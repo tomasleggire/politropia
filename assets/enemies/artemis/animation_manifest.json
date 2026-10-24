@@ -371,7 +371,7 @@
   },
   "stag": {
     "sheet": "spectral_stag_sheet.png",
-    "sprite_scale": 0.2,
+    "sprite_scale": 0.245,
     "feet_row": 340,
     "grid": {
       "columns": 4,
