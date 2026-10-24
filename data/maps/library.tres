@@ -36,7 +36,7 @@ script = ExtResource("2_room")
 scene_path = "uid://bt3m0cf4sgq7r"
 display_name = "Archivo"
 map_rect = Rect2(109, -20, 34, 16)
-connects_to = Array[String](["uid://b6qrv51dde5ob", "uid://dv0i34v7aiwto"])
+connects_to = Array[String](["uid://b6qrv51dde5ob", "uid://dv0i34v7aiwto", "uid://ceuqjn8ipsey5"])
 
 [sub_resource type="Resource" id="Room_6"]
 script = ExtResource("2_room")
@@ -65,8 +65,8 @@ landmark = 3
 script = ExtResource("2_room")
 scene_path = "uid://ceuqjn8ipsey5"
 display_name = "Jefe"
-map_rect = Rect2(176, 0, 20, 12)
-connects_to = Array[String](["uid://fvobcn8y45k4"])
+map_rect = Rect2(116, -2, 20, 12)
+connects_to = Array[String](["uid://bt3m0cf4sgq7r"])
 landmark = 1
 metadata/_custom_type_script = "uid://dhj1rdo620ffd"
 

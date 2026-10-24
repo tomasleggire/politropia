@@ -42,6 +42,10 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	## if _open and event.is_action_pressed(&"ui_cancel"):
+		## close()
+		## get_viewport().set_input_as_handled()
+
 	# Temporary PC testing shortcut
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_M:
