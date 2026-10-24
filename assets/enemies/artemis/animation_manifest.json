@@ -300,6 +300,48 @@
       },
       "events": {}
     },
+    "artemis_walkback_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "walk_back": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {}
+    },
+    "artemis_intro_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 256,
+        "cell_height": 256
+      },
+      "clips": {
+        "intro": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {}
+    },
     "artemis_stagcast_sheet.png": {
       "grid": {
         "columns": 4,
@@ -375,7 +417,7 @@
     "feet_row": 340,
     "grid": {
       "columns": 4,
-      "rows": 3,
+      "rows": 5,
       "cell_width": 384,
       "cell_height": 384
     },
@@ -394,6 +436,16 @@
         8,
         9,
         10
+      ],
+      "stag_vanish": [
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
       ]
     }
   },
@@ -421,6 +473,87 @@
         5,
         6,
         7
+      ]
+    }
+  },
+  "impact": {
+    "sheet": "artemis_impact_sheet.png",
+    "sprite_scale": 0.125,
+    "anchor": [
+      216.0,
+      128.0
+    ],
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 256,
+      "cell_height": 256
+    },
+    "clips": {
+      "arrow_impact": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "arrow_impact_moon": [
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  },
+  "glyphs": {
+    "sheet": "artemis_glyphs_sheet.png",
+    "regions": {
+      "rain": [
+        0,
+        0,
+        214,
+        39
+      ],
+      "dive": [
+        256,
+        0,
+        204,
+        60
+      ],
+      "stag": [
+        512,
+        0,
+        98,
+        172
+      ],
+      "dot": [
+        768,
+        0,
+        36,
+        52
+      ],
+      "rain_hot": [
+        0,
+        256,
+        227,
+        56
+      ],
+      "dive_hot": [
+        256,
+        256,
+        228,
+        78
+      ],
+      "stag_hot": [
+        512,
+        256,
+        118,
+        196
+      ],
+      "dot_hot": [
+        768,
+        256,
+        49,
+        69
       ]
     }
   }
