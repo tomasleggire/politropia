@@ -425,6 +425,9 @@ var _crouching := false
 var _hop_chains := false
 var _manual_engage := false
 var _engaged := false
+## Seconds left of the arena-entry `intro` clip; while it runs she stays in IDLE and
+## `_sync_sprite` leaves the clip alone.
+var _intro_left := 0.0
 var _has_arena_limits := false
 var _arena_left := 0.0
 var _arena_right := 0.0
@@ -469,6 +472,7 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
+	_intro_left = maxf(_intro_left - delta, 0.0)
 	super._physics_process(delta)
 	_sync_sprite()
 
@@ -589,8 +593,19 @@ func is_fresh() -> bool:
 	return _state == State.IDLE and _phase == PHASE_ONE and _health == max_health
 
 
+## Plays the `intro` reveal over `duration` seconds while she waits in IDLE (the
+## arena calls it when the fight starts, with its engage delay). Never for a corpse.
+## Timers and behavior are untouched: only the clip is held until it ends.
+func play_intro(duration: float) -> void:
+	if _dead or _state != State.IDLE or duration <= 0.0:
+		return
+	_intro_left = duration
+	_play(&"intro", duration)
+
+
 ## Leaves IDLE for the fight without waiting for Luz to come close.
 func engage() -> void:
+	_intro_left = 0.0
 	_engaged = true
 	if _state == State.IDLE:
 		_begin_reposition()
@@ -727,6 +742,7 @@ func _reset_ai() -> void:
 	_rain_count = 0
 	_rain_marker_count = 0
 	_engaged = false
+	_intro_left = 0.0
 	_backstep_left = 0.0
 	_dodge_left = 0.0
 	_feint_left = 0.0
@@ -863,6 +879,10 @@ func _set_skin(phase: int) -> void:
 func _sync_sprite() -> void:
 	if _sprite == null or _sprite.sprite_frames == null:
 		return
+	if _intro_left > 0.0:
+		if _state == State.IDLE:
+			return
+		_intro_left = 0.0
 	var request := _clip_request()
 	if request[0] != _clip:
 		_play(request[0], request[1])

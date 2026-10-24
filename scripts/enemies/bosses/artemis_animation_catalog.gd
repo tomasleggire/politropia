@@ -23,6 +23,7 @@ const CLIP_SPEEDS := {
 	"idle": 8.0,
 	"walk_fwd": 12.0,
 	"walk_back": 12.0,
+	"intro": 10.0,
 	"shot_draw": 12.0,
 	"shot_hold": 8.0,
 	"shot_release": 20.0,

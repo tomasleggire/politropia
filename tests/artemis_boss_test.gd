@@ -27,6 +27,7 @@ const HIT_FROM := Vector2(100.0, 0.0)
 
 const CHECKS := {
 	"case_scene_basics": 4,
+	"case_intro_clip": 5,
 	"case_damage_and_defeat": 6,
 	"case_never_knocked_back": 2,
 	"case_phase_two_threshold": 5,
@@ -194,6 +195,28 @@ func case_scene_basics() -> void:
 	h.check(_boss.max_health == 30 and _boss.get_health() == 30, "accessible baseline: 30 health (%d)" % _boss.get_health())
 	h.check(_boss.get_node_or_null("Visual/Body") is Polygon2D, "the placeholder body exists for the hit flash")
 	h.check(_boss.get_state() == ArtemisBoss.State.IDLE and _boss.get_phase() == 1, "she starts idle in phase one")
+	_end_case()
+
+
+func case_intro_clip() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(300.0, 0.0))
+	var sprite := _boss.get_node("Visual/AnimatedSprite2D") as AnimatedSprite2D
+	_boss.set_manual_engage(true)
+	_boss.play_intro(0.5)
+	await _steps(10)
+	h.check(sprite.animation == &"intro", "the intro clip plays while she waits (%s)" % sprite.animation)
+	h.check(_boss.get_state() == ArtemisBoss.State.IDLE, "and she stays idle meanwhile")
+	await _steps(45)
+	h.check(sprite.animation == &"idle" and _boss.get_state() == ArtemisBoss.State.IDLE, "when it ends she is back to the idle clip (%s)" % sprite.animation)
+	_boss.play_intro(0.5)
+	_boss.engage()
+	await _steps(5)
+	h.check(sprite.animation != &"intro", "engaging cuts the intro short (%s)" % sprite.animation)
+	_boss.make_corpse_at(Vector2(300.0, 0.0), -1)
+	_boss.play_intro(0.5)
+	await _steps(5)
+	h.check(sprite.animation != &"intro", "a corpse never plays the intro (%s)" % sprite.animation)
 	_end_case()
 
 
