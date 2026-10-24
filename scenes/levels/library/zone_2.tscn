@@ -1,7 +1,9 @@
 [gd_scene format=4 uid="uid://6p2if0b5nylt"]
 
+[ext_resource type="Script" uid="uid://c1nbk0diqf56p" path="res://scripts/levels/level_objects.gd" id="1_g4t5l"]
 [ext_resource type="Texture2D" uid="uid://croiudofpxjg2" path="res://assets/art/library/Backgrounds/background2.png" id="1_jln6e"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="2_63xwj"]
+[ext_resource type="PackedScene" uid="uid://d0mu0g5r1c2lo" path="res://scenes/world/cofre.tscn" id="3_5e38y"]
 [ext_resource type="TileSet" uid="uid://dul1ibpu3lwwe" path="res://tilesets/platforms_library.tres" id="3_cxp8p"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="4_cxp8p"]
 [ext_resource type="TileSet" uid="uid://bt608aiku7igc" path="res://tilesets/spikes_library.tres" id="4_eglro"]
@@ -9,9 +11,9 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="6_eglro"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="7_cxp8p"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_710r8"]
-[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
-[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
 [ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
 
 [sub_resource type="TileSet" id="TileSet_r6boj"]
@@ -13901,8 +13903,9 @@ sources/0 = SubResource("TileSetAtlasSource_211o3")
 size = Vector2(1926, 792)
 
 [node name="LibraryZone2" type="Node2D" unique_id=424136144]
+script = ExtResource("1_g4t5l")
 
-[node name="ParallaxBackdrop" parent="." instance=ExtResource("par_back")]
+[node name="ParallaxBackdrop" parent="." unique_id=309627111 instance=ExtResource("par_back")]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(2, 683)
@@ -14004,42 +14007,61 @@ shape = SubResource("RectangleShape2D_wakga")
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("10_710r8")]
 position = Vector2(-26, 125)
 target_scene_path = "uid://del2ypua786qc"
-target_door_id = 1
 door_id = 2
+target_door_id = 1
 
 [node name="SceneTransitionArea2" parent="." unique_id=308062238 instance=ExtResource("10_710r8")]
 position = Vector2(1949, 673)
 target_scene_path = "uid://cq3j5o0ey5cvx"
-target_door_id = 4
 door_id = 3
+target_door_id = 4
 
-[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
-[node name="DustMotes" parent="." instance=ExtResource("amb_dust")]
-[node name="LanternLight1" parent="." instance=ExtResource("amb_light")]
+[node name="ZoneAmbience" parent="." unique_id=1139007400 instance=ExtResource("amb_zone")]
+
+[node name="DustMotes" parent="." unique_id=1327661078 instance=ExtResource("amb_dust")]
+
+[node name="LanternLight1" parent="." unique_id=1862959551 instance=ExtResource("amb_light")]
 position = Vector2(536, 111)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
 light_color = Color(1, 0.7, 0.38, 1)
 base_energy = 0.85
 radius = 115.0
 flicker_amount = 0.07
-phase_offset = 0.0
-[node name="LanternLight2" parent="." instance=ExtResource("amb_light")]
+
+[node name="LanternLight2" parent="." unique_id=1582069107 instance=ExtResource("amb_light")]
 position = Vector2(954, 204)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
 light_color = Color(1, 0.7, 0.38, 1)
 base_energy = 0.85
 radius = 115.0
 flicker_amount = 0.07
 phase_offset = 2.3
-[node name="LanternLight3" parent="." instance=ExtResource("amb_light")]
+
+[node name="LanternLight3" parent="." unique_id=497233302 instance=ExtResource("amb_light")]
 position = Vector2(276, 619)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
 light_color = Color(1, 0.7, 0.38, 1)
 base_energy = 0.85
 radius = 115.0
 flicker_amount = 0.07
 phase_offset = 4.6
-[node name="LanternLight4" parent="." instance=ExtResource("amb_light")]
+
+[node name="LanternLight4" parent="." unique_id=1395482946 instance=ExtResource("amb_light")]
 position = Vector2(1475, 642)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
 light_color = Color(1, 0.7, 0.38, 1)
 base_energy = 0.85
 radius = 115.0
 flicker_amount = 0.07
 phase_offset = 6.8999999999999995
+
+[node name="Cofre" parent="." unique_id=1931050741 instance=ExtResource("3_5e38y")]
+position = Vector2(425, 249)
