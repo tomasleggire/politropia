@@ -28,6 +28,7 @@ const HIT_FROM := Vector2(100.0, 0.0)
 const CHECKS := {
 	"case_scene_basics": 4,
 	"case_damage_and_defeat": 6,
+	"case_never_knocked_back": 2,
 	"case_phase_two_threshold": 5,
 	"case_aimed_shot_telegraph_and_arrow": 9,
 	"case_arrow_hurts_luz": 2,
@@ -193,6 +194,19 @@ func case_scene_basics() -> void:
 	h.check(_boss.max_health == 30 and _boss.get_health() == 30, "accessible baseline: 30 health (%d)" % _boss.get_health())
 	h.check(_boss.get_node_or_null("Visual/Body") is Polygon2D, "the placeholder body exists for the hit flash")
 	h.check(_boss.get_state() == ArtemisBoss.State.IDLE and _boss.get_phase() == 1, "she starts idle in phase one")
+	_end_case()
+
+
+func case_never_knocked_back() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(300.0, 0.0), {"stagger_hits": 0})
+	# Even with the generic knockback switch forced on, bosses are never pushed.
+	_boss.knockback_from_player_attacks = true
+	var start := _boss.global_position
+	_boss.receive_hit(1, HIT_FROM, &"attack_1")
+	await h.frames(20)
+	h.check(_boss.get_health() == 29, "the hit landed (%d)" % _boss.get_health())
+	h.check(_boss.global_position.distance_to(start) < 1.0, "an attack hit does not move her (%.1f px)" % _boss.global_position.distance_to(start))
 	_end_case()
 
 

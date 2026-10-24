@@ -14,6 +14,7 @@ extends SceneTree
 
 const PLAYER_SCENE := "res://scenes/player/player.tscn"
 const FLYER_SCENE := "res://scenes/enemies/flyer.tscn"
+const SHADOW_OWL_SCENE := "res://scenes/enemies/shadow_owl.tscn"
 const CHARGER_SCENE := "res://scenes/enemies/charger.tscn"
 const SHOOTER_SCENE := "res://scenes/enemies/shooter.tscn"
 const PROJECTILE_SCENE := "res://scenes/enemies/enemy_projectile.tscn"
@@ -31,6 +32,9 @@ const CHECKS := {
 	"case_flyer_stops_at_walls_and_gives_up": 6,
 	"case_flyer_leash": 1,
 	"case_flyer_light_knockback_and_corpse": 6,
+	"case_flyer_knockback_pushes_away_horizontally": 2,
+	"case_flyer_knockback_up_from_below": 2,
+	"case_shadow_owl_hit_in_charge_recovers": 3,
 	"case_flyer_persistence": 7,
 	"case_charger_patrols": 3,
 	"case_charger_detection": 4,
@@ -322,17 +326,51 @@ func case_flyer_leash() -> void:
 func case_flyer_light_knockback_and_corpse() -> void:
 	await _build_rig(false)
 	await _spawn(FLYER_SCENE, Vector2(200.0, -100.0), -1)
-	_enemy.receive_hit(1, Vector2(150.0, -100.0))
+	_enemy.receive_hit(1, Vector2(150.0, -71.0))
 	await _secs(0.45)
 	check(_enemy.global_position.x > 200.0 + 40.0, "a hit knocks it back strongly (x %.0f)" % _enemy.global_position.x)
 	check(_enemy.get_health() == 1, "2 HP: one hit leaves 1")
-	_enemy.receive_hit(1, Vector2(150.0, -100.0))
+	_enemy.receive_hit(1, Vector2(150.0, -71.0))
 	check(_enemy.is_dead(), "and the second kills it")
 	var died_in_air := _enemy.global_position.y < -60.0
 	check(died_in_air, "it dies in the air (y %.0f)" % _enemy.global_position.y)
 	await _secs(1.5)
 	check(absf(_enemy.global_position.y) < 2.0, "the corpse falls to the floor (y %.1f)" % _enemy.global_position.y)
 	check(not _enemy.is_physics_processing(), "and stays there")
+
+
+func case_flyer_knockback_pushes_away_horizontally() -> void:
+	await _build_rig(false)
+	await _spawn(FLYER_SCENE, Vector2(200.0, -100.0), -1)
+	var start := _enemy.global_position
+	_enemy.receive_hit(1, Vector2(150.0, -71.0), &"attack_ground_1")
+	await _secs(0.3)
+	check(_enemy.global_position.x > start.x + 20.0, "a slash from the left pushes it right (x %.0f)" % _enemy.global_position.x)
+	check(absf(_enemy.global_position.y - start.y) < 20.0, "and barely moves it vertically (y %.0f)" % _enemy.global_position.y)
+
+
+func case_flyer_knockback_up_from_below() -> void:
+	await _build_rig(false)
+	await _spawn(FLYER_SCENE, Vector2(200.0, -100.0), -1)
+	var start := _enemy.global_position
+	_enemy.receive_hit(1, Vector2(200.0, 40.0), &"attack_up")
+	await _secs(0.3)
+	check(_enemy.global_position.y < start.y - 20.0, "attack_up from below pushes it upward (y %.0f)" % _enemy.global_position.y)
+	check(absf(_enemy.global_position.x - start.x) < 20.0, "straight up (x %.0f)" % _enemy.global_position.x)
+
+
+func case_shadow_owl_hit_in_charge_recovers() -> void:
+	await _build_rig(false)
+	await _spawn(SHADOW_OWL_SCENE, Vector2(200.0, -100.0), -1)
+	var owl := _enemy as ShadowOwl
+	owl._start_phase(ShadowOwl.AttackPhase.CHARGE, owl.charge_duration, &"charge")
+	owl._charge_direction = Vector2.LEFT
+	var start := owl.global_position
+	owl.receive_hit(1, Vector2(150.0, -71.0), &"attack_ground_1")
+	check(owl._attack_phase == ShadowOwl.AttackPhase.RECOVER, "a hit during the charge ends it in recovery")
+	check(is_equal_approx(owl._phase_left, owl.recover_duration), "with the normal recover timer")
+	await _secs(0.2)
+	check(owl.global_position.x > start.x + 15.0, "and the push is not overridden (x %.0f)" % owl.global_position.x)
 
 
 func case_flyer_persistence() -> void:
@@ -602,9 +640,9 @@ func case_projectiles_are_cleared() -> void:
 func case_shooter_corpse() -> void:
 	await _build_rig(false)
 	await _spawn(SHOOTER_SCENE, Vector2(200.0, -100.0), -1)
-	_enemy.receive_hit(1, Vector2(150.0, -100.0))
+	_enemy.receive_hit(1, Vector2(150.0, -71.0))
 	check(_enemy.get_health() == 1, "2 HP: one hit leaves 1")
-	_enemy.receive_hit(1, Vector2(150.0, -100.0))
+	_enemy.receive_hit(1, Vector2(150.0, -71.0))
 	await _secs(1.5)
 	check(_enemy.is_dead() and absf(_enemy.global_position.y) < 2.0, "the corpse falls to the floor (y %.1f)" % _enemy.global_position.y)
 	check(not _enemy.is_physics_processing(), "and stays there")
