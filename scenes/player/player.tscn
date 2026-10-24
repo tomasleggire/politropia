@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dowigi85o1a"]
 
 [ext_resource type="Script" uid="uid://52lnrs7hxbfp" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="Texture2D" uid="uid://bu5sfnwttur3b" path="res://assets/player/luz/luz_turn_skid_sheet.png" id="4_5gtgg"]
 [ext_resource type="AudioStream" uid="uid://bcksymyxto0f1" path="res://assets/audio/land.wav" id="5_5gtgg"]
 [ext_resource type="Script" uid="uid://dy77m7qh61ceh" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
 [ext_resource type="AudioStream" uid="uid://crhr3souplnjm" path="res://assets/audio/walking_2s.wav" id="6_qek5x"]
