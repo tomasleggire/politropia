@@ -60,6 +60,7 @@ const CLIP_SPEEDS := {
 	"stag_recover": 10.0,
 	"stag_appear": 20.0,
 	"stag_run": 12.0,
+	"stag_vanish": 20.0,
 	"slash": 25.0,
 	"dive_shaft": 12.0,
 	"dive_shockwave": 12.0,

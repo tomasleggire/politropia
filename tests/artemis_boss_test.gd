@@ -56,7 +56,7 @@ const CHECKS := {
 	"case_moon_dive": 6,
 	"case_moon_dive_stuck_is_a_punish_window": 5,
 	"case_moon_dive_dash": 2,
-	"case_spectral_stag": 8,
+	"case_spectral_stag": 9,
 	"case_cornered_vault": 10,
 	"case_vault_on_hit_and_priority": 5,
 	"case_phase_two_selection": 2,
@@ -1023,7 +1023,11 @@ func _stag_run(react: String) -> Dictionary:
 		elif out["start_x"] != 0.0:
 			break
 	out["active_after"] = stag.is_active()
+	await _steps(2)
+	out["monitoring_after"] = stag.monitoring
 	out["visible_after"] = stag.visible
+	await _steps(int((SpectralStag.VANISH_TIME + 0.2) / _dt()))
+	out["hidden_after_vanish"] = not stag.visible
 	out["hit"] = stag.has_hit()
 	return out
 
@@ -1035,7 +1039,8 @@ func case_spectral_stag() -> void:
 	h.check(int(run["dir"]) == -1 and float(run["start_x"]) > 400.0, "it appears at the wall farthest from Luz (x %.0f)" % run["start_x"])
 	h.check(float(run["min_x"]) < -400.0, "it charges across the whole arena (to x %.0f)" % run["min_x"])
 	h.check(_player.get_health() == 29 and run["hit"], "a grounded Luz is hit exactly once (%d)" % _player.get_health())
-	h.check(not run["active_after"] and not run["visible_after"], "and it despawns at the far wall")
+	h.check(not run["active_after"] and not run["monitoring_after"], "and its hitbox is off at once at the far wall")
+	h.check(run["visible_after"] and run["hidden_after_vanish"], "while the drawn stag dissolves and is hidden once the vanish ends")
 	_end_case()
 	run = await _stag_run("jump")
 	h.check(float(run["clearance"]) > SpectralStag.HEIGHT and _player.get_health() == 30, "a normal jump clears it (%.0f px up, health %d)" % [run["clearance"], _player.get_health()])

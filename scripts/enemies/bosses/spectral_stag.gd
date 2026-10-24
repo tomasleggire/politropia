@@ -9,11 +9,13 @@ extends Area2D
 ## The hitbox is `WIDTH` x `HEIGHT` and stands on the floor, lower than a normal
 ## jump (84 px) and brief enough for a dash, so both answer it. Luz's own damage
 ## gate decides about dash i-frames and i-frames after a hit. The art is the
-## `AnimatedSprite2D` (appear, then the gallop loop); `Body` stays as the hidden
+## `AnimatedSprite2D` (appear, the gallop loop, then the vanish); `Body` stays as the hidden
 ## placeholder polygon, and without the sprite it is the visual again.
 
 ## Length of the materialising clip (docs/bosses/ARTEMIS_ANIMATIONS.md, section 3.4).
 const APPEAR_TIME := 0.15
+## Length of the dissolving clip played when a charge ends at the far wall.
+const VANISH_TIME := 0.4
 
 ## Keep in step with the CollisionShape2D of the scene.
 const WIDTH := 60.0
@@ -43,7 +45,7 @@ func _ready() -> void:
 	collision_mask = PLAYER_MASK
 	top_level = true
 	_setup_sprite()
-	deactivate()
+	deactivate(true)
 
 
 func _physics_process(delta: float) -> void:
@@ -87,12 +89,25 @@ func launch(from: Vector2, dir: int, speed: float, end_x: float, target: Player)
 	reset_physics_interpolation()
 
 
-func deactivate() -> void:
+## Stops the charge: the hitbox and `is_active()` go off at once. When it was
+## running and has the clip, the visual stays and dissolves over `VANISH_TIME`
+## (a new `launch` may interrupt it); `instant` (resets) hides it right away.
+func deactivate(instant := false) -> void:
+	var dissolve := not instant and _active and visible and _has_clip(&"stag_vanish")
 	_active = false
 	_reset_bob()
-	visible = false
 	set_deferred(&"monitoring", false)
 	set_physics_process(false)
+	if dissolve:
+		var frames := _sprite.sprite_frames
+		var count := frames.get_frame_count(&"stag_vanish")
+		_sprite.play(&"stag_vanish", (float(count) / frames.get_animation_speed(&"stag_vanish")) / VANISH_TIME)
+		return
+	visible = false
+
+
+func _has_clip(clip: StringName) -> bool:
+	return _sprite != null and _sprite.visible and _sprite.sprite_frames != null and _sprite.sprite_frames.has_animation(clip)
 
 
 func _setup_sprite() -> void:
@@ -137,6 +152,8 @@ func _play_appear() -> void:
 func _on_sprite_finished() -> void:
 	if _active and _sprite.animation == &"stag_appear":
 		_sprite.play(&"stag_run")
+	elif not _active and _sprite.animation == &"stag_vanish":
+		visible = false
 
 
 ## Once per pass. `overlaps_body` allocates nothing, unlike listing the bodies.

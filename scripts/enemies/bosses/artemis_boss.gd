@@ -652,7 +652,7 @@ func set_ai_active(active: bool) -> void:
 	super.set_ai_active(active)
 	if not active:
 		clear_arrows()
-		_stag.deactivate()
+		_stag.deactivate(true)
 
 
 ## Registers the hit, then checks the phase threshold and the stagger window.
@@ -695,7 +695,7 @@ func make_corpse_at(at: Vector2, facing: int) -> void:
 
 func _clear_attack_leftovers() -> void:
 	clear_arrows()
-	_stag.deactivate()
+	_stag.deactivate(true)
 	_set_dagger(false)
 
 
@@ -723,7 +723,7 @@ func _reset_ai() -> void:
 	_bow.position = _bow_rest
 	_bow.rotation = 0.0
 	clear_arrows()
-	_stag.deactivate()
+	_stag.deactivate(true)
 	_telegraph.clear()
 	_set_dagger(false)
 	_restore_from_dive()
