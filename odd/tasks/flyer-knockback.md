@@ -30,7 +30,8 @@ Assigned team task: hitting a flyer must visibly shove it back, which gives the 
   - `Enemy._apply_recoil()` hook (walkers keep x-only); `FlyingEnemy._init` enables `knockback_from_player_attacks`, 2D `_recoil_vector` away from Luz's center; `ShadowOwl` hit in WINDUP/DIVE/CHARGE goes to RECOVER. Shooter inherits it.
   - `case_flyer_light_knockback_and_corpse` source moved from y=-100 to y=-71 (Luz's feet for a center at -100), otherwise the 2D push pointed down.
   - Evidence: enemy_archetypes FAIL 6/107 (base 6/100, same six cases; 3 new cases pass); enemy FAIL 5/62 (= base, `case_player_recoil_on_hit` passes); combat incomplete 147/153 (= base); boss suite via stillness_desk_ritual_test incomplete 452/702 with 13 failing cases (matches the 13 known base failures), new `case_never_knocked_back` passes; zone_1 boot clean.
-- [ ] T2 — Device check on iPhone: the push reads well, does not shove flyers through walls, ShadowOwl dive is interrupted.
+- [x] T2 — Device check on iPhone: the push reads well, does not shove flyers through walls, ShadowOwl dive is interrupted.
+  - Evidence: user played a5110c3 on the iPhone on 2026-10-24 and approved the flyer push ("Se ve bien el volador").
 
 ## Acceptance criteria
 - A landed `attack_ground_*` hit moves a Flyer away from Luz horizontally; `attack_up` from below moves it up.
