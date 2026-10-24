@@ -89,6 +89,13 @@ func _engaged_think(delta: float) -> void:
 				_play_owl_animation(&"fly")
 
 
+## A hit cancels the attack so the push is not overridden by the dive or charge.
+func _start_recoil(source_position: Vector2) -> void:
+	super._start_recoil(source_position)
+	if _attack_phase in [AttackPhase.WINDUP, AttackPhase.DIVE, AttackPhase.CHARGE]:
+		_start_phase(AttackPhase.RECOVER, recover_duration, &"recover")
+
+
 func _on_engaged() -> void:
 	super._on_engaged()
 	_sfx_chase.play()
