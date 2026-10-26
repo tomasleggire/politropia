@@ -8,6 +8,7 @@
 [ext_resource type="TileSet" uid="uid://bt608aiku7igc" path="res://tilesets/spikes_library.tres" id="6_nmpsk"]
 [ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="7_nmpsk"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="8_sbedd"]
+[ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_3.tscn" id="frag3_collectible"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_rbapt"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="11_expoe"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="14_lhyta"]
@@ -14371,6 +14372,9 @@ phase_offset = 9.2
 
 [node name="Player" parent="." unique_id=1611018514 instance=ExtResource("8_sbedd")]
 position = Vector2(30, 170)
+
+[node name="FragmentoLibro3" parent="." instance=ExtResource("frag3_collectible")]
+position = Vector2(1498, 320)
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)

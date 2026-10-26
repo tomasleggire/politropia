@@ -28,10 +28,7 @@ const ORBIT_DURATION := 1.8
 const TRANSITION_SCENE := preload("res://scenes/ui/level_transition.tscn")
 
 @export_group("Fragments")
-## When on, the lectern only accepts fragments once Luz has collected all four
-## (`FragmentProgress`). Off by default so the demo flow works even while one
-## fragment is unreachable.
-@export var require_all_fragments := false
+## The level this lectern belongs to is resolved from its active scene.
 
 @onready var _area: Area2D = $InteractionArea
 @onready var _prompt: InteractionPrompt = $InteractionPrompt
@@ -47,6 +44,7 @@ const TRANSITION_SCENE := preload("res://scenes/ui/level_transition.tscn")
 @onready var _completion_pulse: Sprite2D = $CompletionPulse
 
 var _player: Player
+var _level_key := ""
 var _fragments_placed := 0
 var _fragment_nodes: Array[Node2D] = []
 var _reconstruction_started := false
@@ -67,6 +65,21 @@ func _ready() -> void:
 	_orbit_sparks.emitting = false
 	_joining_sparks.emitting = false
 	_reveal_flash.emitting = false
+	var progress := get_node_or_null("/root/FragmentProgress")
+	if progress != null:
+		_level_key = progress.current_level_key()
+		for id: int in progress.deposited_ids(_level_key):
+			_spawn_placed_fragment(id)
+		if _fragments_placed > 0 and not progress.reconstruction_started(_level_key):
+			_play_activation_glow()
+			_update_emanating_light()
+			_update_side_auras()
+		if progress.reconstruction_started(_level_key):
+			_reconstruction_started = true
+			_book_reconstructed = true
+			_completed_book.visible = true
+		elif progress.is_fully_deposited(_level_key):
+			call_deferred("reconstruir_libro")
 	add_to_group(INTERACTABLE_GROUP)
 	_area.body_entered.connect(_on_body_entered)
 	_area.body_exited.connect(_on_body_exited)
@@ -88,25 +101,43 @@ func _unhandled_input(event: InputEvent) -> void:
 func request_interact() -> bool:
 	if not _can_place():
 		return false
-	var fragment := FRAGMENT_SCENES[_fragments_placed].instantiate() as FloatingBookFragment
-	fragment.collectible = false
-	fragment.position = _book_marker.position + FRAGMENT_OFFSETS[_fragments_placed]
-	add_child(fragment)
-	_fragment_nodes.append(fragment)
-	_fragments_placed += 1
+	var progress := get_node_or_null("/root/FragmentProgress")
+	if progress == null:
+		return false
+	var carried: Array = progress.carried_ids(_level_key)
+	if carried.is_empty():
+		return false
+	var fragment_id := int(carried[0])
+	if not progress.deposit(fragment_id, _level_key):
+		return false
+	_spawn_placed_fragment(fragment_id)
 	_prompt.hide_prompt()
 	_play_activation_glow()
 	_update_emanating_light()
 	_update_side_auras()
 	_refresh_prompt()
-	if _fragments_placed == FRAGMENT_SCENES.size():
+	if progress.is_fully_deposited(_level_key):
 		call_deferred("reconstruir_libro")
 	return true
+
+
+func _spawn_placed_fragment(fragment_id: int) -> void:
+	if fragment_id < 1 or fragment_id > FRAGMENT_SCENES.size():
+		return
+	var fragment := FRAGMENT_SCENES[fragment_id - 1].instantiate() as FloatingBookFragment
+	fragment.collectible = false
+	fragment.position = _book_marker.position + FRAGMENT_OFFSETS[fragment_id - 1]
+	add_child(fragment)
+	_fragment_nodes.append(fragment)
+	_fragments_placed += 1
 
 
 ## Run once, after all four fragments have been placed on the lectern.
 func reconstruir_libro() -> void:
 	if _reconstruction_started or _book_reconstructed or _fragments_placed != FRAGMENT_SCENES.size():
+		return
+	var progress := get_node_or_null("/root/FragmentProgress")
+	if progress == null or not progress.begin_reconstruction(_level_key):
 		return
 	_reconstruction_started = true
 	_prompt.hide_prompt()
@@ -310,10 +341,8 @@ func _on_body_exited(body: Node2D) -> void:
 func _can_place() -> bool:
 	if _reconstruction_started or _fragments_placed >= FRAGMENT_SCENES.size() or not is_instance_valid(_player):
 		return false
-	if require_all_fragments:
-		var progress := get_node_or_null("/root/FragmentProgress")
-		return progress != null and progress.is_complete()
-	return true
+	var progress := get_node_or_null("/root/FragmentProgress")
+	return progress != null and not progress.carried_ids(_level_key).is_empty()
 
 
 func _refresh_prompt() -> void:

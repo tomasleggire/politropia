@@ -2221,6 +2221,9 @@ func _respawn_after_death() -> void:
 	# Looked up by path: a bare autoload name does not compile in --script
 	# runs, which instantiate the player without the project's autoloads.
 	var checkpoints := get_node_or_null("/root/CheckpointService")
+	var fragment_progress := get_node_or_null("/root/FragmentProgress")
+	if fragment_progress != null and fragment_progress.has_method("lose_carried"):
+		fragment_progress.call("lose_carried")
 	var current := get_tree().current_scene
 	if checkpoints != null and current != null:
 		checkpoints.apply_to_player(self, current.scene_file_path)
