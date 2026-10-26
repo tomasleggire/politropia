@@ -355,6 +355,7 @@ var current_health: int:
 @export var hitbox_air := Rect2(2, -56, 79, 38)
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
+@onready var aseprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
 @onready var _sfx_foot: AudioStreamPlayer = $SfxFoot
 @onready var _sfx_jump: AudioStreamPlayer = $SfxJump
@@ -537,8 +538,9 @@ var _focus_end_animating := false
 
 func _ready() -> void:
 	add_to_group(&"player")
-	_restore_saved_abilities()
 	_sprite.sprite_frames = _animation_sprite_frames
+	_restore_saved_abilities()
+	
 	_sprite.animation_finished.connect(_on_sprite_animation_finished)
 	_sprite.frame_changed.connect(_on_sprite_frame_changed)
 	# Every Luz frame is a uniform 512x512 grid cell (see LuzAnimationCatalog
@@ -636,7 +638,7 @@ func _physics_process(delta: float) -> void:
 		_try_start_dash()
 	
 	if Input.is_action_just_pressed(&"skill"):
-		activar_revelacion()
+		open_eyes()
 
 	_try_start_focus()
 	_focus_tapped = false
@@ -656,6 +658,7 @@ func _physics_process(delta: float) -> void:
 			_update_airborne(delta)
 		State.DASH:
 			_update_dash(delta)
+		
 		State.WALL_CLING:
 			_update_wall_cling(delta)
 		State.ATTACK:
@@ -678,10 +681,19 @@ func _physics_process(delta: float) -> void:
 	_update_animation()
 	_update_afterimages(delta)
 
-func activar_revelacion() -> void:
+signal open_eyes_activated
+
+
+func open_eyes() -> void:
 	if _state != State.IDLE and _state != State.RUN:
 		return 
-	hiperfocus_activated.emit()
+	
+	##prueba##
+	_sprite.stop()
+	_enter_state(State.SKID)
+	##prueba##
+	
+	open_eyes_activated.emit()
 	
 
 
@@ -2819,5 +2831,3 @@ func _play_animation(animation_name: StringName, speed_scale := 1.0) -> void:
 		_sprite.play(animation_name)
 	_sprite.speed_scale = speed_scale
 	
-
-signal hiperfocus_activated

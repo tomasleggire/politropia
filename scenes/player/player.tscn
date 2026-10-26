@@ -27,39 +27,42 @@ shader_parameter/width = 5.0
 shader_parameter/light_direction = Vector2(-0.5, -1)
 shader_parameter/strength = 0.45
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_h17s1"]
-atlas = ExtResource("4_5gtgg")
-region = Rect2(512, 512, 512, 512)
-
 [sub_resource type="AtlasTexture" id="AtlasTexture_je7p5"]
 atlas = ExtResource("4_5gtgg")
 region = Rect2(1536, 0, 512, 512)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_fm80t"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_h17s1"]
 atlas = ExtResource("4_5gtgg")
-region = Rect2(512, 0, 512, 512)
+region = Rect2(512, 512, 512, 512)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_gx1jg"]
 atlas = ExtResource("4_5gtgg")
 region = Rect2(0, 512, 512, 512)
 
+[sub_resource type="AtlasTexture" id="AtlasTexture_fm80t"]
+atlas = ExtResource("4_5gtgg")
+region = Rect2(512, 0, 512, 512)
+
 [sub_resource type="SpriteFrames" id="SpriteFrames_g1plq"]
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": SubResource("AtlasTexture_h17s1")
-}, {
-"duration": 1.0,
 "texture": SubResource("AtlasTexture_je7p5")
 }, {
 "duration": 1.0,
-"texture": SubResource("AtlasTexture_fm80t")
+"texture": SubResource("AtlasTexture_h17s1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_h17s1")
 }, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_gx1jg")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_fm80t")
 }],
 "loop": 1,
-"name": &"hiperfoco",
+"name": &"open_eyes",
 "speed": 5.0
 }]
 
@@ -103,8 +106,9 @@ texture_filter = 4
 material = SubResource("ShaderMaterial_rim")
 scale = Vector2(0.1448, 0.1448)
 sprite_frames = SubResource("SpriteFrames_g1plq")
-animation = &"hiperfoco"
-frame_progress = 0.19053759
+animation = &"open_eyes"
+frame = 2
+frame_progress = 0.68789375
 
 [node name="SlashVfx" type="Node2D" parent="." unique_id=883827761]
 z_index = 1
