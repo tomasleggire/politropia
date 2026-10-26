@@ -13,6 +13,7 @@
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="10_y8mnw"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="12_gkqv4"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="13_rh6b6"]
+[ext_resource type="PackedScene" uid="uid://dmth8yaq1mat2" path="res://scenes/enemies/mathematician_enemy.tscn" id="18_p4w6w"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
@@ -14358,22 +14359,27 @@ position = Vector2(867, 217)
 
 [node name="BookFlyer" parent="." unique_id=1113949942 instance=ExtResource("8_0xytk")]
 position = Vector2(279, 195)
+knockback_from_player_attacks = true
 max_fall_speed = 1400.0
 
 [node name="BookFlyer2" parent="." unique_id=1488631679 instance=ExtResource("8_0xytk")]
 position = Vector2(145, 692)
+knockback_from_player_attacks = true
 max_fall_speed = 1400.0
 
 [node name="BookFlyer3" parent="." unique_id=1293946812 instance=ExtResource("8_0xytk")]
 position = Vector2(1450, 234)
+knockback_from_player_attacks = true
 max_fall_speed = 1400.0
 
 [node name="BookFlyer4" parent="." unique_id=1992233274 instance=ExtResource("8_0xytk")]
 position = Vector2(1641, 538)
+knockback_from_player_attacks = true
 max_fall_speed = 1400.0
 
 [node name="BookFlyer5" parent="." unique_id=1393168097 instance=ExtResource("8_0xytk")]
 position = Vector2(1013, 396)
+knockback_from_player_attacks = true
 max_fall_speed = 1400.0
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
@@ -14423,3 +14429,7 @@ position = Vector2(2206, 172)
 target_scene_path = "uid://bt3m0cf4sgq7r"
 door_id = 7
 target_door_id = 8
+
+[node name="MathematicianEnemy" parent="." unique_id=1401423410 instance=ExtResource("18_p4w6w")]
+position = Vector2(579, 305)
+max_health = 3

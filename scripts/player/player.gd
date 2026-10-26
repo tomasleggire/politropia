@@ -355,6 +355,7 @@ var current_health: int:
 @export var hitbox_air := Rect2(2, -56, 79, 38)
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
+@onready var aseprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
 @onready var _sfx_foot: AudioStreamPlayer = $SfxFoot
 @onready var _sfx_jump: AudioStreamPlayer = $SfxJump
@@ -537,8 +538,9 @@ var _focus_end_animating := false
 
 func _ready() -> void:
 	add_to_group(&"player")
-	_restore_saved_abilities()
 	_sprite.sprite_frames = _animation_sprite_frames
+	_restore_saved_abilities()
+	
 	_sprite.animation_finished.connect(_on_sprite_animation_finished)
 	_sprite.frame_changed.connect(_on_sprite_frame_changed)
 	# Every Luz frame is a uniform 512x512 grid cell (see LuzAnimationCatalog
@@ -634,6 +636,9 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed(&"dash") and not channeling:
 		_try_start_dash()
+	
+	if Input.is_action_just_pressed(&"skill"):
+		open_eyes()
 
 	_try_start_focus()
 	_focus_tapped = false
@@ -653,6 +658,7 @@ func _physics_process(delta: float) -> void:
 			_update_airborne(delta)
 		State.DASH:
 			_update_dash(delta)
+		
 		State.WALL_CLING:
 			_update_wall_cling(delta)
 		State.ATTACK:
@@ -674,6 +680,21 @@ func _physics_process(delta: float) -> void:
 	_update_footsteps(delta)
 	_update_animation()
 	_update_afterimages(delta)
+
+signal open_eyes_activated
+
+
+func open_eyes() -> void:
+	if _state != State.IDLE and _state != State.RUN:
+		return 
+	
+	##prueba##
+	_sprite.stop()
+	_enter_state(State.SKID)
+	##prueba##
+	
+	open_eyes_activated.emit()
+	
 
 
 func _update_shared_timers(delta: float) -> void:
@@ -2200,6 +2221,9 @@ func _respawn_after_death() -> void:
 	# Looked up by path: a bare autoload name does not compile in --script
 	# runs, which instantiate the player without the project's autoloads.
 	var checkpoints := get_node_or_null("/root/CheckpointService")
+	var fragment_progress := get_node_or_null("/root/FragmentProgress")
+	if fragment_progress != null and fragment_progress.has_method("lose_carried"):
+		fragment_progress.call("lose_carried")
 	var current := get_tree().current_scene
 	if checkpoints != null and current != null:
 		checkpoints.apply_to_player(self, current.scene_file_path)
@@ -2809,3 +2833,4 @@ func _play_animation(animation_name: StringName, speed_scale := 1.0) -> void:
 	if _sprite.animation != animation_name:
 		_sprite.play(animation_name)
 	_sprite.speed_scale = speed_scale
+	

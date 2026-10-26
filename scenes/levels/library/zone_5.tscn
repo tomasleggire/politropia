@@ -8,10 +8,12 @@
 [ext_resource type="TileSet" uid="uid://bt608aiku7igc" path="res://tilesets/spikes_library.tres" id="6_nmpsk"]
 [ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="7_nmpsk"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="8_sbedd"]
+[ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_3.tscn" id="frag3_collectible"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_rbapt"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="11_expoe"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="14_lhyta"]
 [ext_resource type="PackedScene" uid="uid://b5lf46acc08rl" path="res://scenes/enemies/teacher_enemy.tscn" id="19_lhyta"]
+[ext_resource type="PackedScene" uid="uid://dmth8yaq1mat2" path="res://scenes/enemies/mathematician_enemy.tscn" id="20_6por8"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
@@ -14371,6 +14373,9 @@ phase_offset = 9.2
 [node name="Player" parent="." unique_id=1611018514 instance=ExtResource("8_sbedd")]
 position = Vector2(30, 170)
 
+[node name="FragmentoLibro3" parent="." instance=ExtResource("frag3_collectible")]
+position = Vector2(1498, 320)
+
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)
 tile_map_data = PackedByteArray("AAACAPL/AAAyAB0AAAACAPP/AAATACYAAAADAPL/AAAzAB0AAAAHAPT/AAAYACcAAAAHAPf/AAAYACoAAAAAAPP/AAARACYAAAAAAPT/AAARACcAAAAAAPX/AAARACgAAAAAAPb/AAARACkAAAAAAPf/AAARACoAAAABAPL/AAASACUAAAABAPP/AAASACYAAAABAPT/AAASACcAAAABAPX/AAASACgAAAABAPb/AAASACkAAAABAPf/AAASACoAAAABAPj/AAASACsAAAACAPT/AAATACcAAAACAPX/AAATACgAAAACAPb/AAATACkAAAACAPf/AAATACoAAAACAPj/AAATACsAAAADAPP/AAAUACYAAAADAPT/AAAUACcAAAADAPX/AAAUACgAAAADAPb/AAAUACkAAAADAPf/AAAUACoAAAADAPj/AAAUACsAAAAEAPP/AAAVACYAAAAEAPT/AAAVACcAAAAEAPX/AAAVACgAAAAEAPb/AAAVACkAAAAEAPf/AAAVACoAAAAEAPj/AAAVACsAAAAFAPL/AAAWACUAAAAFAPP/AAAWACYAAAAFAPT/AAAWACcAAAAFAPX/AAAWACgAAAAFAPb/AAAWACkAAAAFAPf/AAAWACoAAAAFAPj/AAAWACsAAAAGAPL/AAAXACUAAAAGAPP/AAAXACYAAAAGAPT/AAAXACcAAAAGAPX/AAAXACgAAAAGAPb/AAAXACkAAAAGAPf/AAAXACoAAAAGAPj/AAAXACsAAAAHAPP/AAAYACYAAAAHAPX/AAAYACgAAAAHAPb/AAAYACkAAAA=")
@@ -14436,4 +14441,12 @@ source_layer = NodePath("../TilemapLayers/Ground/Platforms")
 debris_color = Color(0.78, 0.68, 0.5, 1)
 
 [node name="teacher_enemy" parent="." unique_id=1714237560 instance=ExtResource("19_lhyta")]
-position = Vector2(1489, 326)
+position = Vector2(1498, 320)
+
+[node name="MathematicianEnemy" parent="." unique_id=1401423410 instance=ExtResource("20_6por8")]
+position = Vector2(395, 215)
+max_health = 3
+
+[node name="MathematicianEnemy2" parent="." unique_id=94214092 instance=ExtResource("20_6por8")]
+position = Vector2(1242, 727)
+max_health = 3

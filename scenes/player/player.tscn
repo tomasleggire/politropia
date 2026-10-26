@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dowigi85o1a"]
 
 [ext_resource type="Script" uid="uid://52lnrs7hxbfp" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="Texture2D" uid="uid://bu5sfnwttur3b" path="res://assets/player/luz/luz_turn_skid_sheet.png" id="4_5gtgg"]
 [ext_resource type="AudioStream" uid="uid://bcksymyxto0f1" path="res://assets/audio/land.wav" id="5_5gtgg"]
 [ext_resource type="Script" uid="uid://dy77m7qh61ceh" path="res://scripts/player/attack_hitbox.gd" id="6_hitbox"]
 [ext_resource type="AudioStream" uid="uid://crhr3souplnjm" path="res://assets/audio/walking_2s.wav" id="6_qek5x"]
@@ -25,6 +26,45 @@ shader_parameter/rim_color = Color(0.4, 0.46, 0.58, 1)
 shader_parameter/width = 5.0
 shader_parameter/light_direction = Vector2(-0.5, -1)
 shader_parameter/strength = 0.45
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_je7p5"]
+atlas = ExtResource("4_5gtgg")
+region = Rect2(1536, 0, 512, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_h17s1"]
+atlas = ExtResource("4_5gtgg")
+region = Rect2(512, 512, 512, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_gx1jg"]
+atlas = ExtResource("4_5gtgg")
+region = Rect2(0, 512, 512, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_fm80t"]
+atlas = ExtResource("4_5gtgg")
+region = Rect2(512, 0, 512, 512)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_g1plq"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_je7p5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_h17s1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_h17s1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_gx1jg")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_fm80t")
+}],
+"loop": 1,
+"name": &"open_eyes",
+"speed": 5.0
+}]
 
 [node name="Player" type="CharacterBody2D" unique_id=1062555339 groups=["player"]]
 collision_mask = 3
@@ -65,6 +105,10 @@ disabled = true
 texture_filter = 4
 material = SubResource("ShaderMaterial_rim")
 scale = Vector2(0.1448, 0.1448)
+sprite_frames = SubResource("SpriteFrames_g1plq")
+animation = &"open_eyes"
+frame = 2
+frame_progress = 0.68789375
 
 [node name="SlashVfx" type="Node2D" parent="." unique_id=883827761]
 z_index = 1

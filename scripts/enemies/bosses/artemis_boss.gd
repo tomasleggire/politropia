@@ -94,6 +94,10 @@ const TRANSITION_PULSE_RATE := 10.0
 const TRANSITION_SKIN_SWAP := 0.5
 ## Landing dust and shockwave never outlast 0.3 s (docs/bosses/ARTEMIS_ANIMATIONS.md, section 4).
 const SHOCKWAVE_TIME := 0.3
+## Bursts that can play at once (a rain can land a dozen arrows together); the oldest is reused.
+const IMPACT_POOL_SIZE := 8
+## Share of a telegraph after which its floor glyph switches to the "about to strike" art.
+const GLYPH_HOT_PROGRESS := 0.7
 const MOONLIT_SHADER := preload("res://shaders/artemis_moonlit.gdshader")
 const CROUCH_SCALE := 0.8
 ## Artemis's sprite scale: the same on-screen pixel size as Luz (tools/process_artemis_sheets.py).
@@ -425,6 +429,9 @@ var _crouching := false
 var _hop_chains := false
 var _manual_engage := false
 var _engaged := false
+## Seconds left of the arena-entry `intro` clip; while it runs she stays in IDLE and
+## `_sync_sprite` leaves the clip alone.
+var _intro_left := 0.0
 var _has_arena_limits := false
 var _arena_left := 0.0
 var _arena_right := 0.0
@@ -432,6 +439,10 @@ var _interrupt_left := 0.0
 ## The contract clip last requested through `_play` (not the fallback it resolved to).
 var _clip: StringName = &""
 var _moonlit := false
+## Pooled arrow-impact bursts (see `_setup_impact`) and the next one to reuse.
+var _impacts: Array[AnimatedSprite2D] = []
+var _impact_next := 0
+var _impact_offset := Vector2.ZERO
 var _surface_ray := PhysicsRayQueryParameters2D.new()
 var _rain_markers: Array[Rect2] = []
 var _rain_marker_count := 0
@@ -469,6 +480,7 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
+	_intro_left = maxf(_intro_left - delta, 0.0)
 	super._physics_process(delta)
 	_sync_sprite()
 
@@ -589,8 +601,19 @@ func is_fresh() -> bool:
 	return _state == State.IDLE and _phase == PHASE_ONE and _health == max_health
 
 
+## Plays the `intro` reveal over `duration` seconds while she waits in IDLE (the
+## arena calls it when the fight starts, with its engage delay). Never for a corpse.
+## Timers and behavior are untouched: only the clip is held until it ends.
+func play_intro(duration: float) -> void:
+	if _dead or _state != State.IDLE or duration <= 0.0:
+		return
+	_intro_left = duration
+	_play(&"intro", duration)
+
+
 ## Leaves IDLE for the fight without waiting for Luz to come close.
 func engage() -> void:
+	_intro_left = 0.0
 	_engaged = true
 	if _state == State.IDLE:
 		_begin_reposition()
@@ -637,7 +660,7 @@ func set_ai_active(active: bool) -> void:
 	super.set_ai_active(active)
 	if not active:
 		clear_arrows()
-		_stag.deactivate()
+		_stag.deactivate(true)
 
 
 ## Registers the hit, then checks the phase threshold and the stagger window.
@@ -680,7 +703,7 @@ func make_corpse_at(at: Vector2, facing: int) -> void:
 
 func _clear_attack_leftovers() -> void:
 	clear_arrows()
-	_stag.deactivate()
+	_stag.deactivate(true)
 	_set_dagger(false)
 
 
@@ -708,7 +731,8 @@ func _reset_ai() -> void:
 	_bow.position = _bow_rest
 	_bow.rotation = 0.0
 	clear_arrows()
-	_stag.deactivate()
+	_hide_impacts()
+	_stag.deactivate(true)
 	_telegraph.clear()
 	_set_dagger(false)
 	_restore_from_dive()
@@ -727,6 +751,7 @@ func _reset_ai() -> void:
 	_rain_count = 0
 	_rain_marker_count = 0
 	_engaged = false
+	_intro_left = 0.0
 	_backstep_left = 0.0
 	_dodge_left = 0.0
 	_feint_left = 0.0
@@ -787,6 +812,7 @@ func _setup_sprite() -> void:
 		return
 	_sprite.sprite_frames = ArtemisAnimationCatalog.build_sprite_frames()
 	_setup_vfx()
+	_setup_impact()
 	_clip = &""
 	_sync_sprite()
 
@@ -826,6 +852,51 @@ func _setup_vfx() -> void:
 		_shockwave_art.animation_finished.connect(_shockwave_art.hide)
 
 
+## A small pool of top-level burst sprites for the arrows' `impacted` signal. Without
+## the "impact" art in the manifest the pool stays empty and arrows just vanish.
+## No moon arrows exist yet (`arrow_impact_moon` is built but unused): every arrow is amber.
+func _setup_impact() -> void:
+	var frames := ArtemisAnimationCatalog.build_impact_frames()
+	var entry := ArtemisAnimationCatalog.manifest_entry("impact")
+	if entry.is_empty() or not frames.has_animation(&"arrow_impact"):
+		return
+	var grid: Dictionary = entry["grid"]
+	var anchor: Array = entry["anchor"]
+	var burst_scale := float(entry["sprite_scale"])
+	# `offset` is in texture pixels: it puts the impact point on the node origin.
+	_impact_offset = Vector2(float(grid["cell_width"]) * 0.5 - float(anchor[0]), float(grid["cell_height"]) * 0.5 - float(anchor[1]))
+	for i: int in IMPACT_POOL_SIZE:
+		var burst := AnimatedSprite2D.new()
+		burst.sprite_frames = frames
+		burst.top_level = true
+		burst.z_index = 3
+		burst.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		burst.scale = Vector2(burst_scale, burst_scale)
+		burst.offset = _impact_offset
+		burst.visible = false
+		burst.animation_finished.connect(burst.hide)
+		add_child(burst)
+		_impacts.append(burst)
+
+
+## Plays the amber burst at `point`, opening back along the way the arrow came from.
+func _on_arrow_impacted(point: Vector2, direction: Vector2) -> void:
+	if _impacts.is_empty():
+		return
+	var burst := _impacts[_impact_next]
+	_impact_next = (_impact_next + 1) % _impacts.size()
+	burst.global_position = point
+	burst.rotation = direction.angle()
+	burst.visible = true
+	burst.play(&"arrow_impact")
+
+
+func _hide_impacts() -> void:
+	for burst: AnimatedSprite2D in _impacts:
+		burst.stop()
+		burst.hide()
+
+
 func _has_vfx(art: AnimatedSprite2D, clip: StringName) -> bool:
 	return art != null and art.sprite_frames != null and art.sprite_frames.has_animation(clip)
 
@@ -863,6 +934,10 @@ func _set_skin(phase: int) -> void:
 func _sync_sprite() -> void:
 	if _sprite == null or _sprite.sprite_frames == null:
 		return
+	if _intro_left > 0.0:
+		if _state == State.IDLE:
+			return
+		_intro_left = 0.0
 	var request := _clip_request()
 	if request[0] != _clip:
 		_play(request[0], request[1])
@@ -1567,7 +1642,7 @@ func _animate_rain() -> void:
 	var pulse := 0.5 + 0.5 * sin(_clock * lerpf(8.0, 24.0, progress))
 	var alpha := lerpf(BossTelegraph.MARKER_ALPHA, 0.7, progress) * (0.75 + 0.25 * pulse)
 	for i: int in _rain_marker_count:
-		_telegraph.show_floor_marker(i, _rain_markers[i], BossTelegraph.RANGED_COLOR, alpha)
+		_telegraph.show_floor_marker(i, _rain_markers[i], BossTelegraph.RANGED_COLOR, alpha, &"rain", progress >= GLYPH_HOT_PROGRESS)
 
 
 func _fire_rain() -> void:
@@ -1761,7 +1836,7 @@ func _animate_moon_dive() -> void:
 	var pulse := 0.75 + 0.25 * sin(_clock * (24.0 if _dive_locked else 8.0))
 	var alpha := (0.8 if _dive_locked else BossTelegraph.MARKER_ALPHA) * pulse
 	var rect := Rect2(_dive_x - dive_marker_width * 0.5, global_position.y - RAIN_MARKER_HEIGHT, dive_marker_width, RAIN_MARKER_HEIGHT)
-	_telegraph.show_floor_marker(0, rect, BossTelegraph.MOON_COLOR, alpha)
+	_telegraph.show_floor_marker(0, rect, BossTelegraph.MOON_COLOR, alpha, &"dive", _dive_locked)
 	_telegraph.show_floor_marker(DIVE_COLUMN_SLOT, get_dive_column(), BossTelegraph.MOON_COLOR, alpha * DIVE_COLUMN_ALPHA_SCALE)
 
 
@@ -1863,7 +1938,7 @@ func _animate_stag() -> void:
 	var pulse := 0.75 + 0.25 * sin(_clock * lerpf(8.0, 24.0, progress))
 	var x := _stag_wall_x if _stag_dir > 0 else _stag_wall_x - SpectralStag.WIDTH
 	var rect := Rect2(x, global_position.y - SpectralStag.HEIGHT, SpectralStag.WIDTH, SpectralStag.HEIGHT)
-	_telegraph.show_floor_marker(0, rect, BossTelegraph.MOON_COLOR, lerpf(BossTelegraph.MARKER_ALPHA, 0.7, progress) * pulse)
+	_telegraph.show_floor_marker(0, rect, BossTelegraph.MOON_COLOR, lerpf(BossTelegraph.MARKER_ALPHA, 0.7, progress) * pulse, &"stag", progress >= GLYPH_HOT_PROGRESS)
 
 
 func _summon_stag() -> void:
@@ -2045,6 +2120,7 @@ func _make_arrow() -> EnemyProjectile:
 	var arrow := ARROW_SCENE.instantiate() as EnemyProjectile
 	arrow.stops_on_one_ways = true
 	arrow.breakable_by_attacks = false
+	arrow.impacted.connect(_on_arrow_impacted)
 	add_child(arrow)
 	_rehome_arrow.call_deferred(arrow)
 	return arrow

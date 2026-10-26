@@ -95,7 +95,7 @@ shape = SubResource("RectangleShape2D_dive")
 
 [node name="ImpactArt" type="AnimatedSprite2D" parent="DiveHitbox"]
 visible = false
-z_index = 2
+z_index = -1
 texture_filter = 4
 scale = Vector2(0.25, 0.25)
 offset = Vector2(0, -128)
@@ -128,7 +128,7 @@ shape = SubResource("RectangleShape2D_stag")
 z_index = 2
 modulate = Color(1, 1, 1, 0.72)
 texture_filter = 4
-scale = Vector2(0.2, 0.2)
+scale = Vector2(0.245, 0.245)
 offset = Vector2(0, -148)
 
 [node name="Body" type="Polygon2D" parent="SpectralStag"]
