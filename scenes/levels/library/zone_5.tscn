@@ -2,17 +2,14 @@
 
 [ext_resource type="Texture2D" uid="uid://bjii87kc3w2vh" path="res://assets/art/library/Backgrounds/background5.png" id="1_6tcvq"]
 [ext_resource type="Texture2D" uid="uid://c40vc3xmgce3c" path="res://assets/art/library/Walls/walls_library.png" id="2_rbapt"]
-[ext_resource type="Texture2D" uid="uid://bqrgujvddynkl" path="res://assets/art/library/Walls/window_library.png" id="3_expoe"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="4_srqf7"]
 [ext_resource type="TileSet" uid="uid://dul1ibpu3lwwe" path="res://tilesets/platforms_library.tres" id="5_wk4xi"]
 [ext_resource type="TileSet" uid="uid://bt608aiku7igc" path="res://tilesets/spikes_library.tres" id="6_nmpsk"]
 [ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="7_nmpsk"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="8_sbedd"]
-[ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_3.tscn" id="frag3_collectible"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_rbapt"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="11_expoe"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="14_lhyta"]
-[ext_resource type="PackedScene" uid="uid://b5lf46acc08rl" path="res://scenes/enemies/teacher_enemy.tscn" id="19_lhyta"]
 [ext_resource type="PackedScene" uid="uid://dmth8yaq1mat2" path="res://scenes/enemies/mathematician_enemy.tscn" id="20_6por8"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
@@ -89,278 +86,6 @@ texture_region_size = Vector2i(16, 32)
 [sub_resource type="TileSet" id="TileSet_r6boj"]
 tile_size = Vector2i(16, 32)
 sources/1 = SubResource("TileSetAtlasSource_fcwr3")
-
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_0mvx0"]
-texture = ExtResource("3_expoe")
-texture_region_size = Vector2i(8, 8)
-0:0/0 = 0
-1:0/0 = 0
-2:0/0 = 0
-3:0/0 = 0
-4:0/0 = 0
-5:0/0 = 0
-6:0/0 = 0
-7:0/0 = 0
-8:0/0 = 0
-9:0/0 = 0
-10:0/0 = 0
-0:1/0 = 0
-1:1/0 = 0
-2:1/0 = 0
-3:1/0 = 0
-4:1/0 = 0
-5:1/0 = 0
-6:1/0 = 0
-7:1/0 = 0
-8:1/0 = 0
-9:1/0 = 0
-10:1/0 = 0
-0:2/0 = 0
-1:2/0 = 0
-2:2/0 = 0
-3:2/0 = 0
-4:2/0 = 0
-5:2/0 = 0
-6:2/0 = 0
-7:2/0 = 0
-8:2/0 = 0
-9:2/0 = 0
-10:2/0 = 0
-0:3/0 = 0
-1:3/0 = 0
-2:3/0 = 0
-3:3/0 = 0
-4:3/0 = 0
-5:3/0 = 0
-6:3/0 = 0
-7:3/0 = 0
-8:3/0 = 0
-9:3/0 = 0
-10:3/0 = 0
-0:4/0 = 0
-1:4/0 = 0
-2:4/0 = 0
-3:4/0 = 0
-4:4/0 = 0
-5:4/0 = 0
-6:4/0 = 0
-7:4/0 = 0
-8:4/0 = 0
-9:4/0 = 0
-10:4/0 = 0
-0:5/0 = 0
-1:5/0 = 0
-2:5/0 = 0
-3:5/0 = 0
-4:5/0 = 0
-5:5/0 = 0
-6:5/0 = 0
-7:5/0 = 0
-8:5/0 = 0
-9:5/0 = 0
-10:5/0 = 0
-0:6/0 = 0
-1:6/0 = 0
-2:6/0 = 0
-3:6/0 = 0
-4:6/0 = 0
-5:6/0 = 0
-6:6/0 = 0
-7:6/0 = 0
-8:6/0 = 0
-9:6/0 = 0
-10:6/0 = 0
-0:7/0 = 0
-1:7/0 = 0
-2:7/0 = 0
-3:7/0 = 0
-4:7/0 = 0
-5:7/0 = 0
-6:7/0 = 0
-7:7/0 = 0
-8:7/0 = 0
-9:7/0 = 0
-10:7/0 = 0
-0:8/0 = 0
-1:8/0 = 0
-2:8/0 = 0
-3:8/0 = 0
-4:8/0 = 0
-5:8/0 = 0
-6:8/0 = 0
-7:8/0 = 0
-8:8/0 = 0
-9:8/0 = 0
-10:8/0 = 0
-0:9/0 = 0
-1:9/0 = 0
-2:9/0 = 0
-3:9/0 = 0
-4:9/0 = 0
-5:9/0 = 0
-6:9/0 = 0
-7:9/0 = 0
-8:9/0 = 0
-9:9/0 = 0
-10:9/0 = 0
-0:10/0 = 0
-1:10/0 = 0
-2:10/0 = 0
-3:10/0 = 0
-4:10/0 = 0
-5:10/0 = 0
-6:10/0 = 0
-7:10/0 = 0
-8:10/0 = 0
-9:10/0 = 0
-10:10/0 = 0
-0:11/0 = 0
-1:11/0 = 0
-2:11/0 = 0
-3:11/0 = 0
-4:11/0 = 0
-5:11/0 = 0
-6:11/0 = 0
-7:11/0 = 0
-8:11/0 = 0
-9:11/0 = 0
-10:11/0 = 0
-0:12/0 = 0
-1:12/0 = 0
-2:12/0 = 0
-3:12/0 = 0
-4:12/0 = 0
-5:12/0 = 0
-6:12/0 = 0
-7:12/0 = 0
-8:12/0 = 0
-9:12/0 = 0
-10:12/0 = 0
-0:13/0 = 0
-1:13/0 = 0
-2:13/0 = 0
-3:13/0 = 0
-4:13/0 = 0
-5:13/0 = 0
-6:13/0 = 0
-7:13/0 = 0
-8:13/0 = 0
-9:13/0 = 0
-10:13/0 = 0
-0:14/0 = 0
-1:14/0 = 0
-2:14/0 = 0
-3:14/0 = 0
-4:14/0 = 0
-5:14/0 = 0
-6:14/0 = 0
-7:14/0 = 0
-8:14/0 = 0
-9:14/0 = 0
-10:14/0 = 0
-0:15/0 = 0
-1:15/0 = 0
-2:15/0 = 0
-3:15/0 = 0
-4:15/0 = 0
-5:15/0 = 0
-6:15/0 = 0
-7:15/0 = 0
-8:15/0 = 0
-9:15/0 = 0
-10:15/0 = 0
-0:16/0 = 0
-1:16/0 = 0
-2:16/0 = 0
-3:16/0 = 0
-4:16/0 = 0
-5:16/0 = 0
-6:16/0 = 0
-7:16/0 = 0
-8:16/0 = 0
-9:16/0 = 0
-10:16/0 = 0
-0:17/0 = 0
-1:17/0 = 0
-2:17/0 = 0
-3:17/0 = 0
-4:17/0 = 0
-5:17/0 = 0
-6:17/0 = 0
-7:17/0 = 0
-8:17/0 = 0
-9:17/0 = 0
-10:17/0 = 0
-0:18/0 = 0
-1:18/0 = 0
-2:18/0 = 0
-3:18/0 = 0
-4:18/0 = 0
-5:18/0 = 0
-6:18/0 = 0
-7:18/0 = 0
-8:18/0 = 0
-9:18/0 = 0
-10:18/0 = 0
-0:19/0 = 0
-1:19/0 = 0
-2:19/0 = 0
-3:19/0 = 0
-4:19/0 = 0
-5:19/0 = 0
-6:19/0 = 0
-7:19/0 = 0
-8:19/0 = 0
-9:19/0 = 0
-10:19/0 = 0
-0:20/0 = 0
-1:20/0 = 0
-2:20/0 = 0
-3:20/0 = 0
-4:20/0 = 0
-5:20/0 = 0
-6:20/0 = 0
-7:20/0 = 0
-8:20/0 = 0
-9:20/0 = 0
-10:20/0 = 0
-0:21/0 = 0
-1:21/0 = 0
-2:21/0 = 0
-3:21/0 = 0
-4:21/0 = 0
-5:21/0 = 0
-6:21/0 = 0
-7:21/0 = 0
-8:21/0 = 0
-9:21/0 = 0
-10:21/0 = 0
-0:22/0 = 0
-1:22/0 = 0
-2:22/0 = 0
-3:22/0 = 0
-4:22/0 = 0
-5:22/0 = 0
-6:22/0 = 0
-7:22/0 = 0
-8:22/0 = 0
-9:22/0 = 0
-10:22/0 = 0
-0:23/0 = 0
-1:23/0 = 0
-2:23/0 = 0
-3:23/0 = 0
-4:23/0 = 0
-5:23/0 = 0
-6:23/0 = 0
-7:23/0 = 0
-8:23/0 = 0
-9:23/0 = 0
-10:23/0 = 0
-
-[sub_resource type="TileSet" id="TileSet_dohk7"]
-tile_size = Vector2i(8, 8)
-sources/1 = SubResource("TileSetAtlasSource_0mvx0")
 
 [sub_resource type="TileSet" id="TileSet_wtwaa"]
 tile_size = Vector2i(32, 8)
@@ -14265,9 +13990,6 @@ modulate = Color(0.92099476, 0.9209946, 0.9209946, 1)
 position = Vector2(-4, -30)
 tile_set = SubResource("TileSet_r6boj")
 
-[node name="WallDecoration" type="TileMapLayer" parent="TilemapLayers/Ground/Walls" unique_id=291202088]
-tile_set = SubResource("TileSet_dohk7")
-
 [node name="Roofs" type="TileMapLayer" parent="TilemapLayers/Ground" unique_id=938643902]
 position = Vector2(0, 2)
 tile_set = SubResource("TileSet_wtwaa")
@@ -14373,9 +14095,6 @@ phase_offset = 9.2
 [node name="Player" parent="." unique_id=1611018514 instance=ExtResource("8_sbedd")]
 position = Vector2(30, 170)
 
-[node name="FragmentoLibro3" parent="." instance=ExtResource("frag3_collectible")]
-position = Vector2(1498, 320)
-
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)
 tile_map_data = PackedByteArray("AAACAPL/AAAyAB0AAAACAPP/AAATACYAAAADAPL/AAAzAB0AAAAHAPT/AAAYACcAAAAHAPf/AAAYACoAAAAAAPP/AAARACYAAAAAAPT/AAARACcAAAAAAPX/AAARACgAAAAAAPb/AAARACkAAAAAAPf/AAARACoAAAABAPL/AAASACUAAAABAPP/AAASACYAAAABAPT/AAASACcAAAABAPX/AAASACgAAAABAPb/AAASACkAAAABAPf/AAASACoAAAABAPj/AAASACsAAAACAPT/AAATACcAAAACAPX/AAATACgAAAACAPb/AAATACkAAAACAPf/AAATACoAAAACAPj/AAATACsAAAADAPP/AAAUACYAAAADAPT/AAAUACcAAAADAPX/AAAUACgAAAADAPb/AAAUACkAAAADAPf/AAAUACoAAAADAPj/AAAUACsAAAAEAPP/AAAVACYAAAAEAPT/AAAVACcAAAAEAPX/AAAVACgAAAAEAPb/AAAVACkAAAAEAPf/AAAVACoAAAAEAPj/AAAVACsAAAAFAPL/AAAWACUAAAAFAPP/AAAWACYAAAAFAPT/AAAWACcAAAAFAPX/AAAWACgAAAAFAPb/AAAWACkAAAAFAPf/AAAWACoAAAAFAPj/AAAWACsAAAAGAPL/AAAXACUAAAAGAPP/AAAXACYAAAAGAPT/AAAXACcAAAAGAPX/AAAXACgAAAAGAPb/AAAXACkAAAAGAPf/AAAXACoAAAAGAPj/AAAXACsAAAAHAPP/AAAYACYAAAAHAPX/AAAYACgAAAAHAPb/AAAYACkAAAA=")
@@ -14407,7 +14126,7 @@ door_id = 24
 target_door_id = 22
 
 [node name="SceneTransitionArea3" parent="." unique_id=971734991 instance=ExtResource("14_lhyta")]
-position = Vector2(1152, 789)
+position = Vector2(1216, 786)
 target_scene_path = "uid://ceuqjn8ipsey5"
 door_id = 32
 target_door_id = 33
@@ -14440,13 +14159,6 @@ wall_id = &"library_zone_5_wall"
 source_layer = NodePath("../TilemapLayers/Ground/Platforms")
 debris_color = Color(0.78, 0.68, 0.5, 1)
 
-[node name="teacher_enemy" parent="." unique_id=1714237560 instance=ExtResource("19_lhyta")]
-position = Vector2(1498, 320)
-
 [node name="MathematicianEnemy" parent="." unique_id=1401423410 instance=ExtResource("20_6por8")]
 position = Vector2(395, 215)
-max_health = 3
-
-[node name="MathematicianEnemy2" parent="." unique_id=94214092 instance=ExtResource("20_6por8")]
-position = Vector2(1242, 727)
 max_health = 3
