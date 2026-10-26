@@ -5,7 +5,7 @@ extends Node2D
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	player.hiperfocus_activated.connect(cofre.show)
+	player.open_eyes_activated.connect(cofre.show)
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
