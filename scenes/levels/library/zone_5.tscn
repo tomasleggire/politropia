@@ -14404,6 +14404,8 @@ target_door_id = 22
 [node name="SceneTransitionArea3" parent="." unique_id=971734991 instance=ExtResource("14_lhyta")]
 position = Vector2(1152, 789)
 target_scene_path = "uid://ceuqjn8ipsey5"
+door_id = 32
+target_door_id = 33
 
 [node name="Area2D" type="Area2D" parent="." unique_id=613879412]
 visible = false

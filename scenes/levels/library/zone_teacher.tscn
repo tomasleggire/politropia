@@ -21,10 +21,9 @@
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="21_l868g"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="22_gq5aw"]
 [ext_resource type="Resource" path="res://data/ambience/greece.tres" id="23_sdpgp"]
+[ext_resource type="PackedScene" uid="uid://c0hn5w70df8kq" path="res://scenes/enemies/bosses/teacher_boss_arena.tscn" id="24_pj0o8"]
 [ext_resource type="PackedScene" path="res://scenes/world/pollen_motes.tscn" id="24_yyqng"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="25_l1rqu"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/bosses/artemis_boss_arena.tscn" id="26_yrqu4"]
-[ext_resource type="PackedScene" path="res://scenes/world/demo_end_toast.tscn" id="27_1prfh"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="28_48ii2"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
@@ -15148,6 +15147,7 @@ tile_map_data = PackedByteArray("AAAqAO//AAALADEAAAArAOz/AAAMAC4AAAArAO3/AAAMAC8
 tile_set = SubResource("TileSet_4nc6c")
 
 [node name="Area2D" type="Area2D" parent="." unique_id=718346139]
+visible = false
 script = ExtResource("21_l868g")
 limite_izquierdo = 20
 limite_superior = -150
@@ -15193,13 +15193,11 @@ base_energy = 0.9
 radius = 170.0
 flicker_amount = 0.05
 
-[node name="ArtemisBossArena" parent="." unique_id=1556303563 instance=ExtResource("26_yrqu4")]
-position = Vector2(481, 358)
-arena_rect = Rect2(-468, -480, 1000, 480)
-trigger_rect = Rect2(0, -200, 200, 200)
+[node name="TeacherBossArena" parent="." unique_id=952071759 instance=ExtResource("24_pj0o8")]
+position = Vector2(512, 352)
+arena_rect = Rect2(-100, -300, 200, 300)
+left_door = Vector2(-490, 0)
 right_door = Vector2(656, 0)
-
-[node name="DemoEndToast" parent="." unique_id=910501107 instance=ExtResource("27_1prfh")]
 
 [node name="SceneTransitionArea" parent="." unique_id=800824897 instance=ExtResource("28_48ii2")]
 position = Vector2(-12, 268)
