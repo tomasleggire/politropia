@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="politropia"
-run/main_scene="uid://sr3e3q84tmke"
+run/main_scene="uid://bt3m0cf4sgq7r"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 
@@ -33,6 +33,7 @@ MapScreen="*res://scenes/ui/map_screen.tscn"
 SecretProgress="*res://scripts/world/secret_progress.gd"
 AbilityProgress="*res://scripts/world/ability_progress.gd"
 MusicManager="*uid://5cfbl0ss3jw"
+ScenePreloader="*uid://edr3pqnwv8me"
 
 [display]
 

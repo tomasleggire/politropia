@@ -193,6 +193,8 @@ func _on_body_entered(body: Node2D) -> void:
 		final_scene_name,
 		scene_name_font_size
 	)
+	
+	MusicManager.stop_music()
 
 
 func _is_player(body: Node2D) -> bool:

@@ -11,9 +11,9 @@ extends RefCounted
 enum ID {
 	NONE,
 
-	# --- Zona 1 <-> Zona 2 ---
-	ZONE_1_TO_ZONE_2,
-	ZONE_2_TO_ZONE_1,
+	# --- DEMO EXPO ---
+	ZONE_5_TO_HEALING,
+	HEALING_TO_ARTEMIS,
 
 	# --- Zona 2 <-> Zona 3 ---
 	ZONE_2_TO_ZONE_3,
@@ -58,7 +58,7 @@ enum ID {
 	ZONE_6_TO_ZONE_5,
 
 	# --- Greece: healing room <-> Artemis room ---
-	HEALING_TO_ARTEMIS,
+	HEALING_TO,
 	ARTEMIS_TO_HEALING,
 
 	# --- Greece: zone 5 <-> Artemis room ---
