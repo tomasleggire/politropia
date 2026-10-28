@@ -38,7 +38,7 @@ enum State {
 	WALL_CLING,
 	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK,
 	HURT, DEAD, FOCUS,
-	TURN, SKID,
+	TURN, SKID,OPEN_EYES
 }
 
 ## Opaque body height (px) of the standing frames inside their 512 px cell.
@@ -638,7 +638,7 @@ func _physics_process(delta: float) -> void:
 		_try_start_dash()
 	
 	if Input.is_action_just_pressed(&"skill"):
-		open_eyes()
+		open_eyes(delta)
 
 	_try_start_focus()
 	_focus_tapped = false
@@ -659,6 +659,7 @@ func _physics_process(delta: float) -> void:
 		State.DASH:
 			_update_dash(delta)
 		
+			
 		State.WALL_CLING:
 			_update_wall_cling(delta)
 		State.ATTACK:
@@ -684,13 +685,16 @@ func _physics_process(delta: float) -> void:
 signal open_eyes_activated
 
 
-func open_eyes() -> void:
+func open_eyes(delta) -> void:
 	if _state != State.IDLE and _state != State.RUN:
 		return 
 	
 	##prueba##
 	_sprite.stop()
+	###_enter_state(State.OPEN_EYES)-->Funciona pero se tilda
 	_enter_state(State.SKID)
+	
+	
 	##prueba##
 	
 	open_eyes_activated.emit()
@@ -2764,6 +2768,10 @@ func _update_animation() -> void:
 			# Braking frames first; the hold part is the real idle (the skid sheet's
 			# standing slots drew a puffier, darker hair than the idle).
 			_play_animation(&"skid" if _state_time < _skid_brake_duration() else &"idle")
+			
+		State.OPEN_EYES:
+			_play_animation(&"open_eyes")
+		
 		State.DASH:
 			if _dash_is_air:
 				_play_animation(&"air_dash")

@@ -13973,6 +13973,7 @@ position = Vector2(35, 193)
 
 [node name="BookFlyer" parent="." unique_id=899168196 instance=ExtResource("6_eglro")]
 position = Vector2(1374, 162)
+knockback_from_player_attacks = true
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)
