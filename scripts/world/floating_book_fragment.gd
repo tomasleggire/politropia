@@ -4,8 +4,8 @@ extends Node2D
 ## A floating book page. Drop `scenes/world/fragmento_libro*.tscn` into a zone.
 ## Luz collects it by touching it: the fragment is recorded in `FragmentProgress`
 ## (so it stays gone when she re-enters the room) and fades out. Each scene
-## carries its own `fragment_id` (1-4); do not place the same id twice in a
-## run. The lectern builds its own copies with `collectible = false`.
+## carries its own `fragment_id` (1-4); place each id once per level. The
+## lectern builds its own copies with `collectible = false`.
 
 signal collected(id: int)
 
@@ -30,28 +30,34 @@ var _float_tween: Tween
 var _glow_tween: Tween
 var _particle_timer: Timer
 var _particle_rng := RandomNumberGenerator.new()
+var _level_key := ""
+var _pickup_area: Area2D
+var _origin_position := Vector2.ZERO
+var _origin_scale := Vector2.ONE
+var _collecting_animation := false
 @onready var _glow: Sprite2D = $Glow
 @onready var _particle_container: Node2D = $Particles
 
 
 func _ready() -> void:
-	if collectible and _already_collected():
-		queue_free()
-		return
+	_origin_position = position
+	_origin_scale = scale
+	var progress := get_node_or_null("/root/FragmentProgress")
+	if progress != null:
+		_level_key = progress.current_level_key()
+		if collectible:
+			_pickup_area = _build_pickup_area()
+			progress.progress_changed.connect(_on_progress_changed)
+			if progress.fragment_state(fragment_id, _level_key) != 0:
+				_set_unavailable()
+				return
 	_particle_rng.randomize()
 	_start_float_animation()
 	_start_glow_pulse()
 	_start_particle_loop()
-	if collectible:
-		_build_pickup_area()
 
 
-func _already_collected() -> bool:
-	var progress := get_node_or_null("/root/FragmentProgress")
-	return progress != null and progress.has_fragment(fragment_id)
-
-
-func _build_pickup_area() -> void:
+func _build_pickup_area() -> Area2D:
 	var area := Area2D.new()
 	area.collision_layer = 0
 	area.collision_mask = 1
@@ -63,21 +69,34 @@ func _build_pickup_area() -> void:
 	area.add_child(shape)
 	area.body_entered.connect(_on_pickup_body_entered)
 	add_child(area)
+	return area
 
 
 func _on_pickup_body_entered(body: Node2D) -> void:
 	if not collectible or not body.is_in_group(&"player"):
 		return
-	collectible = false
 	var progress := get_node_or_null("/root/FragmentProgress")
-	if progress != null:
-		progress.collect(fragment_id)
+	if progress == null:
+		return
+	_collecting_animation = true
+	collectible = false
+	if not progress.collect(fragment_id, _level_key):
+		collectible = true
+		_collecting_animation = false
+		return
+	if is_instance_valid(_pickup_area):
+		_pickup_area.set_deferred("monitoring", false)
 	collected.emit(fragment_id)
 	stop_idle_motion()
 	var fade := create_tween().set_parallel(true)
 	fade.tween_property(self, "modulate:a", 0.0, collect_fade_time).set_trans(Tween.TRANS_SINE)
 	fade.tween_property(self, "scale", Vector2(1.4, 1.4), collect_fade_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	fade.chain().tween_callback(queue_free)
+	fade.chain().tween_callback(_finish_pickup_animation)
+
+
+func _finish_pickup_animation() -> void:
+	_collecting_animation = false
+	visible = false
 
 
 func _start_float_animation() -> void:
@@ -108,10 +127,13 @@ func _start_particle_loop() -> void:
 
 
 func _schedule_next_particle() -> void:
-	_particle_timer.start(_particle_rng.randf_range(0.26, 0.5))
+	if is_instance_valid(_particle_timer):
+		_particle_timer.start(_particle_rng.randf_range(0.26, 0.5))
 
 
 func _emit_magic_particle() -> void:
+	if not collectible or not visible:
+		return
 	var sparkle := Polygon2D.new()
 	var is_spark := _particle_rng.randf() < 0.65
 	sparkle.polygon = _spark_shape() if is_spark else _light_dot_shape()
@@ -150,3 +172,48 @@ func stop_idle_motion() -> void:
 		_glow_tween.kill()
 	if _particle_timer != null:
 		_particle_timer.stop()
+
+
+func _on_progress_changed(changed_level_key: String) -> void:
+	if changed_level_key != _level_key:
+		return
+	var progress := get_node_or_null("/root/FragmentProgress")
+	if progress == null:
+		return
+	var state: int = progress.fragment_state(fragment_id, _level_key)
+	if state == 0:
+		if not _collecting_animation:
+			_restore_pickup()
+	else:
+		collectible = false
+		if is_instance_valid(_pickup_area):
+			_pickup_area.set_deferred("monitoring", false)
+		if not _collecting_animation:
+			visible = false
+			stop_idle_motion()
+
+
+func _set_unavailable() -> void:
+	collectible = false
+	visible = false
+	if is_instance_valid(_pickup_area):
+		_pickup_area.set_deferred("monitoring", false)
+
+
+func _restore_pickup() -> void:
+	collectible = true
+	_collecting_animation = false
+	position = _origin_position
+	scale = _origin_scale
+	modulate = Color.WHITE
+	visible = true
+	if is_instance_valid(_pickup_area):
+		_pickup_area.set_deferred("monitoring", true)
+	if _float_tween == null or not _float_tween.is_running():
+		_start_float_animation()
+	if _glow_tween == null or not _glow_tween.is_running():
+		_start_glow_pulse()
+	if not is_instance_valid(_particle_timer):
+		_start_particle_loop()
+	else:
+		_schedule_next_particle()
