@@ -4,11 +4,11 @@ extends Node
 
 @export var gameplay_volume_db: float = -25.0
 @export var menu_volume_db: float = -35.0
-@export var boss_volume_db: float = -35.0
+@export var boss_volume_db: float = -25.0
 
 const MENU_MUSIC: AudioStream = preload("res://assets/audio/song_lament.wav")
 const GAMEPLAY_MUSIC: AudioStream = preload("res://assets/audio/song_curious_ambiance.wav")
-const BOSS_MUSIC: AudioStream = preload("res://assets/audio/song_curious_ambiance.wav")
+const BOSS_MUSIC: AudioStream = preload("res://assets/audio/250856__joshuaempyre__epic-orchestra-loop.wav")
 
 var _player: AudioStreamPlayer
 

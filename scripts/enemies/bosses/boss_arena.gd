@@ -443,6 +443,7 @@ func _start_fight(player: Player) -> void:
 	_feed_boss()
 	_set_doors(true)
 	_lock_camera()
+	MusicManager.play_boss_music()
 	_bar.setup(boss_name, _boss.max_health, _notch_ratio())
 	_bar.set_health(_boss.get_health())
 	_bar.show_bar()
