@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="CollectibleDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/collectibles/collectible_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+id = "jade_hound_quiet_space"
+title = "Sabueso de Jade"
+category = "Un espacio tranquilo"
+content = "Los ruidos, las interrupciones y la presión de un examen pueden dificultar la concentración. Por eso, algunas personas con dislexia pueden beneficiarse de rendir en un espacio separado y tranquilo. Según las necesidades de cada estudiante, también puede permitirse leer las preguntas en voz alta o utilizar herramientas de apoyo. Estas adaptaciones ayudan a reducir las barreras durante la evaluación y permiten que el estudiante se concentre mejor en lo que necesita resolver."
+image = null

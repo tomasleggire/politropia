@@ -7,15 +7,14 @@ extends SceneTree
 
 const PICKUP_SCENE := preload("res://scenes/world/collectible_pickup.tscn")
 const GALLERY_SCENE := preload("res://scenes/ui/collectibles_gallery.tscn")
-const MENU_SCENE := preload("res://scenes/ui/main_menu.tscn")
 const PLAYER_SCENE := preload("res://scenes/player/player.tscn")
 
 const GALLERY_PATH := "res://scenes/ui/collectibles_gallery.tscn"
 const MENU_PATH := "res://scenes/ui/main_menu.tscn"
 const ZONE_1 := "res://scenes/levels/library/zone_1.tscn"
 const ZONE_2 := "res://scenes/levels/library/zone_2.tscn"
-const FIRST_ID := "library_first_page"
-const SECOND_ID := "library_marginal_note"
+const FIRST_ID := "ruby_owl_read_aloud"
+const SECOND_ID := "emerald_bull_clear_text"
 const FLOOR_RECT := Rect2(-600.0, 0.0, 1200.0, 100.0)
 const WATCHDOG_SECONDS := 120.0
 
@@ -71,12 +70,12 @@ func _case_service() -> void:
 	manager.call("clear")
 	print("CASE manager")
 
-	check(int(manager.call("get_total_count")) == 4, "catalog has four provisional collectibles")
-	check(_definitions().size() == 4, "get_all_definitions returns the whole catalog")
+	check(int(manager.call("get_total_count")) == 6, "catalog has the six collectibles")
+	check(_definitions().size() == 6, "get_all_definitions returns the whole catalog")
 	var ids: Array = []
 	for definition: CollectibleDefinition in _definitions():
 		ids.append(definition.id)
-	check(ids.size() == 4 and ids.count(FIRST_ID) == 1 and ids.count(SECOND_ID) == 1, "catalog ids are unique and stable")
+	check(ids.size() == 6 and ids.count(FIRST_ID) == 1 and ids.count(SECOND_ID) == 1, "catalog ids are unique and stable")
 	check(not bool(manager.call("has_collected", FIRST_ID)), "has_collected is false before collecting")
 
 	var events: Array = []
@@ -89,13 +88,13 @@ func _case_service() -> void:
 	check(int(manager.call("get_collected_count")) == 1, "collected count increases once")
 	check(not bool(manager.call("try_collect", FIRST_ID)), "the same id cannot be collected twice")
 	check(int(manager.call("get_collected_count")) == 1, "duplicate collection does not increase the count")
-	check(events.size() == 1 and events[0] == Vector3i(ids.find(FIRST_ID), 1, 4), "signal fires once with id, count and total")
+	check(events.size() == 1 and events[0] == Vector3i(ids.find(FIRST_ID), 1, 6), "signal fires once with id, count and total")
 
 	check(bool(manager.call("try_collect", SECOND_ID)), "a second, different id can be collected")
 	check(int(manager.call("get_collected_count")) == 2, "two different ids count independently")
 	check(bool(manager.call("has_collected", FIRST_ID)) and bool(manager.call("has_collected", SECOND_ID)), "both ids stay collected")
 	var collected: Array = manager.call("get_collected_ids")
-	check(collected == [FIRST_ID, SECOND_ID], "get_collected_ids is sorted and complete")
+	check(collected == [SECOND_ID, FIRST_ID], "get_collected_ids is sorted and complete")
 
 	check(not bool(manager.call("try_collect", "unknown_collectible")), "an id outside the catalog is rejected")
 	check(not bool(manager.call("has_collected", "unknown_collectible")), "a rejected id is not registered")
@@ -110,7 +109,7 @@ func _case_service() -> void:
 	manager.call("clear")
 	check(int(manager.call("get_collected_count")) == 0, "clear forgets the collectibles of the session")
 	check(not bool(manager.call("has_collected", FIRST_ID)), "clear removes has_collected")
-	check(int(manager.call("get_total_count")) == 4 and _definitions().size() == 4, "clear keeps the catalog intact")
+	check(int(manager.call("get_total_count")) == 6 and _definitions().size() == 6, "clear keeps the catalog intact")
 	check(bool(fragments.has_fragment(1)), "clear does not touch FragmentProgress")
 	fragments.clear()
 
@@ -234,14 +233,14 @@ func _case_scene_reload() -> void:
 	await _wait_scene()
 	check(current_scene != null and current_scene.scene_file_path == ZONE_1, "zone 1 loaded")
 	check(bool(manager.call("has_collected", FIRST_ID)), "progress survives a change_scene_to_file")
-	var pickup := current_scene.get_node_or_null("CollectibleFirstPage")
+	var pickup := current_scene.get_node_or_null("CollectibleRubyOwl")
 	check(pickup == null or pickup.is_queued_for_deletion(), "zone 1 pickup is gone after being collected earlier")
 
 	change_scene_to_file(ZONE_2)
 	await _wait_scene()
 	check(current_scene != null and current_scene.scene_file_path == ZONE_2, "zone 2 loaded through the connected door target")
 	check(bool(manager.call("has_collected", FIRST_ID)) and bool(manager.call("has_collected", SECOND_ID)), "both ids stay collected across two level loads")
-	var connected_pickup := current_scene.get_node_or_null("CollectibleMarginalNote")
+	var connected_pickup := current_scene.get_node_or_null("CollectibleEmeraldBull")
 	check(connected_pickup == null or connected_pickup.is_queued_for_deletion(), "zone 2 pickup is gone after being collected earlier")
 
 	if current_scene != null:
@@ -264,21 +263,21 @@ func _case_gallery_logic() -> void:
 	await process_frame
 	await process_frame
 
-	check(gallery.call("get_slot_count") == 4, "gallery lists the whole catalog")
-	check(gallery.call("get_progress_text") == "0 / 4", "gallery starts with zero progress")
+	check(gallery.call("get_slot_count") == 6, "gallery lists the whole catalog")
+	check(gallery.call("get_progress_text") == "0 / 6", "gallery starts with zero progress")
 	check(bool(gallery.call("is_selected_locked")), "the default selection is locked while nothing is collected")
 	check(gallery.call("get_selected_title") == "???", "a locked item hides its title")
 	check(gallery.call("get_selected_category") == "Bloqueado", "a locked item hides its category")
 	var first := _definitions()[0] as CollectibleDefinition
 	var locked_body: String = gallery.call("get_selected_body")
-	check(not locked_body.contains(first.title) and not locked_body.contains("Texto provisional"), "a locked item hides its content")
-	check(first.image == null, "the provisional catalog includes an item without a texture")
-	check(gallery.call("get_slot_count") == 4, "an empty texture does not remove or break a slot")
+	check(not locked_body.contains(first.title) and not locked_body.contains("texto a voz"), "a locked item hides its content")
+	check(first.image == null, "the catalog includes an item without a texture")
+	check(gallery.call("get_slot_count") == 6, "an empty texture does not remove or break a slot")
 
 	check(bool(manager.call("try_collect", FIRST_ID)), "gallery test collects the first item")
 	gallery.call("refresh")
 	await process_frame
-	check(gallery.call("get_progress_text") == "1 / 4", "gallery updates the progress counter")
+	check(gallery.call("get_progress_text") == "1 / 6", "gallery updates the progress counter")
 	check(gallery.call("get_selected_index") == 0 and not bool(gallery.call("is_selected_locked")), "the first unlocked item is selected by default")
 	check(gallery.call("get_selected_title") == first.title, "an unlocked item shows its title")
 	check(gallery.call("get_selected_category") == first.category, "an unlocked item shows its category")
@@ -286,8 +285,8 @@ func _case_gallery_logic() -> void:
 
 	gallery.call("select_item", 1)
 	check(bool(gallery.call("is_selected_locked")) and gallery.call("get_selected_title") == "???", "selecting a locked slot keeps it hidden")
-	check(not String(gallery.call("get_selected_body")).contains("Texto provisional"), "selecting a locked slot does not leak its text")
-	check(gallery.call("get_slot_count") == 4, "the full catalog remains visible with one unlocked item")
+	check(not String(gallery.call("get_selected_body")).contains("texto a voz"), "selecting a locked slot does not leak its text")
+	check(gallery.call("get_slot_count") == 6, "the full catalog remains visible with one unlocked item")
 
 	var detail_text := gallery.get_node("%DetailText") as RichTextLabel
 	var detail_scroll := gallery.get_node("%DetailScroll") as ScrollContainer
@@ -305,7 +304,11 @@ func _case_menu_integration() -> void:
 	print("CASE menu")
 	var manager := _manager()
 	manager.call("clear")
-	var menu := MENU_SCENE.instantiate()
+	var menu_scene := load(MENU_PATH) as PackedScene
+	check(menu_scene != null, "the main menu scene loads")
+	if menu_scene == null:
+		return
+	var menu := menu_scene.instantiate()
 	root.add_child(menu)
 	current_scene = menu
 	await process_frame
@@ -321,8 +324,8 @@ func _case_menu_integration() -> void:
 	await _wait_scene()
 	check(current_scene != null and current_scene.scene_file_path == GALLERY_PATH, "Collectables opens the gallery")
 	if current_scene != null and current_scene.scene_file_path == GALLERY_PATH:
-		check(current_scene.call("get_slot_count") == 4, "the gallery opens without a saved game")
-		check(current_scene.call("get_progress_text") == "0 / 4", "a new session shows every gallery item locked")
+		check(current_scene.call("get_slot_count") == 6, "the gallery opens without a saved game")
+		check(current_scene.call("get_progress_text") == "0 / 6", "a new session shows every gallery item locked")
 		;(current_scene.get_node("%Back") as Button).pressed.emit()
 		await _wait_scene()
 		check(current_scene != null and current_scene.scene_file_path == MENU_PATH, "Volver returns to the main menu")

@@ -1,11 +1,13 @@
-[gd_resource type="Resource" script_class="CollectibleCatalog" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="CollectibleCatalog" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/collectibles/collectible_catalog.gd" id="1_catalog"]
-[ext_resource type="Resource" path="res://data/collectibles/definitions/library_first_page.tres" id="2_first_page"]
-[ext_resource type="Resource" path="res://data/collectibles/definitions/library_marginal_note.tres" id="3_marginal_note"]
-[ext_resource type="Resource" path="res://data/collectibles/definitions/reading_own_rhythm.tres" id="4_rhythm"]
-[ext_resource type="Resource" path="res://data/collectibles/definitions/friendly_letters.tres" id="5_letters"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/ruby_owl_read_aloud.tres" id="2_ruby_owl"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/emerald_bull_clear_text.tres" id="3_emerald_bull"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/sapphire_horse_extra_time.tres" id="4_sapphire_horse"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/turquoise_dolphin_learn_by_listening.tres" id="5_turquoise_dolphin"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/jade_hound_quiet_space.tres" id="6_jade_hound"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/garnet_goat_other_ways.tres" id="7_garnet_goat"]
 
 [resource]
 script = ExtResource("1_catalog")
-items = Array[ExtResource("2_first_page")]([ExtResource("2_first_page"), ExtResource("3_marginal_note"), ExtResource("4_rhythm"), ExtResource("5_letters")])
+items = Array[ExtResource("2_ruby_owl")]([ExtResource("2_ruby_owl"), ExtResource("3_emerald_bull"), ExtResource("4_sapphire_horse"), ExtResource("5_turquoise_dolphin"), ExtResource("6_jade_hound"), ExtResource("7_garnet_goat")])
