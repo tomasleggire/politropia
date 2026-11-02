@@ -30,6 +30,7 @@ signal meditation_finished
 signal rest_exit_requested
 signal rest_animation_finished(animation_name: StringName)
 signal rest_animation_frame_changed(animation_name: StringName, frame: int)
+signal open_eyes_activated
 
 enum ReturnPhase { NONE, OUT, IN }
 
@@ -685,8 +686,6 @@ func _physics_process(delta: float) -> void:
 	_update_footsteps(delta)
 	_update_animation()
 	_update_afterimages(delta)
-
-signal open_eyes_activated
 
 
 func open_eyes() -> void:
