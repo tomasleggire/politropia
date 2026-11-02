@@ -38,7 +38,7 @@ enum State {
 	WALL_CLING,
 	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK,
 	HURT, DEAD, FOCUS,
-	TURN, SKID,
+	TURN, SKID,OPEN_EYES
 }
 
 ## Opaque body height (px) of the standing frames inside their 512 px cell.
@@ -354,6 +354,8 @@ var current_health: int:
 @export var hitbox_up := Rect2(-46, -110, 79, 77)
 @export var hitbox_air := Rect2(2, -56, 79, 38)
 
+@export var open_eyes_duration := 1.0
+
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var aseprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
@@ -376,6 +378,7 @@ var current_health: int:
 	"land": landing_squash_time,
 	"turn": turn_time,
 	"skid": _skid_brake_duration(),
+	"open_eyes": open_eyes_duration,
 	"attack_1": attack_startup_time + _phase_total(attack_hit1_phases),
 	"attack_2": attack_chain_startup_time + _phase_total(attack_hit2_phases),
 	"attack_3": attack_finisher_startup_time + _phase_total(attack_hit3_phases),
@@ -658,7 +661,9 @@ func _physics_process(delta: float) -> void:
 			_update_airborne(delta)
 		State.DASH:
 			_update_dash(delta)
-		
+		State.OPEN_EYES:
+			_update_open_eyes(delta)
+			
 		State.WALL_CLING:
 			_update_wall_cling(delta)
 		State.ATTACK:
@@ -690,12 +695,17 @@ func open_eyes() -> void:
 	
 	##prueba##
 	_sprite.stop()
-	_enter_state(State.SKID)
+	_enter_state(State.OPEN_EYES)##-->Funciona pero se tilda
+	##_enter_state(State.SKID)
 	##prueba##
-	
 	open_eyes_activated.emit()
 	
 
+func _update_open_eyes(delta: float) -> void:
+	velocity.x = 0.0
+	if _state_time >= open_eyes_duration:
+		_enter_state(State.IDLE)
+		return
 
 func _update_shared_timers(delta: float) -> void:
 	_landing_left = maxf(_landing_left - delta, 0.0)
@@ -2767,6 +2777,10 @@ func _update_animation() -> void:
 			# Braking frames first; the hold part is the real idle (the skid sheet's
 			# standing slots drew a puffier, darker hair than the idle).
 			_play_animation(&"skid" if _state_time < _skid_brake_duration() else &"idle")
+			
+		State.OPEN_EYES:
+			_play_animation(&"open_eyes")
+		
 		State.DASH:
 			if _dash_is_air:
 				_play_animation(&"air_dash")

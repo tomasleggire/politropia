@@ -1,6 +1,6 @@
 extends Node2D
 
-@onready var player = $Player2
+@onready var player = $Player
 @onready var cofre = $Cofre
 
 # Called when the node enters the scene tree for the first time.
