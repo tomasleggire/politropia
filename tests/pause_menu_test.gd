@@ -74,6 +74,26 @@ func _run() -> void:
 	root.get_node("MapScreen").close()
 	pause.set_map_enabled(false)
 
+	# Collectibles gallery: opens on top of the paused game, closes back to pause.
+	var collectibles_button := pause.get_node("Menu/Center/Panel/Margin/Box/Collectibles") as Button
+	check(collectibles_button.text == "Coleccionables", "Coleccionables button is present")
+	collectibles_button.pressed.emit()
+	await process_frame
+	var gallery := pause.get_node_or_null("CollectiblesGallery")
+	check(gallery != null, "Coleccionables opens the gallery overlay")
+	check(paused and pause.is_open(), "opening the gallery keeps the game paused")
+	check(not pause.get_node("Menu").visible, "the pause menu hides behind the gallery")
+	check(gallery != null and gallery.can_process(), "the gallery processes while paused")
+	check(gallery != null and int(gallery.call("get_slot_count")) == 6, "the overlay lists the catalog")
+	if gallery != null:
+		(gallery.get_node("%Back") as Button).pressed.emit()
+	await process_frame
+	await process_frame
+	check(pause.get_node_or_null("CollectiblesGallery") == null, "Volver closes the gallery overlay")
+	check(paused and pause.is_open(), "closing the gallery returns to the paused game")
+	check(pause.get_node("Menu").visible, "the pause menu comes back")
+	check(touch.get("_input_blocked") == true, "touch stays blocked after the gallery closes")
+
 	var esc := InputEventAction.new()
 	esc.action = &"ui_cancel"
 	esc.pressed = true
@@ -83,6 +103,16 @@ func _run() -> void:
 	await _frames(2)
 	pause._unhandled_input(esc)
 	check(pause.is_open() and paused, "Escape opens")
+	collectibles_button.pressed.emit()
+	await process_frame
+	gallery = pause.get_node_or_null("CollectiblesGallery")
+	check(gallery != null, "Coleccionables reopens the gallery")
+	if gallery != null:
+		gallery._unhandled_input(esc)
+		await process_frame
+		await process_frame
+	check(pause.get_node_or_null("CollectiblesGallery") == null, "Escape closes the gallery overlay")
+	check(pause.is_open() and paused, "Escape in the gallery does not close the pause menu")
 	(pause.get_node("Menu/Center/Panel/Margin/Box/Resume") as Button).pressed.emit()
 	check(not pause.is_open() and not paused, "Reanudar resumes")
 

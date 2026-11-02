@@ -10,6 +10,11 @@ extends Control
 ## data comes from `data/collectibles/catalog.tres` (see the final report for the
 ## step-by-step recipe to add a new collectible).
 
+## Emitted when "Volver" (or Escape) is pressed and a listener handles the
+## return. The pause menu connects to it to close the gallery as an overlay
+## without changing scenes; the main menu leaves it unconnected.
+signal back_requested
+
 @export_file("*.tscn") var main_menu_scene := "res://scenes/ui/main_menu.tscn"
 
 const LOCKED_TITLE := "???"
@@ -58,6 +63,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_back_pressed() -> void:
+	# When opened as an overlay (pause menu), the owner handles the return.
+	if not back_requested.get_connections().is_empty():
+		back_requested.emit()
+		return
 	if main_menu_scene.is_empty():
 		push_warning("CollectiblesGallery: main_menu_scene is empty.")
 		return

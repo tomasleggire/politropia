@@ -88,6 +88,12 @@ theme_override_font_sizes/font_size = 12
 disabled = true
 text = "Mapa"
 
+[node name="Collectibles" type="Button" parent="Menu/Center/Panel/Margin/Box"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Coleccionables"
+
 [node name="Quit" type="Button" parent="Menu/Center/Panel/Margin/Box"]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2

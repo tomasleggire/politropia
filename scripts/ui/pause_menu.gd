@@ -14,6 +14,10 @@ extends CanvasLayer
 ##   PauseMenu.set_map_enabled(true)
 ##   PauseMenu.map_requested.connect(_open_my_map)
 ## Call `PauseMenu.close()` from the handler if the map should replace the menu.
+##
+## The "Coleccionables" button opens the gallery on top of the paused game
+## without changing scenes, so the current level and progress are preserved.
+## "Volver" or Escape close the gallery and return to the pause menu.
 
 signal opened
 signal closed
@@ -30,6 +34,8 @@ signal map_requested
 		_refresh_map_button()
 ## Scene the "Menú principal" button loads. Empty means the project's main scene.
 @export_file("*.tscn") var main_menu_scene := ""
+## Gallery opened by the "Coleccionables" button, on top of the paused game.
+@export_file("*.tscn") var collectibles_scene := "res://scenes/ui/collectibles_gallery.tscn"
 @export_range(0.0, 1.0, 0.01) var fade_time := 0.18
 
 @export_group("Touch button")
@@ -43,11 +49,13 @@ signal map_requested
 
 var _open := false
 var _fade: Tween
+var _collectibles_gallery: Node
 
 @onready var _button: Button = $PauseButton
 @onready var _menu: Control = $Menu
 @onready var _resume: Button = $Menu/Center/Panel/Margin/Box/Resume
 @onready var _map: Button = $Menu/Center/Panel/Margin/Box/Map
+@onready var _collectibles: Button = $Menu/Center/Panel/Margin/Box/Collectibles
 @onready var _quit: Button = $Menu/Center/Panel/Margin/Box/Quit
 
 
@@ -57,6 +65,7 @@ func _ready() -> void:
 	_button.pressed.connect(open)
 	_resume.pressed.connect(close)
 	_map.pressed.connect(func() -> void: map_requested.emit())
+	_collectibles.pressed.connect(_on_collectibles_pressed)
 	_quit.pressed.connect(_on_quit_pressed)
 	get_viewport().size_changed.connect(_place_button)
 	_place_button()
@@ -71,7 +80,12 @@ func _process(_delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed(&"ui_cancel"):
 		return
-	if _open:
+	# The gallery consumes Escape first, but this keeps the pause menu from
+	# closing underneath it if the event reaches here.
+	if _collectibles_gallery != null:
+		_close_collectibles()
+		get_viewport().set_input_as_handled()
+	elif _open:
 		close()
 		get_viewport().set_input_as_handled()
 	elif can_pause():
@@ -105,6 +119,8 @@ func open() -> void:
 
 
 func close() -> void:
+	if _collectibles_gallery != null:
+		_close_collectibles()
 	if not _open:
 		return
 	_open = false
@@ -115,6 +131,8 @@ func close() -> void:
 
 
 func _on_quit_pressed() -> void:
+	if _collectibles_gallery != null:
+		_close_collectibles()
 	Player.clear_transition_state()
 	var path := main_menu_scene
 	if path.is_empty():
@@ -126,6 +144,43 @@ func _on_quit_pressed() -> void:
 	_menu.modulate.a = 0.0
 	closed.emit()
 	get_tree().change_scene_to_file(path)
+
+
+## Opens the collectibles gallery as an overlay. The tree stays paused and the
+## current scene is untouched; closing the overlay returns to this menu.
+func _on_collectibles_pressed() -> void:
+	if not _open or _collectibles_gallery != null:
+		return
+	var packed := load(collectibles_scene) as PackedScene
+	if packed == null:
+		push_warning("PauseMenu: cannot load collectibles scene '%s'." % collectibles_scene)
+		return
+	_collectibles_gallery = packed.instantiate()
+	# The gallery must keep processing (and taking input) while the tree is paused.
+	_collectibles_gallery.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_collectibles_gallery)
+	_collectibles_gallery.connect(&"back_requested", _close_collectibles)
+	_collectibles_gallery.connect(&"tree_exited", _on_collectibles_tree_exited)
+	_menu.visible = false
+
+
+func _close_collectibles() -> void:
+	if _collectibles_gallery == null:
+		return
+	var gallery := _collectibles_gallery
+	_collectibles_gallery = null
+	if is_instance_valid(gallery):
+		gallery.queue_free()
+	if _open:
+		_menu.visible = true
+		_collectibles.grab_focus()
+
+
+## The gallery disables touch controls on exit; keep them blocked if the pause
+## menu is still open.
+func _on_collectibles_tree_exited() -> void:
+	if _open:
+		_set_touch_blocked(true)
 
 
 func _in_game() -> bool:
