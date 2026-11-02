@@ -9,9 +9,9 @@
 [ext_resource type="PackedScene" path="res://scenes/world/atril_libro.tscn" id="7_o5po4"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="8_bvayg"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="9_os7eu"]
-[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
-[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
 [ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
 
 [sub_resource type="TileSet" id="TileSet_r6boj"]
@@ -14082,7 +14082,7 @@ size = Vector2(787, 395)
 
 [node name="LibraryLectern" type="Node2D" unique_id=424136144]
 
-[node name="ParallaxBackdrop" parent="." instance=ExtResource("par_back")]
+[node name="ParallaxBackdrop" parent="." unique_id=1909705273 instance=ExtResource("par_back")]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(2, 683)
@@ -14169,10 +14169,17 @@ tile_set = SubResource("TileSet_4nc6c")
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("8_bvayg")]
 position = Vector2(-21, 307)
 target_scene_path = "uid://bt3m0cf4sgq7r"
-target_door_id = 24
 door_id = 22
+target_door_id = 24
+
+[node name="SceneTransitionArea2" parent="." unique_id=1933689893 instance=ExtResource("8_bvayg")]
+position = Vector2(801, 333)
+target_scene_path = "uid://fvobcn8y45k4"
+door_id = 13
+target_door_id = 14
 
 [node name="Area2D" type="Area2D" parent="." unique_id=1366922744]
+visible = false
 position = Vector2(1, 40)
 script = ExtResource("9_os7eu")
 limite_superior = 40
@@ -14183,10 +14190,15 @@ limite_inferior = 425
 position = Vector2(393.5, 195.5)
 shape = SubResource("RectangleShape2D_3bhqe")
 
-[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
-[node name="DustMotes" parent="." instance=ExtResource("amb_dust")]
-[node name="DeskLight" parent="." instance=ExtResource("amb_light")]
+[node name="ZoneAmbience" parent="." unique_id=1489596189 instance=ExtResource("amb_zone")]
+
+[node name="DustMotes" parent="." unique_id=832726138 instance=ExtResource("amb_dust")]
+
+[node name="DeskLight" parent="." unique_id=1312479001 instance=ExtResource("amb_light")]
 position = Vector2(443, 350)
+color = Color(1, 0.78, 0.45, 1)
+energy = 0.9
+texture_scale = 2.65625
 light_color = Color(1, 0.78, 0.45, 1)
 base_energy = 0.9
 radius = 170.0

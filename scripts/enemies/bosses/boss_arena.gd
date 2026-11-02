@@ -448,6 +448,8 @@ func _start_fight(player: Player) -> void:
 	_bar.show_bar()
 	_bar.show_title(boss_name, title_time)
 	play_cue(CUE_BOSS_INTRO)
+	if _boss.has_method(&"play_intro"):
+		_boss.call(&"play_intro", engage_delay)
 	_kill(_intro_tween)
 	_intro_tween = create_tween()
 	_intro_tween.tween_interval(engage_delay)

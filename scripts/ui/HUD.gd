@@ -2,7 +2,10 @@ extends CanvasLayer
 
 @onready var hearts_container: HBoxContainer = $PlayerUI/HeartsContainer
 @onready var energy_bar: TextureProgressBar = $PlayerUI/EnergyBar
-@onready var fragment_count: Label = $PlayerUI/FragmentCounter/Count
+@onready var _fragment_indicator: HBoxContainer = $FragmentIndicator
+
+var _fragment_icons: Array[TextureRect] = []
+var _deposit_marks: Array[Label] = []
 
 @export var heart_full_texture: Texture2D
 @export var heart_empty_texture: Texture2D
@@ -20,8 +23,13 @@ func _ready() -> void:
 	var progress := get_node_or_null("/root/FragmentProgress")
 	if progress == null:
 		return
-	progress.fragment_collected.connect(_on_fragment_collected)
-	_show_fragments(progress.count(), progress.total())
+	for i in range(progress.total()):
+		var slot := _fragment_indicator.get_node("Slot%d" % (i + 1))
+		_fragment_icons.append(slot.get_node("Icon") as TextureRect)
+		_deposit_marks.append(slot.get_node("DepositMark") as Label)
+	progress.fragment_state_changed.connect(_on_fragment_state_changed)
+	get_tree().scene_changed.connect(_on_scene_changed)
+	_refresh_fragment_indicator()
 
 
 func _apply_scale() -> void:
@@ -30,12 +38,34 @@ func _apply_scale() -> void:
 		player_ui.scale = Vector2.ONE * hud_scale
 
 
-func _on_fragment_collected(_id: int, count: int, total: int) -> void:
-	_show_fragments(count, total)
+func _on_fragment_state_changed(level_key: String, id: int, state: int) -> void:
+	if level_key != _active_level_key() or id < 1 or id > _fragment_icons.size():
+		return
+	_set_fragment_icon(id - 1, state)
 
 
-func _show_fragments(count: int, total: int) -> void:
-	fragment_count.text = "%d/%d" % [count, total]
+func _on_scene_changed(_scene: Node) -> void:
+	_refresh_fragment_indicator()
+
+
+func _refresh_fragment_indicator() -> void:
+	var progress := get_node_or_null("/root/FragmentProgress")
+	if progress == null or _fragment_icons.size() != 4:
+		return
+	var level_key: String = _active_level_key()
+	for i in range(_fragment_icons.size()):
+		var state: int = progress.fragment_state(i + 1, level_key)
+		_set_fragment_icon(i, state)
+
+
+func _set_fragment_icon(index: int, state: int) -> void:
+	_fragment_icons[index].modulate = Color("56545c") if state == 0 else Color("ffd66e")
+	_deposit_marks[index].visible = state == 2
+
+
+func _active_level_key() -> String:
+	var progress := get_node_or_null("/root/FragmentProgress")
+	return progress.current_level_key() if progress != null else "default"
 
 
 ## Función que conecta al jugador y dibuja la interfaz de entrada

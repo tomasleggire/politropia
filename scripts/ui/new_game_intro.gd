@@ -40,4 +40,5 @@ func _start_first_level() -> void:
 		return
 	_leaving_intro = true
 	_video.stop()
+	MusicManager.play_gameplay_music()
 	get_tree().call_deferred("change_scene_to_file", FIRST_LEVEL)

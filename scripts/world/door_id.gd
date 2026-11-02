@@ -35,9 +35,9 @@ enum ID {
 	ZONE_3_TO_ZONE_5,
 	ZONE_5_TO_ZONE_3,
 
-	# --- Zona 4 <-> Zona 6 ---
-	ZONE_4_TO_ZONE_6,
-	ZONE_6_TO_ZONE_4,
+	# --- Lectern <-> Zona 6 ---
+	LECTERN_TO_ZONE_6,
+	ZONE_6_TO_LECTERN,
 
 	# --- Puertas Genéricas / Nuevas Zonas ---
 	DOOR_A,
@@ -61,12 +61,16 @@ enum ID {
 	HEALING_TO_ARTEMIS,
 	ARTEMIS_TO_HEALING,
 
-	# --- Greece: zone 1 shortcut <-> Artemis room ---
-	ZONE_1_TO_ARTEMIS,
-	ARTEMIS_TO_ZONE_1,
+	# --- Greece: zone 5 <-> Artemis room ---
+	ZONE_5_TO_ARTEMIS,
+	ARTEMIS_TO_ZONE_5,
 
 	# --- Demo shortcut (one way): library zone 1 -> Artemis room ---
 	LIBRARY_TO_ARTEMIS_DEMO,
+	
+	# --- Biblioteca --- Zona 5 <-> Teacher ---
+	ZONE_5_TO_TEACHER,
+	TEACHER_TO_ZONE_5,
 }
 
 

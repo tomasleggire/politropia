@@ -8,6 +8,11 @@ extends Node2D
 ## hiding a telegraph allocates nothing. Final art replaces the visuals, not the
 ## calls: the boss logic only talks to this API.
 ##
+## Glyph art (manifest key "glyphs") replaces the plain floor markers and the aim
+## line when a caller names a glyph and the art exists; the white glyphs are tinted
+## by the same colour language. Without the art, or for a marker with no glyph
+## (vault, transition, dive column), the polygon look is kept.
+##
 ## Colour language: amber warns of a ranged attack, red of melee, pale
 ## moon-silver marks phase two, and plain white marks her vault over Luz.
 
@@ -26,17 +31,32 @@ const MARKER_EDGE_ALPHA := 0.85
 const GLOW_MAX_ALPHA := 0.65
 const MARKER_ALPHA := 0.38
 const LINE_WIDTH := 3.0
+## Dotted aim line: the dot texture is padded to this many dot widths per period.
+const DOT_PERIOD := 3.0
+const DOTTED_LINE_WIDTH := 6.0
+## A strip glyph is as wide as its rect but never taller than this many rect heights.
+const STRIP_MAX_HEIGHT_FACTOR := 2.0
+## Glyph art is dim next to its alpha budget: the pulse alpha is lifted by these.
+const GLYPH_ALPHA_GAIN := 1.4
+const GLYPH_ALPHA_BIAS := 0.15
 ## An aim line that still follows Luz is dimmer than a locked one.
 const LINE_TRACKING_ALPHA := 0.45
 
 var _glow: Polygon2D
 var _lines: Array[Line2D] = []
 var _markers: Array[Polygon2D] = []
+var _glyph_sprites: Array[Sprite2D] = []
+var _glyphs := {}
+var _dot_normal: Texture2D
+var _dot_hot: Texture2D
 
 
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
+	_glyphs = ArtemisAnimationCatalog.build_glyph_textures()
+	_dot_normal = _build_dot_texture(_glyphs.get(&"dot") as AtlasTexture)
+	_dot_hot = _build_dot_texture(_glyphs.get(&"dot_hot") as AtlasTexture)
 	_build_lines()
 	_build_markers()
 
@@ -67,6 +87,7 @@ func show_aim_line(from: Vector2, direction: Vector2, length: float, color: Colo
 	line.set_point_position(0, to_local(from))
 	line.set_point_position(1, to_local(from + direction * length))
 	line.default_color = Color(color, 1.0 if locked else LINE_TRACKING_ALPHA)
+	_style_line(line, _dot_hot if locked else _dot_normal)
 	line.visible = true
 
 
@@ -76,8 +97,11 @@ func hide_aim_line() -> void:
 
 
 ## A rectangle on the floor (world space) in marker slot `slot`, with brighter
-## edges. `alpha` lets the caller pulse it.
-func show_floor_marker(slot: int, rect: Rect2, color: Color, alpha := MARKER_ALPHA) -> void:
+## edges. `alpha` lets the caller pulse it. `glyph` (`rain`, `dive` or `stag`) draws
+## that glyph art, tinted by `color`, in the rect instead of the polygon, and `hot`
+## swaps in its brighter "about to strike" version; an empty or unknown glyph, or
+## missing art, keeps the polygon.
+func show_floor_marker(slot: int, rect: Rect2, color: Color, alpha := MARKER_ALPHA, glyph := &"", hot := false) -> void:
 	var marker := _markers[slot]
 	marker.global_position = rect.position
 	marker.scale = rect.size
@@ -85,15 +109,23 @@ func show_floor_marker(slot: int, rect: Rect2, color: Color, alpha := MARKER_ALP
 	for edge: Node in marker.get_children():
 		(edge as Polygon2D).color = Color(color, MARKER_EDGE_ALPHA)
 	marker.visible = true
+	var texture := _glyph_texture(glyph, hot)
+	# The polygon stays the marker's state (visible, position); the glyph only hides its drawing.
+	marker.modulate.a = 1.0 if texture == null else 0.0
+	if texture != null:
+		_show_glyph(_glyph_sprites[slot], texture, rect, Color(color, clampf(alpha * GLYPH_ALPHA_GAIN + GLYPH_ALPHA_BIAS, 0.0, 1.0)), glyph == &"stag")
+	else:
+		_glyph_sprites[slot].visible = false
 
 
 func hide_floor_marker(slot: int) -> void:
 	_markers[slot].visible = false
+	_glyph_sprites[slot].visible = false
 
 
 func hide_floor_markers() -> void:
-	for marker: Polygon2D in _markers:
-		marker.visible = false
+	for slot: int in _markers.size():
+		hide_floor_marker(slot)
 
 
 func clear() -> void:
@@ -121,6 +153,53 @@ func is_floor_marker_visible(slot: int) -> bool:
 	return _markers[slot].visible
 
 
+func _glyph_texture(glyph: StringName, hot: bool) -> Texture2D:
+	if glyph.is_empty() or not (glyph in [&"rain", &"dive", &"stag"]):
+		return null
+	return _glyphs.get(StringName(String(glyph) + ("_hot" if hot else ""))) as Texture2D
+
+
+## Fits a glyph to `rect`, resting on its bottom edge. A strip is as wide as the rect
+## and keeps its proportions up to `STRIP_MAX_HEIGHT_FACTOR` rect heights; the tall
+## wall glyph is contained, so the stag head is never squashed.
+func _show_glyph(sprite: Sprite2D, texture: Texture2D, rect: Rect2, tint: Color, contain: bool) -> void:
+	var size := texture.get_size()
+	var fit := Vector2.ONE
+	if contain:
+		var uniform := minf(rect.size.x / size.x, rect.size.y / size.y)
+		fit = Vector2(uniform, uniform)
+	else:
+		var across := rect.size.x / size.x
+		fit = Vector2(across, minf(across, STRIP_MAX_HEIGHT_FACTOR * rect.size.y / size.y))
+	sprite.texture = texture
+	sprite.scale = fit
+	sprite.modulate = tint
+	sprite.global_position = Vector2(rect.get_center().x - size.x * fit.x * 0.5, rect.end.y - size.y * fit.y)
+	sprite.visible = true
+
+
+## One dot padded on the right so a tiled Line2D reads as dots with gaps.
+func _build_dot_texture(source: AtlasTexture) -> Texture2D:
+	if source == null:
+		return null
+	var image := source.get_image()
+	if image == null:
+		return null
+	image.convert(Image.FORMAT_RGBA8)
+	var padded := Image.create_empty(int(image.get_width() * DOT_PERIOD), image.get_height(), false, Image.FORMAT_RGBA8)
+	padded.blit_rect(image, Rect2i(Vector2i.ZERO, image.get_size()), Vector2i.ZERO)
+	return ImageTexture.create_from_image(padded)
+
+
+## A dotted line when there is a dot texture; the plain round-capped line otherwise.
+func _style_line(line: Line2D, dot: Texture2D) -> void:
+	line.texture = dot
+	line.width = LINE_WIDTH if dot == null else DOTTED_LINE_WIDTH
+	var cap := Line2D.LINE_CAP_ROUND if dot == null else Line2D.LINE_CAP_NONE
+	line.begin_cap_mode = cap
+	line.end_cap_mode = cap
+
+
 func _build_lines() -> void:
 	for i: int in LINE_POOL_SIZE:
 		var line := Line2D.new()
@@ -128,6 +207,8 @@ func _build_lines() -> void:
 		line.z_index = 2
 		line.begin_cap_mode = Line2D.LINE_CAP_ROUND
 		line.end_cap_mode = Line2D.LINE_CAP_ROUND
+		line.texture_mode = Line2D.LINE_TEXTURE_TILE
+		line.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		line.add_point(Vector2.ZERO)
 		line.add_point(Vector2.ZERO)
 		line.visible = false
@@ -149,6 +230,13 @@ func _build_markers() -> void:
 		marker.add_child(_make_edge(1.0 - MARKER_EDGE_SHARE))
 		add_child(marker)
 		_markers.append(marker)
+		var sprite := Sprite2D.new()
+		sprite.centered = false
+		sprite.top_level = true
+		sprite.z_index = -1
+		sprite.visible = false
+		add_child(sprite)
+		_glyph_sprites.append(sprite)
 
 
 func _make_edge(left: float) -> Polygon2D:

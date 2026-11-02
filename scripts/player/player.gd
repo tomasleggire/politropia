@@ -38,7 +38,7 @@ enum State {
 	WALL_CLING,
 	ATTACK, AIR_ATTACK, UP_ATTACK, CROUCH_ATTACK,
 	HURT, DEAD, FOCUS,
-	TURN, SKID,
+	TURN, SKID,OPEN_EYES
 }
 
 ## Opaque body height (px) of the standing frames inside their 512 px cell.
@@ -354,10 +354,16 @@ var current_health: int:
 @export var hitbox_up := Rect2(-46, -110, 79, 77)
 @export var hitbox_air := Rect2(2, -56, 79, 38)
 
+@export var open_eyes_duration := 1.0
+
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
+@onready var aseprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var _sfx_land: AudioStreamPlayer = $SfxLand
 @onready var _sfx_foot: AudioStreamPlayer = $SfxFoot
 @onready var _sfx_jump: AudioStreamPlayer = $SfxJump
+@onready var _sfx_dash: AudioStreamPlayer = $SfxDash
+@onready var _sfx_attack: AudioStreamPlayer = $SfxAttack
+@onready var _sfx_hurt: AudioStreamPlayer = $SfxHurt
 @onready var _collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var _wall_check_head: RayCast2D = $WallCheckHead
 @onready var _wall_check_chest: RayCast2D = $WallCheckChest
@@ -372,6 +378,7 @@ var current_health: int:
 	"land": landing_squash_time,
 	"turn": turn_time,
 	"skid": _skid_brake_duration(),
+	"open_eyes": open_eyes_duration,
 	"attack_1": attack_startup_time + _phase_total(attack_hit1_phases),
 	"attack_2": attack_chain_startup_time + _phase_total(attack_hit2_phases),
 	"attack_3": attack_finisher_startup_time + _phase_total(attack_hit3_phases),
@@ -534,8 +541,9 @@ var _focus_end_animating := false
 
 func _ready() -> void:
 	add_to_group(&"player")
-	_restore_saved_abilities()
 	_sprite.sprite_frames = _animation_sprite_frames
+	_restore_saved_abilities()
+	
 	_sprite.animation_finished.connect(_on_sprite_animation_finished)
 	_sprite.frame_changed.connect(_on_sprite_frame_changed)
 	# Every Luz frame is a uniform 512x512 grid cell (see LuzAnimationCatalog
@@ -631,6 +639,9 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed(&"dash") and not channeling:
 		_try_start_dash()
+	
+	if Input.is_action_just_pressed(&"skill"):
+		open_eyes()
 
 	_try_start_focus()
 	_focus_tapped = false
@@ -650,6 +661,9 @@ func _physics_process(delta: float) -> void:
 			_update_airborne(delta)
 		State.DASH:
 			_update_dash(delta)
+		State.OPEN_EYES:
+			_update_open_eyes(delta)
+			
 		State.WALL_CLING:
 			_update_wall_cling(delta)
 		State.ATTACK:
@@ -672,6 +686,26 @@ func _physics_process(delta: float) -> void:
 	_update_animation()
 	_update_afterimages(delta)
 
+signal open_eyes_activated
+
+
+func open_eyes() -> void:
+	if _state != State.IDLE and _state != State.RUN:
+		return 
+	
+	##prueba##
+	_sprite.stop()
+	_enter_state(State.OPEN_EYES)##-->Funciona pero se tilda
+	##_enter_state(State.SKID)
+	##prueba##
+	open_eyes_activated.emit()
+	
+
+func _update_open_eyes(delta: float) -> void:
+	velocity.x = 0.0
+	if _state_time >= open_eyes_duration:
+		_enter_state(State.IDLE)
+		return
 
 func _update_shared_timers(delta: float) -> void:
 	_landing_left = maxf(_landing_left - delta, 0.0)
@@ -1017,6 +1051,8 @@ func _queue_attack(direction: int) -> void:
 		return
 
 	_start_ground_attack()
+	
+	_sfx_attack.play()
 
 
 func _end_generic_attack() -> void:
@@ -1559,6 +1595,7 @@ func _try_start_dash() -> bool:
 	if not is_on_floor() and _air_dash_used:
 		return false
 	_start_dash()
+	_sfx_dash.play()
 	return true
 
 
@@ -1940,6 +1977,7 @@ func set_max_health(value: int) -> void:
 ## knocks Luz away from the source, restores her air dash and air jump (like
 ## Hollow Knight), and starts the i-frames, control lock and hit-stop.
 func take_damage(amount: int, source_position: Vector2) -> bool:
+	_sfx_hurt.play()
 	return _apply_damage(amount, source_position, false)
 
 
@@ -1947,6 +1985,7 @@ func take_damage(amount: int, source_position: Vector2) -> bool:
 ## camera and then fades out, moves Luz to the last safe ground and fades back
 ## in, with input locked throughout. A lethal hit dies normally instead.
 func take_hazard_damage(amount: int, source_position: Vector2) -> bool:
+	_sfx_hurt.play()
 	return _apply_damage(amount, source_position, true)
 
 
@@ -2192,6 +2231,9 @@ func _respawn_after_death() -> void:
 	# Looked up by path: a bare autoload name does not compile in --script
 	# runs, which instantiate the player without the project's autoloads.
 	var checkpoints := get_node_or_null("/root/CheckpointService")
+	var fragment_progress := get_node_or_null("/root/FragmentProgress")
+	if fragment_progress != null and fragment_progress.has_method("lose_carried"):
+		fragment_progress.call("lose_carried")
 	var current := get_tree().current_scene
 	if checkpoints != null and current != null:
 		checkpoints.apply_to_player(self, current.scene_file_path)
@@ -2665,9 +2707,13 @@ func _update_footsteps(delta: float) -> void:
 		_dust_left = footstep_dust_interval
 		_spawn_dust(GroundDust.Kind.FOOTSTEP)
 	_footstep_left -= delta
-	if _footstep_left <= 0.0:
-		_sfx_foot.play()
-		_footstep_left = clampf(0.30 - absf(velocity.x) / 2600.0, 0.12, 0.26)
+	var is_walking := absf(velocity.x) > 10.0
+	if is_walking:
+		if not _sfx_foot.playing:
+			_sfx_foot.play()
+	else:
+		if _sfx_foot.playing:
+			_sfx_foot.stop()
 
 
 ## Drops a self-freeing dust effect at her feet, left behind in world space.
@@ -2731,6 +2777,10 @@ func _update_animation() -> void:
 			# Braking frames first; the hold part is the real idle (the skid sheet's
 			# standing slots drew a puffier, darker hair than the idle).
 			_play_animation(&"skid" if _state_time < _skid_brake_duration() else &"idle")
+			
+		State.OPEN_EYES:
+			_play_animation(&"open_eyes")
+		
 		State.DASH:
 			if _dash_is_air:
 				_play_animation(&"air_dash")
@@ -2797,3 +2847,4 @@ func _play_animation(animation_name: StringName, speed_scale := 1.0) -> void:
 	if _sprite.animation != animation_name:
 		_sprite.play(animation_name)
 	_sprite.speed_scale = speed_scale
+	

@@ -1,0 +1,47 @@
+[gd_scene format=3 uid="uid://c0hn5w70df8kq"]
+
+[ext_resource type="PackedScene" path="res://scenes/enemies/bosses/boss_arena.tscn" id="1_arena"]
+[ext_resource type="PackedScene" uid="uid://b5lf46acc08rl" path="res://scenes/enemies/teacher_enemy.tscn" id="2_nk7rk"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1kus4"]
+size = Vector2(400, 200)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_6led8"]
+size = Vector2(24, 200)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_qnrbx"]
+size = Vector2(24, 200)
+
+[node name="TeacherBossArena" unique_id=1277792817 instance=ExtResource("1_arena")]
+arena_rect = Rect2(-468, -480, 936, 480)
+left_door = Vector2(-456, 0)
+right_door = Vector2(456, 0)
+
+[node name="Trigger" parent="." index="0"]
+position = Vector2(0, -100)
+
+[node name="CollisionShape2D" parent="Trigger" index="0"]
+shape = SubResource("RectangleShape2D_1kus4")
+
+[node name="DoorLeft" parent="." index="1"]
+visible = false
+position = Vector2(-456, -300)
+
+[node name="CollisionShape2D" parent="DoorLeft" index="0"]
+shape = SubResource("RectangleShape2D_6led8")
+
+[node name="Visual" parent="DoorLeft" index="1"]
+polygon = PackedVector2Array(-12, -100, 12, -100, 12, 100, -12, 100)
+
+[node name="DoorRight" parent="." index="2"]
+visible = false
+position = Vector2(456, -300)
+
+[node name="CollisionShape2D" parent="DoorRight" index="0"]
+shape = SubResource("RectangleShape2D_qnrbx")
+
+[node name="Visual" parent="DoorRight" index="1"]
+polygon = PackedVector2Array(-12, -100, 12, -100, 12, 100, -12, 100)
+
+[node name="teacher_enemy" parent="." index="4" unique_id=1714237560 instance=ExtResource("2_nk7rk")]
+position = Vector2(312, -9)

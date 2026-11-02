@@ -1,6 +1,7 @@
 [gd_scene format=4 uid="uid://fvobcn8y45k4"]
 
 [ext_resource type="Texture2D" uid="uid://croiudofpxjg2" path="res://assets/art/library/Backgrounds/background2.png" id="1_d1iv4"]
+[ext_resource type="Script" uid="uid://c1nbk0diqf56p" path="res://scripts/levels/level_objects.gd" id="1_nwq11"]
 [ext_resource type="Texture2D" uid="uid://c40vc3xmgce3c" path="res://assets/art/library/Walls/walls_library.png" id="2_e58f3"]
 [ext_resource type="Texture2D" uid="uid://bqrgujvddynkl" path="res://assets/art/library/Walls/window_library.png" id="3_kacut"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="4_nxnoi"]
@@ -11,10 +12,11 @@
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_4.tscn" id="8_e58f3"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="9_nxnoi"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="11_t7su0"]
+[ext_resource type="PackedScene" uid="uid://d0mu0g5r1c2lo" path="res://scenes/world/cofre.tscn" id="12_flc0j"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="30_door"]
-[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
-[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
+[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
 [ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fcwr3"]
@@ -14239,8 +14241,9 @@ sources/0 = SubResource("TileSetAtlasSource_211o3")
 size = Vector2(1966, 724)
 
 [node name="LibraryZone6" type="Node2D" unique_id=424136144]
+script = ExtResource("1_nwq11")
 
-[node name="ParallaxBackdrop" parent="." instance=ExtResource("par_back")]
+[node name="ParallaxBackdrop" parent="." unique_id=537028092 instance=ExtResource("par_back")]
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
 position = Vector2(2, 683)
@@ -14311,6 +14314,7 @@ position = Vector2(26, 692)
 
 [node name="BookFlyer" parent="Enemies" unique_id=1820963891 instance=ExtResource("9_nxnoi")]
 position = Vector2(1352, -338)
+knockback_from_player_attacks = true
 
 [node name="Fragment4" parent="." unique_id=293282883 instance=ExtResource("8_e58f3")]
 position = Vector2(1909, 209)
@@ -14327,9 +14331,13 @@ tile_map_data = PackedByteArray("AAAGAOT/AAAIABYAAAAGAOX/AAAIABcAAAAGAOb/AAAIABg
 tile_set = SubResource("TileSet_4nc6c")
 
 [node name="VegetationFront" type="TileMapLayer" parent="Foreground" unique_id=1586288370]
+visible = false
 modulate = Color(0.07058824, 0.07058824, 0.07058824, 1)
 tile_map_data = PackedByteArray("AAA5AAkAAAAkACwAAAA6AAkAAAAlACwAAAA7AAkAAAAmACwAAAAbAAgAAAACAC8AAAAbAAkAAAACADAAAAAbAAoAAAACADEAAAAbAAsAAAACADIAAAAcAAcAAAADAC4AAAAcAAgAAAADAC8AAAAcAAkAAAADADAAAAAcAAoAAAADADEAAAAcAAsAAAADADIAAAAdAAcAAAAEAC4AAAAdAAgAAAAEAC8AAAAdAAkAAAAEADAAAAAdAAoAAAAEADEAAAAdAAsAAAAEADIAAAAeAAcAAAAFAC4AAAAeAAgAAAAFAC8AAAAeAAkAAAAFADAAAAAeAAoAAAAFADEAAAAeAAsAAAAFADIAAAAfAAcAAAAGAC4AAAAfAAgAAAAGAC8AAAAfAAkAAAAGADAAAAAfAAoAAAAGADEAAAAfAAsAAAAGADIAAAAgAAYAAAAHAC0AAAAgAAcAAAAHAC4AAAAgAAgAAAAHAC8AAAAgAAkAAAAHADAAAAAgAAoAAAAHADEAAAAgAAsAAAAHADIAAAAhAAcAAAAIAC4AAAAhAAgAAAAIAC8AAAAhAAkAAAAIADAAAAAhAAoAAAAIADEAAAAhAAsAAAAIADIAAAAiAAcAAAAJAC4AAAAiAAgAAAAJAC8AAAAiAAkAAAAJADAAAAAiAAoAAAAJADEAAAAiAAsAAAAJADIAAAAjAAkAAAAKADAAAAAjAAoAAAAKADEAAAD7/wYAAAARACUAAAD7/wcAAAARACYAAAD7/wgAAAARACcAAAD7/wkAAAARACgAAAD7/woAAAARACkAAAD7/wsAAAARACoAAAD8/wYAAAASACUAAAD8/wcAAAASACYAAAD8/wgAAAASACcAAAD8/wkAAAASACgAAAD8/woAAAASACkAAAD8/wsAAAASACoAAAD8/wwAAAASACsAAAD9/wcAAAATACYAAAD9/wgAAAATACcAAAD9/wkAAAATACgAAAD9/woAAAATACkAAAD9/wsAAAATACoAAAD9/wwAAAATACsAAAD+/wcAAAAUACYAAAD+/wgAAAAUACcAAAD+/wkAAAAUACgAAAD+/woAAAAUACkAAAD+/wsAAAAUACoAAAD+/wwAAAAUACsAAAD//wcAAAAVACYAAAD//wgAAAAVACcAAAD//wkAAAAVACgAAAD//woAAAAVACkAAAD//wsAAAAVACoAAAD//wwAAAAVACsAAAAAAAYAAAAWACUAAAAAAAcAAAAWACYAAAAAAAgAAAAWACcAAAAAAAkAAAAWACgAAAAAAAoAAAAWACkAAAAAAAsAAAAWACoAAAAAAAwAAAAWACsAAAABAAYAAAAXACUAAAABAAcAAAAXACYAAAABAAgAAAAXACcAAAABAAkAAAAXACgAAAABAAoAAAAXACkAAAABAAsAAAAXACoAAAABAAwAAAAXACsAAAACAAcAAAAYACYAAAACAAgAAAAYACcAAAACAAkAAAAYACgAAAACAAoAAAAYACkAAAACAAsAAAAYACoAAAACAAwAAAAYACsAAAALAAYAAAARACUAAAALAAcAAAARACYAAAALAAgAAAARACcAAAALAAkAAAARACgAAAALAAoAAAARACkAAAALAAsAAAARACoAAAAMAAYAAAASACUAAAAMAAcAAAASACYAAAAMAAgAAAASACcAAAAMAAkAAAASACgAAAAMAAoAAAASACkAAAAMAAsAAAASACoAAAAMAAwAAAASACsAAAANAAcAAAATACYAAAANAAgAAAATACcAAAANAAkAAAATACgAAAANAAoAAAATACkAAAANAAsAAAATACoAAAANAAwAAAATACsAAAAOAAcAAAAUACYAAAAOAAgAAAAUACcAAAAOAAkAAAAUACgAAAAOAAoAAAAUACkAAAAOAAsAAAAUACoAAAAOAAwAAAAUACsAAAAPAAcAAAAVACYAAAAPAAgAAAAVACcAAAAPAAkAAAAVACgAAAAPAAoAAAAVACkAAAAPAAsAAAAVACoAAAAPAAwAAAAVACsAAAAQAAYAAAAWACUAAAAQAAcAAAAWACYAAAAQAAgAAAAWACcAAAAQAAkAAAAWACgAAAAQAAoAAAAWACkAAAAQAAsAAAAWACoAAAAQAAwAAAAWACsAAAARAAYAAAAXACUAAAARAAcAAAAXACYAAAARAAgAAAAXACcAAAARAAkAAAAXACgAAAARAAoAAAAXACkAAAARAAsAAAAXACoAAAARAAwAAAAXACsAAAASAAcAAAAYACYAAAASAAgAAAAYACcAAAASAAkAAAAYACgAAAASAAoAAAAYACkAAAASAAsAAAAYACoAAAASAAwAAAAYACsAAAAmAAYAAAARACUAAAAmAAcAAAARACYAAAAmAAgAAAARACcAAAAmAAkAAAARACgAAAAmAAoAAAARACkAAAAmAAsAAAARACoAAAAnAAYAAAASACUAAAAnAAcAAAASACYAAAAnAAgAAAASACcAAAAnAAkAAAASACgAAAAnAAoAAAASACkAAAAnAAsAAAASACoAAAAnAAwAAAASACsAAAAoAAcAAAATACYAAAAoAAgAAAATACcAAAAoAAkAAAATACgAAAAoAAoAAAATACkAAAAoAAsAAAATACoAAAAoAAwAAAATACsAAAApAAcAAAAUACYAAAApAAgAAAAUACcAAAApAAkAAAAUACgAAAApAAoAAAAUACkAAAApAAsAAAAUACoAAAApAAwAAAAUACsAAAAqAAcAAAAVACYAAAAqAAgAAAAVACcAAAAqAAkAAAAVACgAAAAqAAoAAAAVACkAAAAqAAsAAAAVACoAAAAqAAwAAAAVACsAAAArAAYAAAAWACUAAAArAAcAAAAWACYAAAArAAgAAAAWACcAAAArAAkAAAAWACgAAAArAAoAAAAWACkAAAArAAsAAAAWACoAAAArAAwAAAAWACsAAAAsAAYAAAAXACUAAAAsAAcAAAAXACYAAAAsAAgAAAAXACcAAAAsAAkAAAAXACgAAAAsAAoAAAAXACkAAAAsAAsAAAAXACoAAAAsAAwAAAAXACsAAAAtAAcAAAAYACYAAAAtAAgAAAAYACcAAAAtAAkAAAAYACgAAAAtAAoAAAAYACkAAAAtAAsAAAAYACoAAAAtAAwAAAAYACsAAABaAAYAAAARACUAAABaAAcAAAARACYAAABaAAgAAAARACcAAABaAAkAAAARACgAAABaAAoAAAARACkAAABaAAsAAAARACoAAABbAAYAAAASACUAAABbAAcAAAASACYAAABbAAgAAAASACcAAABbAAkAAAASACgAAABbAAoAAAASACkAAABbAAsAAAASACoAAABbAAwAAAASACsAAABcAAcAAAATACYAAABcAAgAAAATACcAAABcAAkAAAATACgAAABcAAoAAAATACkAAABcAAsAAAATACoAAABcAAwAAAATACsAAABdAAcAAAAUACYAAABdAAgAAAAUACcAAABdAAkAAAAUACgAAABdAAoAAAAUACkAAABdAAsAAAAUACoAAABdAAwAAAAUACsAAABeAAcAAAAVACYAAABeAAgAAAAVACcAAABeAAkAAAAVACgAAABeAAoAAAAVACkAAABeAAsAAAAVACoAAABeAAwAAAAVACsAAABfAAYAAAAWACUAAABfAAcAAAAWACYAAABfAAgAAAAWACcAAABfAAkAAAAWACgAAABfAAoAAAAWACkAAABfAAsAAAAWACoAAABfAAwAAAAWACsAAABgAAYAAAAXACUAAABgAAcAAAAXACYAAABgAAgAAAAXACcAAABgAAkAAAAXACgAAABgAAoAAAAXACkAAABgAAsAAAAXACoAAABgAAwAAAAXACsAAABhAAcAAAAYACYAAABhAAgAAAAYACcAAABhAAkAAAAYACgAAABhAAoAAAAYACkAAABhAAsAAAAYACoAAABhAAwAAAAYACsAAAAXAPb/AAARACUAAAAXAPf/AAARACYAAAAXAPj/AAARACcAAAAXAPn/AAARACgAAAAXAPr/AAARACkAAAAXAPv/AAARACoAAAAYAPb/AAASACUAAAAYAPf/AAASACYAAAAYAPj/AAASACcAAAAYAPn/AAASACgAAAAYAPr/AAASACkAAAAYAPv/AAASACoAAAAYAPz/AAASACsAAAAZAPf/AAATACYAAAAZAPj/AAATACcAAAAZAPn/AAATACgAAAAZAPr/AAATACkAAAAZAPv/AAATACoAAAAZAPz/AAATACsAAAAaAPf/AAAUACYAAAAaAPj/AAAUACcAAAAaAPn/AAAUACgAAAAaAPr/AAAUACkAAAAaAPv/AAAUACoAAAAaAPz/AAAUACsAAAAbAPf/AAAVACYAAAAbAPj/AAAVACcAAAAbAPn/AAAVACgAAAAbAPr/AAAVACkAAAAbAPv/AAAVACoAAAAbAPz/AAAVACsAAAAcAPb/AAAWACUAAAAcAPf/AAAWACYAAAAcAPj/AAAWACcAAAAcAPn/AAAWACgAAAAcAPr/AAAWACkAAAAcAPv/AAAWACoAAAAcAPz/AAAWACsAAAAdAPb/AAAXACUAAAAdAPf/AAAXACYAAAAdAPj/AAAXACcAAAAdAPn/AAAXACgAAAAdAPr/AAAXACkAAAAdAPv/AAAXACoAAAAdAPz/AAAXACsAAAAeAPf/AAAYACYAAAAeAPj/AAAYACcAAAAeAPn/AAAYACgAAAAeAPr/AAAYACkAAAAeAPv/AAAYACoAAAAeAPz/AAAYACsAAAA=")
 tile_set = SubResource("TileSet_4nc6c")
+
+[node name="Cofre" parent="." unique_id=1931050741 instance=ExtResource("12_flc0j")]
+position = Vector2(162, 696)
 
 [node name="Area2D" type="Area2D" parent="." unique_id=913479367]
 visible = false
@@ -14342,37 +14350,53 @@ limite_inferior = 760
 position = Vector2(983, 403)
 shape = SubResource("RectangleShape2D_w12jv")
 
-[node name="SceneTransitionArea" parent="." instance=ExtResource("30_door")]
+[node name="SceneTransitionArea" parent="." unique_id=1204002781 instance=ExtResource("30_door")]
 position = Vector2(-35, 620)
-target_scene_path = "uid://b6qrv51dde5ob"
-target_door_id = 13
+target_scene_path = "uid://dv0i34v7aiwto"
 door_id = 14
+target_door_id = 13
 
-[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
-[node name="DustMotes" parent="." instance=ExtResource("amb_dust")]
-[node name="LanternLight1" parent="." instance=ExtResource("amb_light")]
+[node name="ZoneAmbience" parent="." unique_id=437048454 instance=ExtResource("amb_zone")]
+
+[node name="DustMotes" parent="." unique_id=1253614048 instance=ExtResource("amb_dust")]
+
+[node name="LanternLight1" parent="." unique_id=1756830780 instance=ExtResource("amb_light")]
 position = Vector2(936, 436)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
 light_color = Color(1, 0.7, 0.38, 1)
 base_energy = 0.85
 radius = 115.0
 flicker_amount = 0.07
-phase_offset = 0.0
-[node name="LanternLight2" parent="." instance=ExtResource("amb_light")]
+
+[node name="LanternLight2" parent="." unique_id=213705586 instance=ExtResource("amb_light")]
 position = Vector2(1222, 460)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
 light_color = Color(1, 0.7, 0.38, 1)
 base_energy = 0.85
 radius = 115.0
 flicker_amount = 0.07
 phase_offset = 2.3
-[node name="LanternLight3" parent="." instance=ExtResource("amb_light")]
+
+[node name="LanternLight3" parent="." unique_id=1387215544 instance=ExtResource("amb_light")]
 position = Vector2(1795, 431)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
 light_color = Color(1, 0.7, 0.38, 1)
 base_energy = 0.85
 radius = 115.0
 flicker_amount = 0.07
 phase_offset = 4.6
-[node name="LanternLight4" parent="." instance=ExtResource("amb_light")]
+
+[node name="LanternLight4" parent="." unique_id=420508436 instance=ExtResource("amb_light")]
 position = Vector2(1787, 132)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
 light_color = Color(1, 0.7, 0.38, 1)
 base_energy = 0.85
 radius = 115.0

@@ -49,6 +49,7 @@ const GROUP_PLAYER: StringName = &"player"
 @onready var pencil_tip_node: Node2D = get_node_or_null("PencilTip") as Node2D
 @onready var pencil_gleam: Node2D = get_node_or_null("PencilTip/Gleam") as Node2D
 @onready var pencil_particles: CPUParticles2D = get_node_or_null("PencilTip/Sparks") as CPUParticles2D
+@onready var _sfx_chase: AudioStreamPlayer = $SfxChase
 
 var _gleam_tween: Tween
 

@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://smlqql3she5b"]
 
-[ext_resource type="Script" path="res://scripts/ui/new_game_intro.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://3puv8oc7pr6" path="res://scripts/ui/new_game_intro.gd" id="1_script"]
 
-[node name="NewGameIntro" type="Control"]
+[node name="NewGameIntro" type="Control" unique_id=393076655]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,7 +11,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 
-[node name="Backdrop" type="ColorRect" parent="."]
+[node name="Backdrop" type="ColorRect" parent="." unique_id=1879338192]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -20,7 +20,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 1)
 
-[node name="VideoStreamPlayer" type="VideoStreamPlayer" parent="."]
+[node name="VideoStreamPlayer" type="VideoStreamPlayer" parent="." unique_id=1538084073]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -29,7 +29,7 @@ grow_horizontal = 2
 grow_vertical = 2
 expand = true
 
-[node name="SkipButton" type="Button" parent="."]
+[node name="SkipButton" type="Button" parent="." unique_id=2002563324]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0

@@ -144,6 +144,22 @@ SHEETS = {
             "feint_retreat": [8, 9, 10, 11],
         },
     },
+    # Batch 3.
+    "walkback": {
+        "raw": "artemis_walkback_raw.png",
+        "grid": (4, 2),
+        "ref": 0,
+        "scale_mult": 0.86,
+        "clips": {"walk_back": list(range(0, 8))},
+    },
+    "intro": {
+        "raw": "artemis_intro_raw.png",
+        "grid": (4, 2),
+        "ref": 7,
+        "scale_mult": 0.79,
+        "body_feet": True,
+        "clips": {"intro": list(range(0, 8))},
+    },
     "stagcast": {
         "raw": "artemis_stagcast_raw.png",
         "grid": (4, 4),
@@ -308,11 +324,77 @@ def build_arrows() -> None:
         print(f"  {file_name}: {out.size}")
 
 
+def split_cells(rgba: np.ndarray, cols: int, rows: int, name: str, min_px: int) -> list[np.ndarray]:
+    """Full raw cells (not cropped to the art) with stray specks removed, so frames
+    keep their position relative to each other (effects and the stag dissolve)."""
+    height, width = rgba.shape[:2]
+    cell_w, cell_h = width // cols, height // rows
+    labels, count = ndimage.label(rgba[..., 3] > 20, structure=np.ones((3, 3)))
+    sizes = ndimage.sum(np.ones_like(labels), labels, range(1, count + 1))
+    centers = ndimage.center_of_mass(np.ones_like(labels), labels, range(1, count + 1))
+    owner: dict[int, int] = {}
+    for index in range(count):
+        if sizes[index] >= min_px:
+            cy, cx = centers[index]
+            owner[index + 1] = int(min(cy // cell_h, rows - 1)) * cols + int(min(cx // cell_w, cols - 1))
+    cells = []
+    for cell in range(cols * rows):
+        keep = [label for label, c in owner.items() if c == cell]
+        if not keep:
+            raise ValueError(f"{name}: cell {cell} has no art")
+        r, c = divmod(cell, cols)
+        block = rgba[r * cell_h : (r + 1) * cell_h, c * cell_w : (c + 1) * cell_w].copy()
+        sel = np.isin(labels, keep)[r * cell_h : (r + 1) * cell_h, c * cell_w : (c + 1) * cell_w]
+        block[..., 3] = np.where(sel, block[..., 3], 0)
+        cells.append(block)
+    return cells
+
+
+def scale_rgba(frame: np.ndarray, scale: float) -> np.ndarray:
+    premult = frame.copy()
+    premult[..., :3] *= premult[..., 3:4] / 255.0
+    img = Image.fromarray(premult.astype(np.uint8), "RGBA")
+    img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
+    arr = np.asarray(img).astype(np.float32)
+    a = arr[..., 3:4]
+    arr[..., :3] = np.where(a > 0, np.minimum(arr[..., :3] * 255.0 / np.maximum(a, 1.0), 255.0), 0)
+    return arr.astype(np.uint8)
+
+
+def place_fixed(frames: list[np.ndarray], scale: float, out_cell: int, anchor_of, anchor_dst: tuple[float, float], label: str, anchor_idx: int = 0) -> list[Image.Image]:
+    """Scale full raw cells and paste them with ONE offset, chosen so the anchor of
+    frame `anchor_idx` lands on `anchor_dst`. Reports art that falls outside the cell."""
+    scaled = [scale_rgba(f, scale) for f in frames]
+    ax, ay = anchor_of(scaled[anchor_idx])
+    left, top = round(anchor_dst[0] - ax), round(anchor_dst[1] - ay)
+    out = []
+    for index, arr in enumerate(scaled):
+        cell = Image.new("RGBA", (out_cell, out_cell), (0, 0, 0, 0))
+        full = Image.new("RGBA", (max(out_cell, arr.shape[1] + abs(left)) + out_cell, max(out_cell, arr.shape[0] + abs(top)) + out_cell), (0, 0, 0, 0))
+        full.alpha_composite(Image.fromarray(arr, "RGBA"), (left + out_cell, top + out_cell))
+        cell = full.crop((out_cell, out_cell, 2 * out_cell, 2 * out_cell))
+        lost = int((arr[..., 3] > 20).sum()) - int((np.asarray(cell)[..., 3] > 20).sum())
+        if lost > 30:
+            print(f"  note: {label}[{index}] loses {lost} px outside the cell")
+        out.append(cell)
+    return out
+
+
+def stag_body_anchor(arr: np.ndarray) -> tuple[float, float]:
+    bottom, cx = body_mask_bottom(arr.astype(np.float32))
+    return cx, float(bottom)
+
+
 # Spectral stag: its own sheet and sprite scale (the sprite node uses STAG_SPRITE_SCALE).
 STAG_RAW = "artemis_stag_raw.png"
 STAG_CELL = 384
 STAG_FEET_ROW = 340
-STAG_SPRITE_SCALE = 0.2
+STAG_SPRITE_SCALE = 0.245  # sprite node scale in artemis.tscn (commit 0aa2d61); the sheet is NOT rescaled by it
+STAG_RENDER_SCALE = 0.2  # sizing basis of the sheet pixels (STAG_BODY_WIDTH is relative to this)
+STAG_VANISH_RAW = "artemis_stagvanish_raw.png"
+STAG_VANISH_GRID = (4, 2)
+# The vanish sheet was drawn about 25% larger than stag_run; this matches the gallop widths.
+STAG_VANISH_SCALE_MULT = 0.8
 STAG_BODY_WIDTH = 46.0  # on-screen px of the compact gallop pose; stretched poses reach about 80 (hitbox 60 wide)
 STAG_GRID = (4, 4)
 STAG_CLIPS = {
@@ -327,10 +409,20 @@ def build_stag() -> dict:
     needed = {i for clip in STAG_CLIPS.values() for i in clip}
     frames = split_frames(key_magenta(Image.open(RAW_DIR / STAG_RAW)), cols, rows, "stag", needed)
     ref = frames[STAG_REF]
-    scale = (STAG_BODY_WIDTH / STAG_SPRITE_SCALE) / ref.shape[1]
+    scale = (STAG_BODY_WIDTH / STAG_RENDER_SCALE) / ref.shape[1]
     used = sorted(needed)
     remap = {src: dst for dst, src in enumerate(used)}
     cells = [to_cell(frames[src], scale, f"stag[{src}]", True, STAG_CELL, STAG_FEET_ROW) for src in used]
+    rows_out = (len(cells) + COLUMNS - 1) // COLUMNS
+    clips = {clip: [remap[i] for i in idx] for clip, idx in STAG_CLIPS.items()}
+    if (RAW_DIR / STAG_VANISH_RAW).exists():
+        # Same scale and feet anchor as stag_run: frame 0 (intact gallop) lands where
+        # a run frame would, the rest keep their position relative to it.
+        vcols, vrows = STAG_VANISH_GRID
+        full = split_cells(key_magenta(Image.open(RAW_DIR / STAG_VANISH_RAW)), vcols, vrows, "stag_vanish", 12)
+        placed = place_fixed(full, scale * STAG_VANISH_SCALE_MULT, STAG_CELL, stag_body_anchor, (STAG_CELL / 2, STAG_FEET_ROW), "stag_vanish")
+        clips["stag_vanish"] = list(range(len(cells), len(cells) + len(placed)))
+        cells.extend(placed)
     rows_out = (len(cells) + COLUMNS - 1) // COLUMNS
     sheet = Image.new("RGBA", (COLUMNS * STAG_CELL, rows_out * STAG_CELL), (0, 0, 0, 0))
     for index, cell in enumerate(cells):
@@ -341,7 +433,7 @@ def build_stag() -> dict:
         "sprite_scale": STAG_SPRITE_SCALE,
         "feet_row": STAG_FEET_ROW,
         "grid": {"columns": COLUMNS, "rows": rows_out, "cell_width": STAG_CELL, "cell_height": STAG_CELL},
-        "clips": {clip: [remap[i] for i in idx] for clip, idx in STAG_CLIPS.items()},
+        "clips": clips,
     }
 
 
@@ -404,6 +496,100 @@ def build_vfx() -> dict:
     }
 
 
+# Arrow impact bursts: amber (normal arrow) and silver (moon arrow). The arrow
+# flew left to right; the burst anchor is the impact point, so code only has to put
+# the sprite on the arrow tip and rotate it by the arrow direction.
+IMPACT_RAW = "artemis_impact_raw.png"
+IMPACT_GRID = (4, 2)
+IMPACT_CELL = 256
+IMPACT_SPRITE_SCALE = 0.125
+IMPACT_SIZE = 28.0  # on-screen px of the widest burst frame
+IMPACT_ANCHOR = (216.0, 128.0)
+IMPACT_CLIPS = {"arrow_impact": [0, 1, 2, 3], "arrow_impact_moon": [4, 5, 6, 7]}
+IMPACT_WIDEST = {"arrow_impact": 2, "arrow_impact_moon": 6}
+
+
+def impact_tip_anchor(arr: np.ndarray) -> tuple[float, float]:
+    ys, xs = np.where(arr[..., 3] > 20)
+    return float(xs.max()), float((ys.min() + ys.max()) / 2.0)
+
+
+def build_impact() -> dict:
+    cols, rows = IMPACT_GRID
+    full = split_cells(key_magenta(Image.open(RAW_DIR / IMPACT_RAW)), cols, rows, "impact", 30)
+    cells: list[Image.Image] = []
+    clips: dict[str, list[int]] = {}
+    for name, idx in IMPACT_CLIPS.items():
+        widest = full[IMPACT_WIDEST[name]]
+        xs = np.where((widest[..., 3] > 20).any(axis=0))[0]
+        scale = (IMPACT_SIZE / IMPACT_SPRITE_SCALE) / float(xs.max() - xs.min() + 1)
+        clips[name] = list(range(len(cells), len(cells) + len(idx)))
+        cells.extend(place_fixed([full[i] for i in idx], scale, IMPACT_CELL, impact_tip_anchor, IMPACT_ANCHOR, name, 1))
+    rows_out = (len(cells) + COLUMNS - 1) // COLUMNS
+    sheet = Image.new("RGBA", (COLUMNS * IMPACT_CELL, rows_out * IMPACT_CELL), (0, 0, 0, 0))
+    for index, cell in enumerate(cells):
+        sheet.alpha_composite(cell, ((index % COLUMNS) * IMPACT_CELL, (index // COLUMNS) * IMPACT_CELL))
+    sheet.save(OUT_DIR / "artemis_impact_sheet.png", optimize=True)
+    return {
+        "sheet": "artemis_impact_sheet.png",
+        "sprite_scale": IMPACT_SPRITE_SCALE,
+        "anchor": [IMPACT_ANCHOR[0], IMPACT_ANCHOR[1]],
+        "grid": {"columns": COLUMNS, "rows": rows_out, "cell_width": IMPACT_CELL, "cell_height": IMPACT_CELL},
+        "clips": clips,
+    }
+
+
+# Telegraph glyphs: white/grey art tinted in code. Each glyph is cropped tight and
+# stored in its own atlas cell; the manifest lists the pixel region of each one.
+GLYPHS_RAW = "artemis_glyphs_raw.png"
+GLYPHS_GRID = (4, 2)
+GLYPH_CELL = 256
+GLYPH_COLUMN_EDGES = (490, 960, 1260)  # raw x (1536 wide) between rain|dive, dive|stag, stag|dot
+GLYPH_SCALE = 0.5
+GLYPH_NAMES = ["rain", "dive", "stag", "dot", "rain_hot", "dive_hot", "stag_hot", "dot_hot"]
+
+
+def split_glyphs(rgba: np.ndarray) -> list[np.ndarray]:
+    """The glyphs are not on the regular grid (the wall glyph and the dive ticks cross
+    the cell lines), so components are assigned by fixed column bands instead."""
+    height = rgba.shape[0]
+    labels, count = ndimage.label(rgba[..., 3] > 20, structure=np.ones((3, 3)))
+    centers = ndimage.center_of_mass(np.ones_like(labels), labels, range(1, count + 1))
+    sizes = ndimage.sum(np.ones_like(labels), labels, range(1, count + 1))
+    owner: dict[int, int] = {}
+    for index in range(count):
+        if sizes[index] < MIN_COMPONENT_PX:
+            continue
+        cy, cx = centers[index]
+        column = sum(cx >= edge for edge in GLYPH_COLUMN_EDGES)
+        owner[index + 1] = (0 if cy < height / 2 else 4) + column
+    frames = []
+    for cell in range(8):
+        sel = np.isin(labels, [label for label, c in owner.items() if c == cell])
+        ys, xs = np.where(sel)
+        crop = rgba[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1].copy()
+        crop[..., 3] = np.where(sel[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1], crop[..., 3], 0)
+        frames.append(crop)
+    return frames
+
+
+def build_glyphs() -> dict:
+    cols, rows = GLYPHS_GRID
+    frames = split_glyphs(key_magenta(Image.open(RAW_DIR / GLYPHS_RAW)))
+    sheet = Image.new("RGBA", (cols * GLYPH_CELL, rows * GLYPH_CELL), (0, 0, 0, 0))
+    regions: dict[str, list[int]] = {}
+    for index, name in enumerate(GLYPH_NAMES):
+        arr = scale_rgba(frames[index], GLYPH_SCALE)
+        h, w = arr.shape[:2]
+        if w > GLYPH_CELL or h > GLYPH_CELL:
+            raise ValueError(f"glyph {name} is {w}x{h}, larger than its cell")
+        x, y = (index % cols) * GLYPH_CELL, (index // cols) * GLYPH_CELL
+        sheet.alpha_composite(Image.fromarray(arr, "RGBA"), (x, y))
+        regions[name] = [x, y, w, h]
+    sheet.save(OUT_DIR / "artemis_glyphs_sheet.png", optimize=True)
+    return {"sheet": "artemis_glyphs_sheet.png", "regions": regions}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--preview", type=Path, default=None)
@@ -459,6 +645,10 @@ def main() -> None:
         manifest["stag"] = build_stag()
     if (RAW_DIR / VFX_RAW).exists():
         manifest["vfx"] = build_vfx()
+    if (RAW_DIR / IMPACT_RAW).exists():
+        manifest["impact"] = build_impact()
+    if (RAW_DIR / GLYPHS_RAW).exists():
+        manifest["glyphs"] = build_glyphs()
     (OUT_DIR / "animation_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print("wrote", OUT_DIR)
 

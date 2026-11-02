@@ -129,7 +129,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if _recoil_left > 0.0:
 		_recoil_left -= delta
-		velocity.x = _recoil_velocity
+		_apply_recoil()
 	else:
 		_think(delta)
 	_apply_gravity(delta)
@@ -274,6 +274,11 @@ func _revive() -> void:
 	collision_layer = ENEMY_LAYER
 	if _contact != null:
 		_contact.monitoring = true
+
+
+## Walkers are pushed along x only; gravity keeps acting on y.
+func _apply_recoil() -> void:
+	velocity.x = _recoil_velocity
 
 
 func _start_recoil(source_position: Vector2) -> void:

@@ -9,17 +9,24 @@ extends Area2D
 ## The hitbox is `WIDTH` x `HEIGHT` and stands on the floor, lower than a normal
 ## jump (84 px) and brief enough for a dash, so both answer it. Luz's own damage
 ## gate decides about dash i-frames and i-frames after a hit. The art is the
-## `AnimatedSprite2D` (appear, then the gallop loop); `Body` stays as the hidden
+## `AnimatedSprite2D` (appear, the gallop loop, then the vanish); `Body` stays as the hidden
 ## placeholder polygon, and without the sprite it is the visual again.
 
 ## Length of the materialising clip (docs/bosses/ARTEMIS_ANIMATIONS.md, section 3.4).
 const APPEAR_TIME := 0.15
+## Length of the dissolving clip played when a charge ends at the far wall.
+const VANISH_TIME := 0.4
 
 ## Keep in step with the CollisionShape2D of the scene.
 const WIDTH := 60.0
 const HEIGHT := 48.0
 const PLAYER_MASK := 1
 const DAMAGE := 1
+
+@export_group("Gallop")
+## Peak height, in game pixels, that the drawn stag rises per stride. The sheet frames
+## are aligned by the lowest hoof, so the bob is added here, on the visual only.
+@export_range(0.0, 8.0, 0.1) var bob_amplitude := 3.0
 
 var _active := false
 var _dir := 1
@@ -38,7 +45,7 @@ func _ready() -> void:
 	collision_mask = PLAYER_MASK
 	top_level = true
 	_setup_sprite()
-	deactivate()
+	deactivate(true)
 
 
 func _physics_process(delta: float) -> void:
@@ -46,6 +53,7 @@ func _physics_process(delta: float) -> void:
 		return
 	global_position.x += float(_dir) * _speed * delta
 	_poll_target()
+	_update_bob()
 	if (global_position.x - _end_x) * float(_dir) >= 0.0:
 		deactivate()
 
@@ -81,11 +89,25 @@ func launch(from: Vector2, dir: int, speed: float, end_x: float, target: Player)
 	reset_physics_interpolation()
 
 
-func deactivate() -> void:
+## Stops the charge: the hitbox and `is_active()` go off at once. When it was
+## running and has the clip, the visual stays and dissolves over `VANISH_TIME`
+## (a new `launch` may interrupt it); `instant` (resets) hides it right away.
+func deactivate(instant := false) -> void:
+	var dissolve := not instant and _active and visible and _has_clip(&"stag_vanish")
 	_active = false
-	visible = false
+	_reset_bob()
 	set_deferred(&"monitoring", false)
 	set_physics_process(false)
+	if dissolve:
+		var frames := _sprite.sprite_frames
+		var count := frames.get_frame_count(&"stag_vanish")
+		_sprite.play(&"stag_vanish", (float(count) / frames.get_animation_speed(&"stag_vanish")) / VANISH_TIME)
+		return
+	visible = false
+
+
+func _has_clip(clip: StringName) -> bool:
+	return _sprite != null and _sprite.visible and _sprite.sprite_frames != null and _sprite.sprite_frames.has_animation(clip)
 
 
 func _setup_sprite() -> void:
@@ -100,6 +122,24 @@ func _setup_sprite() -> void:
 		($Body as Polygon2D).visible = true
 
 
+## Lifts the sprite (never the hitbox) by a half sine over the gallop loop, using the
+## current frame plus its progress, so it follows the animation speed. The loop holds
+## two airborne arcs: sin(TAU * phase) is zero at both ends and abs() keeps it
+## upward, so the hooves touch down twice per cycle.
+func _update_bob() -> void:
+	if _sprite == null or _sprite.animation != &"stag_run":
+		_reset_bob()
+		return
+	var count := _sprite.sprite_frames.get_frame_count(&"stag_run")
+	var phase := (float(_sprite.frame) + _sprite.frame_progress) / float(count)
+	_sprite.position.y = -absf(sin(phase * TAU)) * bob_amplitude
+
+
+func _reset_bob() -> void:
+	if _sprite != null:
+		_sprite.position.y = 0.0
+
+
 ## It is already near full size on frame 0 and the hitbox is live from the start.
 func _play_appear() -> void:
 	if _sprite == null or not _sprite.sprite_frames.has_animation(&"stag_appear"):
@@ -112,6 +152,8 @@ func _play_appear() -> void:
 func _on_sprite_finished() -> void:
 	if _active and _sprite.animation == &"stag_appear":
 		_sprite.play(&"stag_run")
+	elif not _active and _sprite.animation == &"stag_vanish":
+		visible = false
 
 
 ## Once per pass. `overlaps_body` allocates nothing, unlike listing the bodies.

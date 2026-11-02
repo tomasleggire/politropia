@@ -31,6 +31,8 @@ enum AttackPhase { APPROACH, WINDUP, DIVE, CHARGE, RECOVER }
 
 var _owl_sprite: AnimatedSprite2D
 @onready var _attack_sfx: AudioStreamPlayer2D = $AttackSfx
+@onready var _sfx_chase: AudioStreamPlayer = $SfxChase
+
 var _attack_phase := AttackPhase.APPROACH
 var _phase_left := 0.0
 var _charge_direction := Vector2.RIGHT
@@ -87,9 +89,18 @@ func _engaged_think(delta: float) -> void:
 				_play_owl_animation(&"fly")
 
 
+## A hit cancels the attack so the push is not overridden by the dive or charge.
+func _start_recoil(source_position: Vector2) -> void:
+	super._start_recoil(source_position)
+	if _attack_phase in [AttackPhase.WINDUP, AttackPhase.DIVE, AttackPhase.CHARGE]:
+		_start_phase(AttackPhase.RECOVER, recover_duration, &"recover")
+
+
 func _on_engaged() -> void:
 	super._on_engaged()
+	_sfx_chase.play()
 	_start_phase(AttackPhase.WINDUP, windup_duration, &"windup")
+	
 
 
 func make_corpse_at(at: Vector2, facing: int) -> void:

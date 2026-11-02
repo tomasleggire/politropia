@@ -23,6 +23,7 @@ const CLIP_SPEEDS := {
 	"idle": 8.0,
 	"walk_fwd": 12.0,
 	"walk_back": 12.0,
+	"intro": 10.0,
 	"shot_draw": 12.0,
 	"shot_hold": 8.0,
 	"shot_release": 20.0,
@@ -59,6 +60,9 @@ const CLIP_SPEEDS := {
 	"stag_recover": 10.0,
 	"stag_appear": 20.0,
 	"stag_run": 12.0,
+	"stag_vanish": 20.0,
+	"arrow_impact": 20.0,
+	"arrow_impact_moon": 20.0,
 	"slash": 25.0,
 	"dive_shaft": 12.0,
 	"dive_shockwave": 12.0,
@@ -118,6 +122,42 @@ static func build_stag_frames() -> SpriteFrames:
 ## The combat VFX (manifest key "vfx"): slash, dive_shaft and dive_shockwave.
 static func build_vfx_frames() -> SpriteFrames:
 	return _build_single_sheet("vfx")
+
+
+## The arrow impact bursts (manifest key "impact"): arrow_impact (amber) and
+## arrow_impact_moon (silver).
+static func build_impact_frames() -> SpriteFrames:
+	return _build_single_sheet("impact")
+
+
+## One manifest key as a Dictionary (empty when missing): "impact" carries the
+## `sprite_scale` and the `anchor` (impact point, in texture pixels).
+static func manifest_entry(key: String) -> Dictionary:
+	var manifest := _read_manifest()
+	return manifest[key] if manifest.get(key) is Dictionary else {}
+
+
+## The telegraph glyphs (manifest key "glyphs"): StringName -> AtlasTexture of one
+## glyph, named rain, dive, stag, dot and the brighter "_hot" version of each.
+## White art meant to be tinted in code. Empty when the manifest or sheet is missing.
+static func build_glyph_textures() -> Dictionary:
+	var entry := manifest_entry("glyphs")
+	if entry.is_empty():
+		return {}
+	var atlas := load(ASSET_ROOT + String(entry["sheet"])) as Texture2D
+	if atlas == null:
+		push_warning("ArtemisAnimationCatalog: missing glyphs sheet")
+		return {}
+	var glyphs := {}
+	var regions: Dictionary = entry["regions"]
+	for glyph_name: String in regions:
+		var region: Array = regions[glyph_name]
+		var texture := AtlasTexture.new()
+		texture.atlas = atlas
+		texture.region = Rect2(float(region[0]), float(region[1]), float(region[2]), float(region[3]))
+		texture.filter_clip = true
+		glyphs[StringName(glyph_name)] = texture
+	return glyphs
 
 
 static func _build_single_sheet(key: String) -> SpriteFrames:

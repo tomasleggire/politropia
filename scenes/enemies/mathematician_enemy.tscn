@@ -1,0 +1,244 @@
+[gd_scene format=3 uid="uid://dmth8yaq1mat2"]
+
+[ext_resource type="Script" uid="uid://cgdygf8mlbcey" path="res://scripts/enemies/mathematician_enemy.gd" id="1_math"]
+[ext_resource type="Texture2D" uid="uid://chwlt2ay1lyqb" path="res://assets/enemies/mathematician_walk_8frames_attack_single_row.png" id="2_8ufw1"]
+[ext_resource type="Texture2D" uid="uid://uxa8h0ee4r6c" path="res://assets/enemies/mathematician02.png" id="4_wpj8r"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(32, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ciuoo"]
+atlas = ExtResource("2_8ufw1")
+region = Rect2(0, 0, 298.5, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p6xfg"]
+atlas = ExtResource("2_8ufw1")
+region = Rect2(298.5, 0, 298.5, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_rbfrq"]
+atlas = ExtResource("2_8ufw1")
+region = Rect2(597, 0, 298.5, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_temv2"]
+atlas = ExtResource("2_8ufw1")
+region = Rect2(895.5, 0, 298.5, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_i2qak"]
+atlas = ExtResource("2_8ufw1")
+region = Rect2(1194, 0, 298.5, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_aoyhm"]
+atlas = ExtResource("2_8ufw1")
+region = Rect2(1492.5, 0, 298.5, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_k0u2r"]
+atlas = ExtResource("2_8ufw1")
+region = Rect2(1791, 0, 298.5, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_mjgxf"]
+atlas = ExtResource("2_8ufw1")
+region = Rect2(2089.5, 0, 298.5, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_8ufw1"]
+atlas = ExtResource("4_wpj8r")
+region = Rect2(0, 0, 200, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_l2wuy"]
+atlas = ExtResource("4_wpj8r")
+region = Rect2(220, 0, 200, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_6vv8l"]
+atlas = ExtResource("4_wpj8r")
+region = Rect2(660, 0, 200, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_feskm"]
+atlas = ExtResource("4_wpj8r")
+region = Rect2(880, 0, 200, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_qac47"]
+atlas = ExtResource("4_wpj8r")
+region = Rect2(1100, 0, 200, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ea2on"]
+atlas = ExtResource("4_wpj8r")
+region = Rect2(1320, 0, 200, 232)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0upbq"]
+atlas = ExtResource("4_wpj8r")
+region = Rect2(1540, 0, 200, 232)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_cndtc"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ciuoo")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p6xfg")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_rbfrq")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_temv2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_i2qak")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_aoyhm")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_k0u2r")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_mjgxf")
+}],
+"loop": 0,
+"name": &"attack",
+"speed": 10.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_8ufw1")
+}],
+"loop": 1,
+"name": &"idle",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_l2wuy")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_6vv8l")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_feskm")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_qac47")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_l2wuy")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ea2on")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0upbq")
+}],
+"loop": 1,
+"name": &"walk",
+"speed": 10.0
+}]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_detection"]
+size = Vector2(120, 64)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_rear"]
+size = Vector2(75, 64)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hitbox"]
+size = Vector2(48, 56)
+
+[sub_resource type="Curve" id="Curve_particles"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), -1.5, 0.0, 0, 0]
+point_count = 2
+
+[node name="MathematicianEnemy" type="CharacterBody2D" unique_id=1401423410]
+collision_layer = 8
+collision_mask = 3
+script = ExtResource("1_math")
+enemy_id = &"mathematician_enemy"
+start_facing = 1
+max_health = 4
+gravity = 980.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=520318213]
+position = Vector2(0, -32)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=527687615]
+position = Vector2(1.0075445, -37.11867)
+scale = Vector2(0.41481608, 0.4148161)
+sprite_frames = SubResource("SpriteFrames_cndtc")
+animation = &"idle"
+
+[node name="DetectionArea" type="Area2D" parent="." unique_id=642665190]
+collision_layer = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectionArea" unique_id=1581100017]
+position = Vector2(60, -32)
+shape = SubResource("RectangleShape2D_detection")
+
+[node name="RearDetectionArea" type="Area2D" parent="." unique_id=741029182]
+collision_layer = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RearDetectionArea" unique_id=141209823]
+position = Vector2(-37.5, -32)
+shape = SubResource("RectangleShape2D_rear")
+
+[node name="HitboxArea" type="Area2D" parent="." unique_id=1931831015]
+collision_layer = 0
+monitoring = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HitboxArea" unique_id=247603620]
+position = Vector2(28, -32)
+shape = SubResource("RectangleShape2D_hitbox")
+
+[node name="LedgeRayCast" type="RayCast2D" parent="." unique_id=875756290]
+position = Vector2(20, -4)
+target_position = Vector2(0, 20)
+collision_mask = 3
+
+[node name="BlockSparks" type="CPUParticles2D" parent="." unique_id=1279198328]
+position = Vector2(28, -32)
+emitting = false
+amount = 16
+lifetime = 0.25
+one_shot = true
+explosiveness = 0.95
+direction = Vector2(-1, -0.5)
+spread = 60.0
+gravity = Vector2(0, 200)
+initial_velocity_min = 80.0
+initial_velocity_max = 160.0
+scale_amount_min = 1.8
+scale_amount_max = 3.5
+scale_amount_curve = SubResource("Curve_particles")
+color = Color(1, 0.85, 0.3, 1)
+
+[node name="ChalkAttackParticles" type="CPUParticles2D" parent="." unique_id=1191228033]
+position = Vector2(28, -32)
+emitting = false
+amount = 14
+lifetime = 0.35
+one_shot = true
+explosiveness = 0.85
+direction = Vector2(1, -0.2)
+gravity = Vector2(0, 100)
+initial_velocity_min = 50.0
+initial_velocity_max = 120.0
+scale_amount_min = 2.0
+scale_amount_max = 4.0
+scale_amount_curve = SubResource("Curve_particles")
+color = Color(0.95, 0.95, 0.95, 0.85)
+
+[node name="DeathParticles" type="CPUParticles2D" parent="." unique_id=1416398452]
+position = Vector2(0, -30)
+emitting = false
+amount = 32
+lifetime = 0.55
+one_shot = true
+explosiveness = 0.95
+lifetime_randomness = 0.3
+direction = Vector2(0, -1)
+spread = 180.0
+gravity = Vector2(0, 240)
+initial_velocity_min = 60.0
+initial_velocity_max = 180.0
+scale_amount_min = 2.5
+scale_amount_max = 5.0
+scale_amount_curve = SubResource("Curve_particles")
+color = Color(0.96, 0.96, 0.96, 0.9)

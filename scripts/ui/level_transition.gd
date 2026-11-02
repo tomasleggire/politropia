@@ -15,6 +15,7 @@ func _ready() -> void:
 	var stream := VideoStreamTheora.new()
 	stream.file = VIDEO_PATH
 	_video.stream = stream
+	MusicManager.stop_music()
 	_video.play()
 	_skip_button.grab_focus()
 
@@ -34,4 +35,5 @@ func _go_to_greece() -> void:
 		return
 	_leaving_transition = true
 	_video.stop()
+	MusicManager.play_gameplay_music()
 	get_tree().call_deferred("change_scene_to_file", GREECE_LEVEL)

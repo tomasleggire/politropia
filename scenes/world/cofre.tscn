@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://d0mu0g5r1c2lo"]
+
+[ext_resource type="Texture2D" uid="uid://dmpi3suyvdpci" path="res://assets/art/greece/chest.png" id="1_a3f1g"]
+[ext_resource type="Script" uid="uid://lts3i6e53lij" path="res://scripts/world/Objects/hidden_objects.gd" id="2_ljahy"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_8w0r3"]
+size = Vector2(57, 45)
+
+[node name="Cofre" type="Node2D" unique_id=1931050741]
+script = ExtResource("2_ljahy")
+
+[node name="Area2D" type="Area2D" parent="." unique_id=914628845]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=169926230]
+position = Vector2(-0.5, -22.5)
+shape = SubResource("RectangleShape2D_8w0r3")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1965779031]
+position = Vector2(1, -17)
+scale = Vector2(0.3579545, 0.34439567)
+texture = ExtResource("1_a3f1g")

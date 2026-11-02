@@ -42,6 +42,7 @@ const CLIP_SPEEDS := {
 	"heal_start": 14.3,
 	"heal_loop": 4.44,
 	"heal_end": 20.0,
+	"open_eyes": 5.0,
 }
 
 ## PLACEHOLDER MAPPING (no art yet): "turn" and "skid" have no clip in the

@@ -45,6 +45,12 @@ var _sight_clock := 0.0
 var _sight_lost := 0.0
 var _bob_time := 0.0
 var _body_offset := Vector2.ZERO
+var _recoil_vector := Vector2.ZERO
+
+
+func _init() -> void:
+	# Airborne enemies are pushed by Luz's slashes; walkers keep the base default.
+	knockback_from_player_attacks = true
 
 
 func _ready() -> void:
@@ -115,10 +121,19 @@ func _apply_gravity(delta: float) -> void:
 		super._apply_gravity(delta)
 
 
-## A hit stops the vertical drift too; the base class only sets the recoil x.
+## Flyers are pushed in 2D, away from Luz's body center (her origin is her feet),
+## so a strike from below sends them up.
 func _start_recoil(source_position: Vector2) -> void:
-	super._start_recoil(source_position)
-	velocity.y = 0.0
+	var away := global_position - (source_position + PLAYER_CENTER_OFFSET)
+	if away.length_squared() < 0.001:
+		away = Vector2(-float(_facing), 0.0)
+	_recoil_vector = away.normalized() * recoil_speed * (1.0 - knockback_resistance)
+	_recoil_left = recoil_time
+	velocity = _recoil_vector
+
+
+func _apply_recoil() -> void:
+	velocity = _recoil_vector
 
 
 func _bob_offset() -> float:
