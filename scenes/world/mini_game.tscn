@@ -1,0 +1,95 @@
+[gd_scene format=3 uid="uid://blh12a8karymv"]
+
+[ext_resource type="Script" uid="uid://ba6fiwqkt1tlr" path="res://scripts/world/mini_game.gd" id="1_0jy0i"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lqhmj"]
+bg_color = Color(0.09019608, 0.14509805, 0.21176471, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.7764706, 0.6313726, 0.35686275, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+expand_margin_left = 16.0
+expand_margin_top = 16.0
+expand_margin_right = 16.0
+expand_margin_bottom = 16.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_c4lxx"]
+content_margin_left = 0.0
+content_margin_top = 8.0
+content_margin_right = 0.0
+content_margin_bottom = 8.0
+bg_color = Color(0.7764706, 0.6313726, 0.35686275, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="MiniGame" type="CanvasLayer" unique_id=720587512]
+script = ExtResource("1_0jy0i")
+
+[node name="Overlay" type="ColorRect" parent="." unique_id=1506207200]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.627451)
+
+[node name="CenterContainer" type="CenterContainer" parent="Overlay" unique_id=1630050389]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="Overlay/CenterContainer" unique_id=1138007253]
+custom_minimum_size = Vector2(560, 320)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_lqhmj")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Overlay/CenterContainer/PanelContainer" unique_id=1873477088]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Overlay/CenterContainer/PanelContainer/VBoxContainer" unique_id=1642614539]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9098039, 0.78039217, 0.47058824, 1)
+theme_override_font_sizes/font_size = 26
+text = "Ordená las silabas"
+horizontal_alignment = 1
+
+[node name="Instructions" type="Label" parent="Overlay/CenterContainer/PanelContainer/VBoxContainer" unique_id=306099988]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88235295, 0.8980392, 0.91764706, 1)
+text = "Tocá las sílabas en el orden correcto para formar una palabra."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="AnswerSlots" type="HBoxContainer" parent="Overlay/CenterContainer/PanelContainer/VBoxContainer" unique_id=1852140589]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="AvailableSyllables" type="GridContainer" parent="Overlay/CenterContainer/PanelContainer/VBoxContainer" unique_id=1191390977]
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 4
+
+[node name="Feedback" type="Label" parent="Overlay/CenterContainer/PanelContainer/VBoxContainer" unique_id=1453068616]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CheckButton" type="Button" parent="Overlay/CenterContainer/PanelContainer/VBoxContainer" unique_id=1193887155]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.09019608, 0.14509805, 0.21176471, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_c4lxx")
+text = "Comprobar"

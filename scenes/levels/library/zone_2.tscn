@@ -3,7 +3,6 @@
 [ext_resource type="Script" uid="uid://c1nbk0diqf56p" path="res://scripts/levels/level_objects.gd" id="1_g4t5l"]
 [ext_resource type="Texture2D" uid="uid://croiudofpxjg2" path="res://assets/art/library/Backgrounds/background2.png" id="1_jln6e"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="2_63xwj"]
-[ext_resource type="PackedScene" uid="uid://d0mu0g5r1c2lo" path="res://scenes/world/cofre.tscn" id="3_5e38y"]
 [ext_resource type="TileSet" uid="uid://dul1ibpu3lwwe" path="res://tilesets/platforms_library.tres" id="3_cxp8p"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="4_cxp8p"]
 [ext_resource type="TileSet" uid="uid://bt608aiku7igc" path="res://tilesets/spikes_library.tres" id="4_eglro"]
@@ -14063,6 +14062,3 @@ base_energy = 0.85
 radius = 115.0
 flicker_amount = 0.07
 phase_offset = 6.8999999999999995
-
-[node name="Cofre" parent="." unique_id=1931050741 instance=ExtResource("3_5e38y")]
-position = Vector2(425, 249)

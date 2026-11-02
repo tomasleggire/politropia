@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://t5snr0d4egcd"]
+
+[ext_resource type="Script" uid="uid://jc3g8825gl0s" path="res://scripts/world/book_secondary_mission.gd" id="1_3sass"]
+[ext_resource type="Texture2D" uid="uid://5w3qiqlt48hs" path="res://assets/world/grimorio_completo.png" id="2_4x378"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_s7e1j"]
+size = Vector2(33, 33)
+
+[node name="BookSecondaryMission" type="Area2D" unique_id=623789211]
+collision_layer = 0
+script = ExtResource("1_3sass")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1981097305]
+position = Vector2(27.999992, 18)
+scale = Vector2(0.031249998, 0.031249998)
+texture = ExtResource("2_4x378")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=379307335]
+visible = false
+position = Vector2(28.5, 18.5)
+shape = SubResource("RectangleShape2D_s7e1j")
