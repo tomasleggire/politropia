@@ -131,7 +131,7 @@ columns = 3
 [node name="SlotTemplate" type="Button" parent="Margin/Layout/Body/LeftPanel/Margin/Box/GridScroll/Grid"]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(78, 84)
+custom_minimum_size = Vector2(78, 90)
 layout_mode = 2
 toggle_mode = true
 button_group = SubResource("ButtonGroup_slots")
@@ -158,15 +158,13 @@ mouse_filter = 2
 script = ExtResource("3_icon")
 
 [node name="Name" type="Label" parent="Margin/Layout/Body/LeftPanel/Margin/Box/GridScroll/Grid/SlotTemplate/Content"]
-custom_minimum_size = Vector2(0, 24)
+custom_minimum_size = Vector2(0, 34)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.91, 0.851, 0.659, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 9
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
-max_lines_visible = 2
-clip_text = true
 
 [node name="Divider" type="ColorRect" parent="Margin/Layout/Body"]
 custom_minimum_size = Vector2(2, 0)
