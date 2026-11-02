@@ -10,6 +10,8 @@ extends CanvasLayer
 ## very quick tap can never be missed by is_action_just_pressed's same-frame
 ## edge (see Player.request_jump/request_dash).
 
+signal hyperfocus_pressed
+
 @export var force_visible := false
 
 @export_group("Joystick")
@@ -36,6 +38,7 @@ var _jump_touch_id := -1
 var _dash_touch_id := -1
 var _interact_touch_id := -1
 var _focus_touch_id := -1
+var _hyperfocus_touch_id := -1
 var _player: Player
 var _interact_sources: Array[Object] = []
 
@@ -43,6 +46,7 @@ var _attack_touch_id := -1
 var _attack_start := Vector2.ZERO
 var _attack_timer := 0.0
 var _attack_upgraded := false
+var _hyperfocus_available := false
 
 var _held_actions := {
 	&"move_left": false,
@@ -57,6 +61,7 @@ var _held_actions := {
 @onready var _attack_button: Control = $Root/AttackButton
 @onready var _interact_button: Control = $Root/InteractButton
 @onready var _focus_button: Control = $Root/FocusButton
+@onready var _hyperfocus_button: Control = $Root/HyperfocusButton
 
 
 func _ready() -> void:
@@ -64,7 +69,15 @@ func _ready() -> void:
 	add_to_group(&"touch_controls")
 	visible = _platform_wants_controls()
 	_position_pad_at_rest()
+	set_hyperfocus_available(_hyperfocus_available)
 	_bind_found_player.call_deferred()
+	_check_saved_hyperfocus.call_deferred()
+
+
+func _check_saved_hyperfocus() -> void:
+	var blind_progress := get_node_or_null("/root/BlindQuestProgress")
+	if blind_progress != null and (bool(blind_progress.call("is_accepted")) or bool(blind_progress.call("is_completed"))):
+		set_hyperfocus_available(true)
 
 
 func _platform_wants_controls() -> bool:
@@ -122,6 +135,14 @@ func _handle_touch(touch: InputEventScreenTouch) -> void:
 		):
 			_begin_focus(touch.index)
 			get_viewport().set_input_as_handled()
+		elif (
+			_hyperfocus_touch_id < 0
+			and is_instance_valid(_hyperfocus_button)
+			and _hyperfocus_button.visible
+			and _try_begin_button(_hyperfocus_button, touch.index, touch.position)
+		):
+			_begin_hyperfocus(touch.index)
+			get_viewport().set_input_as_handled()
 	else:
 		if touch.index == _pad_touch_id:
 			_end_pad()
@@ -140,6 +161,9 @@ func _handle_touch(touch: InputEventScreenTouch) -> void:
 			get_viewport().set_input_as_handled()
 		elif touch.index == _focus_touch_id:
 			_end_focus()
+			get_viewport().set_input_as_handled()
+		elif touch.index == _hyperfocus_touch_id:
+			_end_hyperfocus()
 			get_viewport().set_input_as_handled()
 
 
@@ -367,6 +391,35 @@ func _end_focus() -> void:
 		_focus_button.call(&"set_button_state", false)
 
 
+## -- Hyperfocus button (single-tap ability) --------------------------------
+
+func set_hyperfocus_available(available: bool) -> void:
+	_hyperfocus_available = available
+	if is_instance_valid(_hyperfocus_button):
+		_hyperfocus_button.visible = available
+	if not available and _hyperfocus_touch_id >= 0:
+		_end_hyperfocus()
+
+
+func unlock_hyperfocus() -> void:
+	set_hyperfocus_available(true)
+
+
+func _begin_hyperfocus(index: int) -> void:
+	_hyperfocus_touch_id = index
+	Input.action_press(&"skill")
+	if is_instance_valid(_hyperfocus_button):
+		_hyperfocus_button.call(&"set_button_state", true)
+	hyperfocus_pressed.emit()
+
+
+func _end_hyperfocus() -> void:
+	_hyperfocus_touch_id = -1
+	Input.action_release(&"skill")
+	if is_instance_valid(_hyperfocus_button):
+		_hyperfocus_button.call(&"set_button_state", false)
+
+
 ## While blocked (pause menu open) no touch reaches the pad or the buttons, and
 ## anything held is released so nothing leaks into the paused or resumed game.
 func set_input_blocked(blocked: bool) -> void:
@@ -388,6 +441,8 @@ func release_all() -> void:
 		_end_interact()
 	if _focus_touch_id >= 0:
 		_end_focus()
+	if _hyperfocus_touch_id >= 0:
+		_end_hyperfocus()
 
 
 func _notification(what: int) -> void:
