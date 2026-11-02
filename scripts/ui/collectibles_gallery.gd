@@ -121,7 +121,8 @@ func select_item(index: int) -> void:
 	_detail_title.text = definition.title if unlocked else LOCKED_TITLE
 	_category.text = definition.category if unlocked else LOCKED_CATEGORY
 	_detail_text.text = definition.content if unlocked else LOCKED_TEXT
-	_detail_hint.text = "Encontrado en esta sesión" if unlocked else "Encontralo en el mundo"
+	_detail_hint.text = "Encontralo en el mundo"
+	_detail_hint.visible = not unlocked
 	_detail_scroll.scroll_vertical = 0
 
 
@@ -219,5 +220,17 @@ func _category_color(category: String) -> Color:
 			return Color(0.72, 0.55, 0.95, 1.0)
 		"personajes":
 			return Color(0.5, 0.85, 0.55, 1.0)
+		"lectura en voz alta":
+			return Color(0.92, 0.3, 0.42, 1.0)
+		"lectura más clara":
+			return Color(0.35, 0.86, 0.55, 1.0)
+		"tiempo extra":
+			return Color(0.35, 0.52, 0.96, 1.0)
+		"aprender escuchando":
+			return Color(0.3, 0.85, 0.85, 1.0)
+		"un espacio tranquilo":
+			return Color(0.55, 0.85, 0.6, 1.0)
+		"otras formas de demostrarlo":
+			return Color(0.78, 0.29, 0.34, 1.0)
 		_:
 			return Color(0.55, 0.7, 0.95, 1.0)

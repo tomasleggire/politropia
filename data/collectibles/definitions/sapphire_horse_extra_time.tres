@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="CollectibleDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/collectibles/collectible_definition.gd" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+id = "sapphire_horse_extra_time"
+title = "Caballo de Zafiro"
+category = "Tiempo extra"
+content = "Leer, interpretar preguntas y escribir respuestas puede llevar más tiempo a algunas personas con dislexia. Esto se debe a que reconocer palabras y escribirlas correctamente puede requerir un esfuerzo adicional. Tener tiempo extra en los exámenes permite leer las consignas con más calma, revisar las respuestas y demostrar lo aprendido sin que la velocidad sea una barrera. ¡Lo importante es evaluar los conocimientos, no solamente qué tan rápido se termina!"
+image = null
