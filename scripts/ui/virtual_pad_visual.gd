@@ -1,3 +1,4 @@
+@tool
 extends Control
 
 ## Draws a compact gothic analog pad. Touch handling stays in TouchControls so

@@ -1,14 +1,19 @@
+@tool
 extends Control
 
 ## Draws a circular gothic touch button with a simple vector icon. Touch
 ## handling and multitouch ID tracking stay in TouchControls; this node only
 ## renders whatever state it is told to.
 
-enum Icon { JUMP, DASH, ATTACK, INTERACT, FOCUS }
+enum Icon { JUMP, DASH, ATTACK, INTERACT, FOCUS, HYPERFOCUS }
 
-@export var icon: Icon = Icon.JUMP
+@export var icon: Icon = Icon.JUMP:
+	set(value):
+		icon = value
+		queue_redraw()
 
 var is_pressed := false
+var is_toggled := false
 
 
 func set_button_state(pressed: bool) -> void:
@@ -18,11 +23,19 @@ func set_button_state(pressed: bool) -> void:
 	queue_redraw()
 
 
+func set_button_toggled(toggled: bool) -> void:
+	if is_toggled == toggled:
+		return
+	is_toggled = toggled
+	queue_redraw()
+
+
 func _draw() -> void:
 	var center := size * 0.5
 	var radius := size.x * 0.5
-	var rim := Color("d8792e") if is_pressed else Color(0.25, 0.44, 0.64, 0.72)
-	var fill_alpha := 0.66 if is_pressed else 0.5
+	var active := is_pressed or is_toggled
+	var rim := Color("e5a23b") if is_toggled else (Color("d8792e") if is_pressed else Color(0.25, 0.44, 0.64, 0.72))
+	var fill_alpha := 0.66 if active else 0.5
 
 	draw_circle(center, radius + 2.0, Color(0.006, 0.012, 0.035, 0.42))
 	draw_circle(center, radius, Color(0.025, 0.055, 0.12, fill_alpha))
@@ -42,6 +55,8 @@ func _draw() -> void:
 			_draw_diamond(center, radius * 0.38, rim)
 		Icon.FOCUS:
 			_draw_focus(center, radius * 0.4, rim)
+		Icon.HYPERFOCUS:
+			_draw_eye(center, radius * 0.45, rim)
 
 
 func _draw_chevron(origin: Vector2, extent: float, color: Color, direction: Vector2) -> void:
@@ -78,3 +93,24 @@ func _draw_diamond(center: Vector2, extent: float, color: Color) -> void:
 func _draw_focus(center: Vector2, extent: float, color: Color) -> void:
 	draw_arc(center, extent, 0.0, TAU, 32, color, 2.0, true)
 	draw_circle(center, extent * 0.35, color)
+
+
+func _draw_eye(center: Vector2, extent: float, color: Color) -> void:
+	var width := extent * 1.25
+	var height := extent * 0.65
+	var top_curve := PackedVector2Array([
+		center + Vector2(-width, 0.0),
+		center + Vector2(-width * 0.45, -height),
+		center + Vector2(width * 0.45, -height),
+		center + Vector2(width, 0.0),
+	])
+	var btm_curve := PackedVector2Array([
+		center + Vector2(width, 0.0),
+		center + Vector2(width * 0.45, height),
+		center + Vector2(-width * 0.45, height),
+		center + Vector2(-width, 0.0),
+	])
+	draw_polyline(top_curve, color, 2.0, true)
+	draw_polyline(btm_curve, color, 2.0, true)
+	draw_arc(center, extent * 0.38, 0.0, TAU, 24, color, 1.5, true)
+	draw_circle(center, extent * 0.18, color)
