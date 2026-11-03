@@ -6,7 +6,7 @@
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="6_20pvq"]
 [ext_resource type="Texture2D" uid="uid://ddqywkuh8qpr2" path="res://assets/art/obstacles/spikes.png" id="6_n3h83"]
 [ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="6_vc2ga"]
-[ext_resource type="PackedScene" uid="uid://d0fndhvvtp3yq" path="res://scenes/world/npc.tscn" id="8_vc2ga"]
+[ext_resource type="PackedScene" uid="uid://d0fndhvvtp3yq" path="res://scenes/world/librarian_npc.tscn" id="8_vc2ga"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="10_0j26h"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_n3h83"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_6keu4"]

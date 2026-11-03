@@ -4,6 +4,7 @@
 [ext_resource type="TileSet" uid="uid://dul1ibpu3lwwe" path="res://tilesets/platforms_library.tres" id="4_w4eui"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="10_ucxks"]
 [ext_resource type="Texture2D" uid="uid://dsln3teo3w40k" path="res://assets/art/greece/Plants/Bush-1.png" id="11_aa0nv"]
+[ext_resource type="PackedScene" uid="uid://bghweuci26m8m" path="res://scenes/world/blind_npc.tscn" id="11_e3xj1"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="12_nebux"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="20_g5kwh"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="21_l868g"]
@@ -14190,12 +14191,16 @@ position = Vector2(319, 102.5)
 shape = SubResource("RectangleShape2D_65vgs")
 
 [node name="TeacherBossArena" parent="." unique_id=952071759 instance=ExtResource("24_pj0o8")]
+visible = false
 position = Vector2(512, 352)
 arena_rect = Rect2(-500, -300, 1000, 280)
 trigger_rect = Rect2(-200, -200, 200, 200)
 left_door = Vector2(-490, 0)
 right_door = Vector2(656, 0)
 boss_name = "Teacher"
+
+[node name="NPC" parent="." unique_id=188900045 instance=ExtResource("11_e3xj1")]
+position = Vector2(70, 220)
 
 [node name="SceneTransitionArea2" parent="." unique_id=1518630621 instance=ExtResource("12_nebux")]
 position = Vector2(-291, -174)
