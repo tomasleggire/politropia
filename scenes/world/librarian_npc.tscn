@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://d0fndhvvtp3yq"]
 
 [ext_resource type="Texture2D" uid="uid://cvjdmwt7wk0da" path="res://assets/ui/librarian.png" id="1_1oqjc"]
-[ext_resource type="PackedScene" uid="uid://bq2h3mekduxqo" path="res://scenes/ui/speech_bubble.tscn" id="1_kmc6d"]
-[ext_resource type="Script" uid="uid://esr7sh3cwqgi" path="res://scripts/world/npc.gd" id="1_ts6vr"]
+[ext_resource type="Script" uid="uid://esr7sh3cwqgi" path="res://scripts/world/librarian_npc.gd" id="1_ts6vr"]
+[ext_resource type="PackedScene" uid="uid://do5yura3snuld" path="res://scenes/ui/librarian_speech_bubble.tscn" id="3_p8m32"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ts6vr"]
 size = Vector2(53, 15)
@@ -30,12 +30,5 @@ collision_mask = 7
 position = Vector2(187, 267)
 shape = SubResource("CircleShape2D_davfq")
 
-[node name="PromptIcon" type="Label" parent="." unique_id=1175269131]
-offset_left = 170.0
-offset_top = 212.0
-offset_right = 184.0
-offset_bottom = 235.0
-text = "E"
-
-[node name="SpeechBubble" parent="." unique_id=641743792 instance=ExtResource("1_kmc6d")]
-position = Vector2(199, 139)
+[node name="LibrarianSpeechBubble" parent="." unique_id=1025694301 instance=ExtResource("3_p8m32")]
+position = Vector2(223, 158)
