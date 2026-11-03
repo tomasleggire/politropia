@@ -47,7 +47,10 @@ User request on 2026-11-03: the menu must be more spectacular, beautiful, immers
   - Commit `ed9c650`. RDD assessed `medium` (`slice_budget_reached`, 1119 lines); user granted; lineage `review-41a3c4d8545b7fdc` approved (reliability lens) and acknowledged (authority burned). Reviewed boundary: `ed9c650`. Non-blocking follow-ups: the test never runs the cinematic's end (reset + intro scene change via `scene_changer`); the "second press ignored" assertion is vacuous; the selector line/star/underline are not recomputed on viewport resize.
 - [x] T3 — Folded into T2 on 2026-11-03: the same writer builds the new game cinematic (Luz walks into the light + gold fade before the intro), since it lives in the same scene and script.
 - T1 review: RDD assessed `high` (process boundary signal on `tools/key_magenta_layer.py`); user granted; lineage `review-99f37ee38a891939` approved by 4 lenses and acknowledged (authority burned). Reviewed boundary: `fbe82ed`. Non-blocking follow-ups: despill also touches opaque near-magenta pixels; the 3x3 opening can erase 1-2 px detail (vine tendrils); no automated check for the keying script.
-- [ ] T4 — Visual check with the user (desktop run + iPhone if requested).
+- [x] T4 — Visual check with the user (desktop run + iPhone if requested).
+  - 2026-11-03: user checked the menu on the iPhone ("me gusta como se ve") and asked to push and merge into main.
+  - 2026-11-03: iOS Debug build of `40f744a` exported and compiled (`build/ios/DerivedData/Build/Products/Debug-iphoneos/politropia.app`, bundle `com.tomasleggire.politropia`). Install blocked twice: iPhone storage (241 MB needed, ~110 MB available). Launch also refused: profile not trusted / invalid signature. Waiting for the user to free space; retry needs only `devicectl install` + launch.
+  - 2026-11-03 (retry): `devicectl install` succeeded ("App installed"). Remote launch still refused by iOS Security (profile not trusted); user must trust the developer profile on the phone.
 
 ## Acceptance criteria
 - The menu matches the approved concept's composition and mood at 640x360 and on wider phone aspect ratios.
