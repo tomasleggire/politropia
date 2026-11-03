@@ -30,12 +30,12 @@ func _start_dialogue() -> void:
 		DialogueColor.tag("No", DialogueColor.CREMA) + " " +
 		DialogueColor.tag("todos", DialogueColor.NARANJA) + " " +
 		DialogueColor.tag("los", DialogueColor.CREMA) + " " +
-		DialogueColor.tag("secretos", DialogueColor.AZUL) + "\n\n" +
+		DialogueColor.tag("secretos", DialogueColor.AZUL) + " " +
 		DialogueColor.tag("están", DialogueColor.AMARILLO) + " " +
-		DialogueColor.tag("ocultos.", DialogueColor.NARANJA) + "\n\n" +
+		DialogueColor.tag("ocultos.", DialogueColor.NARANJA) + "\n" +
 		DialogueColor.tag("Algunos", DialogueColor.CREMA) + " " +
 		DialogueColor.tag("solo", DialogueColor.NARANJA) + " " +
-		DialogueColor.tag("esperan", DialogueColor.AZUL) + "\n\n" +
+		DialogueColor.tag("esperan", DialogueColor.AZUL) + " " +
 		DialogueColor.tag("ser", DialogueColor.AMARILLO) + " " +
 		DialogueColor.tag("revelados.", DialogueColor.NARANJA)
 	)

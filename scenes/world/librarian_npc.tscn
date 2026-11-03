@@ -31,4 +31,4 @@ position = Vector2(187, 267)
 shape = SubResource("CircleShape2D_davfq")
 
 [node name="LibrarianSpeechBubble" parent="." unique_id=1025694301 instance=ExtResource("3_p8m32")]
-position = Vector2(201, 125)
+position = Vector2(223, 158)

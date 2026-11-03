@@ -14,13 +14,15 @@ corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
 [node name="LibrarianSpeechBubble" type="Node2D" unique_id=1025694301]
+z_index = 10
 position = Vector2(1, 1)
 scale = Vector2(0.5, 0.5)
 script = ExtResource("1_5tf0o")
 
 [node name="PanelContainer" type="PanelContainer" parent="." unique_id=918336572]
+custom_minimum_size = Vector2(250, 0)
 propagate_maximum_size = false
-offset_right = 544.0
+offset_right = 324.0
 offset_bottom = 209.0
 size_flags_horizontal = 0
 size_flags_vertical = 0
@@ -34,7 +36,7 @@ theme_override_constants/margin_right = 6
 theme_override_constants/margin_bottom = 4
 
 [node name="RichTextLabel" type="RichTextLabel" parent="PanelContainer/MarginContainer" unique_id=1345014257]
-custom_minimum_size = Vector2(320, 0)
+custom_minimum_size = Vector2(380, 0)
 layout_mode = 2
 size_flags_vertical = 0
 theme_override_constants/line_separation = 4
