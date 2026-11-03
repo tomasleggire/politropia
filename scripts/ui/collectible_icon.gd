@@ -1,17 +1,23 @@
 class_name CollectibleIcon
 extends Control
 
-## Draws the provisional art of a collectible: the optional texture from its
-## definition, or a colored gem when the image is empty. Locked items are drawn
-## as dark silhouettes so the gallery never reveals their final art.
+## Draws the collectible art: the optional texture from its definition, or a
+## colored gem when the image is empty. Locked items draw that same texture
+## through a dark, alpha-preserving shader so the gallery never reveals their
+## final colors but keeps the silhouette of their own coin.
+
+const SILHOUETTE_SHADER := preload("res://scripts/ui/collectible_silhouette.gdshader")
 
 var definition: CollectibleDefinition
 var locked := false
 var accent_color := Color(0.36, 0.85, 0.95, 1.0)
+var _silhouette_material: ShaderMaterial
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Keep the coin pixels crisp at every gallery size.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	resized.connect(queue_redraw)
 
 
@@ -20,7 +26,14 @@ func set_definition(value: CollectibleDefinition, is_locked: bool, accent := Col
 	definition = value
 	locked = is_locked
 	accent_color = accent
+	_update_silhouette_material()
 	queue_redraw()
+
+
+## True when the control is drawing the definition's own texture as a dark
+## silhouette (instead of the generic fallback).
+func uses_coin_silhouette() -> bool:
+	return locked and definition != null and definition.image != null
 
 
 func _draw() -> void:
@@ -30,11 +43,24 @@ func _draw() -> void:
 		return
 
 	if locked:
-		_draw_silhouette(center, radius)
+		if definition != null and definition.image != null:
+			_draw_texture(center)
+		else:
+			_draw_silhouette(center, radius)
 	elif definition != null and definition.image != null:
 		_draw_texture(center)
 	else:
 		_draw_gem(center, radius)
+
+
+func _update_silhouette_material() -> void:
+	if not uses_coin_silhouette():
+		material = null
+		return
+	if _silhouette_material == null:
+		_silhouette_material = ShaderMaterial.new()
+		_silhouette_material.shader = SILHOUETTE_SHADER
+	material = _silhouette_material
 
 
 func _draw_texture(center: Vector2) -> void:

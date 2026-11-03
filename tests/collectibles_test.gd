@@ -17,6 +17,14 @@ const FIRST_ID := "ruby_owl_read_aloud"
 const SECOND_ID := "emerald_bull_clear_text"
 const FLOOR_RECT := Rect2(-600.0, 0.0, 1200.0, 100.0)
 const WATCHDOG_SECONDS := 120.0
+const EXPECTED_REGIONS := {
+	"ruby_owl_read_aloud": Vector2i(0, 0),
+	"emerald_bull_clear_text": Vector2i(512, 0),
+	"sapphire_horse_extra_time": Vector2i(1024, 0),
+	"turquoise_dolphin_learn_by_listening": Vector2i(0, 512),
+	"jade_hound_quiet_space": Vector2i(512, 512),
+	"garnet_goat_other_ways": Vector2i(1024, 512),
+}
 
 var checks := 0
 var failed: Array[String] = []
@@ -58,6 +66,7 @@ func _run() -> void:
 	# Let the autoloads finish their _ready() (the manager loads the catalog there).
 	await process_frame
 	_case_service()
+	_case_coin_textures()
 	await _case_pickup()
 	await _case_scene_reload()
 	await _case_gallery_logic()
@@ -114,6 +123,66 @@ func _case_service() -> void:
 	fragments.clear()
 
 
+func _case_coin_textures() -> void:
+	print("CASE coin textures")
+	var definitions := _definitions()
+	var all_assigned := definitions.size() == 6
+	var all_512 := true
+	var all_transparent := true
+	var same_atlas := true
+	var shared_atlas: Texture2D = null
+	var unique_regions := true
+	var unique_images := true
+	var regions: Array[Vector2i] = []
+	var image_blobs: Array[PackedByteArray] = []
+	for definition: CollectibleDefinition in definitions:
+		var image := definition.image
+		if image == null or not (image is AtlasTexture):
+			all_assigned = false
+			continue
+		var atlas_texture := image as AtlasTexture
+		var region := atlas_texture.region
+		all_512 = all_512 and image.get_size() == Vector2(512.0, 512.0) and region.size == Vector2(512.0, 512.0)
+		var expected: Vector2i = EXPECTED_REGIONS.get(definition.id, Vector2i(-1, -1))
+		all_assigned = all_assigned and Vector2i(region.position) == expected
+		if atlas_texture.atlas == null:
+			all_assigned = false
+		elif shared_atlas == null:
+			shared_atlas = atlas_texture.atlas
+		elif shared_atlas != atlas_texture.atlas:
+			same_atlas = false
+		for existing: Vector2i in regions:
+			if existing == Vector2i(region.position):
+				unique_regions = false
+		regions.append(Vector2i(region.position))
+
+		var region_image := atlas_texture.get_image()
+		if region_image == null:
+			all_transparent = false
+			continue
+		var pixels := region_image.get_data()
+		var transparent_pixels := 0
+		for i in range(3, pixels.size(), 4):
+			if pixels[i] <= 2:
+				transparent_pixels += 1
+		var visible_pixels := pixels.size() / 4 - transparent_pixels
+		all_transparent = all_transparent and transparent_pixels > 0 and visible_pixels > 0
+		var blob := region_image.get_data()
+		for existing: PackedByteArray in image_blobs:
+			if existing == blob:
+				unique_images = false
+		image_blobs.append(blob)
+
+	check(definitions.size() == 6, "six collectible definitions are present")
+	check(all_assigned, "all six definitions have an AtlasTexture from coins.png")
+	check(all_512, "all six coin regions are exactly 512x512")
+	check(regions.size() == 6 and unique_regions, "the six coin regions cover different spritesheet areas")
+	check(same_atlas and shared_atlas != null and shared_atlas.get_size() == Vector2(1536.0, 1024.0), "all coins reference the same full-resolution 1536x1024 spritesheet")
+	check(shared_atlas != null and shared_atlas.resource_path == "res://coins.png", "the shared atlas is the original coins.png import")
+	check(all_transparent, "the coin regions keep a transparent background")
+	check(unique_images, "the six regions contain different coin art")
+
+
 func _build_rig() -> void:
 	_free_rig()
 	_rig = Node2D.new()
@@ -160,6 +229,36 @@ func _case_pickup() -> void:
 	_rig.add_child(pickup)
 	await _frames(3)
 	check(is_instance_valid(pickup) and not pickup.is_collected(), "pickup waits until the player touches it")
+	var pickup_icon := pickup.get_node("Icon") as Sprite2D
+	var pickup_placeholder := pickup.get_node("Placeholder") as Polygon2D
+	check(pickup_icon.texture == definition.image, "pickup uses the image of its own definition")
+	check(pickup_icon.visible and not pickup_placeholder.visible, "pickup hides the placeholder when the coin exists")
+	check(pickup_icon.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "pickup keeps nearest filtering for the coin")
+	check(pickup_icon.modulate == Color.WHITE, "pickup does not tint the original coin colors")
+	check(is_equal_approx(pickup_icon.scale.x, 26.0 / 512.0), "pickup scales the 512x512 coin cell without distortion")
+
+	var second_definition := _definitions()[1] as CollectibleDefinition
+	var second_pickup := _make_pickup(second_definition, Vector2(300.0, -30.0))
+	_rig.add_child(second_pickup)
+	await _frames(3)
+	var second_icon := second_pickup.get_node("Icon") as Sprite2D
+	check(second_icon.texture == second_definition.image, "a second pickup uses its own definition image")
+	check(second_icon.texture != pickup_icon.texture, "different definitions use different coin regions")
+	second_pickup.queue_free()
+	await _frames(2)
+
+	# A real definition without art must keep the neutral placeholder and not crash.
+	var fallback_definition := CollectibleDefinition.new()
+	fallback_definition.id = "missing_image_test"
+	fallback_definition.title = "Sin imagen"
+	fallback_definition.image = null
+	var fallback_pickup := _make_pickup(fallback_definition, Vector2(400.0, -30.0))
+	_rig.add_child(fallback_pickup)
+	await _frames(3)
+	check(not (fallback_pickup.get_node("Icon") as Sprite2D).visible, "a definition without image hides the coin sprite")
+	check((fallback_pickup.get_node("Placeholder") as Polygon2D).visible, "a definition without image keeps the neutral placeholder")
+	fallback_pickup.queue_free()
+	await _frames(2)
 
 	# A body on the player's physics layer but outside the player group must not count.
 	var stranger := CharacterBody2D.new()
@@ -251,6 +350,16 @@ func _case_scene_reload() -> void:
 	manager.call("clear")
 
 
+func _slot_icon(gallery: Node, index: int) -> CollectibleIcon:
+	var grid := gallery.get_node_or_null("%Grid")
+	if grid == null:
+		return null
+	var slot := grid.get_node_or_null("Slot%d" % index)
+	if slot == null:
+		return null
+	return slot.get_node_or_null("Content/Icon") as CollectibleIcon
+
+
 func _case_gallery_logic() -> void:
 	print("CASE gallery")
 	var manager := _manager()
@@ -271,8 +380,30 @@ func _case_gallery_logic() -> void:
 	var first := _definitions()[0] as CollectibleDefinition
 	var locked_body: String = gallery.call("get_selected_body")
 	check(not locked_body.contains(first.title) and not locked_body.contains("texto a voz"), "a locked item hides its content")
-	check(first.image == null, "the catalog includes an item without a texture")
-	check(gallery.call("get_slot_count") == 6, "an empty texture does not remove or break a slot")
+	check(first.image != null, "the first catalog item has a coin texture")
+	check(gallery.call("get_slot_count") == 6, "the assigned texture does not remove or break a slot")
+	var gallery_icons: Array[CollectibleIcon] = []
+	for i in 6:
+		var icon := _slot_icon(gallery, i)
+		check(icon != null and icon.definition == _definitions()[i], "gallery slot %d uses its own definition" % i)
+		if icon != null:
+			gallery_icons.append(icon)
+			check(icon.locked, "locked gallery slot %d keeps its silhouette state" % i)
+			check(icon.definition.image != null, "locked gallery slot %d still has its assigned coin" % i)
+			check(icon.uses_coin_silhouette(), "locked gallery slot %d silhouettes its own coin" % i)
+			check(icon.material is ShaderMaterial, "locked gallery slot %d uses the silhouette shader" % i)
+			check(icon.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "gallery slot %d uses nearest filtering" % i)
+	check(gallery_icons.size() == 6, "all six gallery slots have their coin icon")
+	if gallery_icons.size() == 6:
+		var silhouette_material := gallery_icons[0].material as ShaderMaterial
+		var silhouette_shader := silhouette_material.shader if silhouette_material != null else null
+		check(silhouette_shader != null, "the locked silhouette shader loads")
+		if silhouette_shader != null:
+			check(silhouette_shader.code.contains("source.a") and silhouette_shader.code.contains("silhouette_color.rgb"), "the silhouette shader darkens RGB while keeping the coin alpha")
+	var detail_icon := gallery.get_node("%DetailIcon") as CollectibleIcon
+	check(detail_icon != null and detail_icon.locked, "the locked detail draws a silhouette")
+	check(detail_icon != null and detail_icon.definition.image == first.image, "the detail and the first slot use the same coin texture")
+	check(detail_icon != null and detail_icon.uses_coin_silhouette(), "the locked detail silhouettes the selected coin")
 
 	check(bool(manager.call("try_collect", FIRST_ID)), "gallery test collects the first item")
 	gallery.call("refresh")
@@ -282,10 +413,20 @@ func _case_gallery_logic() -> void:
 	check(gallery.call("get_selected_title") == first.title, "an unlocked item shows its title")
 	check(gallery.call("get_selected_category") == first.category, "an unlocked item shows its category")
 	check(gallery.call("get_selected_body") == first.content, "an unlocked item shows its full text")
+	var unlocked_slot := _slot_icon(gallery, 0)
+	check(unlocked_slot != null and not unlocked_slot.locked, "the first unlocked slot stops using the silhouette")
+	check(unlocked_slot != null and unlocked_slot.definition.image == first.image, "the unlocked slot shows the first coin")
+	check(unlocked_slot != null and not unlocked_slot.uses_coin_silhouette() and unlocked_slot.material == null, "the unlocked slot draws the coin with its original colors")
+	check(detail_icon != null and not detail_icon.locked, "the unlocked detail stops using the silhouette")
+	check(detail_icon != null and detail_icon.definition.image == first.image, "the unlocked detail shows the same first coin")
+	check(detail_icon != null and not detail_icon.uses_coin_silhouette() and detail_icon.material == null, "the unlocked detail draws the coin with its original colors")
 
 	gallery.call("select_item", 1)
 	check(bool(gallery.call("is_selected_locked")) and gallery.call("get_selected_title") == "???", "selecting a locked slot keeps it hidden")
 	check(not String(gallery.call("get_selected_body")).contains("texto a voz"), "selecting a locked slot does not leak its text")
+	check(detail_icon != null and detail_icon.locked, "selecting a locked slot restores the silhouette")
+	check(detail_icon != null and detail_icon.definition.image == _definitions()[1].image, "the locked detail still references its own coin")
+	check(detail_icon != null and detail_icon.uses_coin_silhouette(), "the restored silhouette still uses the selected coin")
 	check(gallery.call("get_slot_count") == 6, "the full catalog remains visible with one unlocked item")
 
 	var detail_text := gallery.get_node("%DetailText") as RichTextLabel
@@ -294,6 +435,27 @@ func _case_gallery_logic() -> void:
 	await process_frame
 	var scroll_bar := detail_scroll.get_v_scroll_bar()
 	check(scroll_bar.max_value > scroll_bar.page, "a long detail text becomes scrollable")
+
+	var fallback_definition := CollectibleDefinition.new()
+	fallback_definition.id = "missing_image_test"
+	fallback_definition.title = "Sin imagen"
+	fallback_definition.image = null
+	var fallback_icon := CollectibleIcon.new()
+	fallback_icon.size = Vector2(62.0, 62.0)
+	fallback_icon.set_definition(fallback_definition, false)
+	holder.add_child(fallback_icon)
+	var locked_fallback_icon := CollectibleIcon.new()
+	locked_fallback_icon.size = Vector2(62.0, 62.0)
+	locked_fallback_icon.set_definition(fallback_definition, true)
+	holder.add_child(locked_fallback_icon)
+	await process_frame
+	check(fallback_icon.definition == fallback_definition and fallback_icon.definition.image == null, "a missing image keeps the gallery fallback path")
+	check(not fallback_icon.uses_coin_silhouette() and fallback_icon.material == null, "an unlocked missing image keeps the procedural fallback")
+	check(not locked_fallback_icon.uses_coin_silhouette() and locked_fallback_icon.material == null, "a locked missing image keeps the generic silhouette fallback")
+	check(gallery.call("get_slot_count") == 6, "a missing image does not change the catalog or slot count")
+	fallback_icon.queue_free()
+	locked_fallback_icon.queue_free()
+	await process_frame
 
 	holder.queue_free()
 	await process_frame
