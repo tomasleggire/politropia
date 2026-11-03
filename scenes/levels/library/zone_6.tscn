@@ -1,7 +1,6 @@
 [gd_scene format=4 uid="uid://fvobcn8y45k4"]
 
 [ext_resource type="Texture2D" uid="uid://croiudofpxjg2" path="res://assets/art/library/Backgrounds/background2.png" id="1_d1iv4"]
-[ext_resource type="Script" uid="uid://c1nbk0diqf56p" path="res://scripts/levels/level_objects.gd" id="1_nwq11"]
 [ext_resource type="Texture2D" uid="uid://c40vc3xmgce3c" path="res://assets/art/library/Walls/walls_library.png" id="2_e58f3"]
 [ext_resource type="Texture2D" uid="uid://bqrgujvddynkl" path="res://assets/art/library/Walls/window_library.png" id="3_kacut"]
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="4_nxnoi"]
@@ -14240,7 +14239,6 @@ sources/0 = SubResource("TileSetAtlasSource_211o3")
 size = Vector2(1966, 724)
 
 [node name="LibraryZone6" type="Node2D" unique_id=424136144]
-script = ExtResource("1_nwq11")
 
 [node name="ParallaxBackdrop" parent="." unique_id=537028092 instance=ExtResource("par_back")]
 

@@ -12,7 +12,9 @@
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro_2.tscn" id="8_y8mnw"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="10_y8mnw"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="12_gkqv4"]
+[ext_resource type="PackedScene" uid="uid://xipvhi7nu2g" path="res://scenes/world/secret_chest.tscn" id="13_k6qi5"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="13_rh6b6"]
+[ext_resource type="PackedScene" uid="uid://t5snr0d4egcd" path="res://scenes/world/book_secondary_mission.tscn" id="14_j0dta"]
 [ext_resource type="PackedScene" uid="uid://dmth8yaq1mat2" path="res://scenes/enemies/mathematician_enemy.tscn" id="18_p4w6w"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
@@ -14351,6 +14353,11 @@ radius = 115.0
 flicker_amount = 0.07
 phase_offset = 9.2
 
+[node name="SecretChest" parent="." unique_id=703667144 instance=ExtResource("13_k6qi5")]
+position = Vector2(1613, 206)
+reward_scene = ExtResource("14_j0dta")
+reward_offset = Vector2(100, 25)
+
 [node name="Player" parent="." unique_id=1611018514 instance=ExtResource("4_fcwr3")]
 position = Vector2(409, 829)
 
@@ -14364,11 +14371,6 @@ max_fall_speed = 1400.0
 
 [node name="BookFlyer2" parent="." unique_id=1488631679 instance=ExtResource("8_0xytk")]
 position = Vector2(145, 692)
-knockback_from_player_attacks = true
-max_fall_speed = 1400.0
-
-[node name="BookFlyer3" parent="." unique_id=1293946812 instance=ExtResource("8_0xytk")]
-position = Vector2(1450, 234)
 knockback_from_player_attacks = true
 max_fall_speed = 1400.0
 
