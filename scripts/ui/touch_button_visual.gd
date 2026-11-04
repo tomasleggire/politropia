@@ -13,7 +13,6 @@ enum Icon { JUMP, DASH, ATTACK, INTERACT, FOCUS, HYPERFOCUS }
 		queue_redraw()
 
 var is_pressed := false
-var is_toggled := false
 
 
 func set_button_state(pressed: bool) -> void:
@@ -23,19 +22,11 @@ func set_button_state(pressed: bool) -> void:
 	queue_redraw()
 
 
-func set_button_toggled(toggled: bool) -> void:
-	if is_toggled == toggled:
-		return
-	is_toggled = toggled
-	queue_redraw()
-
-
 func _draw() -> void:
 	var center := size * 0.5
 	var radius := size.x * 0.5
-	var active := is_pressed or is_toggled
-	var rim := Color("e5a23b") if is_toggled else (Color("d8792e") if is_pressed else Color(0.25, 0.44, 0.64, 0.72))
-	var fill_alpha := 0.66 if active else 0.5
+	var rim := Color("d8792e") if is_pressed else Color(0.25, 0.44, 0.64, 0.72)
+	var fill_alpha := 0.66 if is_pressed else 0.5
 
 	draw_circle(center, radius + 2.0, Color(0.006, 0.012, 0.035, 0.42))
 	draw_circle(center, radius, Color(0.025, 0.055, 0.12, fill_alpha))

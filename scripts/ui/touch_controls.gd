@@ -10,7 +10,6 @@ extends CanvasLayer
 ## very quick tap can never be missed by is_action_just_pressed's same-frame
 ## edge (see Player.request_jump/request_dash).
 
-signal hyperfocus_toggled(active: bool)
 signal hyperfocus_pressed
 
 @export var force_visible := false
@@ -40,7 +39,6 @@ var _dash_touch_id := -1
 var _interact_touch_id := -1
 var _focus_touch_id := -1
 var _hyperfocus_touch_id := -1
-var _hyperfocus_active := false
 var _player: Player
 var _interact_sources: Array[Object] = []
 
@@ -384,38 +382,26 @@ func _end_focus() -> void:
 		_focus_button.call(&"set_button_state", false)
 
 
-## -- Hyperfocus button (toggled ability) -----------------------------------
+## -- Hyperfocus button (single-tap ability) --------------------------------
 
 func set_hyperfocus_available(available: bool) -> void:
 	if is_instance_valid(_hyperfocus_button):
 		_hyperfocus_button.visible = available
-	if not available and _hyperfocus_active:
-		set_hyperfocus_active(false)
-
-
-func set_hyperfocus_active(active: bool) -> void:
-	if _hyperfocus_active == active:
-		return
-	_hyperfocus_active = active
-	if is_instance_valid(_hyperfocus_button):
-		_hyperfocus_button.call(&"set_button_toggled", _hyperfocus_active)
-	hyperfocus_toggled.emit(_hyperfocus_active)
-
-
-func is_hyperfocus_active() -> bool:
-	return _hyperfocus_active
+	if not available and _hyperfocus_touch_id >= 0:
+		_end_hyperfocus()
 
 
 func _begin_hyperfocus(index: int) -> void:
 	_hyperfocus_touch_id = index
+	Input.action_press(&"skill")
 	if is_instance_valid(_hyperfocus_button):
 		_hyperfocus_button.call(&"set_button_state", true)
-	set_hyperfocus_active(not _hyperfocus_active)
 	hyperfocus_pressed.emit()
 
 
 func _end_hyperfocus() -> void:
 	_hyperfocus_touch_id = -1
+	Input.action_release(&"skill")
 	if is_instance_valid(_hyperfocus_button):
 		_hyperfocus_button.call(&"set_button_state", false)
 
