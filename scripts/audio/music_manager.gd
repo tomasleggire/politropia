@@ -30,6 +30,10 @@ func play_gameplay_music() -> void:
 	_play_music(GAMEPLAY_MUSIC, gameplay_volume_db)
 
 
+func play_boss_music() -> void:
+	_play_music(BOSS_MUSIC, boss_volume_db)
+
+
 func stop_music() -> void:
 	_player.stop()
 	_player.stream = null

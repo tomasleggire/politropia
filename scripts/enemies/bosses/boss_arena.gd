@@ -473,6 +473,7 @@ func _on_player_died() -> void:
 	_kill(_intro_tween)
 	if is_instance_valid(_boss):
 		_boss.set_ai_active(false)
+	MusicManager.play_gameplay_music()
 
 
 func _on_player_respawned() -> void:
