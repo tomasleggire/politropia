@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://cvytubfx262a6" path="res://scripts/camera/camara_jugador.gd" id="7_0owmy"]
 [ext_resource type="AudioStream" uid="uid://sewt31va1en3" path="res://assets/audio/jump_hup.wav" id="7_5gtgg"]
 [ext_resource type="Script" uid="uid://crlgiaggiu2j3" path="res://scripts/player/player_slash_vfx.gd" id="7_slash_vfx"]
+[ext_resource type="Script" path="res://scripts/player/revelation_burst.gd" id="11_revelation_burst"]
 [ext_resource type="AudioStream" uid="uid://bknhhl31ufan7" path="res://assets/audio/dash.wav" id="8_5gtgg"]
 [ext_resource type="Shader" uid="uid://y4try36ijkix" path="res://shaders/luz_rim_light.gdshader" id="8_rim"]
 [ext_resource type="AudioStream" uid="uid://cctfr24jtcr0j" path="res://assets/audio/stick_attack.wav" id="9_h17s1"]
@@ -74,6 +75,10 @@ animation = &""
 [node name="SlashVfx" type="Node2D" parent="." unique_id=883827761]
 z_index = 1
 script = ExtResource("7_slash_vfx")
+
+[node name="RevelationBurst" type="Node2D" parent="." unique_id=1880124017]
+z_index = -1
+script = ExtResource("11_revelation_burst")
 
 [node name="SfxLand" type="AudioStreamPlayer" parent="." unique_id=2107798141]
 stream = ExtResource("5_5gtgg")
