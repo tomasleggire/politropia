@@ -75,6 +75,59 @@ func is_collected() -> bool:
 	return _collected
 
 
+## Stops the idle bob so a delivery animation can control the node.
+func suspend_idle_motion() -> void:
+	if _bob_tween != null and _bob_tween.is_valid():
+		_bob_tween.kill()
+	_bob_tween = null
+
+
+## Restarts the idle bob from the current position.
+func resume_idle_motion() -> void:
+	if _collected or not is_inside_tree():
+		return
+	_base_y = position.y
+	_start_bob()
+
+
+## Plays the NPC hand-over intro. The pickup must already be in the tree at
+## `from`. It fades/scales in, flies in a small arc, bounces once and only then
+## becomes collectable.
+func play_delivery(from: Vector2, landing: Vector2, arc_height: float, duration: float) -> void:
+	if _collected or not is_inside_tree():
+		return
+	suspend_idle_motion()
+	_set_collect_enabled(false)
+	global_position = from
+	scale = Vector2(0.35, 0.35)
+	modulate.a = 0.0
+
+	var total := maxf(duration, 0.35)
+	var appear := minf(0.14, total * 0.22)
+	var flight := total * 0.52
+	var bounce := total * 0.14
+	var settle := maxf(total - appear - flight - bounce * 2.0, 0.05)
+	var apex := from.lerp(landing, 0.5) + Vector2(0.0, -maxf(arc_height, 2.0))
+
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "modulate:a", 1.0, appear)
+	tween.parallel().tween_property(self, "scale", Vector2.ONE, appear).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(self, "global_position", apex, flight * 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "global_position", landing, flight * 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	var bounce_height := maxf(arc_height * 0.22, 2.0)
+	tween.tween_property(self, "global_position:y", landing.y - bounce_height, bounce).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "global_position:y", landing.y, bounce).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_interval(settle)
+	await tween.finished
+
+	if not is_inside_tree() or _collected:
+		return
+	global_position = landing
+	_set_collect_enabled(true)
+	resume_idle_motion()
+
+
 func _manager() -> Node:
 	return get_node_or_null("/root/Collectibles")
 
@@ -87,11 +140,13 @@ func _apply_visuals() -> void:
 		return
 
 	_icon.texture = definition.image
-	_icon.visible = true
 	var texture_size := definition.image.get_size()
 	var largest := maxf(texture_size.x, texture_size.y)
 	if largest > 0.0:
 		_icon.scale = Vector2.ONE * (ICON_PIXELS / largest)
+	# Show the icon only after its final scale is set: otherwise the renderer can
+	# present one frame of the raw texture at full size when the node enters.
+	_icon.visible = true
 	_placeholder.visible = false
 
 
@@ -124,6 +179,12 @@ func _on_body_entered(body: Node2D) -> void:
 
 	collected.emit(id)
 	_play_collect_animation()
+
+
+func _set_collect_enabled(enabled: bool) -> void:
+	monitoring = enabled
+	if _collision != null:
+		_collision.set_deferred("disabled", not enabled)
 
 
 func _deactivate() -> void:

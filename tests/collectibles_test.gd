@@ -8,11 +8,13 @@ extends SceneTree
 const PICKUP_SCENE := preload("res://scenes/world/collectible_pickup.tscn")
 const GALLERY_SCENE := preload("res://scenes/ui/collectibles_gallery.tscn")
 const PLAYER_SCENE := preload("res://scenes/player/player.tscn")
+const BLIND_NPC_SCENE := preload("res://scenes/world/blind_npc.tscn")
 
 const GALLERY_PATH := "res://scenes/ui/collectibles_gallery.tscn"
 const MENU_PATH := "res://scenes/ui/main_menu.tscn"
 const ZONE_1 := "res://scenes/levels/library/zone_1.tscn"
 const ZONE_2 := "res://scenes/levels/library/zone_2.tscn"
+const REWARD_DEFINITION_PATH := "res://data/collectibles/definitions/ruby_owl_read_aloud.tres"
 const FIRST_ID := "ruby_owl_read_aloud"
 const SECOND_ID := "emerald_bull_clear_text"
 const FLOOR_RECT := Rect2(-600.0, 0.0, 1200.0, 100.0)
@@ -68,10 +70,14 @@ func _run() -> void:
 	_case_service()
 	_case_coin_textures()
 	await _case_pickup()
+	await _case_blind_reward()
 	await _case_scene_reload()
 	await _case_gallery_logic()
 	await _case_menu_integration()
 	_manager().call("clear")
+	var progress := root.get_node_or_null("BlindQuestProgress")
+	if progress != null:
+		progress.call("clear")
 
 
 func _case_service() -> void:
@@ -316,6 +322,168 @@ func _case_pickup() -> void:
 	manager.call("clear")
 
 
+func _reward_pickups() -> Array:
+	var result: Array = []
+	for node in get_nodes_in_group(CollectiblePickup.PICKUP_GROUP):
+		if node is CollectiblePickup and not node.is_queued_for_deletion():
+			result.append(node)
+	return result
+
+
+func _spawn_blind_npc(at: Vector2) -> BlindNPC:
+	var npc := BLIND_NPC_SCENE.instantiate() as BlindNPC
+	npc.position = at
+	_rig.add_child(npc)
+	return npc
+
+
+func _case_blind_reward() -> void:
+	print("CASE blind npc reward")
+	var manager := _manager()
+	manager.call("clear")
+	var progress := root.get_node_or_null("BlindQuestProgress")
+	check(progress != null, "BlindQuestProgress autoload exists")
+	if progress == null:
+		return
+	progress.call("clear")
+	await _build_rig()
+
+	var npc := _spawn_blind_npc(Vector2(0.0, -128.625))
+	await _frames(4)
+
+	# The first dialogue accepts the mission but must not create the reward.
+	npc._start_dialogue()
+	await process_frame
+	check(npc.speech_bubble.visible, "the first dialogue starts")
+	check(_reward_pickups().is_empty(), "no reward is created when the first dialogue starts")
+	npc.speech_bubble.finished.emit()
+	await process_frame
+	check(npc.quest_accepted, "the first dialogue accepts the mission")
+	check(not npc.quest_completed, "the first dialogue does not complete the mission")
+	check(bool(progress.call("is_accepted")) and not bool(progress.call("is_completed")), "the accepted state is kept for the next visit")
+	check(_reward_pickups().is_empty(), "accepting the mission does not create a reward")
+	check(not bool(manager.call("has_collected", FIRST_ID)), "the coin stays locked after accepting")
+
+	# The final dialogue must not deliver while it is still on screen.
+	npc._start_dialogue()
+	await process_frame
+	check(npc.speech_bubble.visible, "the final dialogue starts")
+	check(_reward_pickups().is_empty(), "no reward is created while the final dialogue is playing")
+	check(not bool(manager.call("has_collected", FIRST_ID)), "the coin stays locked while the final dialogue plays")
+
+	# Finishing it delivers exactly one physical pickup.
+	npc.speech_bubble.finished.emit()
+	await process_frame
+	check(npc.quest_completed, "the final dialogue completes the mission")
+	check(bool(progress.call("is_completed")) and bool(progress.call("is_reward_granted")), "the completed and granted states are recorded")
+	var pickups := _reward_pickups()
+	check(pickups.size() == 1, "finishing the final dialogue creates exactly one pickup")
+	if pickups.is_empty():
+		_free_rig()
+		progress.call("clear")
+		return
+	var reward := pickups[0] as CollectiblePickup
+	check(reward.definition != null and reward.definition.resource_path == REWARD_DEFINITION_PATH, "the reward uses exactly ruby_owl_read_aloud.tres")
+	check(reward.collectible_id() == FIRST_ID, "the reward pickup uses the ruby owl id")
+	check(not bool(manager.call("has_collected", FIRST_ID)), "the coin is not unlocked until the player touches it")
+	check(not reward.monitoring, "the reward cannot be collected while it is being delivered")
+
+	# The hand-over starts near the NPC, moves, and lands above the floor.
+	var origin := npc._delivery_origin()
+	var landing := npc._delivery_landing()
+	check(reward.global_position.distance_to(origin) < 20.0, "the coin appears near the NPC's hands")
+	check(origin.distance_to(npc.global_position) < 150.0, "the delivery starts close to the NPC")
+	check(landing.y < npc._floor_global_y(), "the landing point stays above the floor")
+	await create_timer(0.2).timeout
+	check(reward.global_position.distance_to(origin) > 1.0, "the coin moves during the delivery")
+	check(reward.global_position.y < landing.y + 1.0, "the coin does not cross the floor during the arc")
+	await create_timer(0.8).timeout
+	check(reward.monitoring, "the reward becomes collectable after landing")
+	check(reward.global_position.distance_to(landing) < 8.0, "the coin settles at the landing point")
+	check(reward.global_position.y <= npc._floor_global_y(), "the settled coin stays above the floor")
+	check(is_equal_approx(reward.modulate.a, 1.0), "the coin is fully visible after landing")
+
+	# Repeating the event or talking again must not duplicate the reward.
+	npc.speech_bubble.finished.emit()
+	await process_frame
+	check(_reward_pickups().size() == 1, "repeating the finished event does not duplicate the reward")
+	npc._start_dialogue()
+	await process_frame
+	npc.speech_bubble.finished.emit()
+	await process_frame
+	check(_reward_pickups().size() == 1, "talking again does not duplicate the reward")
+
+	# Leaving the room before touching the coin recovers it on return.
+	_player.global_position = Vector2(-400.0, -10.0)
+	await _frames(4)
+	npc.queue_free()
+	reward.queue_free()
+	await _frames(4)
+	check(_reward_pickups().is_empty(), "the old room loses its pickup")
+	var returning_npc := _spawn_blind_npc(Vector2(0.0, -128.625))
+	await _frames(4)
+	check(returning_npc.quest_accepted and returning_npc.quest_completed, "the returning NPC restores the completed quest")
+	var recovered := _reward_pickups()
+	check(recovered.size() == 1, "a pending reward is restored when Luz returns")
+	if recovered.size() == 1:
+		var recovered_pickup := recovered[0] as CollectiblePickup
+		check(recovered_pickup.collectible_id() == FIRST_ID, "the recovered pickup is still the ruby owl")
+		check(not bool(manager.call("has_collected", FIRST_ID)), "the recovered coin is still locked")
+		check(not recovered_pickup.is_collected(), "the recovered coin waits for contact")
+		check(recovered_pickup.global_position.distance_to(returning_npc._delivery_landing()) < 8.0, "the recovered coin waits on the landing spot")
+
+		# The player touches the recovered coin to unlock it.
+		_player.global_position = recovered_pickup.global_position + Vector2(0.0, 20.0)
+		await _frames(4)
+		check(bool(manager.call("has_collected", FIRST_ID)), "touching the recovered coin unlocks it")
+		check(recovered_pickup.is_collected(), "the recovered pickup registers the contact")
+
+		# A collected reward never appears again on a new visit.
+		await create_timer(0.4).timeout
+		_player.global_position = Vector2(-400.0, -10.0)
+		await _frames(4)
+		returning_npc.queue_free()
+		for node in _reward_pickups():
+			node.queue_free()
+		await _frames(4)
+		var after_collect_npc := _spawn_blind_npc(Vector2(0.0, -128.625))
+		await _frames(4)
+		check(after_collect_npc.quest_completed, "the returning NPC still knows the mission is complete")
+		check(_reward_pickups().is_empty(), "a collected reward does not appear again")
+
+		# Removing the NPC in the middle of the hand-over must not remove the
+		# physical coin: it lives in the level, not as an NPC child.
+		after_collect_npc.queue_free()
+		await _frames(4)
+		manager.call("clear")
+		progress.call("clear")
+		var removal_npc := _spawn_blind_npc(Vector2(0.0, -128.625))
+		await _frames(4)
+		var removal_landing := removal_npc._delivery_landing()
+		removal_npc._start_dialogue()
+		await process_frame
+		removal_npc.speech_bubble.finished.emit()
+		await process_frame
+		removal_npc._start_dialogue()
+		await process_frame
+		removal_npc.speech_bubble.finished.emit()
+		await process_frame
+		var mid_delivery := _reward_pickups()
+		check(mid_delivery.size() == 1, "the reward exists before the NPC is removed")
+		removal_npc.queue_free()
+		await _frames(2)
+		check(_reward_pickups().size() == 1, "removing the NPC during delivery keeps the physical reward")
+		await create_timer(0.8).timeout
+		if mid_delivery.size() == 1:
+			var orphan := mid_delivery[0] as CollectiblePickup
+			check(orphan.monitoring, "the orphaned reward still becomes collectable")
+			check(orphan.global_position.distance_to(removal_landing) < 8.0, "the orphaned reward still settles on the floor")
+
+	_free_rig()
+	progress.call("clear")
+	manager.call("clear")
+
+
 func _wait_scene() -> void:
 	for i in 5:
 		await process_frame
@@ -478,9 +646,15 @@ func _case_menu_integration() -> void:
 	check((menu.get_node("%Continue") as Button).disabled, "Continue stays disabled")
 	check((menu.get_node("%Achievements") as Button).text.strip_edges() == "LOGROS", "Achievements keeps its label")
 	manager.call("try_collect", FIRST_ID)
+	var blind_progress := root.get_node_or_null("BlindQuestProgress")
+	if blind_progress != null:
+		blind_progress.call("accept")
+		blind_progress.call("complete")
+		blind_progress.call("grant_reward")
 	menu.call("_reset_new_game_progress")
 	check(not bool(manager.call("has_collected", FIRST_ID)), "New Game reset clears collectibles")
 	check(int(manager.call("get_collected_count")) == 0, "New Game leaves collectible progress empty")
+	check(blind_progress != null and not bool(blind_progress.call("is_accepted")) and not bool(blind_progress.call("is_completed")) and not bool(blind_progress.call("is_reward_granted")), "New Game reset clears the blind quest reward state")
 
 	;(menu.get_node("%Collectables") as Button).pressed.emit()
 	await _wait_scene()

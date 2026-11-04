@@ -180,7 +180,8 @@ func _reset_new_game_progress() -> void:
 		"/root/MapProgress",
 		"/root/SecretProgress",
 		"/root/AbilityProgress",
-		"/root/Collectibles"
+		"/root/Collectibles",
+		"/root/BlindQuestProgress"
 	]
 
 	for service_path in service_paths:
