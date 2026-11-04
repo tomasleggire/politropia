@@ -16,6 +16,8 @@
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="13_rh6b6"]
 [ext_resource type="PackedScene" uid="uid://t5snr0d4egcd" path="res://scenes/world/book_secondary_mission.tscn" id="14_j0dta"]
 [ext_resource type="PackedScene" uid="uid://dmth8yaq1mat2" path="res://scenes/enemies/mathematician_enemy.tscn" id="18_p4w6w"]
+[ext_resource type="PackedScene" path="res://scenes/world/collectible_pickup.tscn" id="21_k4tlx"]
+[ext_resource type="Resource" path="res://data/collectibles/definitions/emerald_bull_clear_text.tres" id="22_vjm1f"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
@@ -14435,3 +14437,7 @@ target_door_id = 8
 [node name="MathematicianEnemy" parent="." unique_id=1401423410 instance=ExtResource("18_p4w6w")]
 position = Vector2(579, 305)
 max_health = 3
+
+[node name="CollectiblePickup" parent="." unique_id=791671098 instance=ExtResource("21_k4tlx")]
+position = Vector2(1151, 470)
+definition = ExtResource("22_vjm1f")
