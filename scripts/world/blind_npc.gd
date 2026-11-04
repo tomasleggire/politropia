@@ -1,12 +1,14 @@
 class_name BlindNPC
 extends CharacterBody2D
 
+signal hyperfocus_unlocked
+
 var initial_dialogue: Array[String] = []
 var final_dialogue: Array[String] = []
 
 @onready var interaction_area: Area2D = $InteractionArea
 @onready var speech_bubble: SpeechBubble = $SpeechBubble
-@onready var prompt_icon: Control = $PromptIcon
+@onready var prompt_icon: Control = get_node_or_null("PromptIcon")
 @onready var sprite: AnimatedSprite2D = $AnimatedSprite2D
 
 var _player_in_range := false
@@ -15,6 +17,7 @@ var quest_accepted := false
 var quest_completed := false
 
 func _ready() -> void:
+	add_to_group(&"interactable")
 	_setup_dialogues()
 	
 	if prompt_icon:
@@ -26,6 +29,16 @@ func _ready() -> void:
 	
 	if speech_bubble:
 		speech_bubble.finished.connect(_on_dialogue_finished)
+
+	var touch := get_node_or_null("/root/TouchControls")
+	if touch != null and touch.has_method(&"set_hyperfocus_available"):
+		hyperfocus_unlocked.connect(touch.set_hyperfocus_available.bind(true))
+
+
+func _exit_tree() -> void:
+	var touch := get_node_or_null("/root/TouchControls")
+	if touch != null and touch.has_method(&"set_interact_available"):
+		touch.set_interact_available(self, false)
 
 # Construcción de los textos con la paleta unificada de accesibilidad
 func _setup_dialogues() -> void:
@@ -109,8 +122,28 @@ func _setup_dialogues() -> void:
 	
 	final_dialogue = [f1]
 
+func _unhandled_input(event: InputEvent) -> void:
+	if _player_in_range and not _is_talking and event.is_action_pressed(&"interact"):
+		get_viewport().set_input_as_handled()
+		_start_dialogue()
+
+
+func request_interact() -> bool:
+	if _player_in_range and not _is_talking:
+		_start_dialogue()
+		return true
+	return false
+
+
+func _refresh_touch_interact() -> void:
+	var touch := get_node_or_null("/root/TouchControls")
+	if touch != null and touch.has_method(&"set_interact_available"):
+		touch.set_interact_available(self, _player_in_range and not _is_talking)
+
+
 func _start_dialogue() -> void:
 	_is_talking = true
+	_refresh_touch_interact()
 	if prompt_icon:
 		prompt_icon.hide()
 		
@@ -136,6 +169,7 @@ func _start_dialogue() -> void:
 
 func _on_dialogue_finished() -> void:
 	_is_talking = false
+	_refresh_touch_interact()
 	
 	if not quest_accepted:
 		quest_accepted = true
@@ -143,6 +177,8 @@ func _on_dialogue_finished() -> void:
 	elif has_required_book() and not quest_completed:
 		quest_completed = true
 		_give_reward()
+
+	hyperfocus_unlocked.emit()
 
 func has_required_book() -> bool:
 	return true
@@ -153,6 +189,7 @@ func _give_reward() -> void:
 func _on_body_entered(body: Node2D) -> void:
 	if body.is_in_group("player") or body is Player or "Luz" in body.name or "Player" in body.name:
 		_player_in_range = true
+		_refresh_touch_interact()
 		if not _is_talking:
 			_start_dialogue()
 
@@ -160,3 +197,4 @@ func _on_body_exited(body: Node2D) -> void:
 	if body.is_in_group("player") or body is Player or "Luz" in body.name or "Player" in body.name:
 		_player_in_range = false
 		_is_talking = false
+		_refresh_touch_interact()

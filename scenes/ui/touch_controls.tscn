@@ -120,6 +120,7 @@ script = ExtResource("3_button")
 icon = 4
 
 [node name="HyperfocusButton" type="Control" parent="Root" unique_id=1266409217]
+visible = false
 custom_minimum_size = Vector2(48, 48)
 layout_mode = 1
 anchors_preset = 3

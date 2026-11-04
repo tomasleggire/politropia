@@ -46,6 +46,7 @@ var _attack_touch_id := -1
 var _attack_start := Vector2.ZERO
 var _attack_timer := 0.0
 var _attack_upgraded := false
+var _hyperfocus_available := false
 
 var _held_actions := {
 	&"move_left": false,
@@ -68,6 +69,7 @@ func _ready() -> void:
 	add_to_group(&"touch_controls")
 	visible = _platform_wants_controls()
 	_position_pad_at_rest()
+	set_hyperfocus_available(_hyperfocus_available)
 	_bind_found_player.call_deferred()
 
 
@@ -385,10 +387,15 @@ func _end_focus() -> void:
 ## -- Hyperfocus button (single-tap ability) --------------------------------
 
 func set_hyperfocus_available(available: bool) -> void:
+	_hyperfocus_available = available
 	if is_instance_valid(_hyperfocus_button):
 		_hyperfocus_button.visible = available
 	if not available and _hyperfocus_touch_id >= 0:
 		_end_hyperfocus()
+
+
+func unlock_hyperfocus() -> void:
+	set_hyperfocus_available(true)
 
 
 func _begin_hyperfocus(index: int) -> void:

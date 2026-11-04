@@ -42,8 +42,8 @@ func _test_minigame() -> void:
 	print("\n--- MINIGAME TESTS ---")
 
 	var game = MINIGAME_SCENE.instantiate()
-	game.target_word = "BIBLIOTECA"
-	game.syllables = ["BI", "BLO", "TE", "CA"]
+	game.target_word = "LIBRO"
+	game.syllables = ["LI", "BRO"]
 	root.add_child(game)
 
 	await process_frame
@@ -146,6 +146,10 @@ func _test_chest(test_root: Node2D) -> void:
 		"Interaction starts disabled"
 	)
 
+	check(chest.is_in_group(&"interactable"), "Chest belongs to interactable group")
+	check(not chest.can_interact(), "Chest cannot be interacted with while hidden")
+	check(not chest.request_interact(), "request_interact returns false while hidden")
+
 	# Reveal chest.
 	chest.reveal()
 
@@ -154,9 +158,21 @@ func _test_chest(test_root: Node2D) -> void:
 		chest.interaction_area.monitoring,
 		"Revealing chest enables interaction"
 	)
+	check(not chest.can_interact(), "Chest cannot be interacted with if player is not nearby")
+
+	# Simulate player nearby.
+	chest.player_nearby = true
+	chest._refresh_interaction()
+	check(chest.can_interact(), "Chest can be interacted when revealed and player is nearby")
+	var touch := root.get_node_or_null("TouchControls")
+	if touch != null and touch.has_node("Root/InteractButton"):
+		var btn: Control = touch.get_node("Root/InteractButton")
+		check(btn.visible, "Touch interact button is visible when chest is interactable")
 
 	# Simulate an unsuccessful minigame result.
 	chest.minigame_active = true
+	chest._refresh_interaction()
+	check(not chest.can_interact(), "Chest cannot be interacted with during minigame")
 	chest._on_minigame_completed(false)
 
 	check(
@@ -167,6 +183,7 @@ func _test_chest(test_root: Node2D) -> void:
 		not chest.minigame_active,
 		"Failed minigame allows another attempt"
 	)
+	check(chest.can_interact(), "Chest can be interacted again after failed minigame")
 
 	# Simulate a successful result.
 	var opened_signal: Array[bool] = []
