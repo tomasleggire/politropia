@@ -21,6 +21,7 @@ connects_to = Array[String](["res://scenes/levels/library/zone_1.tscn", "res://s
 script = ExtResource("2_room")
 scene_path = "res://scenes/levels/library/zone_3.tscn"
 display_name = "Pozo de libros"
+map_rect = Rect2(75, 4, 30, 26)
 connects_to = Array[String](["res://scenes/levels/library/zone_2.tscn", "res://scenes/levels/library/zone_4.tscn"])
 
 [sub_resource type="Resource" id="Room_4"]
