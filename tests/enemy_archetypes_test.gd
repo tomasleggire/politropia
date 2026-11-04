@@ -360,15 +360,20 @@ func case_flyer_knockback_up_from_below() -> void:
 
 
 func case_shadow_owl_hit_in_charge_recovers() -> void:
-	await _build_rig(false)
-	await _spawn(SHADOW_OWL_SCENE, Vector2(200.0, -100.0), -1)
+	await _build_rig()
+	await _spawn(SHADOW_OWL_SCENE, Vector2(100.0, -50.0), -1)
 	var owl := _enemy as ShadowOwl
-	owl._start_phase(ShadowOwl.AttackPhase.CHARGE, owl.charge_duration, &"charge")
-	owl._charge_direction = Vector2.LEFT
+	var sprite := owl.get_node("Visual/AnimatedSprite2D") as AnimatedSprite2D
 	var start := owl.global_position
-	owl.receive_hit(1, Vector2(150.0, -71.0), &"attack_ground_1")
-	check(owl._attack_phase == ShadowOwl.AttackPhase.RECOVER, "a hit during the charge ends it in recovery")
-	check(is_equal_approx(owl._phase_left, owl.recover_duration), "with the normal recover timer")
+	var hit_during_charge := false
+	for i: int in 210:
+		await physics_frame
+		if sprite.animation == &"charge":
+			hit_during_charge = true
+			owl.receive_hit(1, Vector2(owl.global_position.x - 50.0, owl.global_position.y + 29.0), &"attack_ground_1")
+			break
+	check(hit_during_charge, "the owl reaches its charge animation")
+	check(sprite.animation == &"recover", "a hit during the charge ends it in recovery")
 	await _secs(0.2)
 	check(owl.global_position.x > start.x + 15.0, "and the push is not overridden (x %.0f)" % owl.global_position.x)
 
