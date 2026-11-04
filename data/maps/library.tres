@@ -21,7 +21,7 @@ connects_to = Array[String](["res://scenes/levels/library/zone_1.tscn", "res://s
 script = ExtResource("2_room")
 scene_path = "res://scenes/levels/library/zone_3.tscn"
 display_name = "Pozo de libros"
-map_rect = Rect2(75, 4, 21, 26)
+map_rect = Rect2(75, 4, 30, 26)
 connects_to = Array[String](["res://scenes/levels/library/zone_2.tscn", "res://scenes/levels/library/zone_4.tscn"])
 
 [sub_resource type="Resource" id="Room_4"]
@@ -64,10 +64,10 @@ landmark = 3
 [sub_resource type="Resource" id="Resource_se022"]
 script = ExtResource("2_room")
 scene_path = "uid://ceuqjn8ipsey5"
-display_name = "Jefe"
-map_rect = Rect2(116, -2, 20, 12)
+display_name = "Sala de lectura"
+map_rect = Rect2(116, -2, 40, 24)
 connects_to = Array[String](["uid://bt3m0cf4sgq7r"])
-landmark = 1
+landmark = 4
 metadata/_custom_type_script = "uid://dhj1rdo620ffd"
 
 [resource]

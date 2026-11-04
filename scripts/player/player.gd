@@ -32,6 +32,8 @@ signal rest_animation_finished(animation_name: StringName)
 signal rest_animation_frame_changed(animation_name: StringName, frame: int)
 signal open_eyes_activated
 
+@onready var _revelation_burst: RevelationBurst = $RevelationBurst
+
 enum ReturnPhase { NONE, OUT, IN }
 
 enum State {
@@ -695,6 +697,7 @@ func open_eyes() -> void:
 	##prueba##
 	_sprite.stop()
 	_enter_state(State.OPEN_EYES)##-->Funciona pero se tilda
+	_revelation_burst.play_burst()
 	##_enter_state(State.SKID)
 	##prueba##
 	open_eyes_activated.emit()

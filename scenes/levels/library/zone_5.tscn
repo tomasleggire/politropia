@@ -8,7 +8,9 @@
 [ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="7_nmpsk"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="8_sbedd"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_rbapt"]
+[ext_resource type="PackedScene" uid="uid://xipvhi7nu2g" path="res://scenes/world/secret_chest.tscn" id="11_6por8"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="11_expoe"]
+[ext_resource type="PackedScene" uid="uid://t5snr0d4egcd" path="res://scenes/world/book_secondary_mission.tscn" id="12_hx3dv"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="14_lhyta"]
 [ext_resource type="PackedScene" uid="uid://dmth8yaq1mat2" path="res://scenes/enemies/mathematician_enemy.tscn" id="20_6por8"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
@@ -14091,6 +14093,11 @@ base_energy = 0.85
 radius = 115.0
 flicker_amount = 0.07
 phase_offset = 9.2
+
+[node name="SecretChest" parent="." unique_id=703667144 instance=ExtResource("11_6por8")]
+position = Vector2(10, 115)
+reward_scene = ExtResource("12_hx3dv")
+reward_offset = Vector2(100, 25)
 
 [node name="Player" parent="." unique_id=1611018514 instance=ExtResource("8_sbedd")]
 position = Vector2(30, 170)
