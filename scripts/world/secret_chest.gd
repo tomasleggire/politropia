@@ -11,8 +11,15 @@ signal chest_failed
 @export_group("Reward")
 @export var reward_offset: Vector2 = Vector2(0, -24)
 
+@export_group("Revelation Path")
+## Intermediate platform centres in this chest's local coordinates.
+@export var revelation_waypoints: PackedVector2Array = PackedVector2Array()
+@export_range(1.0, 120.0, 1.0) var reveal_duration := 30.0
+
 @onready var interaction_area: Area2D = $InteractionArea
 @onready var sprite: Sprite2D = $Sprite2D
+@onready var _revelation_guide: RevelationGuide = $RevelationGuide
+@onready var _reveal_timer: Timer = $RevealTimer
 
 var player_nearby: bool = false
 var revealed: bool = false
@@ -22,6 +29,7 @@ var minigame_active: bool = false
 
 func _ready() -> void:
 	# Start hidden and disable interaction.
+	_reveal_timer.timeout.connect(hide_chest)
 	hide_chest()
 	
 	# Connect to the REVEAL skill signal 
@@ -46,20 +54,31 @@ func _process(_delta: float) -> void:
 
 # Called by the skill system when the chest is revealed.
 func reveal() -> void:
-	if revealed:
+	if not revealed:
+		revealed = true
+		show()
+		interaction_area.monitoring = true
+	if opened:
 		return
-
-	revealed = true
-	show()
-
-	interaction_area.monitoring = true
+	_reveal_timer.start(reveal_duration)
+	var player := get_tree().get_first_node_in_group("player") as Node2D
+	if player == null:
+		return
+	var route := PackedVector2Array([to_local(player.global_position)])
+	route.append_array(revelation_waypoints)
+	# The chest sprite is offset from this scene's origin.
+	route.append(sprite.position)
+	_revelation_guide.show_route(route)
 
 
 func hide_chest() -> void:
+	_reveal_timer.stop()
 	revealed = false
+	player_nearby = false
 	hide()
 
 	interaction_area.monitoring = false
+	_revelation_guide.hide_guide()
 
 
 func _on_body_entered(body: Node2D) -> void:
@@ -107,6 +126,8 @@ func open_chest() -> void:
 		return
 
 	opened = true
+	_reveal_timer.stop()
+	_revelation_guide.hide_guide()
 
 	drop_reward()
 	chest_opened.emit()
