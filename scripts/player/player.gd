@@ -412,6 +412,9 @@ var _health := 0
 var _input_locked := false
 var _meditating := false
 var _dead := false
+## True once the death beat handed the screen to the GameOver overlay. Stops a
+## second update from spawning another screen or falling back to an auto-respawn.
+var _game_over_requested := false
 var _hurt_left := 0.0
 var _invuln_left := 0.0
 var _dash_grace_left := 0.0
@@ -2269,6 +2272,8 @@ func _update_hurt(delta: float) -> void:
 
 
 func _begin_death() -> void:
+	if _dead:
+		return
 	var camera := get_viewport().get_camera_2d()
 	if camera != null and camera.has_method(&"cancel_shake"):
 		camera.call(&"cancel_shake")
@@ -2293,7 +2298,21 @@ func _update_dead(delta: float) -> void:
 	var fade := clampf(_state_time / maxf(death_fade_time, 0.001), 0.0, 1.0)
 	_set_sprite_alpha(lerpf(_base_alpha, 0.0, fade))
 	if _state_time >= death_fade_time:
-		_respawn_after_death()
+		_finish_death_beat()
+
+
+## The death animation is over. In a running game the GameOver autoload takes
+## over and pauses the tree; standalone uses (tools, tests without a current
+## scene) keep the old automatic respawn so the player is never left stuck.
+func _finish_death_beat() -> void:
+	if _game_over_requested:
+		return
+	var game_over := get_node_or_null("/root/GameOver")
+	if game_over != null and game_over.has_method(&"show_game_over"):
+		if bool(game_over.call(&"show_game_over", self)):
+			_game_over_requested = true
+			return
+	_respawn_after_death()
 
 
 ## Wakes Luz at the active checkpoint of this scene (or where the level
@@ -2729,8 +2748,15 @@ func set_checkpoint(checkpoint: Vector2) -> void:
 	_spawn_position = checkpoint
 
 
+## Wakes Luz through the same post-death path the automatic respawn used. The
+## GameOver overlay's REINTENTAR button calls this after it resumes the tree.
+func respawn_after_game_over() -> void:
+	_respawn_after_death()
+
+
 func respawn() -> void:
 	_dead = false
+	_game_over_requested = false
 	_has_safe_ground = false
 	exit_meditation()
 	restore_full_health()

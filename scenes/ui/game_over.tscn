@@ -1,0 +1,231 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/game_over.gd" id="1_script"]
+[ext_resource type="Theme" path="res://assets/ui/gothic_theme.tres" id="2_theme"]
+
+[sub_resource type="StyleBoxFlat" id="RetryNormal"]
+content_margin_left = 18.0
+content_margin_top = 10.0
+content_margin_right = 18.0
+content_margin_bottom = 10.0
+bg_color = Color(0.098, 0.137, 0.216, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.878, 0.725, 0.31, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+shadow_color = Color(0, 0, 0, 0.55)
+shadow_size = 5
+
+[sub_resource type="StyleBoxFlat" id="RetryHover"]
+content_margin_left = 18.0
+content_margin_top = 10.0
+content_margin_right = 18.0
+content_margin_bottom = 10.0
+bg_color = Color(0.137, 0.196, 0.31, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.976, 0.835, 0.42, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+shadow_color = Color(0, 0, 0, 0.55)
+shadow_size = 6
+
+[sub_resource type="StyleBoxFlat" id="RetryPressed"]
+content_margin_left = 18.0
+content_margin_top = 10.0
+content_margin_right = 18.0
+content_margin_bottom = 10.0
+bg_color = Color(0.051, 0.078, 0.129, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.976, 0.835, 0.42, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="RetryFocus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.976, 0.835, 0.42, 0.65)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="SecondaryNormal"]
+content_margin_left = 14.0
+content_margin_top = 8.0
+content_margin_right = 14.0
+content_margin_bottom = 8.0
+bg_color = Color(0.035, 0.051, 0.086, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.412, 0.388, 0.333, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="SecondaryHover"]
+content_margin_left = 14.0
+content_margin_top = 8.0
+content_margin_right = 14.0
+content_margin_bottom = 8.0
+bg_color = Color(0.059, 0.086, 0.141, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.694, 0.604, 0.416, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="SecondaryPressed"]
+content_margin_left = 14.0
+content_margin_top = 8.0
+content_margin_right = 14.0
+content_margin_bottom = 8.0
+bg_color = Color(0.024, 0.035, 0.059, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.694, 0.604, 0.416, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="SecondaryFocus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.878, 0.725, 0.31, 0.45)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="GameOver" type="CanvasLayer"]
+process_mode = 3
+layer = 130
+script = ExtResource("1_script")
+
+[node name="Overlay" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Backdrop" type="ColorRect" parent="Overlay"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.008, 0.009, 0.014, 0)
+
+[node name="Center" type="CenterContainer" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Content" type="VBoxContainer" parent="Overlay/Center"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(330, 0)
+layout_mode = 2
+mouse_filter = 2
+theme = ExtResource("2_theme")
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="Title" type="Label" parent="Overlay/Center/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.933, 0.914, 0.851, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.75)
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 38
+text = "GAME OVER"
+horizontal_alignment = 1
+
+[node name="Ornament" type="ColorRect" parent="Overlay/Center/Content"]
+custom_minimum_size = Vector2(150, 1)
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+color = Color(0.878, 0.725, 0.31, 0.32)
+
+[node name="Spacer" type="Control" parent="Overlay/Center/Content"]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Retry" type="Button" parent="Overlay/Center/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 56)
+layout_mode = 2
+focus_neighbor_top = NodePath("../MainMenu")
+focus_neighbor_bottom = NodePath("../MainMenu")
+theme = ExtResource("2_theme")
+theme_override_colors/font_color = Color(0.973, 0.945, 0.863, 1)
+theme_override_colors/font_focus_color = Color(1, 0.953, 0.804, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/focus = SubResource("RetryFocus")
+theme_override_styles/hover = SubResource("RetryHover")
+theme_override_styles/normal = SubResource("RetryNormal")
+theme_override_styles/pressed = SubResource("RetryPressed")
+text = "REINTENTAR"
+
+[node name="MainMenu" type="Button" parent="Overlay/Center/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 50)
+layout_mode = 2
+focus_neighbor_top = NodePath("../Retry")
+focus_neighbor_bottom = NodePath("../Retry")
+theme = ExtResource("2_theme")
+theme_override_colors/font_color = Color(0.827, 0.8, 0.733, 1)
+theme_override_colors/font_focus_color = Color(0.933, 0.914, 0.851, 1)
+theme_override_colors/font_hover_color = Color(0.973, 0.945, 0.863, 1)
+theme_override_colors/font_pressed_color = Color(0.973, 0.945, 0.863, 1)
+theme_override_font_sizes/font_size = 13
+theme_override_styles/focus = SubResource("SecondaryFocus")
+theme_override_styles/hover = SubResource("SecondaryHover")
+theme_override_styles/normal = SubResource("SecondaryNormal")
+theme_override_styles/pressed = SubResource("SecondaryPressed")
+text = "MENÚ PRINCIPAL"
