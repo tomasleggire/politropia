@@ -39,6 +39,8 @@ const ARRIVAL_STEP := 8.0
 const ARRIVAL_MAX_SLIDE := 240.0
 ## Extra room kept between Luz and the edge of that ledge.
 const ARRIVAL_EDGE_MARGIN := 24.0
+## Short cast under the feet to confirm a remembered spot still has floor.
+const FLOOR_PROBE := 4.0
 ## A doorway in a wall is meant to end at the floor; Luz is placed this far above it.
 const ARRIVAL_FLOOR_INSET := 2.0
 const _DEFAULT_BODY_SIZE := Vector2(29.0, 46.0)
@@ -118,8 +120,102 @@ enum LoadingAnimationMode {
 ## Bandera temporal para evitar re-triggers mientras la pantalla está en transición.
 static var is_transition_in_progress: bool = false
 
+## Last arrival point of each scene visited this run, keyed by scene path. It is
+## only a fallback: when a door's `target_door_id` no longer exists (a link was
+## renamed or removed), returning to that scene still lands at the connection
+## point she used before instead of at the scene start.
+static var _arrival_memory: Dictionary = {}
+## Where the current scene was entered from. This lets a return through the
+## same doorway resolve the scene that actually sent her here.
+static var _entry_scene: String = ""
+static var _entry_door: DoorID.ID = DoorID.ID.NONE
+static var _entry_source_scene: String = ""
+static var _entry_source_door: DoorID.ID = DoorID.ID.NONE
+
 var _triggered: bool = false
 var _spawn_overlapping: bool = false
+
+
+## Clears the fallback memory (tests and a new run start from a clean slate).
+static func clear_transition_memory() -> void:
+	_arrival_memory.clear()
+	_entry_scene = ""
+	_entry_door = DoorID.ID.NONE
+	_entry_source_scene = ""
+	_entry_source_door = DoorID.ID.NONE
+
+
+## Remembers a valid arrival spot for `scene_path`.
+static func remember_arrival(scene_path: String, door_id: DoorID.ID, position: Vector2) -> void:
+	if scene_path.is_empty():
+		return
+	_arrival_memory[scene_path] = {"door_id": door_id, "position": position}
+
+
+static func get_remembered_arrival(scene_path: String) -> Variant:
+	if scene_path.is_empty() or not _arrival_memory.has(scene_path):
+		return null
+	return (_arrival_memory[scene_path] as Dictionary).get("position")
+
+
+## The door in the CURRENT scene that leads back to `source_scene`. The exact
+## reverse link wins; otherwise the first door pointing at the source scene.
+static func find_return_door(tree: SceneTree, source_scene: String, source_door: DoorID.ID) -> Node2D:
+	if tree == null or source_scene.is_empty():
+		return null
+	var any_back: Node2D = null
+	for node in tree.get_nodes_in_group(&"scene_transition_area"):
+		if not node is SceneTransitionArea:
+			continue
+		var area := node as SceneTransitionArea
+		if _target_scene_path(area) != source_scene:
+			continue
+		if source_door != DoorID.ID.NONE and area.target_door_id == source_door:
+			return area
+		if any_back == null:
+			any_back = area
+	return any_back
+
+
+## The only door of the current scene, when there is exactly one. A room with a
+## single connection point has no ambiguity even if its ids are out of date.
+static func find_only_door(tree: SceneTree) -> Node2D:
+	if tree == null:
+		return null
+	var only: Node2D = null
+	for node in tree.get_nodes_in_group(&"scene_transition_area"):
+		if not node is SceneTransitionArea:
+			continue
+		if only != null:
+			return null
+		only = node as Node2D
+	return only
+
+
+## Resolves where a door pair that lost its `target_door_id` should place her:
+## the reverse door, the remembered arrival, or the scene's only door. Returns
+## an empty dictionary when there is no safe memory (she then keeps the scene
+## start).
+static func resolve_fallback_arrival(tree: SceneTree, source_scene: String, source_door: DoorID.ID, target_scene: String) -> Dictionary:
+	if tree == null or source_scene.is_empty():
+		return {}
+	var back := find_return_door(tree, source_scene, source_door)
+	if back != null:
+		return {"door": back, "kind": "return"}
+	var remembered: Variant = get_remembered_arrival(target_scene)
+	if remembered != null:
+		return {"position": remembered as Vector2, "kind": "memory"}
+	var only := find_only_door(tree)
+	if only != null:
+		return {"door": only, "kind": "only"}
+	return {}
+
+
+static func _target_scene_path(area: SceneTransitionArea) -> String:
+	var path := area.target_scene_path
+	if path.is_empty() and area.target_scene != null:
+		path = area.target_scene.resource_path
+	return normalize_scene_path(path)
 
 
 func _ready() -> void:
@@ -191,7 +287,9 @@ func _on_body_entered(body: Node2D) -> void:
 		loading_animation_scale,
 		show_scene_name,
 		final_scene_name,
-		scene_name_font_size
+		scene_name_font_size,
+		_current_scene_path(),
+		door_id
 	)
 
 
@@ -201,6 +299,14 @@ func _is_player(body: Node2D) -> bool:
 	if body.is_in_group(&"player"):
 		return true
 	return false
+
+
+## Path of the scene this door lives in ("" in a scene that was never saved).
+func _current_scene_path() -> String:
+	var tree := get_tree()
+	if tree == null or tree.current_scene == null:
+		return ""
+	return tree.current_scene.scene_file_path
 
 
 ## Normaliza una ruta que puede venir como "uid://..." o "res://..." a su ruta estándar "res://...".
@@ -271,7 +377,9 @@ static func start_transition(
 	anim_scale: float = 1.25,
 	show_title: bool = true,
 	title_text: String = "",
-	title_font_sz: int = 22
+	title_font_sz: int = 22,
+	source_scene_path: String = "",
+	source_door_id: DoorID.ID = DoorID.ID.NONE
 ) -> void:
 	var overlay := ScreenFadeOverlay.new(
 		color,
@@ -291,7 +399,9 @@ static func start_transition(
 		anim_scale,
 		show_title,
 		title_text,
-		title_font_sz
+		title_font_sz,
+		source_scene_path,
+		source_door_id
 	)
 	tree.root.add_child(overlay)
 	overlay.run_transition()
@@ -383,12 +493,60 @@ static func settle_position(body: CharacterBody2D, wanted: Vector2, slide: float
 		if spot == null:
 			continue
 		if i == 0:
-			return spot
+			if _is_hazard_clear(body, spot as Vector2):
+				return spot
+			continue
 		# Keep clear of the ledge edge: stand a little further along it.
 		var clear: Variant = _stand_near(space, params, local, wanted + Vector2(dx + side * ARRIVAL_EDGE_MARGIN, 0.0))
 		if clear != null and absf((clear as Vector2).y - (spot as Vector2).y) <= ARRIVAL_STEP:
-			return clear
+			if _is_hazard_clear(body, clear as Vector2):
+				return clear
 	return wanted
+
+
+## True when `feet` is a free, supported spot clear of hazards: valid for an
+## arrival remembered from an earlier visit.
+static func is_arrival_safe(body: CharacterBody2D, feet: Vector2) -> bool:
+	if body == null or not body.is_inside_tree():
+		return false
+	var shape_node := body.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	var shape: Shape2D = RectangleShape2D.new()
+	(shape as RectangleShape2D).size = _DEFAULT_BODY_SIZE
+	var local := Vector2(0.0, -_DEFAULT_BODY_SIZE.y * 0.5)
+	if shape_node != null and shape_node.shape != null:
+		shape = shape_node.shape
+		local = shape_node.position
+	var params := PhysicsShapeQueryParameters2D.new()
+	params.shape = shape
+	params.collision_mask = body.collision_mask
+	params.exclude = [body.get_rid()]
+	var space := body.get_world_2d().direct_space_state
+	params.transform = Transform2D(0.0, feet + local + Vector2(0.0, -2.0))
+	if not space.intersect_shape(params, 1).is_empty():
+		return false
+	params.transform = Transform2D(0.0, feet + local + Vector2(0.0, -2.0))
+	params.motion = Vector2(0.0, FLOOR_PROBE + 2.0)
+	var fractions := space.cast_motion(params)
+	if fractions.size() != 2 or fractions[0] >= 1.0:
+		return false
+	return _is_hazard_clear(body, feet)
+
+
+## The player's body rect at `feet` must not touch a hazard.
+static func _is_hazard_clear(body: Node, feet: Vector2) -> bool:
+	var tree := body.get_tree()
+	if tree == null:
+		return true
+	var shape_node := body.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	var rect := Rect2(feet + Vector2(-_DEFAULT_BODY_SIZE.x * 0.5, -_DEFAULT_BODY_SIZE.y), _DEFAULT_BODY_SIZE)
+	if shape_node != null and shape_node.shape != null:
+		var size := shape_node.shape.get_rect().size
+		rect = Rect2(feet + shape_node.position - size * 0.5, size)
+	for node in tree.get_nodes_in_group(ContactDamage.HAZARD_GROUP):
+		var hazard := node as ContactDamage
+		if hazard != null and hazard.get_world_rect().intersects(rect):
+			return false
+	return true
 
 
 ## Free spot with floor under `at`, within the vertical reach of the arrival, or null.
@@ -499,6 +657,8 @@ class ScreenFadeOverlay extends CanvasLayer:
 	var show_scene_name: bool
 	var scene_name_text: String
 	var scene_name_font_size: int
+	var source_scene: String
+	var source_door: DoorID.ID
 
 	var color_rect: ColorRect
 	var loading_container: Control
@@ -522,7 +682,9 @@ class ScreenFadeOverlay extends CanvasLayer:
 		p_loading_anim_scale: float = 1.25,
 		p_show_scene_name: bool = true,
 		p_scene_name_text: String = "",
-		p_scene_name_font_size: int = 22
+		p_scene_name_font_size: int = 22,
+		p_source_scene: String = "",
+		p_source_door: DoorID.ID = DoorID.ID.NONE
 	) -> void:
 		fade_color = p_color
 		duration = p_duration
@@ -542,6 +704,8 @@ class ScreenFadeOverlay extends CanvasLayer:
 		show_scene_name = p_show_scene_name
 		scene_name_text = p_scene_name_text
 		scene_name_font_size = p_scene_name_font_size
+		source_scene = SceneTransitionArea.normalize_scene_path(p_source_scene)
+		source_door = p_source_door
 
 		if show_scene_name and scene_name_text.is_empty():
 			var eff_path := target_scene_path
@@ -769,14 +933,32 @@ class ScreenFadeOverlay extends CanvasLayer:
 			SceneTransitionArea.apply_player_lock(new_player)
 
 		# 2.5 Find the matching door of the target scene. With target_door NONE Luz keeps the
-		# default position of the scene; a missing id is reported instead of failing silently.
+		# default position of the scene. A missing id falls back to the remembered
+		# connection point, and only to the scene start when there is no valid memory.
+		var target_key := SceneTransitionArea.normalize_scene_path(tree.current_scene.scene_file_path)
+		var default_position := new_player.global_position if new_player != null else Vector2.ZERO
 		var door := SceneTransitionArea.find_door(tree, target_door)
+		var memory_position := Vector2.ZERO
+		var has_memory := false
 		if target_door != DoorID.ID.NONE and door == null:
-			push_warning("SceneTransitionArea: door '%s' not found in '%s'; Luz stays at the scene start." % [DoorID.get_id_name(target_door), tree.current_scene.scene_file_path])
+			var fallback := SceneTransitionArea.resolve_fallback_arrival(tree, source_scene, source_door, target_key)
+			if fallback.has("door"):
+				door = fallback["door"] as Node2D
+				var reason := "using the matching return door." if fallback.get("kind") == "return" else "using the scene's only door."
+				push_warning("SceneTransitionArea: door '%s' not found in '%s'; %s" % [DoorID.get_id_name(target_door), tree.current_scene.scene_file_path, reason])
+			elif fallback.has("position"):
+				memory_position = fallback["position"] as Vector2
+				has_memory = true
+				push_warning("SceneTransitionArea: door '%s' not found in '%s'; using the remembered arrival." % [DoorID.get_id_name(target_door), tree.current_scene.scene_file_path])
+			else:
+				push_warning("SceneTransitionArea: door '%s' not found in '%s'; Luz stays at the scene start." % [DoorID.get_id_name(target_door), tree.current_scene.scene_file_path])
 		var arrival := {}
 		if door != null and new_player != null:
 			arrival = SceneTransitionArea.resolve_arrival(door, new_player.global_position)
 			_place_player(new_player, arrival.position)
+		elif has_memory and new_player != null:
+			arrival = {"position": memory_position, "facing": 0, "slide": 0.0}
+			_place_player(new_player, memory_position)
 
 		# Wait two physics frames so the new scene's colliders exist before touching the floor
 		await tree.physics_frame
@@ -784,13 +966,29 @@ class ScreenFadeOverlay extends CanvasLayer:
 
 		if not arrival.is_empty() and new_player is CharacterBody2D:
 			var settled := SceneTransitionArea.settle_position(new_player, arrival.position, arrival.slide)
-			_place_player(new_player, settled)
-			if arrival.facing != 0 and new_player.has_method(&"place_for_transition"):
-				new_player.place_for_transition(settled, arrival.facing)
-			if new_player.has_method(&"set_checkpoint"):
-				new_player.set_checkpoint(settled)
-			SceneTransitionArea._reset_cameras(new_player)
-			await tree.physics_frame
+			if has_memory and not SceneTransitionArea.is_arrival_safe(new_player, settled):
+				# The remembered spot is now walled off or covered by a hazard:
+				# stay at the normal start rather than dropping her inside it.
+				_place_player(new_player, default_position)
+				arrival = {}
+				has_memory = false
+			else:
+				_place_player(new_player, settled)
+				if arrival.facing != 0 and new_player.has_method(&"place_for_transition"):
+					new_player.place_for_transition(settled, arrival.facing)
+				if new_player.has_method(&"set_checkpoint"):
+					new_player.set_checkpoint(settled)
+				if not target_key.is_empty():
+					var arrived_door := DoorID.ID.NONE
+					if door is SceneTransitionArea:
+						arrived_door = (door as SceneTransitionArea).door_id
+					SceneTransitionArea.remember_arrival(target_key, arrived_door, settled)
+					SceneTransitionArea._entry_scene = target_key
+					SceneTransitionArea._entry_door = arrived_door
+					SceneTransitionArea._entry_source_scene = source_scene
+					SceneTransitionArea._entry_source_door = source_door
+				SceneTransitionArea._reset_cameras(new_player)
+				await tree.physics_frame
 
 		# Desarmar SOLAMENTE los triggers que realmente solapan con el jugador en su posición de aparición
 		if new_player != null:

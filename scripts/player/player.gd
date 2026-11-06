@@ -425,6 +425,10 @@ var _auto_walk := 0
 var _keep_momentum := false
 var _last_safe_ground := Vector2.ZERO
 var _has_safe_ground := false
+## Floor the safe spot was recorded on and her offset from it. Keeping the
+## offset lets the spot follow a moving platform instead of staying behind.
+var _safe_ground_anchor: Node2D
+var _safe_ground_offset := Vector2.ZERO
 var _ground_time := 0.0
 var _ground_collider: Object
 var _rest_animation := &""
@@ -2099,6 +2103,7 @@ func _shake_camera() -> void:
 ## The last floor spot judged safe to come back to (the level start until she
 ## has stood anywhere safe).
 func get_last_safe_ground() -> Vector2:
+	_follow_safe_ground_anchor()
 	return _last_safe_ground if _has_safe_ground else _spawn_position
 
 
@@ -2148,6 +2153,7 @@ func _end_safe_return() -> void:
 
 
 func _track_safe_ground(delta: float) -> void:
+	_follow_safe_ground_anchor()
 	var ground := _floor_collider() if is_on_floor() and _state != State.HURT else null
 	if ground == null:
 		_ground_time = 0.0
@@ -2160,27 +2166,90 @@ func _track_safe_ground(delta: float) -> void:
 	if _ground_time >= safe_ground_time and _is_safe_spot(ground):
 		_last_safe_ground = global_position
 		_has_safe_ground = true
+		if ground is Node2D:
+			_safe_ground_anchor = ground as Node2D
+			_safe_ground_offset = global_position - _safe_ground_anchor.global_position
+		else:
+			_safe_ground_anchor = null
+			_safe_ground_offset = Vector2.ZERO
 
 
-## The solid (layer 1) or one-way (layer 2) body she is standing on.
-func _floor_collider() -> CollisionObject2D:
+## Keeps the remembered spot on the platform it was recorded on, if that
+## platform has moved since. Static floors never change it.
+func _follow_safe_ground_anchor() -> void:
+	if not _has_safe_ground or _safe_ground_anchor == null:
+		return
+	if not is_instance_valid(_safe_ground_anchor) or not _safe_ground_anchor.is_inside_tree():
+		_safe_ground_anchor = null
+		return
+	_last_safe_ground = _safe_ground_anchor.global_position + _safe_ground_offset
+
+
+## The solid (layer 1) or one-way (layer 2) body she is standing on. Library
+## and Greece floors are TileMapLayer nodes, not CollisionObject2D bodies, so
+## both kinds count.
+func _floor_collider() -> Object:
 	for index in get_slide_collision_count():
 		var collision := get_slide_collision(index)
-		var body := collision.get_collider() as CollisionObject2D
-		if body != null and collision.get_normal().y <= -0.7 and (body.get_collision_layer_value(1) or body.get_collision_layer_value(2)):
+		if collision.get_normal().y > -0.7:
+			continue
+		var body := collision.get_collider()
+		if body is CollisionObject2D:
+			var solid := body as CollisionObject2D
+			if solid.get_collision_layer_value(1) or solid.get_collision_layer_value(2):
+				return solid
+		elif body is TileMapLayer and (body as TileMapLayer).collision_enabled:
 			return body
 	return null
 
 
-func _is_safe_spot(ground: CollisionObject2D) -> bool:
-	var surface := _surface_rect(ground)
-	if surface.has_area():
-		if global_position.x < surface.position.x + safe_ground_margin or global_position.x > surface.end.x - safe_ground_margin:
-			return false
+func _is_safe_spot(ground: Object) -> bool:
+	if ground is CollisionObject2D:
+		var surface := _surface_rect(ground as CollisionObject2D)
+		if surface.has_area():
+			if global_position.x < surface.position.x + safe_ground_margin or global_position.x > surface.end.x - safe_ground_margin:
+				return false
+	# A tilemap has no single rectangle to measure: probe both sides instead, so
+	# a spot next to a tile edge is not remembered as safe.
+	if not _has_floor_at_offset(-safe_ground_margin) or not _has_floor_at_offset(safe_ground_margin):
+		return false
+	if _body_overlaps_solid():
+		return false
 	for node: Node in get_tree().get_nodes_in_group(ContactDamage.HAZARD_GROUP):
-		if (node as ContactDamage).get_world_rect().grow(safe_ground_margin).has_point(global_position):
+		var hazard := node as ContactDamage
+		if hazard != null and hazard.get_world_rect().grow(safe_ground_margin).has_point(global_position):
 			return false
 	return true
+
+
+## True when a floor at the same height as her feet exists `dx` px sideways.
+## The ray starts a little above the feet and reaches a little below them, so it
+## ignores walls and only accepts an upward-facing surface.
+func _has_floor_at_offset(dx: float) -> bool:
+	var space := get_world_2d().direct_space_state
+	var from := global_position + Vector2(dx, -2.0)
+	var to := global_position + Vector2(dx, 8.0)
+	var query := PhysicsRayQueryParameters2D.create(from, to, collision_mask, [get_rid()])
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return false
+	if (hit["normal"] as Vector2).y > -0.7:
+		return false
+	return absf((hit["position"] as Vector2).y - global_position.y) <= 8.0
+
+
+## The body must not already be inside solid geometry: returning there would
+## leave her stuck in a wall.
+func _body_overlaps_solid() -> bool:
+	var shape_node := get_node_or_null("CollisionShape2D") as CollisionShape2D
+	if shape_node == null or shape_node.shape == null:
+		return false
+	var params := PhysicsShapeQueryParameters2D.new()
+	params.shape = shape_node.shape
+	params.collision_mask = 1
+	params.exclude = [get_rid()]
+	params.transform = Transform2D(0.0, global_position + shape_node.position + Vector2(0.0, -2.0))
+	return not get_world_2d().direct_space_state.intersect_shape(params, 1).is_empty()
 
 
 ## World rect of the body's rectangle shape (no rotation), or an empty rect.
