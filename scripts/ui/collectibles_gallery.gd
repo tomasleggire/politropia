@@ -22,6 +22,8 @@ const LOCKED_CATEGORY := "Bloqueado"
 const LOCKED_TEXT := "Este coleccionable todavía no fue descubierto.\n\nRecorré los niveles para encontrarlo."
 const EMPTY_TEXT := "El catálogo todavía no tiene coleccionables."
 const MISSING_MANAGER_TEXT := "No se pudo cargar el progreso de coleccionables."
+## Muted cream-blue for secondary and locked labels. Contrast on #0B1020: 7.75:1.
+const LOCKED_LABEL_COLOR := Color(0.604, 0.655, 0.722, 1.0)
 
 @onready var _back: Button = %Back
 @onready var _progress: Label = %Progress
@@ -33,6 +35,7 @@ const MISSING_MANAGER_TEXT := "No se pudo cargar el progreso de coleccionables."
 @onready var _empty_state: Label = %EmptyState
 @onready var _detail_icon: CollectibleIcon = %DetailIcon
 @onready var _category: Label = %Category
+@onready var _detail_lock: Control = %DetailLock
 @onready var _detail_title: Label = %DetailTitle
 @onready var _detail_scroll: ScrollContainer = %DetailScroll
 @onready var _detail_text: RichTextLabel = %DetailText
@@ -122,6 +125,9 @@ func select_item(index: int) -> void:
 	_selected_index = index
 	for i in _slots.size():
 		_slots[i].button_pressed = i == index
+		var selected_bar := _slots[i].get_node_or_null("SelectedBar") as ColorRect
+		if selected_bar != null:
+			selected_bar.visible = i == index
 
 	var definition := _definitions[index]
 	var unlocked: bool = manager.call("has_collected", definition.id)
@@ -129,6 +135,11 @@ func select_item(index: int) -> void:
 	_detail_icon.set_definition(definition, not unlocked, accent)
 	_detail_title.text = definition.title if unlocked else LOCKED_TITLE
 	_category.text = definition.category if unlocked else LOCKED_CATEGORY
+	_category.add_theme_color_override(
+		"font_color",
+		accent if unlocked else LOCKED_LABEL_COLOR
+	)
+	_detail_lock.visible = not unlocked
 	_detail_text.text = definition.content if unlocked else LOCKED_TEXT
 	_detail_hint.text = "Encontralo en el mundo"
 	_detail_hint.visible = not unlocked
@@ -194,8 +205,11 @@ func _rebuild_grid() -> void:
 		name_label.text = definition.title if unlocked else LOCKED_TITLE
 		name_label.add_theme_color_override(
 			"font_color",
-			accent.lightened(0.45) if unlocked else Color(0.38, 0.45, 0.53, 1.0)
+			accent.lightened(0.22) if unlocked else LOCKED_LABEL_COLOR
 		)
+		var lock_badge := slot.get_node_or_null("LockBadge") as Control
+		if lock_badge != null:
+			lock_badge.visible = not unlocked
 		if unlocked:
 			slot.tooltip_text = "%s · %s" % [definition.title, definition.category]
 		_style_slot(slot, accent, unlocked)
@@ -240,6 +254,7 @@ func _category_color(category: String) -> Color:
 		"un espacio tranquilo":
 			return Color(0.55, 0.85, 0.6, 1.0)
 		"otras formas de demostrarlo":
-			return Color(0.78, 0.29, 0.34, 1.0)
+			# Lightened from #C74A57 so 16 px category text reaches WCAG AA (5.42:1).
+			return Color(0.851, 0.392, 0.439, 1.0)
 		_:
 			return Color(0.55, 0.7, 0.95, 1.0)
