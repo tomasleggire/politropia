@@ -19,7 +19,9 @@ const INTERACTABLE_GROUP := &"interactable"
 @export_range(1.0, 120.0, 1.0) var reveal_duration := 30.0
 
 @onready var interaction_area: Area2D = $InteractionArea
-@onready var sprite: Sprite2D = $Sprite2D
+@onready var body_collision: CollisionPolygon2D = $StaticBody2D/CollisionPolygon2D
+@onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
+@onready var opening_halo: PointLight2D = $OpeningHalo
 @onready var _revelation_guide: RevelationGuide = $RevelationGuide
 @onready var _reveal_timer: Timer = $RevealTimer
 
@@ -29,12 +31,14 @@ var opened: bool = false
 var minigame_active: bool = false
 
 var _player: Node = null
+var _opening_halo_tween: Tween
 
 
 func _ready() -> void:
 	add_to_group(INTERACTABLE_GROUP)
 	# Start hidden and disable interaction.
 	_reveal_timer.timeout.connect(hide_chest)
+	animated_sprite.animation_finished.connect(_on_chest_animation_finished)
 	hide_chest()
 
 	interaction_area.body_entered.connect(_on_body_entered)
@@ -95,6 +99,8 @@ func reveal() -> void:
 	if not revealed:
 		revealed = true
 		show()
+		animated_sprite.play(&"closed")
+		body_collision.set_deferred(&"disabled", false)
 		interaction_area.monitoring = true
 		_check_player_overlap()
 		_check_player_overlap.call_deferred()
@@ -107,7 +113,7 @@ func reveal() -> void:
 	var route := PackedVector2Array([to_local(player.global_position)])
 	route.append_array(revelation_waypoints)
 	# The chest sprite is offset from this scene's origin.
-	route.append(sprite.position)
+	route.append(animated_sprite.position)
 	_revelation_guide.show_route(route)
 
 
@@ -118,6 +124,7 @@ func hide_chest() -> void:
 	hide()
 
 	interaction_area.monitoring = false
+	body_collision.set_deferred(&"disabled", true)
 	_revelation_guide.hide_guide()
 	_refresh_interaction()
 
@@ -195,13 +202,35 @@ func open_chest() -> void:
 	opened = true
 	_reveal_timer.stop()
 	_revelation_guide.hide_guide()
+	# The lid animation is only triggered after the minigame reports success.
+	animated_sprite.play(&"opening")
+	_play_opening_halo()
 
 	# Disable further interaction.
 	interaction_area.monitoring = false
 	_refresh_interaction()
 
-	drop_reward()
 	chest_opened.emit()
+
+
+func _on_chest_animation_finished() -> void:
+	if animated_sprite.animation == &"opening":
+		animated_sprite.play(&"opened")
+		drop_reward()
+
+
+func _play_opening_halo() -> void:
+	_opening_halo_tween = create_tween()
+	opening_halo.visible = true
+	opening_halo.energy = 0.0
+	opening_halo.texture_scale = 0.85
+	_opening_halo_tween.tween_interval(0.16)
+	_opening_halo_tween.tween_property(opening_halo, "energy", 1.5, 0.42).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_opening_halo_tween.parallel().tween_property(opening_halo, "texture_scale", 2.0, 0.72).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_opening_halo_tween.tween_interval(0.35)
+	_opening_halo_tween.tween_property(opening_halo, "energy", 0.0, 0.72).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_opening_halo_tween.parallel().tween_property(opening_halo, "texture_scale", 1.0, 0.72).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_opening_halo_tween.tween_callback(opening_halo.hide)
 
 
 func drop_reward() -> void:
@@ -210,9 +239,25 @@ func drop_reward() -> void:
 		return
 
 	var reward = reward_scene.instantiate()
-
-	get_tree().current_scene.add_child(reward)
+	var start_position := global_position + animated_sprite.position
+	var reward_sprite := reward.get_node_or_null("Sprite2D") as Node2D
+	if reward_sprite != null:
+		start_position -= reward_sprite.position
+	var target_position := global_position + reward_offset
+	var current_scene := get_tree().current_scene
+	if current_scene == null:
+		return
+	if reward is CanvasItem:
+		reward.modulate.a = 0.0
+	current_scene.add_child(reward)
 
 	if reward is Node2D:
-		reward.global_position = global_position + reward_offset
+		reward.global_position = start_position
+		var pop_position := start_position + Vector2(0.0, -32.0)
+		var tween := reward.create_tween()
+		tween.tween_property(reward, "global_position", pop_position, 0.52).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tween.parallel().tween_property(reward, "modulate:a", 1.0, 0.45)
+		tween.tween_property(reward, "global_position", target_position, 1.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tween.tween_property(reward, "global_position", target_position + Vector2(0.0, 8.0), 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tween.tween_property(reward, "global_position", target_position, 0.34).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
