@@ -36,6 +36,7 @@ AbilityProgress="*res://scripts/world/ability_progress.gd"
 MusicManager="*uid://5cfbl0ss3jw"
 Collectibles="*res://scripts/world/collectibles_manager.gd"
 BlindQuestProgress="*res://scripts/world/blind_quest_progress.gd"
+SaveService="*res://scripts/world/save_service.gd"
 
 [display]
 

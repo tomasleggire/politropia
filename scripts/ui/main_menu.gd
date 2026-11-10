@@ -47,13 +47,14 @@ func _ready() -> void:
 		false
 	)
 
-	btn_continue.disabled = true  # No save data available yet.
+	btn_continue.disabled = not SaveService.has_save()
 	_buttons = [btn_new_game, btn_continue, btn_collectables, btn_achievements]
 	for button in _buttons:
 		_setup_button(button)
 	_rebuild_focus_chain()
 
 	btn_new_game.pressed.connect(_on_new_game_pressed)
+	btn_continue.pressed.connect(_on_continue_pressed)
 	btn_collectables.pressed.connect(_on_collectables_pressed)
 	btn_achievements.pressed.connect(_on_achievements_pressed)
 
@@ -164,11 +165,38 @@ func _play_new_game_cinematic() -> void:
 
 func _finish_new_game() -> void:
 	_reset_new_game_progress()
+	SaveService.begin_new_game(GAME_SCENE)
 	MusicManager.stop_music()
 	if scene_changer.is_valid():
 		scene_changer.call(INTRO_SCENE)
 	else:
 		get_tree().change_scene_to_file(INTRO_SCENE)
+
+
+func _on_continue_pressed() -> void:
+	if input_locked or btn_continue.disabled:
+		return
+	input_locked = true
+	get_viewport().gui_release_focus()
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(_ui, "modulate:a", 0.0, 0.3)
+	tween.tween_property(_fade_black, "color:a", 1.0, 0.55) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.chain().tween_callback(_continue_from_save)
+
+
+func _continue_from_save() -> void:
+	if SaveService.continue_game():
+		return
+	input_locked = false
+	btn_continue.disabled = true
+	_ui.modulate.a = 1.0
+	_fade_black.color.a = 0.0
+	_rebuild_focus_chain()
+	btn_new_game.grab_focus()
+	var toast := get_node_or_null("/root/PickupToast")
+	if toast != null:
+		toast.show_toast("No se pudo cargar la partida guardada.")
 
 
 func _reset_new_game_progress() -> void:

@@ -64,3 +64,27 @@ func clear() -> void:
 	_completed = false
 	_reward_granted = false
 	changed.emit()
+
+
+func to_dict() -> Dictionary:
+	return {
+		"version": 1,
+		"accepted": _accepted,
+		"completed": _completed,
+		"reward_granted": _reward_granted,
+	}
+
+
+func from_dict(data: Dictionary) -> void:
+	clear()
+	if int(data.get("version", 0)) != 1:
+		return
+	var accepted: Variant = data.get("accepted", false)
+	var completed: Variant = data.get("completed", false)
+	var reward_granted: Variant = data.get("reward_granted", false)
+	if not accepted is bool or not completed is bool or not reward_granted is bool:
+		return
+	_accepted = bool(accepted) or bool(completed) or bool(reward_granted)
+	_completed = bool(completed) or bool(reward_granted)
+	_reward_granted = bool(reward_granted)
+	changed.emit()

@@ -226,6 +226,7 @@ func _apply_rest_effects(player: Player) -> void:
 	player.restore_full_health()
 	player.apply_checkpoint(_anchor.global_position)
 	CheckpointService.activate(checkpoint_id, _owner_scene_path(), _anchor.global_position)
+	SaveService.save_checkpoint()
 	CheckpointService.reset_resettable_enemies()
 
 

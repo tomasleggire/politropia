@@ -100,3 +100,16 @@ func clear() -> void:
 		return
 	_collected.clear()
 	collectibles_changed.emit()
+
+
+func to_dict() -> Dictionary:
+	return {"version": 1, "collected": get_collected_ids()}
+
+
+func from_dict(data: Dictionary) -> void:
+	_collected.clear()
+	if int(data.get("version", 0)) == 1 and data.get("collected") is Array:
+		for id: Variant in data["collected"]:
+			if (id is String or id is StringName) and _definitions_by_id.has(String(id)):
+				_collected[String(id)] = true
+	collectibles_changed.emit()

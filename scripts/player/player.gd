@@ -606,6 +606,9 @@ func _ready() -> void:
 	
 	if hud_instance.has_method("bind_player"):
 		hud_instance.bind_player(self)
+	var checkpoint_service := get_node_or_null("/root/CheckpointService")
+	if checkpoint_service != null:
+		checkpoint_service.call_deferred("restore_pending_player", self)
 
 
 func _recompute_jump_physics() -> void:
@@ -2325,7 +2328,11 @@ func _respawn_after_death() -> void:
 	if fragment_progress != null and fragment_progress.has_method("lose_carried"):
 		fragment_progress.call("lose_carried")
 	var current := get_tree().current_scene
-	if checkpoints != null and current != null:
+	if checkpoints != null and current != null and checkpoints.has_active_checkpoint():
+		var checkpoint_scene: String = checkpoints.get_active_scene_path()
+		if checkpoint_scene != current.scene_file_path:
+			if checkpoints.return_to_active_checkpoint_scene():
+				return
 		checkpoints.apply_to_player(self, current.scene_file_path)
 	respawn()
 	# A damage area she just left still lists her as inside for one physics
@@ -2333,6 +2340,10 @@ func _respawn_after_death() -> void:
 	_invuln_left = invulnerability_time
 	if checkpoints != null:
 		checkpoints.reset_resettable_enemies()
+
+
+func grant_respawn_invulnerability() -> void:
+	_invuln_left = invulnerability_time
 
 
 func restore_full_health() -> void:

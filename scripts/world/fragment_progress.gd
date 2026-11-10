@@ -2,8 +2,8 @@ extends Node
 
 ## In-memory fragment state, separated by playable level (for example,
 ## `library` and `greece`). Carried fragments are temporary; deposited ones are
-## secured for the current run until a new game starts. This is memory-only;
-## progress is not written to disk.
+## secured for the current run until a new game starts. Both states are saved
+## by SaveService at a checkpoint, but only deposited pieces survive death.
 
 signal progress_changed(level_key: String)
 signal fragment_state_changed(level_key: String, id: int, state: int)
@@ -153,7 +153,6 @@ func clear() -> void:
 
 func to_dict() -> Dictionary:
 	return {"version": 2, "levels": _levels.duplicate(true)}
-
 
 func from_dict(data: Dictionary) -> void:
 	_levels.clear()
