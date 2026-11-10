@@ -37,6 +37,7 @@ var _buttons: Array[Button] = []
 @onready var _selector: MenuSelector = %Selector
 @onready var _fade_black: ColorRect = %FadeBlack
 @onready var _gold_flash: ColorRect = %GoldFlash
+@onready var _loading_label: Label = %LoadingLabel
 
 
 func _ready() -> void:
@@ -125,6 +126,8 @@ func _on_button_hovered(button: Button) -> void:
 
 func _play_opening() -> void:
 	_fade_black.color.a = 1.0
+	_loading_label.visible = false
+	_loading_label.modulate.a = 0.0
 	_logo.modulate.a = 0.0
 	_selector.modulate.a = 0.0
 	var tween := create_tween().set_parallel(true)
@@ -178,20 +181,27 @@ func _on_continue_pressed() -> void:
 		return
 	input_locked = true
 	get_viewport().gui_release_focus()
+	_loading_label.visible = true
+	_loading_label.modulate.a = 0.0
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(_ui, "modulate:a", 0.0, 0.3)
 	tween.tween_property(_fade_black, "color:a", 1.0, 0.55) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(_loading_label, "modulate:a", 1.0, 0.18).set_delay(0.38)
 	tween.chain().tween_callback(_continue_from_save)
 
 
 func _continue_from_save() -> void:
+	# Render the label before the saved PackedScene is synchronously loaded.
+	await get_tree().process_frame
 	if SaveService.continue_game():
 		return
 	input_locked = false
 	btn_continue.disabled = true
 	_ui.modulate.a = 1.0
 	_fade_black.color.a = 0.0
+	_loading_label.visible = false
+	_loading_label.modulate.a = 0.0
 	_rebuild_focus_chain()
 	btn_new_game.grab_focus()
 	var toast := get_node_or_null("/root/PickupToast")

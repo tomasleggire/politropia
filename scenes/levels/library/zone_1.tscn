@@ -12,6 +12,7 @@
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_n3h83"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_6keu4"]
 [ext_resource type="PackedScene" path="res://scenes/world/tutorial_sign.tscn" id="20_tutsign"]
+[ext_resource type="PackedScene" path="res://scenes/world/energy_food.tscn" id="21_food"]
 [ext_resource type="PackedScene" path="res://scenes/world/gothic_candle.tscn" id="amb_candle"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
@@ -14150,6 +14151,9 @@ tile_set = SubResource("TileSet_7wplu")
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("19_6keu4")]
 position = Vector2(83, 689)
+
+[node name="ChegusanMilanesa" parent="." instance=ExtResource("21_food")]
+position = Vector2(280, 683)
 
 [node name="Enemies" type="Node2D" parent="." unique_id=923529168]
 

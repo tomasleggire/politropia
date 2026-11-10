@@ -36,6 +36,7 @@ extends CanvasLayer
 
 var _queue: Array[Array] = []
 var _playing := false
+var _energy_food_tip_shown := false
 
 @onready var _slide: Control = $Root/Slide
 @onready var _title: Label = $Root/Slide/Panel/Margin/Box/Title
@@ -58,6 +59,14 @@ func show_toast(title: String, subtitle := "") -> void:
 	_queue.append([title, subtitle])
 	if not _playing:
 		_play_next()
+
+
+## Explains the food's effect once per game session.
+func show_energy_food_first_use() -> void:
+	if _energy_food_tip_shown:
+		return
+	_energy_food_tip_shown = true
+	show_toast("Chegusán de Milanesa", "Restaura la mitad de la concentración")
 
 
 func _play_next() -> void:
