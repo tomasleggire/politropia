@@ -1,0 +1,92 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/game_completion.gd" id="1_script"]
+[ext_resource type="FontFile" uid="uid://rcvj3nh8n7hb" path="res://assets/ui/Cinzel-Bold.ttf" id="2_font"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_option"]
+
+[node name="GameCompletion" type="CanvasLayer"]
+process_mode = 3
+layer = 131
+script = ExtResource("1_script")
+
+[node name="Overlay" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Backdrop" type="ColorRect" parent="Overlay"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.03, 0.035, 0.06, 0)
+
+[node name="Center" type="CenterContainer" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Content" type="VBoxContainer" parent="Overlay/Center"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Title" type="Label" parent="Overlay/Center/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.945, 0.93, 0.87, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_constants/shadow_offset_y = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 46
+text = "CONTINUARÁ..."
+horizontal_alignment = 1
+
+[node name="Ornament" type="ColorRect" parent="Overlay/Center/Content"]
+custom_minimum_size = Vector2(180, 1)
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+color = Color(0.878, 0.725, 0.31, 0.28)
+
+[node name="Spacer" type="Control" parent="Overlay/Center/Content"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="MainMenu" type="Button" parent="Overlay/Center/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 60)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.85, 0.66, 1)
+theme_override_colors/font_focus_color = Color(1, 0.96, 0.84, 1)
+theme_override_colors/font_hover_color = Color(1, 0.96, 0.84, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 0.92, 1)
+theme_override_colors/font_hover_pressed_color = Color(1, 1, 0.92, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxEmpty_option")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_option")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_option")
+theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_option")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_option")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_option")
+text = "MENÚ PRINCIPAL"
+alignment = 1

@@ -443,7 +443,9 @@ func _start_fight(player: Player) -> void:
 	_feed_boss()
 	_set_doors(true)
 	_lock_camera()
-	MusicManager.play_boss_music()
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null and music.has_method(&"play_boss_music"):
+		music.call(&"play_boss_music")
 	_bar.setup(boss_name, _boss.max_health, _notch_ratio())
 	_bar.set_health(_boss.get_health())
 	_bar.show_bar()
@@ -473,7 +475,9 @@ func _on_player_died() -> void:
 	_kill(_intro_tween)
 	if is_instance_valid(_boss):
 		_boss.set_ai_active(false)
-	MusicManager.play_gameplay_music()
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null and music.has_method(&"play_gameplay_music"):
+		music.call(&"play_gameplay_music")
 
 
 func _on_player_respawned() -> void:
@@ -537,7 +541,30 @@ func _on_boss_died(_enemy: Enemy) -> void:
 		_boss.connect(&"corpse_settled", _remember_defeat)
 	_defeat_tween = create_tween()
 	_defeat_tween.tween_interval(defeat_beat)
-	_defeat_tween.tween_callback(_open_arena)
+	_defeat_tween.tween_callback(_on_defeat_beat_finished)
+
+
+func _on_defeat_beat_finished() -> void:
+	if _is_final_boss():
+		_bar.hide_title()
+		_bar.hide_bar()
+		_trigger_game_completion()
+		return
+	_open_arena()
+
+
+func _is_final_boss() -> bool:
+	return _boss is ArtemisBoss
+
+
+func _trigger_game_completion() -> void:
+	var completion := get_node_or_null("/root/GameCompletion")
+	if completion != null and completion.has_method(&"show_completion"):
+		if bool(completion.call(&"show_completion")):
+			return
+	# Fallback: if completion cannot take over, never strand the player in a
+	# locked arena after the final boss falls.
+	_open_arena()
 
 
 func _open_arena() -> void:

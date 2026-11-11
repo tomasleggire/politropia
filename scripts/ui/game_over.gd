@@ -127,6 +127,9 @@ func is_accepting_input() -> bool:
 func show_game_over(player: Player) -> bool:
 	if _active:
 		return true
+	var completion := get_node_or_null("/root/GameCompletion")
+	if completion != null and completion.has_method(&"is_active") and bool(completion.call(&"is_active")):
+		return false
 	if not enabled or not is_instance_valid(player) or get_tree().current_scene == null:
 		return false
 
