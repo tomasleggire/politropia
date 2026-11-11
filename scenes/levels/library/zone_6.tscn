@@ -14303,6 +14303,56 @@ tile_set = SubResource("TileSet_w0rkp")
 position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
+[node name="Ambiance" type="Node2D" parent="TilemapLayers/Ground" unique_id=30261186]
+position = Vector2(-2, -683)
+
+[node name="ZoneAmbience" parent="TilemapLayers/Ground/Ambiance" unique_id=437048454 instance=ExtResource("amb_zone")]
+
+[node name="DustMotes" parent="TilemapLayers/Ground/Ambiance" unique_id=1253614048 instance=ExtResource("amb_dust")]
+
+[node name="LanternLight1" parent="TilemapLayers/Ground/Ambiance" unique_id=1756830780 instance=ExtResource("amb_light")]
+position = Vector2(936, 436)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+
+[node name="LanternLight2" parent="TilemapLayers/Ground/Ambiance" unique_id=213705586 instance=ExtResource("amb_light")]
+position = Vector2(1222, 460)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 2.3
+
+[node name="LanternLight3" parent="TilemapLayers/Ground/Ambiance" unique_id=1387215544 instance=ExtResource("amb_light")]
+position = Vector2(1795, 431)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 4.6
+
+[node name="LanternLight4" parent="TilemapLayers/Ground/Ambiance" unique_id=420508436 instance=ExtResource("amb_light")]
+position = Vector2(1787, 132)
+color = Color(1, 0.7, 0.38, 1)
+energy = 0.85
+texture_scale = 1.796875
+light_color = Color(1, 0.7, 0.38, 1)
+base_energy = 0.85
+radius = 115.0
+flicker_amount = 0.07
+phase_offset = 6.8999999999999995
+
 [node name="Player" parent="." unique_id=1611018514 instance=ExtResource("7_t35w5")]
 position = Vector2(26, 692)
 
@@ -14311,6 +14361,12 @@ position = Vector2(26, 692)
 
 [node name="BookFlyer" parent="Enemies" unique_id=1820963891 instance=ExtResource("9_nxnoi")]
 position = Vector2(1352, -338)
+enemy_id = &"bf_61"
+knockback_from_player_attacks = true
+
+[node name="BookFlyer2" parent="Enemies" unique_id=1134364774 instance=ExtResource("9_nxnoi")]
+position = Vector2(1155, -152)
+enemy_id = &"bf_62"
 knockback_from_player_attacks = true
 
 [node name="Fragment4" parent="." unique_id=293282883 instance=ExtResource("8_e58f3")]
@@ -14349,50 +14405,3 @@ position = Vector2(-35, 620)
 target_scene_path = "uid://dv0i34v7aiwto"
 door_id = 14
 target_door_id = 13
-
-[node name="ZoneAmbience" parent="." unique_id=437048454 instance=ExtResource("amb_zone")]
-
-[node name="DustMotes" parent="." unique_id=1253614048 instance=ExtResource("amb_dust")]
-
-[node name="LanternLight1" parent="." unique_id=1756830780 instance=ExtResource("amb_light")]
-position = Vector2(936, 436)
-color = Color(1, 0.7, 0.38, 1)
-energy = 0.85
-texture_scale = 1.796875
-light_color = Color(1, 0.7, 0.38, 1)
-base_energy = 0.85
-radius = 115.0
-flicker_amount = 0.07
-
-[node name="LanternLight2" parent="." unique_id=213705586 instance=ExtResource("amb_light")]
-position = Vector2(1222, 460)
-color = Color(1, 0.7, 0.38, 1)
-energy = 0.85
-texture_scale = 1.796875
-light_color = Color(1, 0.7, 0.38, 1)
-base_energy = 0.85
-radius = 115.0
-flicker_amount = 0.07
-phase_offset = 2.3
-
-[node name="LanternLight3" parent="." unique_id=1387215544 instance=ExtResource("amb_light")]
-position = Vector2(1795, 431)
-color = Color(1, 0.7, 0.38, 1)
-energy = 0.85
-texture_scale = 1.796875
-light_color = Color(1, 0.7, 0.38, 1)
-base_energy = 0.85
-radius = 115.0
-flicker_amount = 0.07
-phase_offset = 4.6
-
-[node name="LanternLight4" parent="." unique_id=420508436 instance=ExtResource("amb_light")]
-position = Vector2(1787, 132)
-color = Color(1, 0.7, 0.38, 1)
-energy = 0.85
-texture_scale = 1.796875
-light_color = Color(1, 0.7, 0.38, 1)
-base_energy = 0.85
-radius = 115.0
-flicker_amount = 0.07
-phase_offset = 6.8999999999999995

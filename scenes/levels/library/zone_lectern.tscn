@@ -6,7 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://6xu6ikmpoqje" path="res://assets/art/obstacles/thorns.png" id="4_dw4mf"]
 [ext_resource type="Texture2D" uid="uid://ddqywkuh8qpr2" path="res://assets/art/obstacles/spikes.png" id="5_kl0pi"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="6_u271u"]
-[ext_resource type="PackedScene" path="res://scenes/world/atril_libro.tscn" id="7_o5po4"]
+[ext_resource type="PackedScene" uid="uid://bfqriiplccheq" path="res://scenes/world/atril_libro.tscn" id="7_o5po4"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="8_bvayg"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="9_os7eu"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
@@ -14141,12 +14141,12 @@ tile_set = SubResource("TileSet_w0rkp")
 position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
-[node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("6_u271u")]
-position = Vector2(67, 323)
-
 [node name="Lectern" parent="." unique_id=1057357694 instance=ExtResource("7_o5po4")]
 physics_interpolation_mode = 2
 position = Vector2(443, 386)
+
+[node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("6_u271u")]
+position = Vector2(67, 323)
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)

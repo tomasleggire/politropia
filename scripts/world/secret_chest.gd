@@ -260,4 +260,3 @@ func drop_reward() -> void:
 		tween.tween_property(reward, "global_position", target_position, 1.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		tween.tween_property(reward, "global_position", target_position + Vector2(0.0, 8.0), 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		tween.tween_property(reward, "global_position", target_position, 0.34).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
