@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="CollectibleDefinition" load_steps=4 format=3 uid="uid://bjvvbvaqbdklf"]
+[gd_resource type="Resource" script_class="CollectibleDefinition" format=3 uid="uid://bjvvbvaqbdklf"]
 
 [ext_resource type="Script" uid="uid://bxg58ygtsvspe" path="res://scripts/collectibles/collectible_definition.gd" id="1_definition"]
 [ext_resource type="Texture2D" uid="uid://br0cpuw3xccrm" path="res://coins.png" id="2_coins"]

@@ -15190,23 +15190,25 @@ position = Vector2(260, 363)
 
 [node name="ShadowOwl" parent="Enemies" unique_id=947189450 instance=ExtResource("21_i8mgn")]
 position = Vector2(997, 447)
+enemy_id = &"owl_11"
 knockback_from_player_attacks = true
 max_fall_speed = 1400.0
 
 [node name="LancetEnemy" parent="Enemies" unique_id=945093425 instance=ExtResource("21_r00ng")]
 position = Vector2(1882, 547)
 walk_speed = 120.0
+enemy_id = &"lancet11"
 start_facing = 1
 
 [node name="SnakeEnemy" parent="Enemies" unique_id=383943052 instance=ExtResource("24_pblv5")]
 position = Vector2(1483, -237)
-enemy_id = &"snake01"
+enemy_id = &"snake11"
 start_facing = 1
 max_health = 2
 
 [node name="SnakeEnemy2" parent="Enemies" unique_id=1238404916 instance=ExtResource("24_pblv5")]
 position = Vector2(2026, -139)
-enemy_id = &"snake02"
+enemy_id = &"snake12"
 max_health = 2
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]

@@ -25,13 +25,12 @@
 [ext_resource type="Texture2D" uid="uid://dlwrsbh0h61js" path="res://assets/art/greece/Decorations/Potted_plant.png" id="22_xbgl8"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="23_pmn7b"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="24_5bejm"]
-[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
-[ext_resource type="Resource" path="res://data/ambience/greece.tres" id="amb_style"]
-[ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
-[ext_resource type="PackedScene" path="res://scenes/world/pollen_motes.tscn" id="amb_pollen"]
 [ext_resource type="PackedScene" path="res://scenes/world/firefly_swarm.tscn" id="amb_fly"]
+[ext_resource type="PackedScene" path="res://scenes/world/pollen_motes.tscn" id="amb_pollen"]
+[ext_resource type="Resource" path="res://data/ambience/greece.tres" id="amb_style"]
+[ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
 [ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
-[ext_resource type="Resource" path="res://data/parallax/greece.tres" id="par_style"]
+[ext_resource type="Resource" uid="uid://cnyabltaqgayo" path="res://data/parallax/greece.tres" id="par_style"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("6_4naxb")
@@ -15098,7 +15097,7 @@ size = Vector2(1129, 1807)
 
 [node name="GreeceZone4" type="Node2D" unique_id=424136144]
 
-[node name="ParallaxBackdrop" parent="." instance=ExtResource("par_back")]
+[node name="ParallaxBackdrop" parent="." unique_id=309155091 instance=ExtResource("par_back")]
 style = ExtResource("par_style")
 
 [node name="TilemapLayers" type="Node2D" parent="." unique_id=1573067583]
@@ -15162,37 +15161,41 @@ position = Vector2(710, 1733)
 
 [node name="SnakeEnemy" parent="Enemies" unique_id=383943052 instance=ExtResource("21_2d4ur")]
 position = Vector2(146, 1707)
-enemy_id = &"snake01"
+enemy_id = &"snake41"
 start_facing = 1
 max_health = 2
 
 [node name="SnakeEnemy2" parent="Enemies" unique_id=1343577645 instance=ExtResource("21_2d4ur")]
 position = Vector2(649, 1385)
-enemy_id = &"snake02"
+enemy_id = &"snake42"
 max_health = 2
 
 [node name="SnakeEnemy3" parent="Enemies" unique_id=2140226252 instance=ExtResource("21_2d4ur")]
 position = Vector2(840, 1111)
-enemy_id = &"snake03"
+enemy_id = &"snake43"
 start_facing = 1
 max_health = 2
 
 [node name="SnakeEnemy4" parent="Enemies" unique_id=787144481 instance=ExtResource("21_2d4ur")]
 position = Vector2(557, 653)
-enemy_id = &"snake04"
+enemy_id = &"snake44"
 start_facing = 1
 max_health = 2
 
 [node name="SnakeEnemy5" parent="Enemies" unique_id=2085685920 instance=ExtResource("21_2d4ur")]
 position = Vector2(707, 320)
-enemy_id = &"snake05"
+enemy_id = &"snake45"
 max_health = 2
 
 [node name="ShadowOwl" parent="Enemies" unique_id=667068756 instance=ExtResource("21_ms0bv")]
 position = Vector2(312, 1163)
+enemy_id = &"owl41"
+knockback_from_player_attacks = true
 
 [node name="ShadowOwl2" parent="Enemies" unique_id=758372325 instance=ExtResource("21_ms0bv")]
 position = Vector2(840, 414)
+enemy_id = &"owl42"
+knockback_from_player_attacks = true
 
 [node name="FragmentoLibro" parent="." unique_id=587489609 instance=ExtResource("22_jpvhh")]
 position = Vector2(315, 598)
@@ -15230,29 +15233,31 @@ debug_color = Color(1.6364455e-06, 0.6042749, 0.6767223, 0.41960785)
 [node name="SceneTransitionArea" parent="." unique_id=1518630621 instance=ExtResource("22_4dr0a")]
 position = Vector2(891, -23)
 target_scene_path = "uid://drehrd4yly6oj"
-target_door_id = 8
 door_id = 7
+target_door_id = 8
 
 [node name="SceneTransitionArea2" parent="." unique_id=949283958 instance=ExtResource("22_4dr0a")]
 position = Vector2(584, 1824)
 target_scene_path = "uid://3nag83g3qfyp"
-target_door_id = 9
 door_id = 10
+target_door_id = 9
 
 [node name="SceneTransitionArea3" parent="." unique_id=44791832 instance=ExtResource("23_pmn7b")]
 position = Vector2(1103, 95)
 target_scene_path = "uid://bjruohx06abro"
-target_door_id = 21
 door_id = 23
+target_door_id = 21
 
-[node name="ZoneAmbience" parent="." instance=ExtResource("amb_zone")]
+[node name="ZoneAmbience" parent="." unique_id=766579282 instance=ExtResource("amb_zone")]
 style = ExtResource("amb_style")
-[node name="PollenMotes" parent="." instance=ExtResource("amb_pollen")]
-[node name="Fireflies1" parent="." instance=ExtResource("amb_fly")]
+
+[node name="PollenMotes" parent="." unique_id=1781532920 instance=ExtResource("amb_pollen")]
+
+[node name="Fireflies1" parent="." unique_id=2037279370 instance=ExtResource("amb_fly")]
 position = Vector2(790, 1733)
 
 [node name="SceneTransitionArea4" parent="." unique_id=1668227683 instance=ExtResource("23_pmn7b")]
 position = Vector2(-81, 769)
 target_scene_path = "uid://dovqeqmmtdbxe"
-target_door_id = 22
 door_id = 22
+target_door_id = 22

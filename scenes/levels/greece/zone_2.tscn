@@ -14965,14 +14965,16 @@ position = Vector2(68, 585)
 
 [node name="ShadowOwl3" parent="Enemies" unique_id=1731167037 instance=ExtResource("22_8eax7")]
 position = Vector2(1505, 1059)
+enemy_id = &"owl21"
 knockback_from_player_attacks = true
 
 [node name="LancetEnemy" parent="Enemies" unique_id=1519339315 instance=ExtResource("23_3ceah")]
 position = Vector2(2396, 1189)
+enemy_id = &"lancet21"
 
 [node name="SnakeEnemy" parent="Enemies" unique_id=383943052 instance=ExtResource("22_j5lj7")]
 position = Vector2(718, 1233)
-enemy_id = &"snake03"
+enemy_id = &"snake21"
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)
