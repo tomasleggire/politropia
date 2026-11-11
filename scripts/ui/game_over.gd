@@ -30,7 +30,9 @@ var _reveal_tween: Tween
 var _options: Array[Button] = []
 
 @onready var _overlay: Control = %Overlay
+@onready var _background: TextureRect = %Background
 @onready var _backdrop: ColorRect = %Backdrop
+@onready var _shade: Control = %Shade
 @onready var _content: Control = %Content
 @onready var _retry_button: Button = %Retry
 @onready var _main_menu_button: Button = %MainMenu
@@ -40,7 +42,9 @@ func _ready() -> void:
 	# The tree pauses while this screen is up; it must still animate and take input.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_overlay.visible = false
+	_background.modulate.a = 0.0
 	_backdrop.color.a = 0.0
+	_shade.modulate.a = 0.0
 	_content.modulate.a = 0.0
 	_options = [_retry_button, _main_menu_button]
 	for option: Button in _options:
@@ -159,7 +163,9 @@ func _reveal() -> void:
 		_reveal_tween.kill()
 
 	_overlay.visible = true
+	_background.modulate.a = 0.0
 	_backdrop.color.a = 0.0
+	_shade.modulate.a = 0.0
 	_content.modulate.a = 0.0
 
 	_reveal_tween = create_tween()
@@ -167,7 +173,9 @@ func _reveal() -> void:
 	_reveal_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	_reveal_tween.set_trans(Tween.TRANS_SINE)
 	_reveal_tween.set_ease(Tween.EASE_OUT)
-	_reveal_tween.tween_property(_backdrop, "color:a", 1.0, backdrop_fade_time)
+	_reveal_tween.tween_property(_background, "modulate:a", 1.0, backdrop_fade_time)
+	_reveal_tween.parallel().tween_property(_shade, "modulate:a", 1.0, backdrop_fade_time)
+	_reveal_tween.parallel().tween_property(_backdrop, "color:a", 1.0, backdrop_fade_time)
 	if content_delay > 0.0:
 		_reveal_tween.tween_interval(content_delay)
 	_reveal_tween.tween_property(_content, "modulate:a", 1.0, content_fade_time)
@@ -233,7 +241,9 @@ func _close_overlay() -> void:
 	_active = false
 	_accepting_input = false
 	_overlay.visible = false
+	_background.modulate.a = 0.0
 	_backdrop.color.a = 0.0
+	_shade.modulate.a = 0.0
 	_content.modulate.a = 0.0
 	for option: Button in _options:
 		_reset_option_visual(option)

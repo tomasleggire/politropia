@@ -1,9 +1,44 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/game_completion.gd" id="1_script"]
 [ext_resource type="FontFile" uid="uid://rcvj3nh8n7hb" path="res://assets/ui/Cinzel-Bold.ttf" id="2_font"]
+[ext_resource type="Texture2D" uid="uid://dr5njrg18v7xn" path="res://assets/ui/end_screens/game_completion_background.jpeg" id="3_background"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_option"]
+
+[sub_resource type="Gradient" id="Gradient_top"]
+offsets = PackedFloat32Array(0, 0.46, 1)
+colors = PackedColorArray(0.01, 0.012, 0.022, 0.74, 0.01, 0.012, 0.022, 0.22, 0.01, 0.012, 0.022, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_top"]
+gradient = SubResource("Gradient_top")
+width = 4
+height = 128
+fill_from = Vector2(0, 0)
+fill_to = Vector2(0, 1)
+
+[sub_resource type="Gradient" id="Gradient_bottom"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(0.01, 0.012, 0.022, 0, 0.01, 0.012, 0.022, 0, 0.01, 0.012, 0.022, 0.62)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_bottom"]
+gradient = SubResource("Gradient_bottom")
+width = 4
+height = 128
+fill_from = Vector2(0, 0)
+fill_to = Vector2(0, 1)
+
+[sub_resource type="Gradient" id="Gradient_vignette"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0, 0, 0, 0, 0, 0, 0, 0, 0.008, 0.006, 0.014, 0.52)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_vignette"]
+gradient = SubResource("Gradient_vignette")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1.15, 0.5)
 
 [node name="GameCompletion" type="CanvasLayer"]
 process_mode = 3
@@ -21,8 +56,23 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 0
 
+[node name="Background" type="TextureRect" parent="Overlay"]
+unique_name_in_owner = true
+texture_filter = 4
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("3_background")
+expand_mode = 1
+stretch_mode = 6
+
 [node name="Backdrop" type="ColorRect" parent="Overlay"]
 unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0.38)
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -30,58 +80,125 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.03, 0.035, 0.06, 0)
+color = Color(0.01, 0.012, 0.022, 0)
 
-[node name="Center" type="CenterContainer" parent="Overlay"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="Content" type="VBoxContainer" parent="Overlay/Center"]
+[node name="Shade" type="Control" parent="Overlay"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 0)
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
-theme_override_constants/separation = 18
-alignment = 1
+
+[node name="TopShade" type="TextureRect" parent="Overlay/Shade"]
+texture_filter = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_top")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="BottomShade" type="TextureRect" parent="Overlay/Shade"]
+texture_filter = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_bottom")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Vignette" type="TextureRect" parent="Overlay/Shade"]
+texture_filter = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_vignette")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Center" type="Control" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Content" type="Control" parent="Overlay/Center"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="Title" type="Label" parent="Overlay/Center/Content"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.945, 0.93, 0.87, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
-theme_override_constants/shadow_offset_y = 2
+unique_name_in_owner = true
+layout_mode = 1
+anchor_top = 0.1
+anchor_right = 1.0
+anchor_bottom = 0.3
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.97, 0.93, 0.81, 1)
+theme_override_colors/font_outline_color = Color(0.03, 0.025, 0.02, 0.92)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.78)
+theme_override_constants/outline_size = 8
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 46
+theme_override_font_sizes/font_size = 42
 text = "CONTINUARÁ..."
 horizontal_alignment = 1
-
-[node name="Ornament" type="ColorRect" parent="Overlay/Center/Content"]
-custom_minimum_size = Vector2(180, 1)
-layout_mode = 2
-size_flags_horizontal = 4
-mouse_filter = 2
-color = Color(0.878, 0.725, 0.31, 0.28)
-
-[node name="Spacer" type="Control" parent="Overlay/Center/Content"]
-custom_minimum_size = Vector2(0, 10)
-layout_mode = 2
-mouse_filter = 2
+vertical_alignment = 1
 
 [node name="MainMenu" type="Button" parent="Overlay/Center/Content"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(300, 60)
-layout_mode = 2
+custom_minimum_size = Vector2(300, 56)
+layout_mode = 1
+anchor_left = 0.5
+anchor_top = 0.84
+anchor_right = 0.5
+anchor_bottom = 0.84
+offset_left = -150.0
+offset_right = 150.0
+offset_bottom = 56.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_colors/font_color = Color(0.91, 0.85, 0.66, 1)
 theme_override_colors/font_focus_color = Color(1, 0.96, 0.84, 1)
 theme_override_colors/font_hover_color = Color(1, 0.96, 0.84, 1)
 theme_override_colors/font_pressed_color = Color(1, 1, 0.92, 1)
 theme_override_colors/font_hover_pressed_color = Color(1, 1, 0.92, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.72)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 2
+theme_override_constants/shadow_outline_size = 3
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxEmpty_option")
 theme_override_styles/hover = SubResource("StyleBoxEmpty_option")
 theme_override_styles/pressed = SubResource("StyleBoxEmpty_option")
