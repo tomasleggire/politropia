@@ -105,3 +105,5 @@ func _draw_eye(center: Vector2, extent: float, color: Color) -> void:
 	draw_polyline(btm_curve, color, 2.0, true)
 	draw_arc(center, extent * 0.38, 0.0, TAU, 24, color, 1.5, true)
 	draw_circle(center, extent * 0.18, color)
+
+

@@ -96,6 +96,7 @@ var current_health: int:
 ## A non-lethal hit nudges the room camera by this many pixels for this long.
 @export var hit_shake_strength := 3.0
 @export var hit_shake_time := 0.2
+
 ## Hazard hit: dark fade out, move to the last safe ground, fade back in.
 @export var hazard_fade_out := 0.15
 @export var hazard_fade_in := 0.2

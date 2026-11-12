@@ -10,7 +10,9 @@
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="10_0j26h"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="10_f5s00"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_n3h83"]
+[ext_resource type="PackedScene" uid="uid://b5lf46acc08rl" path="res://scenes/enemies/teacher_enemy.tscn" id="18_4127r"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="19_6keu4"]
+[ext_resource type="PackedScene" uid="uid://dmth8yaq1mat2" path="res://scenes/enemies/mathematician_enemy.tscn" id="19_cqlt6"]
 [ext_resource type="PackedScene" path="res://scenes/world/tutorial_sign.tscn" id="20_tutsign"]
 [ext_resource type="PackedScene" path="res://scenes/world/energy_food.tscn" id="21_food"]
 [ext_resource type="PackedScene" path="res://scenes/world/gothic_candle.tscn" id="amb_candle"]
@@ -14235,3 +14237,9 @@ phase_offset = 1.7
 [node name="Candle3" parent="." unique_id=969284469 instance=ExtResource("amb_candle")]
 position = Vector2(1130, 697)
 phase_offset = 3.4
+
+[node name="teacher_enemy" parent="." unique_id=1714237560 instance=ExtResource("18_4127r")]
+position = Vector2(436, 688)
+
+[node name="MathematicianEnemy" parent="." unique_id=1401423410 instance=ExtResource("19_cqlt6")]
+position = Vector2(887, 626)
