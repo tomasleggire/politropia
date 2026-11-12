@@ -10,6 +10,7 @@
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="7_cxp8p"]
 [ext_resource type="PackedScene" uid="uid://dmth8yaq1mat2" path="res://scenes/enemies/mathematician_enemy.tscn" id="8_5e38y"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="10_710r8"]
+[ext_resource type="PackedScene" uid="uid://b5lf46acc08rl" path="res://scenes/enemies/teacher_enemy.tscn" id="13_g4t5l"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
@@ -14016,6 +14017,10 @@ start_facing = -1
 position = Vector2(1374, 162)
 enemy_id = &"bf_21"
 knockback_from_player_attacks = true
+
+[node name="Teacher" parent="." unique_id=1714237560 instance=ExtResource("13_g4t5l")]
+position = Vector2(1671, 727)
+enemy_id = &"teacher21"
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)

@@ -13,6 +13,7 @@
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="10_y8mnw"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="12_gkqv4"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="13_rh6b6"]
+[ext_resource type="PackedScene" uid="uid://b5lf46acc08rl" path="res://scenes/enemies/teacher_enemy.tscn" id="18_5iptr"]
 [ext_resource type="PackedScene" uid="uid://dmth8yaq1mat2" path="res://scenes/enemies/mathematician_enemy.tscn" id="18_p4w6w"]
 [ext_resource type="PackedScene" path="res://scenes/world/collectible_pickup.tscn" id="21_k4tlx"]
 [ext_resource type="Resource" uid="uid://d0iqa2l0r7smr" path="res://data/collectibles/definitions/emerald_bull_clear_text.tres" id="22_vjm1f"]
@@ -14392,6 +14393,10 @@ max_fall_speed = 1400.0
 [node name="MathematicianEnemy" parent="Enemies" unique_id=1401423410 instance=ExtResource("18_p4w6w")]
 position = Vector2(579, 305)
 enemy_id = &"math_41"
+
+[node name="Teacher" parent="Enemies" unique_id=1714237560 instance=ExtResource("18_5iptr")]
+position = Vector2(1390, 827)
+enemy_id = &"teacher41"
 
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(162, 550)
