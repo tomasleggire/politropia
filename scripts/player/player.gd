@@ -374,35 +374,7 @@ var current_health: int:
 @onready var _headroom_check: RayCast2D = $HeadroomCheck
 @onready var _attack_hitbox: AttackHitbox = $AttackHitbox
 @onready var _slash_vfx: PlayerSlashVfx = $SlashVfx
-@onready var _animation_sprite_frames: SpriteFrames = LuzAnimationCatalog.build_sprite_frames({
-	"ground_dash": dash_duration,
-	"air_dash": air_dash_duration,
-	"wall_jump": wall_kick_input_lock_time,
-	"land": landing_squash_time,
-	"turn": turn_time,
-	"skid": _skid_brake_duration(),
-	"open_eyes": open_eyes_duration,
-	"attack_1": attack_startup_time + _phase_total(attack_hit1_phases),
-	"attack_2": attack_chain_startup_time + _phase_total(attack_hit2_phases),
-	"attack_3": attack_finisher_startup_time + _phase_total(attack_hit3_phases),
-	"crouch_attack": crouch_attack_startup_time + _phase_total(crouch_attack_phases),
-	"up_attack": up_attack_startup_time + _phase_total(up_attack_phases),
-	"air_attack": air_attack_startup_time + _phase_total(air_attack_phases),
-}, {
-	"attack_1": attack_startup_time,
-	"attack_2": attack_chain_startup_time,
-	"attack_3": attack_finisher_startup_time,
-	"crouch_attack": crouch_attack_startup_time,
-	"up_attack": up_attack_startup_time,
-	"air_attack": air_attack_startup_time,
-}, {
-	"attack_1": attack_hit1_phases.x,
-	"attack_2": attack_hit2_phases.x,
-	"attack_3": attack_hit3_phases.x,
-	"crouch_attack": crouch_attack_phases.x,
-	"up_attack": up_attack_phases.x,
-	"air_attack": air_attack_phases.x,
-})
+@onready var _animation_sprite_frames: SpriteFrames = _build_animation_sprite_frames()
 
 var _state := State.IDLE
 var _state_time := 0.0
@@ -548,9 +520,32 @@ var _focus_tapped := false
 var _focus_vfx: FocusHealVfx
 var _focus_end_animating := false
 
+## Stats as authored in the scene, before any collectible passive. Effective
+## stats are always rebuilt from these plus the collected IDs; bonuses are never
+## added on top of the current effective values.
+var _base_max_health := 0
+var _base_attack_damage := 0
+var _base_max_energy := 0.0
+var _base_dash_duration := 0.0
+var _base_air_dash_duration := 0.0
+var _base_jump_height := 0.0
+var _base_double_jump_height := 0.0
+var _jump_height_bonus_percent := 0.0
+var _collectibles_manager: Node = null
+## Dash lengths of the dash in progress. A passive gained mid-dash only changes
+## the next one, so the timer, movement and animation of the current dash agree.
+var _active_dash_duration := 0.0
+var _active_air_dash_duration := 0.0
+## The dash clips are rebuilt lazily: changing SpriteFrames in the middle of a
+## dash would desync the clip from the already snapshotted dash timer.
+var _dash_animation_dirty := false
+
 
 func _ready() -> void:
 	add_to_group(&"player")
+	_capture_base_stats()
+	_connect_collectibles()
+	_apply_collectible_passives()
 	_sprite.sprite_frames = _animation_sprite_frames
 	_restore_saved_abilities()
 	
@@ -612,10 +607,152 @@ func _ready() -> void:
 
 
 func _recompute_jump_physics() -> void:
-	_rise_gravity = (2.0 * jump_height) / (jump_time_to_apex * jump_time_to_apex)
-	_jump_velocity = -_rise_gravity * jump_time_to_apex
-	_double_jump_velocity = -sqrt(2.0 * _rise_gravity * double_jump_height)
+	# The passive raises the launch speed, not gravity, so the fall arc, wall
+	# kicks and variable jump release keep their authored feel. At the same
+	# gravity, multiplying the launch speed by sqrt(1 + p/100) multiplies the
+	# apex height by (1 + p/100). The base values keep the no-passive case
+	# bit-for-bit identical to the original formulas.
+	var base_jump_height := _base_jump_height if _base_jump_height > 0.0 else jump_height
+	var base_double_jump_height := (
+		_base_double_jump_height if _base_double_jump_height > 0.0 else double_jump_height
+	)
+	var height_multiplier := maxf(1.0 + _jump_height_bonus_percent / 100.0, 0.0)
+	_rise_gravity = (2.0 * base_jump_height) / (jump_time_to_apex * jump_time_to_apex)
+	_jump_velocity = -_rise_gravity * jump_time_to_apex * sqrt(height_multiplier)
+	_double_jump_velocity = -sqrt(2.0 * _rise_gravity * base_double_jump_height * height_multiplier)
 	_fall_gravity = _rise_gravity * fall_gravity_multiplier
+
+
+func _build_animation_sprite_frames() -> SpriteFrames:
+	return LuzAnimationCatalog.build_sprite_frames({
+		"ground_dash": dash_duration,
+		"air_dash": air_dash_duration,
+		"wall_jump": wall_kick_input_lock_time,
+		"land": landing_squash_time,
+		"turn": turn_time,
+		"skid": _skid_brake_duration(),
+		"open_eyes": open_eyes_duration,
+		"attack_1": attack_startup_time + _phase_total(attack_hit1_phases),
+		"attack_2": attack_chain_startup_time + _phase_total(attack_hit2_phases),
+		"attack_3": attack_finisher_startup_time + _phase_total(attack_hit3_phases),
+		"crouch_attack": crouch_attack_startup_time + _phase_total(crouch_attack_phases),
+		"up_attack": up_attack_startup_time + _phase_total(up_attack_phases),
+		"air_attack": air_attack_startup_time + _phase_total(air_attack_phases),
+	}, {
+		"attack_1": attack_startup_time,
+		"attack_2": attack_chain_startup_time,
+		"attack_3": attack_finisher_startup_time,
+		"crouch_attack": crouch_attack_startup_time,
+		"up_attack": up_attack_startup_time,
+		"air_attack": air_attack_startup_time,
+	}, {
+		"attack_1": attack_hit1_phases.x,
+		"attack_2": attack_hit2_phases.x,
+		"attack_3": attack_hit3_phases.x,
+		"crouch_attack": crouch_attack_phases.x,
+		"up_attack": up_attack_phases.x,
+		"air_attack": air_attack_phases.x,
+	})
+
+
+## -- Collectible passives -----------------------------------------------------
+
+## Saves the authored stats once. Every later application starts from these.
+func _capture_base_stats() -> void:
+	_base_max_health = maxi(max_health, 1)
+	_base_attack_damage = attack_damage
+	_base_max_energy = max_energy
+	_base_dash_duration = dash_duration
+	_base_air_dash_duration = air_dash_duration
+	_base_jump_height = jump_height
+	_base_double_jump_height = double_jump_height
+
+
+func _connect_collectibles() -> void:
+	_collectibles_manager = get_node_or_null("/root/Collectibles")
+	if _collectibles_manager == null:
+		return
+	if not _collectibles_manager.is_connected(&"collectibles_changed", _on_collectibles_changed):
+		_collectibles_manager.connect(&"collectibles_changed", _on_collectibles_changed)
+
+
+func _disconnect_collectibles() -> void:
+	if not is_instance_valid(_collectibles_manager):
+		return
+	if _collectibles_manager.is_connected(&"collectibles_changed", _on_collectibles_changed):
+		_collectibles_manager.disconnect(&"collectibles_changed", _on_collectibles_changed)
+
+
+func _exit_tree() -> void:
+	_disconnect_collectibles()
+
+
+func _on_collectibles_changed() -> void:
+	_apply_collectible_passives()
+
+
+func _passive_total(effect: int) -> float:
+	if not is_instance_valid(_collectibles_manager):
+		return 0.0
+	return float(_collectibles_manager.call(&"get_passive_total", effect))
+
+
+## Rebuilds every effective stat from the base stats plus the bonuses of the
+## collected IDs. Never adds over the current values, so it can run any number
+## of times (duplicate signals, saved-game restore, respawn) without stacking.
+func _apply_collectible_passives() -> void:
+	var health_before := _health
+	var max_health_before := max_health
+	var energy_before := current_energy
+	var max_energy_before := max_energy
+	var dash_before := dash_duration
+	var air_dash_before := air_dash_duration
+
+	var health_bonus := _passive_total(CollectibleDefinition.PassiveEffect.MAX_HEALTH)
+	var damage_bonus := _passive_total(CollectibleDefinition.PassiveEffect.DAMAGE)
+	var energy_bonus := _passive_total(CollectibleDefinition.PassiveEffect.MAX_ENERGY)
+	var dash_bonus := _passive_total(CollectibleDefinition.PassiveEffect.DASH_DURATION)
+	var jump_bonus := _passive_total(CollectibleDefinition.PassiveEffect.JUMP_HEIGHT)
+
+	# Health: extra pips only. Current health is preserved (no free heal) and
+	# clamped, so losing the bonus never leaves her above the maximum.
+	max_health = maxi(_base_max_health + maxi(roundi(health_bonus), 0), 1)
+	_health = mini(_health, max_health)
+	if max_health != max_health_before or _health != health_before:
+		health_changed.emit(_health, max_health)
+
+	# Damage: affects only Luz's outgoing hit (attack_damage is what
+	# _resolve_attack_hit passes to receive_hit); enemies keep their own.
+	attack_damage = maxi(_base_attack_damage + maxi(roundi(damage_bonus), 0), 0)
+
+	# Energy: capacity only. The current charge is preserved and clamped.
+	max_energy = maxf(_base_max_energy + maxf(energy_bonus, 0.0), 0.0)
+	current_energy = clampf(current_energy, 0.0, max_energy)
+	if max_energy != max_energy_before or current_energy != energy_before:
+		energy_changed.emit(current_energy, max_energy)
+
+	# Dash: extra seconds for future dashes. The dash in progress keeps the
+	# lengths snapshotted by _start_dash().
+	dash_duration = maxf(_base_dash_duration + maxf(dash_bonus, 0.0), 0.001)
+	air_dash_duration = maxf(_base_air_dash_duration + maxf(dash_bonus, 0.0), 0.001)
+	if not is_equal_approx(dash_duration, dash_before) or not is_equal_approx(air_dash_duration, air_dash_before):
+		_dash_animation_dirty = true
+		_refresh_dash_animation_if_possible()
+
+	# Jump: extra height percentage. _recompute_jump_physics() only changes the
+	# launch speeds, so the next ground/air jump gets it and the current rise is
+	# untouched (collecting mid-air never teleports the arc).
+	_jump_height_bonus_percent = maxf(jump_bonus, 0.0)
+	_recompute_jump_physics()
+
+
+func _refresh_dash_animation_if_possible() -> void:
+	if not _dash_animation_dirty or _state == State.DASH:
+		return
+	_dash_animation_dirty = false
+	_animation_sprite_frames = _build_animation_sprite_frames()
+	if _sprite != null:
+		_sprite.sprite_frames = _animation_sprite_frames
 
 
 func _physics_process(delta: float) -> void:
@@ -1622,6 +1759,11 @@ func _can_dash_from_state() -> bool:
 
 
 func _start_dash() -> void:
+	# A dash clip deferred during the previous dash (a passive collected while
+	# sliding) is rebuilt here, before the new timer and animation start.
+	_refresh_dash_animation_if_possible()
+	_active_dash_duration = dash_duration
+	_active_air_dash_duration = air_dash_duration
 	_dash_direction = _facing
 	_dash_is_air = not is_on_floor()
 	if _dash_is_air:
@@ -1650,7 +1792,7 @@ func _dash_sliding() -> bool:
 func _dash_speed_at(t: float) -> float:
 	var ramp := maxf(dash_ramp_time, 0.001)
 	var ease_time := maxf(dash_ease_time, 0.001)
-	var ease_start := maxf(dash_duration - ease_time, ramp)
+	var ease_start := maxf(_active_dash_duration - ease_time, ramp)
 	if t < ramp:
 		return lerpf(_dash_start_speed, dash_speed, t / ramp)
 	if t < ease_start:
@@ -1681,7 +1823,7 @@ func _update_dash(delta: float) -> void:
 		_spawn_dust(GroundDust.Kind.DASH_START)
 	velocity.x = float(_dash_direction) * _dash_speed_at(slide_t)
 
-	if slide_t >= dash_duration:
+	if slide_t >= _active_dash_duration:
 		_spawn_dust(GroundDust.Kind.DASH_END)
 		if _has_standing_headroom():
 			_enter_state(State.RUN if absf(velocity.x) > 5.0 else State.IDLE)
@@ -1703,7 +1845,7 @@ func _update_air_dash(_delta: float) -> void:
 	if Input.is_action_just_pressed(&"jump") and _try_launch_jump():
 		return
 
-	if _state_time >= air_dash_duration:
+	if _state_time >= _active_air_dash_duration:
 		_enter_state(State.JUMP if velocity.y < 0.0 else State.FALL)
 
 
@@ -1977,11 +2119,16 @@ func heal(amount: int) -> int:
 	return restored
 
 
-## Changes the mask count; health is clamped to it and listeners are told.
+## Changes the authored mask count; collectible bonuses are re-applied on top
+## of the new base, health is clamped and listeners are told.
 func set_max_health(value: int) -> void:
-	max_health = maxi(value, 1)
-	_health = mini(_health, max_health)
-	health_changed.emit(_health, max_health)
+	_base_max_health = maxi(value, 1)
+	var health_before := _health
+	var max_health_before := max_health
+	_apply_collectible_passives()
+	if max_health == max_health_before and _health == health_before:
+		_health = mini(_health, max_health)
+		health_changed.emit(_health, max_health)
 
 
 ## Applies a hit coming from `source_position`. Returns false, changing

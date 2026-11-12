@@ -7,12 +7,13 @@ extends Node
 ## reported instead of becoming an invisible "ghost" entry.
 ##
 ## World objects, the gallery and the main menu use only this public API.
-## Everything else is private, which keeps a future save system in one place:
-## save `get_collected_ids()` and restore that list inside this script.
+## Everything else is private. The IDs are saved by `SaveService` (see
+## `to_dict()`/`from_dict()`), never by pickups or the gallery. Passive bonuses
+## are derived from those IDs, so they need no separate persistence.
 ##
-## SAVE SYSTEM NOTE: no disk persistence yet, on purpose. When it exists, load
-## the saved IDs here in `_ready()` and write them after `try_collect()`/`clear()`
-## without changing any caller.
+## The catalog is the source of truth for each passive effect; this manager only
+## sums the definitions of the collected IDs, so the same ID can never grant its
+## bonus twice and the totals are always rebuilt from scratch.
 
 signal collectibles_changed
 signal collectible_collected(id: String, count: int, total: int)
@@ -91,6 +92,21 @@ func get_total_count() -> int:
 
 func get_collected_count() -> int:
 	return _collected.size()
+
+
+## Sum of the passive bonuses of `effect` across every collected definition.
+## Rebuilt from the collected IDs on every call, so it is idempotent, stacks
+## different IDs additively, counts an ID once, and ignores NONE/invalid values.
+func get_passive_total(effect: int) -> float:
+	if effect == CollectibleDefinition.PassiveEffect.NONE:
+		return 0.0
+	var total := 0.0
+	for id: Variant in _collected.keys():
+		var definition: CollectibleDefinition = _definitions_by_id.get(id)
+		if definition == null or definition.passive_effect != effect:
+			continue
+		total += definition.passive_bonus()
+	return total
 
 
 ## Forgets the collectibles of this session. It never touches the catalog or
