@@ -531,6 +531,9 @@ var _base_air_dash_duration := 0.0
 var _base_jump_height := 0.0
 var _base_double_jump_height := 0.0
 var _jump_height_bonus_percent := 0.0
+## Health bonus already applied, in whole hearts. Used to fill only the pips a
+## new collectible adds without healing the ones already lost.
+var _applied_health_bonus := 0
 var _collectibles_manager: Node = null
 ## Dash lengths of the dash in progress. A passive gained mid-dash only changes
 ## the next one, so the timer, movement and animation of the current dash agree.
@@ -714,10 +717,16 @@ func _apply_collectible_passives() -> void:
 	var dash_bonus := _passive_total(CollectibleDefinition.PassiveEffect.DASH_DURATION)
 	var jump_bonus := _passive_total(CollectibleDefinition.PassiveEffect.JUMP_HEIGHT)
 
-	# Health: extra pips only. Current health is preserved (no free heal) and
-	# clamped, so losing the bonus never leaves her above the maximum.
-	max_health = maxi(_base_max_health + maxi(roundi(health_bonus), 0), 1)
+	# Health: the pips a new collectible adds arrive full; the pips already lost
+	# stay lost and the current health is clamped, so losing the bonus never
+	# leaves her above the maximum.
+	var health_bonus_rounded := maxi(roundi(health_bonus), 0)
+	var gained_hearts := maxi(health_bonus_rounded - _applied_health_bonus, 0)
+	max_health = maxi(_base_max_health + health_bonus_rounded, 1)
+	if gained_hearts > 0:
+		_health += gained_hearts
 	_health = mini(_health, max_health)
+	_applied_health_bonus = health_bonus_rounded
 	if max_health != max_health_before or _health != health_before:
 		health_changed.emit(_health, max_health)
 

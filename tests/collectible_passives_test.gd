@@ -310,12 +310,12 @@ func _case_health() -> void:
 
 	check(_collect(HEALTH_A), "a one-heart passive is collected")
 	check(_player.get_max_health() == 6, "max health rises by the first bonus")
-	check(_player.get_health() == 3, "raising max health does not heal the current health")
+	check(_player.get_health() == 4, "the new heart arrives full")
 	check(_collect(HEALTH_B), "a second health passive is collected")
 	check(_player.get_max_health() == 8, "health bonuses from different ids stack")
-	check(_player.get_health() == 3, "the second bonus also does not heal")
+	check(_player.get_health() == 6, "the two new hearts arrive full")
 
-	check(_player.heal(99) == 5, "healing fills up to the new maximum")
+	check(_player.heal(99) == 2, "healing fills up to the new maximum")
 	check(_player.get_health() == 8, "the player can reach the bonused maximum")
 	check(_player._base_max_health == 5, "the base max health stays untouched")
 
