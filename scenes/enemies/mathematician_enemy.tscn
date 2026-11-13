@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dmth8yaq1mat2"]
 
-[ext_resource type="Script" uid="uid://cgdygf8mlbcey" path="res://scripts/enemies/mathematician_enemy.gd" id="1_math"]
+[ext_resource type="Script" uid="uid://dikm85jhyyb12" path="res://scripts/enemies/mathematician_enemy.gd" id="1_math"]
 [ext_resource type="Texture2D" uid="uid://chwlt2ay1lyqb" path="res://assets/enemies/mathematician_walk_8frames_attack_single_row.png" id="2_8ufw1"]
 [ext_resource type="Texture2D" uid="uid://uxa8h0ee4r6c" path="res://assets/enemies/mathematician02.png" id="4_wpj8r"]
 
@@ -150,9 +150,11 @@ point_count = 2
 collision_layer = 8
 collision_mask = 3
 script = ExtResource("1_math")
+cooldown_duration = 0.8
+rear_detection_range = 100.0
 enemy_id = &"mathematician_enemy"
 start_facing = 1
-max_health = 4
+max_health = 3
 gravity = 980.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=520318213]

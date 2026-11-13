@@ -11,6 +11,7 @@ extends Enemy
 
 enum State {
 	PATROL,    ## Patrullaje regular de izquierda a derecha.
+	ENGAGE,
 	ATTACK,    ## Arremetida hacia adelante empujando el pizarrón.
 	COOLDOWN,  ## Breve recuperación tras el empujón antes de patrullar.
 	DEAD       ## Estado tras ser derrotado.
@@ -38,6 +39,12 @@ const GROUP_PLAYER: StringName = &"player"
 ## Rango de detección a la espalda para darse vuelta y atacar si el jugador se acerca por detrás.
 @export var rear_detection_range: float = 75.0
 
+@export_group("Engagement")
+## Time the enemy waits before turning toward the player.
+@export var rear_reaction_delay: float = 1.5
+## Maximum distance at which the enemy maintains engagement.
+@export var engagement_range: float = 140.0
+
 @export_group("Efectos")
 ## Posición relativa del centro del pizarrón cuando mira a la derecha (para chispas y polvo).
 @export var blackboard_offset: Vector2 = Vector2(28.0, -32.0)
@@ -57,6 +64,8 @@ const GROUP_PLAYER: StringName = &"player"
 var current_state: State = State.PATROL
 var cooldown_timer: float = 0.0
 var turn_cooldown: float = 0.0
+var rear_reaction_timer: float = 0.0
+var engagement_target: Node2D = null
 
 # Aliases de compatibilidad con Enemy (_facing y _health)
 var facing_direction: int:
@@ -111,6 +120,8 @@ func _think(delta: float) -> void:
 	match current_state:
 		State.PATROL:
 			_process_patrol(delta)
+		State.ENGAGE:
+			_process_engage(delta)
 		State.ATTACK:
 			_process_attack(delta)
 		State.COOLDOWN:
@@ -129,20 +140,23 @@ func _process_patrol(delta: float) -> void:
 	velocity.x = float(_facing) * walk_speed
 	_play_animation(&"walk")
 
-	# Si el jugador se acerca por la espalda, se da vuelta y arremete
 	_check_rear_detection()
+
+	# Detection may have changed the enemy's state.
 	if current_state != State.PATROL:
 		return
 
-	# Si está en el suelo y no está en cooldown de giro, verifica obstáculos
+	# Normal wall and ledge detection.
 	if is_on_floor() and turn_cooldown <= 0.0:
 		var reached_wall: bool = false
+
 		if is_on_wall():
 			var wall_norm: Vector2 = get_wall_normal()
 			if wall_norm.x * float(_facing) < -0.1:
 				reached_wall = true
 
 		var reached_ledge: bool = false
+
 		if ledge_ray != null:
 			ledge_ray.force_raycast_update()
 			if not ledge_ray.is_colliding():
@@ -150,6 +164,40 @@ func _process_patrol(delta: float) -> void:
 
 		if reached_wall or reached_ledge:
 			_flip_direction()
+
+
+func _process_engage(delta: float) -> void:
+	velocity.x = 0.0
+	_play_animation(&"idle")
+
+	# Make sure the target still exists.
+	if not is_instance_valid(engagement_target):
+		_cancel_engagement()
+		return
+
+	# Check whether the player is still nearby.
+	var dx: float = absf(engagement_target.global_position.x - global_position.x)
+	var dy: float = absf(engagement_target.global_position.y - global_position.y)
+
+	if dx > engagement_range or dy > 70.0:
+		_cancel_engagement()
+		return
+
+	# Continue tracking the player without turning around.
+	rear_reaction_timer -= delta
+
+	if rear_reaction_timer <= 0.0:
+		# Face the player's CURRENT position, not their original position.
+		var dir_to_player: float = signf(
+			engagement_target.global_position.x - global_position.x
+		)
+
+		if dir_to_player != 0.0:
+			_facing = int(dir_to_player)
+			_update_facing_direction()
+
+		engagement_target = null
+		_launch_attack()
 
 
 ## Arremetida frontal hacia adelante empujando el pizarrón.
@@ -299,12 +347,19 @@ func make_corpse_at(at: Vector2, _facing_dir: int) -> void:
 ## Reinicia el estado del matemático cuando el jugador reaparece en un checkpoint o desk.
 func _reset_ai() -> void:
 	super._reset_ai()
+
 	current_state = State.PATROL
 	cooldown_timer = 0.0
 	turn_cooldown = 0.0
+
+	rear_reaction_timer = 0.0
+	engagement_target = null
+
 	_set_hitbox_active(false)
+
 	if sprite != null:
 		sprite.visible = true
+
 	_update_facing_direction()
 	_play_animation(&"walk")
 
@@ -408,30 +463,42 @@ func _on_detection_area_body_entered(body: Node2D) -> void:
 
 
 func _on_rear_detection_body_entered(body: Node2D) -> void:
-	if _is_player(body) and (current_state == State.PATROL or current_state == State.COOLDOWN):
-		_on_rear_player_detected(body)
+	if _is_player(body):
+		if current_state == State.PATROL or current_state == State.COOLDOWN:
+			_on_rear_player_detected(body)
 
 
 ## Verifica si el jugador se encuentra a espaldas del matemático dentro del rango de percepción.
 func _check_rear_detection() -> void:
-	if current_state != State.PATROL and current_state != State.COOLDOWN:
+	if current_state != State.PATROL:
 		return
 
-	# 1. Comprobación mediante área física RearDetectionArea si existe en la escena
+	var detected_player: Node2D = null
+
+	# Check the physical detection area.
 	if rear_detection_area != null and rear_detection_area.monitoring:
 		for body: Node2D in rear_detection_area.get_overlapping_bodies():
 			if _is_player(body):
-				_on_rear_player_detected(body)
-				return
+				detected_player = body
+				break
 
-	# 2. Comprobación de proximidad y ángulo si el jugador está registrado
-	if is_instance_valid(_player_ref) and _player_ref is Node2D:
-		var p_pos: Vector2 = (_player_ref as Node2D).global_position
-		var dx: float = p_pos.x - global_position.x
-		var dy: float = absf(p_pos.y - global_position.y)
-		# A una altura similar (< 55px) y viniendo desde atrás (lado opuesto a la marcha):
-		if dy <= 55.0 and (dx * float(_facing)) < -4.0 and absf(dx) <= rear_detection_range:
-			_on_rear_player_detected(_player_ref as Node2D)
+	# Fallback: check player position and distance.
+	if detected_player == null:
+		if is_instance_valid(_player_ref) and _player_ref is Node2D:
+			var player := _player_ref as Node2D
+
+			var dx: float = player.global_position.x - global_position.x
+			var dy: float = absf(player.global_position.y - global_position.y)
+
+			var is_behind: bool = dx * float(_facing) < -4.0
+			var is_close: bool = absf(dx) <= rear_detection_range
+			var is_same_height: bool = dy <= 55.0
+
+			if is_behind and is_close and is_same_height:
+				detected_player = player
+
+	if detected_player != null:
+		_on_rear_player_detected(detected_player)
 
 
 ## Reacción cuando el jugador se acerca por la espalda: gira y arremete con el pizarrón.
@@ -439,12 +506,13 @@ func _on_rear_player_detected(player: Node2D) -> void:
 	if current_state != State.PATROL and current_state != State.COOLDOWN:
 		return
 
-	var dir_to_player: float = signf(player.global_position.x - global_position.x)
-	if dir_to_player != 0.0 and int(dir_to_player) != _facing:
-		_facing = int(dir_to_player)
-		_update_facing_direction()
+	engagement_target = player
+	rear_reaction_timer = rear_reaction_delay
 
-	_launch_attack()
+	current_state = State.ENGAGE
+	velocity.x = 0.0
+
+	_play_animation(&"idle")
 
 
 func _on_hitbox_body_entered(body: Node2D) -> void:
@@ -491,3 +559,9 @@ func _trigger_chalk_attack_fx() -> void:
 		chalk_attack_particles.direction = Vector2(float(_facing), -0.2)
 		chalk_attack_particles.restart()
 		chalk_attack_particles.emitting = true
+
+
+func _cancel_engagement() -> void:
+	engagement_target = null
+	rear_reaction_timer = 0.0
+	current_state = State.PATROL

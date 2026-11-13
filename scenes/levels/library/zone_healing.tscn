@@ -14144,6 +14144,20 @@ tile_set = SubResource("TileSet_w0rkp")
 position = Vector2(0, 2)
 tile_set = SubResource("TileSet_7wplu")
 
+[node name="ZoneAmbience" parent="." unique_id=1933139757 instance=ExtResource("amb_zone")]
+
+[node name="DustMotes" parent="." unique_id=138632098 instance=ExtResource("amb_dust")]
+
+[node name="DeskLight" parent="." unique_id=1214992449 instance=ExtResource("amb_light")]
+position = Vector2(449, 699)
+color = Color(1, 0.78, 0.45, 1)
+energy = 0.9
+texture_scale = 2.65625
+light_color = Color(1, 0.78, 0.45, 1)
+base_energy = 0.9
+radius = 170.0
+flicker_amount = 0.05
+
 [node name="SecretChest" parent="." unique_id=703667144 instance=ExtResource("9_k66w0")]
 position = Vector2(217, 683)
 reward_scene = ExtResource("10_simqr")
@@ -14191,17 +14205,3 @@ limite_inferior = 775
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1279308137]
 position = Vector2(620, 583.5)
 shape = SubResource("RectangleShape2D_3n1fk")
-
-[node name="ZoneAmbience" parent="." unique_id=1933139757 instance=ExtResource("amb_zone")]
-
-[node name="DustMotes" parent="." unique_id=138632098 instance=ExtResource("amb_dust")]
-
-[node name="DeskLight" parent="." unique_id=1214992449 instance=ExtResource("amb_light")]
-position = Vector2(449, 699)
-color = Color(1, 0.78, 0.45, 1)
-energy = 0.9
-texture_scale = 2.65625
-light_color = Color(1, 0.78, 0.45, 1)
-base_energy = 0.9
-radius = 170.0
-flicker_amount = 0.05

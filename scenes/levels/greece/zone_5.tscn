@@ -15151,6 +15151,12 @@ tile_set = SubResource("TileSet_7wplu")
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("24_tolj8")]
 position = Vector2(305, 778)
 
+[node name="SnakeEnemy" parent="." unique_id=383943052 instance=ExtResource("23_pmixq")]
+position = Vector2(1018, 733)
+enemy_id = &"snake51"
+start_facing = 1
+max_health = 2
+
 [node name="Foreground" type="TileMapLayer" parent="." unique_id=75189775]
 position = Vector2(-3548, 3828)
 tile_map_data = PackedByteArray("AAACAPL/AAAyAB0AAAACAPP/AAATACYAAAADAPL/AAAzAB0AAAAHAPT/AAAYACcAAAAHAPf/AAAYACoAAAAAAPP/AAARACYAAAAAAPT/AAARACcAAAAAAPX/AAARACgAAAAAAPb/AAARACkAAAAAAPf/AAARACoAAAABAPL/AAASACUAAAABAPP/AAASACYAAAABAPT/AAASACcAAAABAPX/AAASACgAAAABAPb/AAASACkAAAABAPf/AAASACoAAAABAPj/AAASACsAAAACAPT/AAATACcAAAACAPX/AAATACgAAAACAPb/AAATACkAAAACAPf/AAATACoAAAACAPj/AAATACsAAAADAPP/AAAUACYAAAADAPT/AAAUACcAAAADAPX/AAAUACgAAAADAPb/AAAUACkAAAADAPf/AAAUACoAAAADAPj/AAAUACsAAAAEAPP/AAAVACYAAAAEAPT/AAAVACcAAAAEAPX/AAAVACgAAAAEAPb/AAAVACkAAAAEAPf/AAAVACoAAAAEAPj/AAAVACsAAAAFAPL/AAAWACUAAAAFAPP/AAAWACYAAAAFAPT/AAAWACcAAAAFAPX/AAAWACgAAAAFAPb/AAAWACkAAAAFAPf/AAAWACoAAAAFAPj/AAAWACsAAAAGAPL/AAAXACUAAAAGAPP/AAAXACYAAAAGAPT/AAAXACcAAAAGAPX/AAAXACgAAAAGAPb/AAAXACkAAAAGAPf/AAAXACoAAAAGAPj/AAAXACsAAAAHAPP/AAAYACYAAAAHAPX/AAAYACgAAAAHAPb/AAAYACkAAAA=")
@@ -15198,11 +15204,6 @@ position = Vector2(1721, 640)
 target_scene_path = "uid://d0frrlyw800j7"
 door_id = 29
 target_door_id = 30
-
-[node name="SnakeEnemy" parent="." unique_id=383943052 instance=ExtResource("23_pmixq")]
-position = Vector2(1018, 733)
-start_facing = 1
-max_health = 2
 
 [node name="ZoneAmbience" parent="." unique_id=1702245887 instance=ExtResource("amb_zone")]
 style = ExtResource("amb_style")

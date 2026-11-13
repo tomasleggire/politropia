@@ -10,6 +10,8 @@
 [ext_resource type="PackedScene" path="res://scenes/enemies/book_flyer.tscn" id="8_cne4m"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="8_ctd55"]
 [ext_resource type="PackedScene" path="res://scenes/world/fragmento_libro.tscn" id="8_vrfrn"]
+[ext_resource type="PackedScene" path="res://scenes/world/collectible_pickup.tscn" id="10_2jtkc"]
+[ext_resource type="Resource" uid="uid://0i2o8tutuald" path="res://data/collectibles/definitions/garnet_goat_other_ways.tres" id="11_7m53a"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="11_cne4m"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="12_a30ts"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="13_tmyxi"]
@@ -14317,11 +14319,24 @@ tile_set = SubResource("TileSet_7wplu")
 [node name="Player" parent="." unique_id=1611018514 instance=ExtResource("8_ctd55")]
 position = Vector2(70, 1404)
 
+[node name="CollectiblePickup" parent="." unique_id=843226684 instance=ExtResource("10_2jtkc")]
+position = Vector2(75, 494)
+definition = ExtResource("11_7m53a")
+
 [node name="BookFlyer" parent="." unique_id=898895438 instance=ExtResource("8_cne4m")]
 position = Vector2(165, 916)
+enemy_id = &"bf_31"
+knockback_from_player_attacks = true
 
 [node name="BookFlyer2" parent="." unique_id=135052472 instance=ExtResource("8_cne4m")]
 position = Vector2(910, 255)
+enemy_id = &"bf32"
+knockback_from_player_attacks = true
+
+[node name="BookFlyer3" parent="." unique_id=1134364774 instance=ExtResource("8_cne4m")]
+position = Vector2(221, 436)
+enemy_id = &"bf33"
+knockback_from_player_attacks = true
 
 [node name="FragmentoLibro" parent="." unique_id=1398381815 instance=ExtResource("8_vrfrn")]
 position = Vector2(103, 942)
