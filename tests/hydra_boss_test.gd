@@ -85,6 +85,10 @@ func run() -> void:
 	await process_frame
 	create_timer(WATCHDOG_SECONDS).timeout.connect(_on_watchdog)
 	_only = OS.get_cmdline_user_args()
+	# A misspelled case name must fail the run instead of passing with zero checks.
+	for requested: String in _only:
+		if not CHECKS.has(requested):
+			_problems.append("unknown case requested: %s" % requested)
 	for case_name: String in CHECKS:
 		if not _only.is_empty() and not _only.has(case_name):
 			continue
