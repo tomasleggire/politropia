@@ -22,8 +22,8 @@ While the Codex workspace is out of credits (El Topo's art is blocked), close th
 
 ## Tasks
 
-- [ ] T1 Polish follow-ups (route: delegated writer; trigger: 2+ non-trivial files across three bosses). Each item verified first; real defects fixed with a test; non-issues recorded with the reason.
-- [ ] T2 Native review of the polish range, then single-branch consolidation (route: inline).
+- [ ] T1 Polish follow-ups: CANCELLED by the user on 2026-11-16 ("dejemos los jefes jugables y listo"; art when Codex has credits again). The writer was stopped mid-way; its uncommitted, untested changes were not kept in the branch (saved outside the repo as a patch). The scope list above stays as the open follow-up list.
+- [x] T2 Single-branch consolidation (route: inline): `feat/new-bosses` fast-forwarded to the top of the stack, intermediate branches deleted, pushed with the user's go-ahead.
 
 ## Checks
 
