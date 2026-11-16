@@ -151,8 +151,15 @@ Axis per boss, so no two fights share a core loop (Artemis: agility and range).
 - 2026-11-15: user approved the three concepts with changes (blind creature instead of a tome, Hydra instead of the Minotaur, Hyperfocus optional). T1 writer told to support event-driven phases, multi-part bosses and a non-hittable state.
 
 ## Next step
-All tasks are checked. Pending:
-- The native review of the last range (T9, T10 and the Hydra runner fix).
+All tasks are checked and every range up to `e9d5e4a` has an acknowledged native review. Pending:
 - A play session by the user: reach the hub through the left demo door of `library/zone_1`, fight the three bosses, and report feel and tuning.
-- Delivery (push, pull request or merge) is the user's decision. The branch is about 12,500 authored changed lines, far above the review budget, so the chain strategy has to be asked before any pull request.
-- Open low-risk follow-ups: the Hydra tier scan ignores platforms nested below `Platforms` and takes the first ancestor with a child of that name; `boss_enemy_test` prints an engine error from `CheckpointService.restore_pending_player` at teardown; the quest link from the blind NPC to the Blind Beast is documented but not wired; the Engram mirror of this document is still pending.
+- Delivery (push, pull request or merge) is the user's decision. The branch holds 12 commits and 11,920 changed lines over `82eb468`, far above the review budget, so the chain strategy has to be asked before any pull request.
+- Open follow-ups, none a demonstrated defect:
+  - Boombox Teacher (advisory findings of the last review): no case proves a dodged hazard hurts again on a second overlap (the briefcase's return after a dash through its outward pass); the empty-phrase guard refills the phrase without clearing the finale flag; the 12-beat cap on wave recovery can open the overheat with waves still in flight in a very wide arena.
+  - Hydra: the tier scan ignores platforms nested below `Platforms` and takes the first ancestor with a child of that name.
+  - `boss_enemy_test` prints an engine error from `CheckpointService.restore_pending_player` at teardown.
+  - The quest link from the blind NPC to the Blind Beast is documented but not wired.
+  - The Engram mirror of this document is still pending (`mem_save` is blocked in auto mode because a hook rewrites the call).
+  - The writers' worktrees under `.claude/worktrees/` (about 2.7 GB with their import caches) are still on disk; their commits are all cherry-picked.
+
+Last native review, range `7466c56..e9d5e4a` (T9, T10 and the Hydra runner fix, 1000 lines): assessed `medium` (`slice_budget_reached`), consent granted under the user's standing instruction, one lens (`review-reliability`), result `approved`, acknowledged (lineage `review-c27d2cdb4eb3adc0`, authority burned). The reviewed boundary is `e9d5e4a`.
