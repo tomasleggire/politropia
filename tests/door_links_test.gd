@@ -6,10 +6,13 @@ extends SceneTree
 ## Run: godot --headless --path . --script res://tests/door_links_test.gd
 ## Exits 0 when every check passes, 1 otherwise.
 
-const LEVELS: Array[String] = ["library", "greece"]
+const LEVELS: Array[String] = ["library", "greece", "test"]
+## "test" holds the demo boss test hub and its three boss rooms (scaffolding linked
+## from library zone 1); a zone that does not exist in a level is skipped.
 const ZONES: Array[String] = [
 	"zone_1", "zone_2", "zone_3", "zone_4", "zone_5", "zone_6", "zone_healing", "zone_lectern",
 	"zone_artemis",
+	"boss_test_hub", "boombox_teacher_arena", "blind_beast_arena", "hydra_arena",
 ]
 const WATCHDOG_SECONDS := 240.0
 ## The farthest from its door Luz may arrive.
@@ -21,9 +24,9 @@ const FLOOR_PROBE := 4.0
 const PENDING_ARRIVAL_DOORS: Array[String] = []
 ## Deliberate ONE-WAY demo shortcuts, keyed "<level> <zone>/<node>". Their target door
 ## must exist and Luz must arrive safely, but the target door does not lead back to
-## the source (Artemis' right door continues to Greece). Remove the entry when the
-## shortcut is deleted; every other door keeps the full pairing check.
-const ONE_WAY_DEMO_DOORS: Array[String] = ["library zone_1/DemoShortcutToArtemis"]
+## the source (Artemis' left door continues to Greece). The hub's Artemis door is demo
+## scaffolding: remove the entry with the hub; every other door keeps the full pairing check.
+const ONE_WAY_DEMO_DOORS: Array[String] = ["test boss_test_hub/DoorToArtemis"]
 
 var checks := 0
 var failed: Array[String] = []

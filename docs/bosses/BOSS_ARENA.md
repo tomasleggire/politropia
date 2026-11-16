@@ -62,3 +62,14 @@ Other bosses extend `BossEnemy` (`scripts/enemies/bosses/boss_enemy.gd`), the sh
 2. Wrap it: new scene inheriting `scenes/enemies/bosses/boss_arena.tscn`, boss as a child, then set `boss_name`, a **unique** `enemy_id` (BossProgress is global for the whole run) and `reward_enabled = false` unless the boss really grants the double jump.
 3. Only `ArtemisBoss` ends the game (`BossArena._is_final_boss()`); any other boss opens the arena and the level music comes back.
 4. Phase notches: the bar draws a notch at `phase_two_threshold` (the first entry of `phase_thresholds`) and one more for each further entry when there are more than two phases.
+
+## Boss test hub
+
+Demo scaffolding to reach the three new bosses (El Profesor, El Topo, La Hidra) while playing the real game, touch controls included. Delete it, with its door in library zone 1, once the bosses are placed in real levels.
+
+- **How to reach it:** in `scenes/levels/library/zone_1.tscn`, walk left from the start into the dead end. The existing demo door `DemoShortcutToArtemis` (door id `LIBRARY_TO_ARTEMIS_DEMO`, kept under that name because the scene saves the number) now leads to `scenes/levels/test/boss_test_hub.tscn` instead of straight to Artemis, and a "Sala de jefes" sign stands next to it. No door was added on the walking path to the right.
+- **The hub:** a small room with a Stillness Desk (`checkpoint_id = boss_test_hub`), a door back to `library/zone_1` (two-way with door 31) and one door per boss with its name above it: El Profesor, El Topo, La Hidra and Artemisa. Artemis is reached through the hub: that door goes to `greece/zone_artemis` exactly as the old shortcut did (one way; her own door leads on to Greece zone 5). Rest at the desk once: from then on dying in a boss room wakes Luz at the hub. Without that rest, death follows the last checkpoint you rested at.
+- **The boss rooms** (`boombox_teacher_arena`, `blind_beast_arena`, `hydra_arena` under `scenes/levels/test/`) each hold the arena prefab and a return door to the hub on the left wall. Luz arrives just inside it, away from the boss trigger. They also still run on their own from the editor.
+- **The `test_` ids:** the boss in each test room overrides its `enemy_id` (`test_boombox_teacher`, `test_blind_beast`, `test_hydra`). A defeat there is recorded under that id, so it never marks the real boss as defeated once teammates place the prefab in a real level. The prefabs keep their real ids.
+- **Refights:** entering the hub forgets only the three `test_` ids (`BossTestHub`, using `BossProgress.forget()` and `EnemyRegistry.forget()`), so walk out of a boss room and back in to fight again. Artemis and every other boss keep their defeat.
+- **Coverage:** `tests/boss_test_hub_test.gd`; `tests/door_links_test.gd` also checks the pairing of the hub, its rooms and the zone_1 door (the hub's Artemis door is its whitelisted one-way demo door).

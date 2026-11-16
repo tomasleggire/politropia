@@ -2,7 +2,7 @@
 
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/enemies/bosses/hydra_boss_arena.tscn" id="3_arena"]
-[ext_resource type="PackedScene" path="res://scenes/ui/health_hud.tscn" id="4_hud"]
+[ext_resource type="PackedScene" path="res://scenes/world/change_scene_vertical.tscn" id="4_door"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_floor"]
 size = Vector2(1000, 64)
@@ -58,4 +58,12 @@ position = Vector2(-300, 0)
 
 [node name="HydraBossArena" parent="." instance=ExtResource("3_arena")]
 
-[node name="HealthHud" parent="." instance=ExtResource("4_hud")]
+[node name="Hydra" parent="HydraBossArena" index="4"]
+enemy_id = &"test_hydra"
+
+[node name="DoorToHub" parent="." instance=ExtResource("4_door")]
+position = Vector2(-444, -77)
+target_scene_path = "res://scenes/levels/test/boss_test_hub.tscn"
+door_id = 41
+target_door_id = 40
+arrival_offset = Vector2(60, 77)

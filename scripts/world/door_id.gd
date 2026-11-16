@@ -65,12 +65,23 @@ enum ID {
 	ZONE_5_TO_ARTEMIS,
 	ARTEMIS_TO_ZONE_5,
 
-	# --- Demo shortcut (one way): library zone 1 -> Artemis room ---
+	# --- Demo shortcut: library zone 1 -> Artemis room. Kept under this name and value
+	# (zone_1 saves the number); it now leads to the boss test hub, which reaches Artemis. ---
 	LIBRARY_TO_ARTEMIS_DEMO,
 	
 	# --- Biblioteca --- Zona 5 <-> Teacher ---
 	ZONE_5_TO_TEACHER,
 	TEACHER_TO_ZONE_5,
+
+	# --- Demo scaffolding: library zone 1 <-> boss test hub <-> the three boss test rooms ---
+	BOSS_HUB_TO_ARTEMIS_DEMO,
+	BOSS_HUB_TO_LIBRARY,
+	BOSS_HUB_TO_TEACHER_ROOM,
+	TEACHER_ROOM_TO_BOSS_HUB,
+	BOSS_HUB_TO_BLIND_BEAST_ROOM,
+	BLIND_BEAST_ROOM_TO_BOSS_HUB,
+	BOSS_HUB_TO_HYDRA_ROOM,
+	HYDRA_ROOM_TO_BOSS_HUB,
 }
 
 

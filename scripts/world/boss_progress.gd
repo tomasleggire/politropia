@@ -51,6 +51,11 @@ func is_reward_claimed(boss_id: StringName) -> bool:
 	return _bosses.has(boss_id) and _bosses[boss_id]["reward_claimed"]
 
 
+## Forgets one boss (the demo boss test hub makes its `test_` bosses fightable again).
+func forget(boss_id: StringName) -> void:
+	_bosses.erase(boss_id)
+
+
 ## Forgets every boss (tests, new game).
 func clear() -> void:
 	_bosses.clear()
