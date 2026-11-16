@@ -7,8 +7,8 @@ lowest sole on a shared feet row, anchor the feet on the cell centre, and write 
 sheet PNG plus the manifest entry that `BossAnimationCatalog` (and the older
 `ArtemisAnimationCatalog`) read.
 
-It is used by tools/process_artemis_sheets.py and tools/process_boombox_teacher_sheets.py,
-and is meant for El Topo and La Hidra later. Nothing in here knows a boss by name.
+It is used by tools/process_artemis_sheets.py, tools/process_boombox_teacher_sheets.py and
+tools/process_blind_beast_sheets.py, and is meant for La Hidra later. Nothing in here knows a boss by name.
 """
 
 from __future__ import annotations
@@ -123,6 +123,14 @@ def union_box(frames: list[np.ndarray]) -> tuple[int, int, int, int] | None:
     if not boxes:
         return None
     return min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes)
+
+
+def require_box(frames: list[np.ndarray], label: str) -> tuple[int, int, int, int]:
+    """`union_box`, but an error naming `label` (sheet and cells) when nothing is drawn."""
+    box = union_box(frames)
+    if box is None:
+        raise ValueError(f"{label}: no drawn pixels (the cells are empty after keying); check the raw sheet")
+    return box
 
 
 def standing_height(frame: np.ndarray) -> float:
@@ -263,6 +271,23 @@ def compact_clips(clips: dict[str, list[int]]) -> tuple[list[int], dict[str, lis
     return used, {clip: [remap[i] for i in idx] for clip, idx in clips.items()}
 
 
+def clip_contents(image: Image.Image, cell: int, clips: dict[str, list[int]]) -> dict[str, list[int]]:
+    """Per clip, the [width, height] in sheet px of the box that holds its art in every frame
+    of a sheet laid out by `assemble_sheet` (clips with no drawn pixel are left out)."""
+    sheet = np.asarray(image).astype(np.float32)
+    columns = image.width // cell
+    contents = {}
+    for clip, indices in clips.items():
+        frames = []
+        for i in indices:
+            row, col = divmod(i, columns)
+            frames.append(sheet[row * cell : (row + 1) * cell, col * cell : (col + 1) * cell])
+        box = union_box(frames)
+        if box is not None:
+            contents[clip] = [box[2] - box[0], box[3] - box[1]]
+    return contents
+
+
 def manifest_entry(sheet: Image.Image, out_cell: int, clips: dict[str, list[int]], events: dict[str, int]) -> dict:
     """The manifest block of one sheet: grid, clips (compacted indices) and events."""
     columns = sheet.width // out_cell
@@ -319,6 +344,34 @@ def block_size(frame: np.ndarray, max_saturation: float = 0.15, min_value: int =
     mask = ndimage.binary_closing(grey, structure=np.ones((closing, closing)))
     mask = ndimage.binary_fill_holes(mask)
     mask = ndimage.binary_opening(mask, structure=np.ones((9, 9)))
+    labels, count = ndimage.label(mask)
+    if count == 0:
+        return 0.0
+    sizes = ndimage.sum(mask, labels, range(1, count + 1))
+    boxes = ndimage.find_objects(labels)
+    candidates = [i for i in range(count) if sizes[i] >= min_fraction * sizes.max()]
+    best = min(candidates, key=lambda i: boxes[i][0].start)
+    return float(np.sqrt(sizes[best]))
+
+
+def color_block_size(
+    frame: np.ndarray,
+    targets: list[tuple[int, int, int]],
+    tolerance: float = 55.0,
+    opening: int = 5,
+    min_fraction: float = 0.25,
+) -> float:
+    """sqrt(area) of the highest large block of a frame painted in one of `targets` (RGB):
+    a size reference for a distinctive colour (El Topo's pink nose), as `block_size` is
+    for a grey one. A pixel belongs to the block when it is solid and within `tolerance`
+    (euclidean RGB distance) of a target; an opening drops specks and thin links; among
+    the components of at least `min_fraction` of the largest one the topmost wins. 0.0
+    when the colour is absent (the nose is hidden or not drawn yet)."""
+    rgb = frame[..., :3].astype(np.float32)
+    near = np.zeros(frame.shape[:2], dtype=bool)
+    for target in targets:
+        near |= np.sqrt(((rgb - np.array(target, dtype=np.float32)) ** 2).sum(-1)) <= tolerance
+    mask = ndimage.binary_opening(near & (frame[..., 3] > 128), structure=np.ones((opening, opening)))
     labels, count = ndimage.label(mask)
     if count == 0:
         return 0.0

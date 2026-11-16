@@ -204,19 +204,7 @@ def props_scale(frames: list[np.ndarray]) -> float:
 
 
 def clip_contents(image: Image.Image, cell: int, clips: dict[str, list[int]]) -> dict[str, list[int]]:
-    """Per clip, the [width, height] in sheet px of the box that holds its art in every frame."""
-    sheet = np.asarray(image).astype(np.float32)
-    columns = image.width // cell
-    contents = {}
-    for clip, indices in clips.items():
-        frames = []
-        for i in indices:
-            row, col = divmod(i, columns)
-            frames.append(sheet[row * cell : (row + 1) * cell, col * cell : (col + 1) * cell])
-        box = pipeline.union_box(frames)
-        if box is not None:
-            contents[clip] = [box[2] - box[0], box[3] - box[1]]
-    return contents
+    return pipeline.clip_contents(image, cell, clips)
 
 
 def build_props(preview: Path | None) -> dict:
@@ -243,7 +231,7 @@ def build_fx(preview: Path | None) -> dict:
     cells = pipeline.split_cells(pipeline.key_magenta(Image.open(raw_path("fx"))), cols, rows, "fx", FX_MIN_COMPONENT_PX)
     placed: dict[int, Image.Image] = {}
     for clip, indices in FX["clips"].items():
-        left, top, right, bottom = pipeline.union_box([cells[i] for i in indices])
+        left, top, right, bottom = pipeline.require_box([cells[i] for i in indices], f"fx clip '{clip}' (cells {indices})")
         for i in indices:
             frame = cells[i][top:bottom, left:right]
             placed[i] = pipeline.centered_cell(frame, FX_SCALE, FX_CELL, f"fx[{i}]")
@@ -263,7 +251,7 @@ def build_fx(preview: Path | None) -> dict:
 def build_blackboard(preview: Path | None) -> dict:
     """The blank blackboard keyed, cropped to its box and scaled: one texture."""
     frame = pipeline.key_magenta(Image.open(raw_path("blackboard")))
-    left, top, right, bottom = pipeline.union_box([frame])
+    left, top, right, bottom = pipeline.require_box([frame], "blackboard (the whole image)")
     board = pipeline.scale_rgba(frame[top:bottom, left:right], BLACKBOARD_SCALE)
     image = Image.fromarray(board, "RGBA")
     image.save(OUT_DIR / BLACKBOARD_FILE, optimize=True)
