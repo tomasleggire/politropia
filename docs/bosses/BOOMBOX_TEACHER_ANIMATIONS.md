@@ -27,8 +27,8 @@ Same style as Luz and Artemis: thick dark outline `#1A1410`, cel shading in 2-3 
 |---|---|
 | `Visual` (`Node2D`) | Code owns it: `scale.x = facing`, `position.x` (flinch shake), `modulate` (stun and corpse tints), tilt and squash of the placeholder corpse. Art never animates these. |
 | `Visual/AnimatedSprite2D` | The final art, first child of `Visual` (so the flash and glow clones draw above it). `texture_filter = 4`, `scale = 0.2896`, `offset = (0, -192)`. |
-| `Visual/Body`, `Tie`, `Pointer`, `Head/*` | Placeholders. Visible only when no art exists. With art they are hidden. The white hit flash and the telegraph glow are clones with their own visibility and use `ART_SILHOUETTE` (a tall torso + head polygon in the script) so they cover the sprite. |
-| `CollisionShape2D` | 28 x 84 at `(0, -42)` on this scene only (the base boss is 26 x 56) so Luz's hits connect with the drawn torso and head. |
+| `Visual/Body`, `Tie`, `Pointer`, `Head/*` | Placeholders. Visible only when no art exists. With art they are hidden. The telegraph glow and the white hit flash are drawn on the sprite itself by `shaders/sprite_glow.gdshader` (see 3, "Glow and flash"), so they follow the exact silhouette; without art the old polygon clones are used. |
+| `CollisionShape2D` | 28 x 84 at `(0, -42)` on this scene only (the base boss is 26 x 56) so Luz's hits connect with the drawn torso and head. It applies with or without art (decision: the art ships with the boss, so the placeholder fight uses the same body). |
 | Hazards (`BoomboxHazard`) | Boxes polled against Luz. Their size and timing do not change. |
 
 ### 2.2 Origin, facing and scale
@@ -50,6 +50,7 @@ Scale rules (script `tools/process_boombox_teacher_sheets.py`, helpers in `tools
 - The loco idle frames set the base: median height sole to top of the boombox, antenna excluded (the first row whose solid run is at least 30% of the widest row, so a thin antenna is skipped), scaled to 318 px.
 - Codex draws each sheet at a slightly different size, so each other sheet is scaled to match the **boombox size** of loco (`block_size`: the topmost grey block, sqrt of its area, median over the sheet; the boombox exists in every pose). `size_cells` limits the measured cells (defeat: 0-4) and `scale_mult` tunes by hand.
 - Props have no boombox: the briefcase of cell 0 is scaled to 30 px on screen (the hazard is 30 wide) and every prop uses that factor.
+- A sheet whose boombox block measures 0 (no grey block found) stops the script with an error naming the sheet; list other cells in `size_cells` or fix the raw sheet.
 - Unused cells are dropped; clip indices in the manifest are for the compacted sheet.
 
 Run (Pillow, numpy and scipy are not in the system Python; use a venv, nothing global):
@@ -72,7 +73,9 @@ Missing raw sheets are skipped with a message; sheets already processed stay in 
 | `bass` | `bass_lift` 0-1 (boombox over the shoulders, about 1.3x height), `bass_slam` 2-3, `overheat` 4-7 (loop) |
 | `trans` | `phase_change` 0-3, `intro` 4-7 |
 | `defeat` | `defeat` 0-7 (6-7 are the corpse) |
-| `props` (no figure) | `briefcase_spin` 0-3 (front, edge, back, edge), `note` 4, `note_pair` 5, `steam` 6, `spark` 7 |
+| `props` (no figure) | `briefcase_spin` 0-3 (front, edge, back, edge), `note` 4, `note_pair` 5, `steam` 6 (unused), `spark` 7 |
+| `fx` (no figure) | `wave_low` 0, `wave_high` 1, `bass_shock` 2 (flat bottom), `chalk_dust` 3, `steam` 4-7 (loop) |
+| `blackboard` (one image) | one blank blackboard, keyed and cropped to its box |
 
 ---
 
@@ -88,8 +91,8 @@ The boss asks for clips by these names. A clip that is not drawn resolves throug
 | `phase_change` | `TRANSITION` | `phase_transition_time` | one-shot | `idle` |
 | `overheat` | `STUN` (overheat after a finale) | open-ended (2.2 / 2.0 / 1.8 s) | loop | `idle` |
 | `defeat` | `DEFEATED` | `defeat_time`; a restored corpse shows the last frame | one-shot | `idle` |
-| `thrust_<h>_windup` | THRUST TELEGRAPH, `h` = height of the first thrust (`high` / `low`) | the telegraph (`thrust_telegraph_beats` whole beats) | hold | `thrust_<h>_strike`, other height |
-| `thrust_<h>_strike` | THRUST ACTIVE, the `thrust_strike_time` (0.18 s) after each strike event; event k fires on beat `anchor + k` | 0.18 s | hold | `thrust_<h>_windup` |
+| `thrust_<h>_windup` | THRUST TELEGRAPH, `h` = height of the first thrust (`high` / `low`) | the telegraph (`thrust_telegraph_beats` whole beats) | hold | the other height's windup |
+| `thrust_<h>_strike` | THRUST ACTIVE, the `thrust_strike_time` (0.18 s) after each strike event; event k fires on beat `anchor + k` | 0.18 s | hold | `thrust_<h>_windup`, the other height's strike |
 | `thrust_<h>_windup` (again) | ACTIVE after a strike with another thrust coming in the chain, height of the next one | until the next beat | hold | as above |
 | `thrust_<h>_recover` | ACTIVE after the last strike of the chain, and RECOVER | rest of the phase | hold | `thrust_<h>_strike` |
 | `throw_windup` | BRIEFCASE TELEGRAPH | the telegraph (`briefcase_telegraph_beats`, 2 beats) | hold | `idle` |
@@ -107,20 +110,31 @@ The boss asks for clips by these names. A clip that is not drawn resolves throug
 
 **Events** (manifest `events`: clip -> frame index of the strike inside the clip): `thrust_high_strike`, `thrust_low_strike`, `throw_release`, `kick_strike`, `bass_slam` all at frame 0, because the clip starts when ACTIVE starts.
 
-Gameplay overlays stay code-driven: telegraph aim lines and floor markers, the pips over his head, the blackboard, the hit flash (white clone of `ART_SILHOUETTE`), the telegraph glow, the stun and corpse tints.
+Gameplay overlays stay code-driven: telegraph aim lines and floor markers, the wave pips over his head, the beat ring, the stun and corpse tints. The blackboard, the hit flash and the telegraph glow keep their logic and only change how they look (below).
+
+**Glow and flash.** With art, `BossSpriteFx` puts a `ShaderMaterial` (`shaders/sprite_glow.gdshader`) on the `AnimatedSprite2D`. `BossTelegraph.bind_sprite_fx` makes `set_glow(color, amount)` drive the shader (`glow_color`, `glow_amount`: an outline grown from the alpha plus a 30% tint of the body) instead of the `Polygon2D` clone; `is_glowing()` reads the same value. The hit flash is the shader's `flash_amount` (1 for `flash_time`, 0.08 s, through the same `_set_flash_visible` hook). The calls, colours and timings of the boss are unchanged; El Topo and La Hidra can bind the same class. Without art the polygon glow and flash stay exactly as before.
 
 **Metronome head swell.** The head cannot be isolated from a baked sprite, so with art the swell is dropped and only the floor ring pulses on the beat (the placeholder `Head` still swells when there is no art). If the art later needs a pulse, a 2-3% sprite scale pulse is the option.
 
-## 4. Props
+## 4. Props and effects
 
-| Prop | Used by | Note |
+Hazards keep their boxes, speeds and timings. With art each one shows a sprite and its placeholder is not drawn; without the art (or without that sheet) the placeholder stays. Each sprite is scaled from the `content` box of its clip in the manifest (the union of the drawn pixels of every frame, in sheet px) to the box that hurts, so what you see matches what hurts. `BoomboxHazard.art_scale` is the single relation: `STRETCH` fills the box on both axes, `WIDTH` matches the width and keeps the proportions, `CONTAIN` keeps the proportions inside the box.
+
+| Art | Sheet / clip | Hazard and fit |
 |---|---|---|
-| `briefcase_spin` | BRIEFCASE hazard (30 x 22 box), spinning while it flies | scaled so the front view is 30 px wide |
-| `note`, `note_pair` | NOTE_BOUNCE disc hazard (radius 10), the `note_pair` for accents over `conduct` / `notes` | same factor as the briefcase |
-| `steam` | overheat puffs (`_draw_steam`) | |
-| `spark` | bass drop shock and hit accents | |
+| Briefcase | props `briefcase_spin` (front, edge, back, edge), loops at 10 fps | BRIEFCASE 30 x 22 box, `WIDTH`: the front view is 30 px wide (the handle rises above the box) |
+| Notes | props `note`, `note_pair` | NOTE_BOUNCE disc of radius 10, `CONTAIN` in 20 x 20; the pair on every second note |
+| Sound waves | fx `wave_low` (amber) and `wave_high` (cyan) | wave box (24 x 22 low, 24 x 30 high), `STRETCH`; arcs drawn opening to the right and mirrored when the wave travels left |
+| Bass shock | fx `bass_shock` | the floor band (arena width x `shock_height`): crests as tall as the band, side by side, standing on its bottom edge, enough of them to cover the width |
+| Overheat steam | fx `steam`, four-frame loop at 6 fps | a sprite 40 px wide over the boombox at `(0, -100)` while he is stunned; it replaces the code-drawn puffs |
+| Dictation | blackboard texture | as wide as `board_size` (240 px, proportions kept) behind the text; no flat rectangle |
+| Chalk text and letters | none (drawn) | the board text and each falling letter are off-white with a dark outline and no box (`Look.CHALK`); the letter box (30 x 30) is unchanged |
+| Chalk dust | fx `chalk_dust` | a 34 px puff that grows, rises and fades where a letter lands (`BoomboxHazard.touched_floor`) |
+| Spark | props `spark` | a 40 px puff on the floor in front of him at the bass slam, where the boombox lands. The briefcase catch gets no spark: the catch is already marked by the clip |
 
-Props are integrated in a later task (T5); until then the polygons the hazards draw stay.
+The props `steam` cell is not used (the fx loop replaces it). Telegraph lines, floor markers, wave pips and the beat ring stay as they are: they are gameplay readability.
+
+Processing: the `fx` sheet is 4 x 2 raw cells of 384 x 512, cropped per clip with one shared box and centred in a 256 px cell at one factor (`FX_SCALE` 0.7); the `blackboard` raw image is keyed, cropped to its box and saved as one texture (`boombox_teacher_blackboard.png`, manifest key `blackboard`). Manifest entries `props` and `fx` carry `sheet`, `grid`, `clips` and `content`.
 
 ## 5. Integration checklist
 

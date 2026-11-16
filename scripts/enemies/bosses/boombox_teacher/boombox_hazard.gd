@@ -1,7 +1,7 @@
 class_name BoomboxHazard
 extends Node2D
 
-## One placeholder hazard of the Boombox Teacher: a thrust, a kick, a sound wave, a
+## One hazard of the Boombox Teacher: a thrust, a kick, a sound wave, a
 ## note, the briefcase, a falling letter or the bass shock. It is an axis aligned box
 ## in world space that hurts Luz at most once, polled every physics frame against her
 ## live collider (so a crouch really lowers her hurtbox). It lives beside the boss,
@@ -13,9 +13,20 @@ extends Node2D
 ## and cannot hurt her until it has stopped overlapping her (so her i-frames ending
 ## inside the same hazard never hurts). A hit refused for any other reason, such as
 ## the i-frames after a hurt, is retried on the next frame.
+##
+## Look: the box is drawn as a placeholder. A boss with art hands over its sprites
+## (`attach_art`) and the placeholder is not drawn any more: the box and the motion are
+## the same either way, the art only replaces what is seen. `art_scale` is the one
+## relation between a drawn effect and the box that hurts.
 
 enum Motion { STATIC, LINEAR, BOOMERANG }
-enum Look { RECT, POINTER, DISC, GLYPH }
+enum Look { RECT, POINTER, DISC, GLYPH, CHALK }
+## How the art's content box is fitted to the hazard's box: CONTAIN keeps its proportions
+## inside the box, STRETCH fills the box exactly, WIDTH matches the box width.
+enum ArtFit { CONTAIN, STRETCH, WIDTH }
+
+## The hazard touched the floor it was told to despawn at; `at` is the contact point.
+signal touched_floor(at: Vector2)
 
 const OUTLINE_LIGHTEN := 0.45
 const OUTLINE_WIDTH := 2.0
@@ -23,6 +34,9 @@ const PENDING_ALPHA := 0.35
 const FILL_ALPHA := 0.85
 const GLYPH_FONT_SIZE := 26
 const POINTER_TIP := 14.0
+const CHALK_COLOR := Color(0.95, 0.94, 0.86)
+const CHALK_OUTLINE_COLOR := Color(0.1, 0.08, 0.06)
+const CHALK_OUTLINE_SIZE := 6
 const FALLBACK_LUZ_SIZE := Vector2(29.0, 46.0)
 const LUZ_SHAPE_PATH := "CollisionShape2D"
 
@@ -59,6 +73,7 @@ var _origin := Vector2.ZERO
 var _alive := true
 var _spent := false
 var _dodged := false
+var _art: Array[Node2D] = []
 
 
 func _init() -> void:
@@ -78,10 +93,14 @@ func _physics_process(delta: float) -> void:
 	if not _alive:
 		return
 	_try_hurt()
+	if not _art.is_empty():
+		modulate.a = 1.0 if _age >= arm_delay else PENDING_ALPHA
 	queue_redraw()
 
 
 func _draw() -> void:
+	if not _art.is_empty():
+		return
 	var live := _age >= arm_delay
 	var fill := Color(color, FILL_ALPHA) if live else Color(color, PENDING_ALPHA)
 	var edge := color.lightened(OUTLINE_LIGHTEN)
@@ -95,6 +114,8 @@ func _draw() -> void:
 			draw_rect(box, edge, false, OUTLINE_WIDTH)
 			var font := ThemeDB.fallback_font
 			draw_string(font, Vector2(-half_extents.x * 0.45, half_extents.y * 0.45), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1.0, GLYPH_FONT_SIZE, Color.WHITE)
+		Look.CHALK:
+			_draw_chalk(live)
 		Look.POINTER:
 			draw_rect(box, fill)
 			var tip_x := float(dir) * half_extents.x
@@ -108,6 +129,28 @@ func _draw() -> void:
 			draw_rect(box, edge, false, OUTLINE_WIDTH)
 
 
+## A letter written in chalk: off-white with a dark outline, no box behind it.
+func _draw_chalk(live: bool) -> void:
+	var font := ThemeDB.fallback_font
+	var size := font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_LEFT, -1.0, GLYPH_FONT_SIZE)
+	var at := Vector2(-size.x * 0.5, half_extents.y * 0.45)
+	var alpha := 1.0 if live else PENDING_ALPHA
+	font.draw_string_outline(get_canvas_item(), at, glyph, HORIZONTAL_ALIGNMENT_LEFT, -1.0, GLYPH_FONT_SIZE, CHALK_OUTLINE_SIZE, Color(CHALK_OUTLINE_COLOR, alpha))
+	font.draw_string(get_canvas_item(), at, glyph, HORIZONTAL_ALIGNMENT_LEFT, -1.0, GLYPH_FONT_SIZE, Color(CHALK_COLOR, alpha))
+
+
+## Scale that fits art of `content` px (its drawn box) to a hazard `box`.
+static func art_scale(content: Vector2, box: Vector2, fit: ArtFit) -> Vector2:
+	if content.x <= 0.0 or content.y <= 0.0:
+		return Vector2.ONE
+	match fit:
+		ArtFit.STRETCH:
+			return Vector2(box.x / content.x, box.y / content.y)
+		ArtFit.WIDTH:
+			return Vector2.ONE * (box.x / content.x)
+	return Vector2.ONE * minf(box.x / content.x, box.y / content.y)
+
+
 ## Luz's live hurtbox in world space (it shrinks while she crouches).
 static func luz_rect(player: Player) -> Rect2:
 	var shape_node := player.get_node_or_null(LUZ_SHAPE_PATH) as CollisionShape2D
@@ -119,6 +162,21 @@ static func luz_rect(player: Player) -> Rect2:
 
 func get_rect() -> Rect2:
 	return Rect2(position - half_extents, half_extents * 2.0)
+
+
+## Shows `sprite` (positioned around the hazard centre) instead of the placeholder.
+func attach_art(sprite: Node2D) -> void:
+	add_child(sprite)
+	_art.append(sprite)
+	queue_redraw()
+
+
+func has_art() -> bool:
+	return not _art.is_empty()
+
+
+func get_art() -> Array[Node2D]:
+	return _art
 
 
 func is_alive() -> bool:
@@ -164,6 +222,8 @@ func _advance_linear(delta: float) -> void:
 		velocity.y = -bounce_speed
 	var out_of_walls := position.x < wall_left - half_extents.x or position.x > wall_right + half_extents.x
 	var landed := despawn_at_floor and position.y >= floor_y
+	if landed:
+		touched_floor.emit(position + Vector2(0.0, half_extents.y))
 	if out_of_walls or landed or _age >= lifetime:
 		retire()
 

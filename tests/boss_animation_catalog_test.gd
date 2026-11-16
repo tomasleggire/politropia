@@ -33,6 +33,8 @@ func run() -> void:
 	case_resolves_fallbacks()
 	case_events_scale_and_offset()
 	case_props()
+	case_effect_entries()
+	case_duplicate_clip()
 	case_missing_manifest()
 	case_missing_texture()
 	case_malformed_manifest()
@@ -83,6 +85,8 @@ func _write_fixture() -> void:
 	DirAccess.make_dir_recursive_absolute(FIXTURE_DIR)
 	_write_sheet("main_sheet.png", COLUMNS, ROWS)
 	_write_sheet("props_sheet.png", COLUMNS, 1)
+	_write_sheet("zdup_sheet.png", COLUMNS, 1)
+	_write_sheet("board.png", COLUMNS, 1)
 	_write_json(MANIFEST, {
 		"cell": 448, "feet_row": 416, "sprite_scale": 0.25,
 		"sheets": {
@@ -94,6 +98,8 @@ func _write_fixture() -> void:
 			"ghost_sheet.png": {"grid": _grid(COLUMNS, ROWS), "clips": {"ghost": [0, 1]}, "events": {}},
 		},
 		"props": {"sheet": "props_sheet.png", "sprite_scale": 0.25, "grid": _grid(COLUMNS, 1), "clips": {"spark": [0], "steam": [1, 2]}},
+		"fx": {"sheet": "props_sheet.png", "grid": _grid(COLUMNS, 1), "clips": {"wave": [0], "dust": [1, 2]}, "content": {"wave": [3, 2], "bad": [1], "dust": "x"}},
+		"blackboard": {"texture": "board.png", "size": [16, 4]},
 	})
 
 
@@ -151,6 +157,31 @@ func case_props() -> void:
 	var props := _catalog().build_props_frames()
 	check(props.has_animation(&"spark") and props.get_frame_count(&"steam") == 2, "the props sheet builds its own clips")
 	check(not props.has_animation(&"idle"), "the props frames do not mix with the character's")
+
+
+func case_effect_entries() -> void:
+	var catalog := _catalog()
+	var fx := catalog.build_entry_frames("fx")
+	check(fx.has_animation(&"wave") and fx.get_frame_count(&"dust") == 2 and not fx.has_animation(&"spark"), "any entry builds its own clips")
+	check(catalog.content_size("fx", &"wave") == Vector2(3.0, 2.0), "the content box of a clip comes from the manifest")
+	check(catalog.content_size("fx", &"dust") == Vector2.ZERO and catalog.content_size("fx", &"bad") == Vector2.ZERO, "a malformed content box reads as unknown")
+	check(catalog.content_size("fx", &"missing") == Vector2.ZERO and catalog.content_size("props", &"spark") == Vector2.ZERO, "a clip with no content box reads as unknown")
+	check(catalog.build_entry_frames("nothing").get_animation_names().is_empty(), "an entry the manifest lacks builds nothing")
+	var board := catalog.blackboard_texture()
+	check(board != null and board.get_size() == Vector2(COLUMNS * CELL, CELL), "the blackboard texture loads")
+
+
+## A clip two sheets both draw keeps the first sheet's frames; it is never stacked.
+func case_duplicate_clip() -> void:
+	var path := FIXTURE_DIR + "/duplicate.json"
+	_write_json(path, {"cell": 4, "feet_row": 3, "sprite_scale": 0.3, "sheets": {
+		"main_sheet.png": {"grid": _grid(COLUMNS, ROWS), "clips": {"idle": [0, 1, 2]}, "events": {}},
+		"zdup_sheet.png": {"grid": _grid(COLUMNS, 1), "clips": {"idle": [0, 1, 2, 3], "extra": [0]}, "events": {}},
+	}})
+	var frames := _catalog(path).build_sprite_frames()
+	check(frames.get_frame_count(&"idle") == 3, "a duplicated clip keeps the first sheet's three frames")
+	check(frames.has_animation(&"extra"), "the other clips of that sheet still load")
+	check(_catalog(FIXTURE_DIR + "/nope.json").blackboard_texture() == null, "no manifest, no blackboard")
 
 
 func case_missing_manifest() -> void:

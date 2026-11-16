@@ -95,9 +95,17 @@ const THROW_RELEASE_TIME := 0.15
 const THROW_CATCH_TIME := 0.3
 const MIN_CLIP_TIME := 0.05
 const NO_EVENT := -1.0e9
-## Hit flash and telegraph glow outline over the sprite: a 20 px torso under a
-## 44 x 32 boombox, 92 px tall, feet on the origin (the placeholder Body is only 36 tall).
-const ART_SILHOUETTE := [Vector2(-9, 0), Vector2(9, 0), Vector2(10, -58), Vector2(22, -60), Vector2(22, -92), Vector2(-22, -92), Vector2(-22, -60), Vector2(-10, -58)]
+## Effect art, in px on screen: the overheat steam sits just over the boombox, the spark
+## marks the bass slam, the chalk dust puffs where a letter lands.
+const STEAM_ART_POSITION := Vector2(0.0, -100.0)
+const STEAM_ART_WIDTH := 40.0
+const STEAM_ART_Z := 1
+const SPARK_WIDTH := 40.0
+const SPARK_LIFT := 14.0
+const DUST_WIDTH := 34.0
+const BOARD_CHALK_OUTLINE := 4
+## The slam clip lasts the shock plus this hold, so the strike frame outlives the shock a little.
+const BASS_SLAM_HOLD := 0.08
 const PLACEHOLDERS: Array[String] = ["Body", "Tie", "Pointer", "Head"]
 const CLIP_SPEEDS := {
 	"idle": 8.0, "walk": 10.0, "intro": 8.0, "phase_change": 8.0, "overheat": 8.0, "defeat": 8.0,
@@ -282,6 +290,9 @@ var _attack_log: Array[int] = []
 var _catalog: BossAnimationCatalog
 var _art_on := false
 var _sprite_scale := 1.0
+var _sprite_fx: BossSpriteFx
+var _effects: BoomboxEffectArt
+var _steam_sprite: AnimatedSprite2D
 ## The contract clip last requested through `_play` (not the fallback it resolved to).
 var _clip: StringName = &""
 ## `_clock` when the last attack event (strike, release...) fired.
@@ -449,6 +460,7 @@ func _tick(delta: float) -> void:
 	_steam_left = maxf(_steam_left - delta, 0.0)
 	_apply_head_pose()
 	_sync_sprite()
+	_update_steam_art()
 	if _attack_visuals_on and _state != State.ATTACK:
 		_hide_attack_visuals()
 	queue_redraw()
@@ -929,6 +941,7 @@ func _throw_briefcase() -> void:
 	hazard.out_time = 2.0 * interval
 	hazard.back_time = 2.0 * interval
 	hazard.home = Callable(self, &"_briefcase_home")
+	_dress(hazard, BoomboxEffectArt.PROPS, &"briefcase_spin", BoomboxHazard.ArtFit.WIDTH)
 
 
 func _briefcase_home() -> Vector2:
@@ -962,6 +975,7 @@ func _throw_note(k: int) -> void:
 	hazard.wall_left = bounds.x
 	hazard.wall_right = bounds.y
 	hazard.lifetime = 30.0
+	_dress(hazard, BoomboxEffectArt.PROPS, &"note_pair" if k % 2 == 1 else &"note")
 
 
 ## -- Sound waves ----------------------------------------------------------------------------
@@ -986,6 +1000,7 @@ func _fire_wave(k: int) -> void:
 		hazard.wall_left = bounds.x
 		hazard.wall_right = bounds.y
 		hazard.lifetime = 30.0
+		_dress(hazard, BoomboxEffectArt.FX, &"wave_high" if high else &"wave_low", BoomboxHazard.ArtFit.STRETCH, side < 0)
 
 
 ## -- Blackboard dictation -----------------------------------------------------------------
@@ -1017,22 +1032,44 @@ func _make_board() -> Node2D:
 	var board := Node2D.new()
 	board.top_level = true
 	board.z_index = 2
+	var texture := _effects.blackboard() if _effects != null else null
+	board.add_child(_board_backdrop(texture))
+	board.add_child(_board_label(texture != null))
+	_world_parent().add_child(board)
+	board.global_position = Vector2((bounds.x + bounds.y) * 0.5, global_position.y - board_height)
+	return board
+
+
+## The blackboard art as wide as `board_size` (its proportions kept), or the flat green
+## placeholder rectangle without art.
+func _board_backdrop(texture: Texture2D) -> Node2D:
+	if texture != null:
+		var art := Sprite2D.new()
+		art.name = "Art"
+		art.texture = texture
+		art.texture_filter = BoomboxEffectArt.FILTER
+		art.scale = Vector2.ONE * (board_size.x / float(texture.get_width()))
+		return art
 	var frame := Polygon2D.new()
 	var half := board_size * 0.5
 	frame.polygon = PackedVector2Array([Vector2(-half.x, -half.y), Vector2(half.x, -half.y), Vector2(half.x, half.y), Vector2(-half.x, half.y)])
 	frame.color = Color(0.1, 0.28, 0.2)
-	board.add_child(frame)
+	return frame
+
+
+## The dictated text; chalk (off-white, dark outline) over the blackboard art, plain white without it.
+func _board_label(chalk: bool) -> Label:
 	var label := Label.new()
 	label.name = "Text"
 	label.text = dictation_text
 	label.size = BOARD_LABEL_SIZE
 	label.position = Vector2(-BOARD_LABEL_SIZE.x * 0.5, -BOARD_LABEL_SIZE.y * 0.5)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_color_override(&"font_color", Color.WHITE)
-	board.add_child(label)
-	_world_parent().add_child(board)
-	board.global_position = Vector2((bounds.x + bounds.y) * 0.5, global_position.y - board_height)
-	return board
+	label.add_theme_color_override(&"font_color", BoomboxHazard.CHALK_COLOR if chalk else Color.WHITE)
+	if chalk:
+		label.add_theme_color_override(&"font_outline_color", BoomboxHazard.CHALK_OUTLINE_COLOR)
+		label.add_theme_constant_override(&"outline_size", BOARD_CHALK_OUTLINE)
+	return label
 
 
 func _free_board() -> void:
@@ -1060,13 +1097,20 @@ func _release_letter(k: int) -> void:
 	var ground := global_position.y - letter_size * 0.5
 	var top := global_position.y - board_height + board_size.y * 0.5 + letter_size * 0.5
 	var hazard := _spawn_hazard(Vector2(_columns[k], top), Vector2(letter_size, letter_size) * 0.5, LETTER_COLOR)
-	hazard.look = BoomboxHazard.Look.GLYPH
+	hazard.look = BoomboxHazard.Look.CHALK if _art_on else BoomboxHazard.Look.GLYPH
 	hazard.glyph = letters[k % maxi(letters.length(), 1)] if not letters.is_empty() else ""
 	hazard.motion = BoomboxHazard.Motion.LINEAR
 	hazard.velocity = Vector2(0.0, (ground - top) / maxf(letter_fall_time, MIN_TELEGRAPH))
 	hazard.floor_y = ground
 	hazard.despawn_at_floor = true
 	hazard.lifetime = 10.0
+	if _effects != null and _effects.has_clip(BoomboxEffectArt.FX, &"chalk_dust"):
+		hazard.touched_floor.connect(_puff_chalk_dust)
+
+
+## A puff of chalk where a letter lands.
+func _puff_chalk_dust(at: Vector2) -> void:
+	_effects.puff(_world_parent(), BoomboxEffectArt.FX, &"chalk_dust", at, DUST_WIDTH)
 
 
 ## -- Bass drop ------------------------------------------------------------------------------------
@@ -1083,6 +1127,22 @@ func _spawn_shock() -> void:
 	var hazard := _spawn_hazard(area.get_center(), area.size * 0.5, SHOCK_COLOR)
 	hazard.lifetime = shock_time
 	hazard.bound = true
+	_dress_shock(hazard)
+	_spark_at_slam()
+
+
+## Ground crests along the whole band that hurts.
+func _dress_shock(hazard: BoomboxHazard) -> void:
+	if _effects == null:
+		return
+	for crest: AnimatedSprite2D in _effects.floor_sprites(BoomboxEffectArt.FX, &"bass_shock", hazard.half_extents * 2.0):
+		hazard.attach_art(crest)
+
+
+## The spark punctuates the slam, on the floor in front of him where the boombox lands.
+func _spark_at_slam() -> void:
+	if _effects != null:
+		_effects.puff(_world_parent(), BoomboxEffectArt.PROPS, &"spark", Vector2(_front_x(), global_position.y - SPARK_LIFT), SPARK_WIDTH)
 
 
 ## -- Hazards ----------------------------------------------------------------------------------------
@@ -1203,7 +1263,8 @@ func _setup_sprite() -> void:
 	_sprite.offset = _catalog.sprite_offset()
 	_sprite_scale = _catalog.sprite_scale()
 	_visual.move_child(_sprite, 0)
-	_apply_art_silhouette()
+	_bind_sprite_fx()
+	_setup_effect_art()
 	_clip = &""
 	_apply_visual()
 
@@ -1215,13 +1276,57 @@ func _set_placeholders_visible(on: bool) -> void:
 			node.visible = on
 
 
-## The hit flash and the telegraph glow trace the sprite, not the short placeholder.
-func _apply_art_silhouette() -> void:
-	var outline := PackedVector2Array(ART_SILHOUETTE)
+## The hit flash and the telegraph glow are drawn by a shader on the sprite itself, so
+## they follow its exact silhouette; the polygon overlays stay hidden.
+func _bind_sprite_fx() -> void:
+	_sprite_fx = BossSpriteFx.new(_sprite)
 	if _flash != null:
-		_flash.polygon = outline
+		_flash.visible = false
 	if _telegraph != null:
-		_telegraph.set_glow_polygon(outline)
+		_telegraph.bind_sprite_fx(_sprite_fx)
+
+
+## The props, effects and blackboard the manifest draws: each hazard dresses itself with
+## them when they exist and keeps its placeholder when not.
+func _setup_effect_art() -> void:
+	_effects = BoomboxEffectArt.new(_catalog)
+	_steam_sprite = _effects.sprite(BoomboxEffectArt.FX, &"steam", Vector2.ONE * (STEAM_ART_WIDTH / maxf(_effects.content(BoomboxEffectArt.FX, &"steam").x, 1.0)))
+	if _steam_sprite == null:
+		return
+	_steam_sprite.position = STEAM_ART_POSITION
+	_steam_sprite.z_index = STEAM_ART_Z
+	_steam_sprite.visible = false
+	add_child(_steam_sprite)
+
+
+## The drawn steam loops over the boombox while he is overheated (it replaces the code-drawn puffs).
+func _update_steam_art() -> void:
+	if _steam_sprite != null:
+		_steam_sprite.visible = _steam_left > 0.0 and not _dead
+
+
+## Dresses `hazard` with the drawn `clip` of `key`, fitted to its box; no art keeps the placeholder.
+func _dress(hazard: BoomboxHazard, key: String, clip: StringName, fit := BoomboxHazard.ArtFit.CONTAIN, flip := false) -> void:
+	if _effects == null:
+		return
+	var sprite := _effects.fit_sprite(key, clip, hazard.half_extents * 2.0, fit, flip)
+	if sprite != null:
+		hazard.attach_art(sprite)
+
+
+## With art the flash is the sprite's own; without it, the white polygon as always.
+func _set_flash_visible(visible_now: bool) -> void:
+	if _sprite_fx != null:
+		_sprite_fx.set_flash(visible_now)
+		return
+	super._set_flash_visible(visible_now)
+
+
+## True while the hit flash shows, on the sprite or on the placeholder.
+func is_flash_visible() -> bool:
+	if _sprite_fx != null:
+		return _sprite_fx.is_flashing()
+	return _flash != null and _flash.visible
 
 
 func has_art() -> bool:
@@ -1327,7 +1432,7 @@ func _attack_clip_request() -> Array:
 				AttackPhase.TELEGRAPH:
 					return [&"bass_lift", _telegraph_total]
 				AttackPhase.ACTIVE:
-					return [&"bass_slam", shock_time + 0.08]
+					return [&"bass_slam", shock_time + BASS_SLAM_HOLD]
 			return [&"bass_slam", 0.0]
 	return [&"idle", 0.0]
 
@@ -1410,7 +1515,7 @@ func _draw_pips() -> void:
 
 
 func _draw_steam() -> void:
-	if _steam_left <= 0.0 or _dead:
+	if _steam_left <= 0.0 or _dead or _steam_sprite != null:
 		return
 	for i: int in STEAM_PUFFS:
 		var rise := fposmod(_clock * 38.0 + float(i) * 17.0, 56.0)

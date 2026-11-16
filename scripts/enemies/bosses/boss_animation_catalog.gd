@@ -52,11 +52,33 @@ func build_sprite_frames() -> SpriteFrames:
 
 ## The props sheet (manifest key "props"): its own cell size, same rules.
 func build_props_frames() -> SpriteFrames:
+	return build_entry_frames("props")
+
+
+## The frames of any sheet entry outside "sheets" (props, fx): its own cell size, same rules.
+func build_entry_frames(key: String) -> SpriteFrames:
 	var frames := _new_frames()
-	var entry := manifest_entry("props")
+	var entry := manifest_entry(key)
 	if not entry.is_empty():
 		_add_sheet(frames, entry, String(entry.get("sheet", "")))
 	return frames
+
+
+## The box (sheet px) that holds the art of `clip` of entry `key` in every frame, as the
+## processing script measured it; ZERO when the manifest does not say.
+func content_size(key: String, clip: StringName) -> Vector2:
+	var content: Variant = manifest_entry(key).get("content")
+	if not content is Dictionary:
+		return Vector2.ZERO
+	var box: Variant = (content as Dictionary).get(String(clip))
+	if not box is Array or (box as Array).size() != 2:
+		return Vector2.ZERO
+	return Vector2(float((box as Array)[0]), float((box as Array)[1]))
+
+
+## The single blackboard texture (manifest key "blackboard"), or null without art.
+func blackboard_texture() -> Texture2D:
+	return _load_texture(String(manifest_entry("blackboard").get("texture", "")))
 
 
 ## True when the default clip exists: the boss can then show its sprite.
@@ -125,6 +147,11 @@ func _add_sheet(frames: SpriteFrames, sheet: Dictionary, sheet_name: String) -> 
 
 
 func _add_clip(frames: SpriteFrames, clip_name: String, atlas: Texture2D, grid: Dictionary, indices: Array) -> void:
+	# A clip named by two sheets is a manifest mistake: the first sheet keeps it, the
+	# second must not stack its frames on top (and `add_animation` would log an error).
+	if frames.has_animation(clip_name):
+		push_warning("%s: clip '%s' is drawn by more than one sheet; the first one is kept" % [_manifest_path, clip_name])
+		return
 	frames.add_animation(clip_name)
 	frames.set_animation_speed(clip_name, float(_speeds.get(clip_name, DEFAULT_FPS)))
 	frames.set_animation_loop(clip_name, clip_name in _looping)

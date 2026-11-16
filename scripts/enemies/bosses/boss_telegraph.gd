@@ -13,6 +13,9 @@ extends Node2D
 ## by the same colour language. Without the art, or for a marker with no glyph
 ## (vault, transition, dive column), the polygon look is kept.
 ##
+## A boss with sprite art hands over a `BossSpriteFx` (`bind_sprite_fx`): the glow is then
+## drawn on the sprite by its shader and the polygon stays hidden.
+##
 ## Colour language: amber warns of a ranged attack, red of melee, pale
 ## moon-silver marks phase two, and plain white marks her vault over Luz.
 
@@ -43,6 +46,7 @@ const GLYPH_ALPHA_BIAS := 0.15
 const LINE_TRACKING_ALPHA := 0.45
 
 var _glow: Polygon2D
+var _sprite_fx: BossSpriteFx
 var _lines: Array[Line2D] = []
 var _markers: Array[Polygon2D] = []
 var _glyph_sprites: Array[Sprite2D] = []
@@ -71,14 +75,19 @@ func bind_body(body: Polygon2D) -> void:
 	parent.move_child(_glow, body.get_index() + 1)
 
 
-## Replaces the silhouette of the glow (a boss whose art is taller than its placeholder).
-func set_glow_polygon(polygon: PackedVector2Array) -> void:
+## Draws the glow on the sprite itself from now on (a boss with art) and keeps the polygon
+## hidden. The calls of the boss do not change.
+func bind_sprite_fx(fx: BossSpriteFx) -> void:
+	_sprite_fx = fx
 	if _glow != null:
-		_glow.polygon = polygon
+		_glow.visible = false
 
 
 ## Tints the body with `color`; `amount` 0 hides it and 1 is the full glow.
 func set_glow(color: Color, amount: float) -> void:
+	if _sprite_fx != null:
+		_sprite_fx.set_glow(color, amount)
+		return
 	if _glow == null:
 		return
 	_glow.visible = amount > 0.0
@@ -152,6 +161,8 @@ func visible_aim_line_count() -> int:
 
 
 func is_glowing() -> bool:
+	if _sprite_fx != null:
+		return _sprite_fx.is_glowing()
 	return _glow != null and _glow.visible
 
 

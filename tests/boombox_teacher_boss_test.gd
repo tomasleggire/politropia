@@ -12,7 +12,7 @@ extends SceneTree
 const BOSS_SCENE := "res://scenes/enemies/bosses/boombox_teacher.tscn"
 const PREFAB_SCENE := "res://scenes/enemies/bosses/boombox_teacher_boss_arena.tscn"
 const PLAYER_SCENE := "res://scenes/player/player.tscn"
-const WATCHDOG_SECONDS := 420.0
+const WATCHDOG_SECONDS := 600.0
 ## Game seconds run per real second (physics frames then last that much longer).
 ## Timing cases run at 1; the long fights and avoidance runs at the faster default.
 const FAST_SCALE := 3.0
@@ -44,6 +44,10 @@ const ART_MANIFEST := ART_DIR + "/animation_manifest.json"
 const NO_ART_MANIFEST := ART_DIR + "/missing.json"
 const ART_CELL := 4
 const ART_COLUMNS := 4
+## Content boxes (sheet px) the fixture manifest declares for the effect clips.
+const FIXTURE_PROPS := {"briefcase_spin": [100, 120], "note": [60, 90], "note_pair": [90, 90], "spark": [80, 80]}
+const FIXTURE_FX := {"wave_low": [100, 130], "wave_high": [100, 130], "bass_shock": [240, 70], "chalk_dust": [100, 80], "steam": [150, 150]}
+const FIXTURE_BOARD := Vector2(120.0, 40.0)
 const PLACEHOLDER_NODES := ["Visual/Body", "Visual/Tie", "Visual/Pointer", "Visual/Head"]
 
 const CHECKS := {
@@ -72,11 +76,17 @@ const CHECKS := {
 	"case_reset_clears_every_hazard": 12,
 	"case_arena_reset_after_luz_dies": 5,
 	"case_defeat_through_the_arena": 16,
-	"case_art_absent_keeps_the_placeholders": 9,
+	"case_art_absent_keeps_the_placeholders": 12,
 	"case_art_shows_the_sprite": 12,
+	"case_art_glow_and_flash_on_the_sprite": 10,
 	"case_art_thrust_and_briefcase_clips": 18,
 	"case_art_other_attack_clips": 5,
 	"case_art_state_clips": 15,
+	"case_art_scale_relation": 6,
+	"case_art_hazards_wear_the_sprites": 17,
+	"case_art_steam_over_the_boombox": 6,
+	"case_art_dictation_on_chalk": 11,
+	"case_art_absent_hazards_stay_placeholders": 7,
 }
 
 var checks := 0
@@ -1271,7 +1281,7 @@ func case_defeat_through_the_arena() -> void:
 # -- Art (a fixture manifest, never the real sheets) -----------------------------------
 
 ## A manifest with every contract clip as two frames of a tiny sheet.
-func _write_art_fixture() -> void:
+func _write_art_fixture(with_effects := true) -> void:
 	DirAccess.make_dir_recursive_absolute(ART_DIR)
 	var clips := {}
 	var next := 0
@@ -1289,11 +1299,39 @@ func _write_art_fixture() -> void:
 			"clips": clips, "events": {},
 		}},
 	}
+	if with_effects:
+		manifest["props"] = _write_effect_sheet("fixture_props.png", FIXTURE_PROPS)
+		manifest["fx"] = _write_effect_sheet("fixture_fx.png", FIXTURE_FX)
+		var board := Image.create_empty(int(FIXTURE_BOARD.x), int(FIXTURE_BOARD.y), false, Image.FORMAT_RGBA8)
+		board.fill(Color.WHITE)
+		board.save_png(ART_DIR + "/fixture_board.png")
+		manifest["blackboard"] = {"texture": "fixture_board.png", "size": [int(FIXTURE_BOARD.x), int(FIXTURE_BOARD.y)]}
 	var file := FileAccess.open(ART_MANIFEST, FileAccess.WRITE)
 	file.store_string(JSON.stringify(manifest))
 
 
+## A props or fx entry: one white cell per clip, and the declared content box of each clip.
+## Every clip but the 4-frame `steam` and `briefcase_spin` has one frame.
+func _write_effect_sheet(file_name: String, content: Dictionary) -> Dictionary:
+	var clips := {}
+	var next := 0
+	for clip_name: String in content:
+		var count := 4 if clip_name in ["steam", "briefcase_spin"] else 1
+		clips[clip_name] = range(next, next + count)
+		next += count
+	var rows := ceili(float(next) / float(ART_COLUMNS))
+	var image := Image.create_empty(ART_COLUMNS * ART_CELL, rows * ART_CELL, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	image.save_png(ART_DIR.path_join(file_name))
+	return {
+		"sheet": file_name, "sprite_scale": 0.2896, "clips": clips, "content": content,
+		"grid": {"columns": ART_COLUMNS, "rows": rows, "cell_width": ART_CELL, "cell_height": ART_CELL},
+	}
+
+
 func _remove_art_fixture() -> void:
+	if not DirAccess.dir_exists_absolute(ART_DIR):
+		return
 	for file_name: String in DirAccess.get_files_at(ART_DIR):
 		DirAccess.remove_absolute(ART_DIR.path_join(file_name))
 	DirAccess.remove_absolute(ART_DIR)
@@ -1329,6 +1367,7 @@ func case_art_absent_keeps_the_placeholders() -> void:
 	await _awake_boss(_with_manifest(NO_ART_MANIFEST))
 	check(not _boss.has_art(), "a manifest that does not exist means no art")
 	check(not _sprite().visible, "the sprite stays hidden without art")
+	check(_sprite().material == null, "the sprite has no glow shader without art")
 	for path: String in PLACEHOLDER_NODES:
 		check((_boss.get_node(path) as CanvasItem).visible, "%s is still drawn without art" % path)
 	_boss.start_attack(BoomboxTeacherBoss.Attack.THRUST)
@@ -1337,6 +1376,12 @@ func case_art_absent_keeps_the_placeholders() -> void:
 	var shape := _boss.get_node("CollisionShape2D") as CollisionShape2D
 	check((shape.shape as RectangleShape2D).size == Vector2(28.0, 84.0), "the body collision covers the drawn height")
 	check(shape.position == Vector2(0.0, -42.0), "the body collision is centred on the torso")
+	_boss.receive_hit(1, HIT_FROM, &"attack_1")
+	check(_boss.is_flash_visible() and _boss._flash.visible, "a hit flashes the white polygon as before")
+	await _wait(_boss.flash_time + 0.1)
+	_boss.start_attack(BoomboxTeacherBoss.Attack.KICK)
+	await _frames(3)
+	check(_boss.get_telegraph()._glow.visible, "the telegraph glows on the polygon as before")
 
 
 func case_art_shows_the_sprite() -> void:
@@ -1352,8 +1397,38 @@ func case_art_shows_the_sprite() -> void:
 	check(is_equal_approx(absf(sprite.scale.x), 0.2896), "the sprite uses the manifest scale")
 	check(sprite.get_index() == 0, "the sprite is the first child of Visual, under the flash and the glow")
 	check(_boss.get_clip() == &"idle", "he idles")
-	check(_boss._flash.polygon.size() == BoomboxTeacherBoss.ART_SILHOUETTE.size(), "the hit flash traces the sprite")
-	check(_boss.get_telegraph()._glow.polygon.size() == BoomboxTeacherBoss.ART_SILHOUETTE.size(), "the telegraph glow traces the sprite")
+	check(sprite.material is ShaderMaterial, "the glow and the flash are a shader on the sprite")
+	check(not _boss.get_telegraph()._glow.visible and not _boss._flash.visible, "no polygon overlay is drawn over the sprite")
+	_remove_art_fixture()
+
+
+## With art the telegraph glow and the hit flash live on the sprite's material and keep
+## their timings: the glow follows the wind-up, the flash lasts `flash_time`.
+func case_art_glow_and_flash_on_the_sprite() -> void:
+	_write_art_fixture()
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(3)
+	var material := _sprite().material as ShaderMaterial
+	var telegraph := _boss.get_telegraph()
+	check(not telegraph.is_glowing() and is_zero_approx(float(material.get_shader_parameter(&"glow_amount"))), "no glow at rest")
+	_boss.start_attack(BoomboxTeacherBoss.Attack.THRUST)
+	await _frames(4)
+	var early := float(material.get_shader_parameter(&"glow_amount"))
+	check(telegraph.is_glowing() and early > 0.0, "the wind-up lights the sprite")
+	check((material.get_shader_parameter(&"glow_color") as Color).is_equal_approx(BossTelegraph.MELEE_COLOR), "a melee wind-up glows red")
+	check(not telegraph._glow.visible, "the polygon glow stays hidden with art")
+	await _frames(6)
+	check(float(material.get_shader_parameter(&"glow_amount")) > early, "the glow grows through the wind-up")
+	await _frames_until_phase(BossEnemy.AttackPhase.ACTIVE)
+	await _frames(2)
+	check(not telegraph.is_glowing() and is_zero_approx(float(material.get_shader_parameter(&"glow_amount"))), "the glow clears when the strike lands")
+	await _wait(2.0)
+	check(not _boss.is_flash_visible(), "no flash before a hit")
+	_boss.receive_hit(1, HIT_FROM, &"attack_1")
+	check(_boss.is_flash_visible() and is_equal_approx(float(material.get_shader_parameter(&"flash_amount")), 1.0), "a hit flashes the sprite white")
+	check(not _boss._flash.visible, "the white polygon stays hidden with art")
+	await _wait(_boss.flash_time + 0.1)
+	check(not _boss.is_flash_visible() and is_zero_approx(float(material.get_shader_parameter(&"flash_amount"))), "the flash ends after flash_time")
 	_remove_art_fixture()
 
 
@@ -1477,7 +1552,7 @@ func case_art_state_clips() -> void:
 	_boss.receive_hit(99, HIT_FROM, &"attack_1")
 	await _frames(2)
 	check(_boss.get_clip() == &"defeat", "the killing blow plays the defeat clip")
-	check(_lasts(&"defeat", _boss.defeat_time) or _sprite().animation == &"defeat", "the defeat lasts as long as the collapse")
+	check(_lasts(&"defeat", _boss.defeat_time), "the defeat lasts as long as the collapse")
 	await _wait(1.0)
 	var visual := _boss.get_node("Visual") as Node2D
 	check(absf(visual.rotation) > 0.1, "the placeholder pose still tilts Visual")
@@ -1494,3 +1569,202 @@ func case_art_state_clips() -> void:
 	var corpse_sprite := corpse.get_node("Visual/AnimatedSprite2D") as AnimatedSprite2D
 	check(corpse_sprite.frame == corpse_sprite.sprite_frames.get_frame_count(&"defeat") - 1 and not corpse_sprite.is_playing(), "a restored corpse lies on the last frame")
 	_remove_art_fixture()
+
+
+# -- Hazard and effect art ----------------------------------------------------------------
+
+func _art_of(hazard: BoomboxHazard, index := 0) -> AnimatedSprite2D:
+	return hazard.get_art()[index] as AnimatedSprite2D
+
+
+func _content(sheet: Dictionary, clip: String) -> Vector2:
+	var box: Array = sheet[clip]
+	return Vector2(float(box[0]), float(box[1]))
+
+
+## Starts `step` and returns once its ACTIVE phase is two frames old.
+func _into_active(step: Dictionary) -> void:
+	_boss.plan_step(step)
+	_boss.start_attack(int(step["attack"]))
+	await _frames_until_phase(BossEnemy.AttackPhase.ACTIVE)
+	await _frames(2)
+
+
+## Sprites in the world of the boss that play `clip` (puffs and sparks).
+## Lets the running attack end and its hazards go.
+func _finish_attack() -> void:
+	var guard := 0
+	while (_boss.get_state() == BossEnemy.State.ATTACK or _boss.hazard_count() > 0) and guard < MAX_CYCLE_FRAMES:
+		await physics_frame
+		guard += 1
+
+
+func _puffs(clip: StringName) -> Array[AnimatedSprite2D]:
+	var found: Array[AnimatedSprite2D] = []
+	for child: Node in _rig.get_children():
+		if child is AnimatedSprite2D and (child as AnimatedSprite2D).animation == clip and not child.is_queued_for_deletion():
+			found.append(child as AnimatedSprite2D)
+	return found
+
+
+func case_art_scale_relation() -> void:
+	var box := Vector2(30.0, 22.0)
+	var content := Vector2(100.0, 200.0)
+	check(BoomboxHazard.art_scale(content, box, BoomboxHazard.ArtFit.STRETCH).is_equal_approx(Vector2(0.3, 0.11)), "STRETCH fills the box on both axes")
+	check(BoomboxHazard.art_scale(content, box, BoomboxHazard.ArtFit.WIDTH).is_equal_approx(Vector2(0.3, 0.3)), "WIDTH matches the box width and keeps the proportions")
+	check(BoomboxHazard.art_scale(content, box, BoomboxHazard.ArtFit.CONTAIN).is_equal_approx(Vector2(0.11, 0.11)), "CONTAIN keeps the art inside the box")
+	check(BoomboxHazard.art_scale(Vector2.ZERO, box, BoomboxHazard.ArtFit.CONTAIN) == Vector2.ONE, "an unknown content box leaves the art unscaled")
+	var hazard := BoomboxHazard.new()
+	check(not hazard.has_art() and hazard.get_art().is_empty(), "a hazard has no art until it is given some")
+	hazard.attach_art(AnimatedSprite2D.new())
+	check(hazard.has_art(), "attached art is kept")
+	hazard.free()
+
+
+## Every hazard shows its drawn sprite scaled to the box that hurts; boxes, speeds and timings are the placeholder's.
+func case_art_hazards_wear_the_sprites() -> void:
+	_write_art_fixture()
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(2)
+	var attack := BoomboxTeacherBoss.Attack
+	await _into_active({"attack": attack.BRIEFCASE})
+	var briefcase := _boss.get_hazards()[0]
+	var expected := BoomboxHazard.art_scale(_content(FIXTURE_PROPS, "briefcase_spin"), _boss.briefcase_size, BoomboxHazard.ArtFit.WIDTH)
+	check(briefcase.has_art() and _art_of(briefcase).animation == &"briefcase_spin", "the briefcase tumbles with the spin clip")
+	check(_art_of(briefcase).scale.is_equal_approx(expected) and is_equal_approx(_art_of(briefcase).scale.x * 100.0, _boss.briefcase_size.x), "its front view is as wide as the box that hurts")
+	check(briefcase.get_rect().size == _boss.briefcase_size, "the briefcase box is unchanged")
+	check(_art_of(briefcase).is_playing() and _art_of(briefcase).sprite_frames.get_animation_loop(&"briefcase_spin"), "the spin loops")
+	await _finish_attack()
+	# Sound waves: stretched to their box, mirrored toward the side they travel.
+	await _into_active(_wave(BoomboxTeacherBoss.WAVE_LOW))
+	var waves := _boss.get_hazards()
+	var left := waves[0] if waves[0].velocity.x < 0.0 else waves[1]
+	var right := waves[1] if waves[0].velocity.x < 0.0 else waves[0]
+	var wave_box := Vector2(_boss.wave_width, _boss.wave_low_height)
+	check(waves.size() == 2 and _art_of(left).animation == &"wave_low", "a low wave is the amber arcs")
+	check(_art_of(left).scale.x < 0.0 and _art_of(right).scale.x > 0.0, "the arcs open toward the side they travel")
+	check(is_equal_approx(absf(_art_of(right).scale.x) * 100.0, wave_box.x) and is_equal_approx(_art_of(right).scale.y * 130.0, wave_box.y), "the arcs fill the wave box")
+	check(left.get_rect().size == wave_box, "the wave box is unchanged")
+	await _finish_attack()
+	await _into_active(_wave(BoomboxTeacherBoss.WAVE_HIGH))
+	check(_art_of(_boss.get_hazards()[0]).animation == &"wave_high", "a high wave is the cyan arcs")
+	await _finish_attack()
+	# Notes: the single note first, the pair on the second one.
+	_boss.plan_step({"attack": attack.NOTE_BOUNCE, "count": 2})
+	_boss.start_attack(attack.NOTE_BOUNCE)
+	var seen: Array[BoomboxHazard] = []
+	var guard := 0
+	while seen.size() < 2 and guard < MAX_ATTACK_FRAMES:
+		await physics_frame
+		for hazard: BoomboxHazard in _boss.get_hazards():
+			if not seen.has(hazard):
+				seen.append(hazard)
+		guard += 1
+	check(seen.size() == 2 and _art_of(seen[0]).animation == &"note" and _art_of(seen[1]).animation == &"note_pair", "the notes alternate the single note and the pair")
+	var note_box := Vector2.ONE * _boss.note_radius * 2.0
+	check(_art_of(seen[0]).scale.is_equal_approx(BoomboxHazard.art_scale(_content(FIXTURE_PROPS, "note"), note_box, BoomboxHazard.ArtFit.CONTAIN)), "a note fits inside its disc")
+	check(seen[0].get_rect().size == note_box, "the note box is unchanged")
+	await _finish_attack()
+	# Bass drop: crests along the floor band, a spark where the slam lands.
+	await _into_active({"attack": attack.BASS_DROP})
+	var shock := _boss.get_hazards()[0]
+	var band := shock.get_rect().size
+	var crest_scale := band.y / 70.0
+	var crests := shock.get_art()
+	var on_floor := true
+	for crest: Node2D in crests:
+		on_floor = on_floor and is_equal_approx(crest.position.y + 70.0 * crest_scale * 0.5, band.y * 0.5)
+	check(crests.size() >= 2 and _art_of(shock).animation == &"bass_shock", "the shock is a row of ground crests")
+	check(on_floor and is_equal_approx(_art_of(shock).scale.y * 70.0, band.y), "the crests stand on the floor as tall as the band")
+	var first_x := crests[0].position.x - 240.0 * crest_scale * 0.5
+	var last_x := crests[crests.size() - 1].position.x + 240.0 * crest_scale * 0.5
+	check(first_x <= -band.x * 0.5 + 1.0 and last_x >= band.x * 0.5 - 1.0, "the crests span the whole band that hurts")
+	var sparks := _puffs(&"spark")
+	check(sparks.size() == 1 and sparks[0].scale.x * 80.0 <= BoomboxTeacherBoss.SPARK_WIDTH + 0.01, "a spark punctuates the slam")
+	await _wait(1.0)
+	check(_puffs(&"spark").is_empty(), "the spark frees itself")
+	_remove_art_fixture()
+
+
+func case_art_steam_over_the_boombox() -> void:
+	_write_art_fixture()
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(2)
+	var steam := _boss._steam_sprite
+	check(steam != null and not steam.visible, "the steam waits, hidden, until he overheats")
+	_boss.stun(1.0)
+	await _frames(3)
+	check(steam.visible and steam.animation == &"steam" and steam.sprite_frames.get_animation_loop(&"steam"), "the steam loops while he is overheated")
+	check(steam.position.y < -92.0 and absf(steam.scale.x * 150.0 - BoomboxTeacherBoss.STEAM_ART_WIDTH) < 0.01, "the steam rises over the boombox at its size")
+	check(steam.get_parent() == _boss and steam.sprite_frames.get_frame_count(&"steam") == 4, "the loop has four frames and does not flip with him")
+	await _wait(1.2)
+	check(not steam.visible, "the steam stops with the stun")
+	_remove_art_fixture()
+	_write_art_fixture(false)
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	check(_boss._steam_sprite == null, "no fx sheet keeps the drawn steam")
+
+
+## The blackboard, the dictated text and the falling letters.
+func case_art_dictation_on_chalk() -> void:
+	_write_art_fixture()
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(2)
+	_boss.plan_step({"attack": BoomboxTeacherBoss.Attack.DICTATION})
+	_boss.start_attack(BoomboxTeacherBoss.Attack.DICTATION)
+	await _frames(3)
+	var board := _boss.get_board()
+	var backdrop := board.get_node_or_null("Art") as Sprite2D
+	check(backdrop != null and backdrop.texture.get_size() == FIXTURE_BOARD, "the blackboard art is the board")
+	check(is_equal_approx(backdrop.scale.x * FIXTURE_BOARD.x, _boss.board_size.x), "it is as wide as the board size")
+	check(board.get_children().filter(func(node: Node) -> bool: return node is Polygon2D).is_empty(), "the flat green rectangle is gone")
+	var label := board.get_node("Text") as Label
+	check(label.get_theme_color(&"font_color") == BoomboxHazard.CHALK_COLOR and label.get_theme_color(&"font_outline_color") == BoomboxHazard.CHALK_OUTLINE_COLOR, "the text is chalk: off-white with a dark outline")
+	check(label.get_theme_constant(&"outline_size") > 0, "the chalk text is outlined")
+	await _frames_until_phase(BossEnemy.AttackPhase.ACTIVE)
+	await _frames(2)
+	var letter := _boss.get_hazards()[0]
+	check(letter.look == BoomboxHazard.Look.CHALK and letter.glyph == "i", "a letter is drawn as chalk")
+	check(not letter.has_art() and letter.get_rect().size == Vector2.ONE * _boss.letter_size, "no box is drawn and the letter box is unchanged")
+	var landed: Array[Vector2] = []
+	letter.touched_floor.connect(func(at: Vector2) -> void: landed.append(at))
+	var guard := 0
+	while _puffs(&"chalk_dust").is_empty() and guard < 240:
+		await physics_frame
+		guard += 1
+	var puffs := _puffs(&"chalk_dust")
+	check(landed.size() == 1 and puffs.size() >= 1, "a puff of chalk dust rises where the letter lands")
+	check(landed.size() == 1 and absf(landed[0].y - _boss.global_position.y) < 1.0, "the letter lands on the floor")
+	check(puffs.size() >= 1 and puffs[0].scale.x * 100.0 < BoomboxTeacherBoss.DUST_WIDTH, "the puff grows from a smaller size")
+	await _wait(BoomboxEffectArt.PUFF_TIME + 0.2)
+	check(_puffs(&"chalk_dust").size() < 2, "the dust fades and frees itself")
+	_remove_art_fixture()
+
+
+func case_art_absent_hazards_stay_placeholders() -> void:
+	await _awake_boss(_with_manifest(NO_ART_MANIFEST))
+	await _frames(2)
+	await _into_active({"attack": BoomboxTeacherBoss.Attack.BRIEFCASE})
+	var briefcase := _boss.get_hazards()[0]
+	check(not briefcase.has_art() and briefcase.get_art().is_empty(), "the briefcase is the placeholder box without art")
+	await _finish_attack()
+	_boss.plan_step({"attack": BoomboxTeacherBoss.Attack.DICTATION})
+	_boss.start_attack(BoomboxTeacherBoss.Attack.DICTATION)
+	await _frames(3)
+	var board := _boss.get_board()
+	check(board.get_node_or_null("Art") == null and not board.get_children().filter(func(node: Node) -> bool: return node is Polygon2D).is_empty(), "the blackboard is the flat green rectangle")
+	var label := board.get_node("Text") as Label
+	check(label.get_theme_color(&"font_color") == Color.WHITE and not label.has_theme_color_override(&"font_outline_color"), "the text is plain white")
+	await _frames_until_phase(BossEnemy.AttackPhase.ACTIVE)
+	await _frames(2)
+	check(_boss.get_hazards()[0].look == BoomboxHazard.Look.GLYPH, "the letters keep their white box")
+	_boss.stun(1.0)
+	await _frames(2)
+	check(_boss._steam_sprite == null and _boss._effects == null, "there are no effect sprites")
+	_remove_art_fixture()
+	_write_art_fixture(false)
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(2)
+	await _into_active({"attack": BoomboxTeacherBoss.Attack.BRIEFCASE})
+	check(not _boss.get_hazards()[0].has_art(), "character art without a props sheet keeps the placeholder box")
+	check(_boss.has_art(), "and the boss still shows its sprite")
