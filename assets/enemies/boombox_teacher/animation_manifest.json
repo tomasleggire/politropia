@@ -219,6 +219,86 @@
       "spark": [
         7
       ]
+    },
+    "content": {
+      "briefcase_spin": [
+        106,
+        120
+      ],
+      "note": [
+        71,
+        93
+      ],
+      "note_pair": [
+        95,
+        95
+      ],
+      "steam": [
+        108,
+        91
+      ],
+      "spark": [
+        85,
+        98
+      ]
     }
+  },
+  "fx": {
+    "sheet": "boombox_teacher_fx_sheet.png",
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 256,
+      "cell_height": 256
+    },
+    "clips": {
+      "wave_low": [
+        0
+      ],
+      "wave_high": [
+        1
+      ],
+      "bass_shock": [
+        2
+      ],
+      "chalk_dust": [
+        3
+      ],
+      "steam": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    "content": {
+      "wave_low": [
+        109,
+        129
+      ],
+      "wave_high": [
+        109,
+        129
+      ],
+      "bass_shock": [
+        241,
+        74
+      ],
+      "chalk_dust": [
+        104,
+        83
+      ],
+      "steam": [
+        151,
+        153
+      ]
+    }
+  },
+  "blackboard": {
+    "texture": "boombox_teacher_blackboard.png",
+    "size": [
+      601,
+      224
+    ]
   }
 }

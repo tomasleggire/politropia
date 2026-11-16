@@ -108,6 +108,23 @@ def split_cells(rgba: np.ndarray, cols: int, rows: int, name: str, min_px: int) 
     return cells
 
 
+def alpha_box(frame: np.ndarray, threshold: float = 20.0) -> tuple[int, int, int, int] | None:
+    """(left, top, right, bottom) of the pixels above `threshold` alpha (right and bottom
+    exclusive), or None when the frame is empty."""
+    ys, xs = np.where(frame[..., 3] > threshold)
+    if len(xs) == 0:
+        return None
+    return int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
+
+
+def union_box(frames: list[np.ndarray]) -> tuple[int, int, int, int] | None:
+    """Smallest box that holds the art of every frame (None when all are empty)."""
+    boxes = [box for box in (alpha_box(f) for f in frames) if box is not None]
+    if not boxes:
+        return None
+    return min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes)
+
+
 def standing_height(frame: np.ndarray) -> float:
     """Height of the whole cropped frame (every pixel of art counts)."""
     return float(frame.shape[0])

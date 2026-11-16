@@ -16,6 +16,10 @@ of the sheet is matched to the loco median. `size_cells` restricts which cells a
 measured, `scale_mult` is a manual multiplier for tuning. The props sheet has no
 boombox: the briefcase of its cell 0 is scaled to BRIEFCASE_GAME_WIDTH on screen (the
 hazard is 30 px wide) and every prop uses that factor (`PROPS_SCALE_MULT` tunes it).
+The `fx` sheet (wave arcs, ground crest, chalk dust, steam loop) uses one fixed factor
+(`FX_SCALE`); the game rescales each effect to its hazard from the per-clip `content`
+box the manifest records. The `blackboard` raw image is keyed, cropped and saved as one
+texture. A sheet whose boombox block measures 0 stops with a clear error.
 
 Usage: python tools/process_boombox_teacher_sheets.py [--preview DIR]
 Needs Pillow, numpy and scipy (see the contract for the exact command).
@@ -46,6 +50,13 @@ ANTENNA_WIDTH_FRACTION = 0.30
 BRIEFCASE_GAME_WIDTH = 30.0  # on-screen px, the thrown briefcase hazard (briefcase_size.x)
 PROPS_SCALE_MULT = 1.0
 REFERENCE = "loco"
+# Scale assumed for the first sheet present while loco (the reference) is missing.
+FALLBACK_BASE_SCALE = 0.8
+FX_CELL = 256
+FX_SCALE = 0.7  # one factor for the whole fx sheet; the game rescales each effect to its hazard
+FX_MIN_COMPONENT_PX = 40  # raw px; drops stray specks around the effects
+BLACKBOARD_SCALE = 0.4
+BLACKBOARD_FILE = "boombox_teacher_blackboard.png"
 
 # sheet -> raw grid (cols, rows), clips (raw cell indices), events (clip -> frame
 # index of the strike inside the clip), `body_feet` (align the soles on the largest
@@ -113,6 +124,15 @@ PROPS = {
     "clips": {"briefcase_spin": [0, 1, 2, 3], "note": [4], "note_pair": [5], "steam": [6], "spark": [7]},
 }
 
+# Effects (no figure): one clip per effect. Every frame of a clip is cropped with the
+# same box and centred, so a looping clip (steam) keeps its motion and a single frame
+# (a wave, the ground crest) sits on the cell centre. `content` in the manifest is that
+# box in sheet px: the game scales each effect from it.
+FX = {
+    "grid": (4, 2),
+    "clips": {"wave_low": [0], "wave_high": [1], "bass_shock": [2], "chalk_dust": [3], "steam": [4, 5, 6, 7]},
+}
+
 
 def raw_path(sheet: str) -> Path:
     return RAW_DIR / f"boombox_teacher_{sheet}_raw.png"
@@ -148,13 +168,18 @@ def sheet_scales(prepared: dict[str, list[np.ndarray | None]]) -> tuple[dict[str
     The reference is the loco sheet; while it is missing, its expected scale is unknown,
     so the sheets are measured against the first one present and a note says so."""
     sizes = {name: median_block(frames, SHEETS[name]) for name, frames in prepared.items()}
+    for name, size in sizes.items():
+        if size <= 0.0:
+            raise ValueError(f"{name}: no boombox block found in the measured cells, so its scale cannot be derived. Check the raw sheet or list other cells in `size_cells`.")
     ref = REFERENCE if REFERENCE in prepared else next(iter(prepared))
     if ref == REFERENCE:
         stand = idle_stand_height(prepared[ref], SHEETS[ref]["clips"]["idle"])
+        if stand <= 0.0:
+            raise ValueError(f"{ref}: the idle frames have no height, so the base scale cannot be derived")
         base = STAND_HEIGHT / stand
         print(f"idle stands {stand:.0f} raw px (antenna excluded) -> loco scale {base:.4f}, {STAND_HEIGHT:.0f} px in the cell")
     else:
-        base = 0.8
+        base = FALLBACK_BASE_SCALE
         print(f"note: no loco sheet yet, scale {base} assumed for {ref}; rerun when loco arrives")
     scales = {}
     for name in prepared:
@@ -178,6 +203,22 @@ def props_scale(frames: list[np.ndarray]) -> float:
     return BRIEFCASE_GAME_WIDTH / SPRITE_SCALE / width * PROPS_SCALE_MULT
 
 
+def clip_contents(image: Image.Image, cell: int, clips: dict[str, list[int]]) -> dict[str, list[int]]:
+    """Per clip, the [width, height] in sheet px of the box that holds its art in every frame."""
+    sheet = np.asarray(image).astype(np.float32)
+    columns = image.width // cell
+    contents = {}
+    for clip, indices in clips.items():
+        frames = []
+        for i in indices:
+            row, col = divmod(i, columns)
+            frames.append(sheet[row * cell : (row + 1) * cell, col * cell : (col + 1) * cell])
+        box = pipeline.union_box(frames)
+        if box is not None:
+            contents[clip] = [box[2] - box[0], box[3] - box[1]]
+    return contents
+
+
 def build_props(preview: Path | None) -> dict:
     cols, rows = PROPS["grid"]
     frames = pipeline.split_frames(pipeline.key_magenta(Image.open(raw_path("props"))), cols, rows, "props")
@@ -188,7 +229,51 @@ def build_props(preview: Path | None) -> dict:
     image.save(OUT_DIR / sheet_file("props"), optimize=True)
     write_preview(image, "props", preview, PROPS_CELL, f"props scale {scale:.3f}")
     entry = pipeline.manifest_entry(image, PROPS_CELL, PROPS["clips"], {})
-    return {"sheet": sheet_file("props"), "sprite_scale": round(SPRITE_SCALE, 4), "grid": entry["grid"], "clips": entry["clips"]}
+    return {
+        "sheet": sheet_file("props"),
+        "sprite_scale": round(SPRITE_SCALE, 4),
+        "grid": entry["grid"],
+        "clips": entry["clips"],
+        "content": clip_contents(image, PROPS_CELL, entry["clips"]),
+    }
+
+
+def build_fx(preview: Path | None) -> dict:
+    cols, rows = FX["grid"]
+    cells = pipeline.split_cells(pipeline.key_magenta(Image.open(raw_path("fx"))), cols, rows, "fx", FX_MIN_COMPONENT_PX)
+    placed: dict[int, Image.Image] = {}
+    for clip, indices in FX["clips"].items():
+        left, top, right, bottom = pipeline.union_box([cells[i] for i in indices])
+        for i in indices:
+            frame = cells[i][top:bottom, left:right]
+            placed[i] = pipeline.centered_cell(frame, FX_SCALE, FX_CELL, f"fx[{i}]")
+    used, clips = pipeline.compact_clips(FX["clips"])
+    image = pipeline.assemble_sheet([placed[i] for i in used], FX_CELL)
+    image.save(OUT_DIR / sheet_file("fx"), optimize=True)
+    write_preview(image, "fx", preview, FX_CELL, f"fx scale {FX_SCALE}")
+    entry = pipeline.manifest_entry(image, FX_CELL, clips, {})
+    return {
+        "sheet": sheet_file("fx"),
+        "grid": entry["grid"],
+        "clips": entry["clips"],
+        "content": clip_contents(image, FX_CELL, entry["clips"]),
+    }
+
+
+def build_blackboard(preview: Path | None) -> dict:
+    """The blank blackboard keyed, cropped to its box and scaled: one texture."""
+    frame = pipeline.key_magenta(Image.open(raw_path("blackboard")))
+    left, top, right, bottom = pipeline.union_box([frame])
+    board = pipeline.scale_rgba(frame[top:bottom, left:right], BLACKBOARD_SCALE)
+    image = Image.fromarray(board, "RGBA")
+    image.save(OUT_DIR / BLACKBOARD_FILE, optimize=True)
+    if preview is not None:
+        preview.mkdir(parents=True, exist_ok=True)
+        backdrop = Image.new("RGBA", image.size, (24, 32, 56, 255))
+        backdrop.alpha_composite(image)
+        backdrop.save(preview / BLACKBOARD_FILE)
+    print(f"  blackboard: {image.width}x{image.height} px")
+    return {"texture": BLACKBOARD_FILE, "size": [image.width, image.height]}
 
 
 def write_preview(image: Image.Image, sheet: str, preview: Path | None, cell: int, label: str) -> None:
@@ -220,7 +305,11 @@ def main() -> None:
     props_present = raw_path("props").exists()
     if not props_present:
         print(f"skip props: {raw_path('props')} not found")
-    if not present and not props_present:
+    extras = {name: raw_path(name).exists() for name in ("fx", "blackboard")}
+    for name, found in extras.items():
+        if not found:
+            print(f"skip {name}: {raw_path(name)} not found")
+    if not present and not props_present and not any(extras.values()):
         print("nothing to process")
         return
 
@@ -237,6 +326,11 @@ def main() -> None:
             print(f"  {name}: done")
     if props_present:
         manifest["props"] = build_props(args.preview)
+    if extras["fx"]:
+        manifest["fx"] = build_fx(args.preview)
+        print("  fx: done")
+    if extras["blackboard"]:
+        manifest["blackboard"] = build_blackboard(args.preview)
     pipeline.write_manifest(OUT_DIR / "animation_manifest.json", manifest)
     print("wrote", OUT_DIR)
 
