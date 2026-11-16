@@ -19,6 +19,7 @@ const FAST_SCALE := 3.0
 const TIMING_CASES := [
 	"case_beat_clock_and_tempo", "case_strikes_start_on_a_beat", "case_minimum_telegraph_at_high_tempo",
 	"case_tempo_holds_in_telegraph", "case_tempo_holds_in_active", "case_dash_through_hazards",
+	"case_art_thrust_and_briefcase_clips",
 ]
 const FLOOR_RECT := Rect2(-500.0, 0.0, 1000.0, 100.0)
 const LUZ_START := Vector2(-400.0, 0.0)
@@ -37,6 +38,13 @@ const ARENA_TIMINGS := {
 	"door_time": 0.05, "title_time": 0.3, "engage_delay": 0.1,
 	"camera_blend_time": 0.0, "defeat_beat": 0.2,
 }
+
+const ART_DIR := "user://boombox_teacher_art_fixture"
+const ART_MANIFEST := ART_DIR + "/animation_manifest.json"
+const NO_ART_MANIFEST := ART_DIR + "/missing.json"
+const ART_CELL := 4
+const ART_COLUMNS := 4
+const PLACEHOLDER_NODES := ["Visual/Body", "Visual/Tie", "Visual/Pointer", "Visual/Head"]
 
 const CHECKS := {
 	"case_prefab_is_one_drag": 15,
@@ -64,6 +72,11 @@ const CHECKS := {
 	"case_reset_clears_every_hazard": 12,
 	"case_arena_reset_after_luz_dies": 5,
 	"case_defeat_through_the_arena": 16,
+	"case_art_absent_keeps_the_placeholders": 9,
+	"case_art_shows_the_sprite": 12,
+	"case_art_thrust_and_briefcase_clips": 18,
+	"case_art_other_attack_clips": 5,
+	"case_art_state_clips": 15,
 }
 
 var checks := 0
@@ -1253,3 +1266,231 @@ func case_defeat_through_the_arena() -> void:
 	var fresh := (load(BOSS_SCENE) as PackedScene).instantiate() as BoomboxTeacherBoss
 	check(is_equal_approx(fresh.final_freeze_time, 0.25) and is_equal_approx(fresh.final_slowmo_time, 0.5), "the final blow keeps the Artemis defaults")
 	fresh.free()
+
+
+# -- Art (a fixture manifest, never the real sheets) -----------------------------------
+
+## A manifest with every contract clip as two frames of a tiny sheet.
+func _write_art_fixture() -> void:
+	DirAccess.make_dir_recursive_absolute(ART_DIR)
+	var clips := {}
+	var next := 0
+	for clip_name: String in BoomboxTeacherBoss.CLIP_SPEEDS:
+		clips[clip_name] = [next, next + 1]
+		next += 2
+	var rows := ceili(float(next) / float(ART_COLUMNS))
+	var image := Image.create_empty(ART_COLUMNS * ART_CELL, rows * ART_CELL, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	image.save_png(ART_DIR + "/fixture_sheet.png")
+	var manifest := {
+		"cell": 448, "feet_row": 416, "sprite_scale": 0.2896,
+		"sheets": {"fixture_sheet.png": {
+			"grid": {"columns": ART_COLUMNS, "rows": rows, "cell_width": ART_CELL, "cell_height": ART_CELL},
+			"clips": clips, "events": {},
+		}},
+	}
+	var file := FileAccess.open(ART_MANIFEST, FileAccess.WRITE)
+	file.store_string(JSON.stringify(manifest))
+
+
+func _remove_art_fixture() -> void:
+	for file_name: String in DirAccess.get_files_at(ART_DIR):
+		DirAccess.remove_absolute(ART_DIR.path_join(file_name))
+	DirAccess.remove_absolute(ART_DIR)
+
+
+func _with_manifest(path: String) -> Callable:
+	return func(boss: BoomboxTeacherBoss) -> void:
+		boss.animation_manifest = path
+
+
+## The speed the sprite plays `clip` at must make it last `duration` seconds.
+func _lasts(clip: StringName, duration: float, tolerance := 0.05) -> bool:
+	var sprite := _boss.get_node("Visual/AnimatedSprite2D") as AnimatedSprite2D
+	var frames := sprite.sprite_frames
+	var wanted := (float(frames.get_frame_count(clip)) / frames.get_animation_speed(clip)) / duration
+	return sprite.animation == clip and absf(sprite.get_playing_speed() - wanted) <= tolerance * wanted
+
+
+func _sprite() -> AnimatedSprite2D:
+	return _boss.get_node("Visual/AnimatedSprite2D") as AnimatedSprite2D
+
+
+## Frames from now until the boss' clip is `clip` (-1 on timeout).
+func _frames_until_clip(clip: StringName, limit := 900) -> int:
+	var frames := 0
+	while _boss.get_clip() != clip and frames < limit:
+		await physics_frame
+		frames += 1
+	return frames if frames < limit else -1
+
+
+func case_art_absent_keeps_the_placeholders() -> void:
+	await _awake_boss(_with_manifest(NO_ART_MANIFEST))
+	check(not _boss.has_art(), "a manifest that does not exist means no art")
+	check(not _sprite().visible, "the sprite stays hidden without art")
+	for path: String in PLACEHOLDER_NODES:
+		check((_boss.get_node(path) as CanvasItem).visible, "%s is still drawn without art" % path)
+	_boss.start_attack(BoomboxTeacherBoss.Attack.THRUST)
+	await _frames(3)
+	check(_boss.get_clip() == &"", "no clip is requested without art")
+	var shape := _boss.get_node("CollisionShape2D") as CollisionShape2D
+	check((shape.shape as RectangleShape2D).size == Vector2(28.0, 84.0), "the body collision covers the drawn height")
+	check(shape.position == Vector2(0.0, -42.0), "the body collision is centred on the torso")
+
+
+func case_art_shows_the_sprite() -> void:
+	_write_art_fixture()
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(3)
+	var sprite := _sprite()
+	check(_boss.has_art(), "a manifest with the default clip means art")
+	check(sprite.visible, "the sprite shows")
+	for path: String in PLACEHOLDER_NODES:
+		check(not (_boss.get_node(path) as CanvasItem).visible, "%s is hidden with art" % path)
+	check(sprite.offset == Vector2(0.0, -192.0), "the offset puts the feet row on the origin")
+	check(is_equal_approx(absf(sprite.scale.x), 0.2896), "the sprite uses the manifest scale")
+	check(sprite.get_index() == 0, "the sprite is the first child of Visual, under the flash and the glow")
+	check(_boss.get_clip() == &"idle", "he idles")
+	check(_boss._flash.polygon.size() == BoomboxTeacherBoss.ART_SILHOUETTE.size(), "the hit flash traces the sprite")
+	check(_boss.get_telegraph()._glow.polygon.size() == BoomboxTeacherBoss.ART_SILHOUETTE.size(), "the telegraph glow traces the sprite")
+	_remove_art_fixture()
+
+
+## Thrust chain and briefcase in real time: the clip of each part and the strike on a beat.
+func case_art_thrust_and_briefcase_clips() -> void:
+	_write_art_fixture()
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(2)
+	var high := BoomboxTeacherBoss.Height.HIGH
+	var low := BoomboxTeacherBoss.Height.LOW
+	_boss.plan_step({"attack": BoomboxTeacherBoss.Attack.THRUST, "heights": [high, low]})
+	_boss.start_attack(BoomboxTeacherBoss.Attack.THRUST)
+	await _frames(2)
+	check(_boss.get_clip() == &"thrust_high_windup", "the first thrust winds up at its height")
+	check(_lasts(&"thrust_high_windup", _boss._telegraph_total), "the wind-up lasts as long as the telegraph")
+	await _frames_until_phase(BossEnemy.AttackPhase.ACTIVE)
+	await physics_frame
+	var strike_frame := Engine.get_physics_frames()
+	check(_boss.get_clip() == &"thrust_high_strike", "the strike frame shows when ACTIVE starts")
+	check(_gap_to_beat(strike_frame) <= 2, "the strike frame is on a beat (%d frames away)" % _gap_to_beat(strike_frame))
+	await _wait(_boss.thrust_strike_time + 0.05)
+	check(_boss.get_clip() == &"thrust_low_windup", "between strikes he winds up the next height")
+	await _frames_until_clip(&"thrust_low_strike")
+	check(_boss.get_clip() == &"thrust_low_strike", "the second strike shows its own height")
+	check(_gap_to_beat(Engine.get_physics_frames()) <= 2, "the second strike frame is on a beat")
+	await _wait(_boss.thrust_strike_time + 0.05)
+	check(_boss.get_clip() == &"thrust_low_recover", "after the last strike he recovers")
+	await _frames_until_phase(BossEnemy.AttackPhase.RECOVER)
+	await physics_frame
+	check(_boss.get_clip() == &"thrust_low_recover", "the recovery keeps the pose")
+	await _wait(1.5)
+	check(_boss.get_state() != BossEnemy.State.ATTACK and _boss.get_clip() == &"idle", "he is idle again after the attack")
+	_boss.start_attack(BoomboxTeacherBoss.Attack.BRIEFCASE)
+	await _frames(2)
+	check(_boss.get_clip() == &"throw_windup", "the throw winds up")
+	check(_lasts(&"throw_windup", _boss._telegraph_total), "the throw wind-up lasts as long as the telegraph")
+	await _frames_until_phase(BossEnemy.AttackPhase.ACTIVE)
+	await physics_frame
+	check(_boss.get_clip() == &"throw_release", "the release frame shows when ACTIVE starts")
+	check(_gap_to_beat(Engine.get_physics_frames()) <= 2, "the release frame is on a beat")
+	await _wait(BoomboxTeacherBoss.THROW_RELEASE_TIME + 0.1)
+	check(_boss.get_clip() == &"throw_wait", "he waits empty-handed while the briefcase flies")
+	while _boss.get_state_time_left() > BoomboxTeacherBoss.THROW_CATCH_TIME - 0.05 and _boss.get_attack_phase() == BossEnemy.AttackPhase.ACTIVE:
+		await physics_frame
+	await physics_frame
+	check(_boss.get_clip() == &"throw_catch", "he catches it when it comes home")
+	await _frames_until_phase(BossEnemy.AttackPhase.RECOVER)
+	await physics_frame
+	check(_boss.get_clip() == &"idle", "he is idle in the recovery of the throw")
+	check(_boss.get_attack_phase() == BossEnemy.AttackPhase.RECOVER, "that was the recovery")
+	_remove_art_fixture()
+
+
+## The clip in the TELEGRAPH, ACTIVE and RECOVER phases of `step`.
+func _clips_by_phase(step: Dictionary) -> Array[StringName]:
+	var clips: Array[StringName] = []
+	_boss.plan_step(step)
+	_boss.start_attack(int(step["attack"]))
+	await _frames(2)
+	clips.append(_boss.get_clip())
+	for phase_id: BossEnemy.AttackPhase in [BossEnemy.AttackPhase.ACTIVE, BossEnemy.AttackPhase.RECOVER]:
+		await _frames_until_phase(phase_id)
+		await physics_frame
+		clips.append(_boss.get_clip())
+	var guard := 0
+	while _boss.get_state() == BossEnemy.State.ATTACK and guard < MAX_ATTACK_FRAMES:
+		await physics_frame
+		guard += 1
+	return clips
+
+
+func case_art_other_attack_clips() -> void:
+	_write_art_fixture()
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(2)
+	var attack := BoomboxTeacherBoss.Attack
+	var kick: Array[StringName] = [&"kick_windup", &"kick_strike", &"kick_recover"]
+	var waves: Array[StringName] = [&"conduct", &"conduct", &"idle"]
+	var notes: Array[StringName] = [&"notes", &"notes", &"idle"]
+	var lecture: Array[StringName] = [&"lecture", &"lecture", &"idle"]
+	var bass: Array[StringName] = [&"bass_lift", &"bass_slam", &"bass_slam"]
+	check(await _clips_by_phase({"attack": attack.KICK}) == kick, "the kick plays windup, strike, recover")
+	check(await _clips_by_phase(_wave(BoomboxTeacherBoss.WAVE_LOW)) == waves, "the sound waves are conducted until the recovery")
+	check(await _clips_by_phase({"attack": attack.NOTE_BOUNCE, "count": 2}) == notes, "the notes are thrown from the notes clip")
+	check(await _clips_by_phase({"attack": attack.DICTATION}) == lecture, "the dictation is the lecture clip")
+	check(await _clips_by_phase({"attack": attack.BASS_DROP}) == bass, "the bass drop lifts, slams and holds the slam")
+	_remove_art_fixture()
+
+
+func case_art_state_clips() -> void:
+	_write_art_fixture()
+	# Walking, overheat and the phase change.
+	await _awake_boss(func(boss: BoomboxTeacherBoss) -> void:
+		boss.animation_manifest = ART_MANIFEST
+		boss.walk_speed = 70.0
+		boss.auto_phrases = false)
+	_player.global_position = Vector2(-100.0, 0.0)
+	await _frames_until_clip(&"walk", 200)
+	check(_boss.get_clip() == &"walk", "he walks to his mid range with the walk clip")
+	_boss.stun(1.0)
+	await _frames(2)
+	check(_boss.get_clip() == &"overheat", "the overheat stun plays the overheat clip")
+	check(_sprite().sprite_frames.get_animation_loop(&"overheat"), "the overheat loops while the stun lasts")
+	_boss.walk_speed = 0.0
+	await _wait(1.2)
+	check(_boss.get_clip() == &"idle", "he idles once the stun ends")
+	_hit(13)
+	await _frames(3)
+	check(_boss.get_state() == BossEnemy.State.TRANSITION and _boss.get_clip() == &"phase_change", "the phase change plays its clip")
+	check(_lasts(&"phase_change", _boss.phase_transition_time), "the phase change lasts as long as the transition")
+	# Intro: the arena reveal while he waits in IDLE.
+	await _build_rig(_with_manifest(ART_MANIFEST))
+	await _frames(3)
+	_boss.play_intro(1.0)
+	await _frames(2)
+	check(_boss.get_clip() == &"intro", "the arena reveal plays the intro clip")
+	check(_lasts(&"intro", 1.0, 0.1), "the intro lasts as long as the reveal (a few frames in)")
+	# Defeat and the corpse.
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(3)
+	_boss.receive_hit(99, HIT_FROM, &"attack_1")
+	await _frames(2)
+	check(_boss.get_clip() == &"defeat", "the killing blow plays the defeat clip")
+	check(_lasts(&"defeat", _boss.defeat_time) or _sprite().animation == &"defeat", "the defeat lasts as long as the collapse")
+	await _wait(1.0)
+	var visual := _boss.get_node("Visual") as Node2D
+	check(absf(visual.rotation) > 0.1, "the placeholder pose still tilts Visual")
+	check(absf(_sprite().global_transform.y.x) < 0.01, "the sprite undoes the tilt: the clip carries the slump")
+	check(absf(_sprite().global_transform.y.length() - 0.2896) < 0.005, "the sprite undoes the squash")
+	check(_sprite().frame == _sprite().sprite_frames.get_frame_count(&"defeat") - 1, "the corpse shows the last defeat frame")
+	# A corpse restored by a checkpoint shows the last frame at once.
+	_build_world()
+	var corpse := (load(BOSS_SCENE) as PackedScene).instantiate() as BoomboxTeacherBoss
+	corpse.animation_manifest = ART_MANIFEST
+	corpse.make_corpse_at(BOSS_AT, 1)
+	_rig.add_child(corpse)
+	await _frames(3)
+	var corpse_sprite := corpse.get_node("Visual/AnimatedSprite2D") as AnimatedSprite2D
+	check(corpse_sprite.frame == corpse_sprite.sprite_frames.get_frame_count(&"defeat") - 1 and not corpse_sprite.is_playing(), "a restored corpse lies on the last frame")
+	_remove_art_fixture()

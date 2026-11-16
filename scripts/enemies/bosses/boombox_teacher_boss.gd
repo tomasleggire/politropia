@@ -89,6 +89,36 @@ const STEAM_PUFFS := 5
 const STEAM_COLOR := Color(0.92, 0.95, 1.0)
 const HEAD_LIFT := 10.0
 
+## Art. Clip names are the contract of docs/bosses/BOOMBOX_TEACHER_ANIMATIONS.md.
+const WALK_CLIP_SPEED := 1.0
+const THROW_RELEASE_TIME := 0.15
+const THROW_CATCH_TIME := 0.3
+const MIN_CLIP_TIME := 0.05
+const NO_EVENT := -1.0e9
+## Hit flash and telegraph glow outline over the sprite: a 20 px torso under a
+## 44 x 32 boombox, 92 px tall, feet on the origin (the placeholder Body is only 36 tall).
+const ART_SILHOUETTE := [Vector2(-9, 0), Vector2(9, 0), Vector2(10, -58), Vector2(22, -60), Vector2(22, -92), Vector2(-22, -92), Vector2(-22, -60), Vector2(-10, -58)]
+const PLACEHOLDERS: Array[String] = ["Body", "Tie", "Pointer", "Head"]
+const CLIP_SPEEDS := {
+	"idle": 8.0, "walk": 10.0, "intro": 8.0, "phase_change": 8.0, "overheat": 8.0, "defeat": 8.0,
+	"thrust_high_windup": 12.0, "thrust_high_strike": 12.0, "thrust_high_recover": 12.0,
+	"thrust_low_windup": 12.0, "thrust_low_strike": 12.0, "thrust_low_recover": 12.0,
+	"throw_windup": 12.0, "throw_release": 12.0, "throw_wait": 8.0, "throw_catch": 12.0,
+	"kick_windup": 12.0, "kick_strike": 12.0, "kick_recover": 12.0,
+	"conduct": 8.0, "lecture": 4.0, "notes": 4.0, "bass_lift": 12.0, "bass_slam": 12.0,
+}
+## Clips that repeat; every other clip plays once and holds its last frame.
+const LOOPING_CLIPS := ["idle", "walk", "overheat", "conduct", "lecture", "notes"]
+## Contract clip -> candidates, closest first, for a clip with no art yet (then `idle`).
+const CLIP_FALLBACKS := {
+	"thrust_high_windup": ["thrust_low_windup"], "thrust_low_windup": ["thrust_high_windup"],
+	"thrust_high_strike": ["thrust_high_windup", "thrust_low_strike"], "thrust_low_strike": ["thrust_low_windup", "thrust_high_strike"],
+	"thrust_high_recover": ["thrust_high_strike"], "thrust_low_recover": ["thrust_low_strike"],
+	"throw_release": ["throw_windup"], "throw_wait": ["idle"], "throw_catch": ["throw_wait"],
+	"kick_strike": ["kick_windup"], "kick_recover": ["kick_strike"],
+	"notes": ["conduct"], "lecture": ["conduct"], "bass_slam": ["bass_lift"],
+}
+
 ## The phrase table by phase: [weight, [attacks]]. A later phase adds attacks, it
 ## never removes the earlier ones, and an attack never shows up before its phase.
 const PHRASES := {
@@ -208,6 +238,11 @@ const PHRASES := {
 @export var shock_height := 34.0
 @export var shock_time := 0.22
 
+@export_group("Art")
+## The animation manifest of his sprite sheets. Without it (or without its sheets) he
+## keeps the placeholder polygons.
+@export_file("*.json") var animation_manifest := "res://assets/enemies/boombox_teacher/animation_manifest.json"
+
 @export_group("Hazards")
 @export var hazard_damage := 1
 ## A note's flight never makes the boss wait more than this many beats (at least 1).
@@ -244,8 +279,16 @@ var _column_alpha := PackedFloat32Array()
 var _steam_left := 0.0
 var _head_rest := Vector2.ZERO
 var _attack_log: Array[int] = []
+var _catalog: BossAnimationCatalog
+var _art_on := false
+var _sprite_scale := 1.0
+## The contract clip last requested through `_play` (not the fallback it resolved to).
+var _clip: StringName = &""
+## `_clock` when the last attack event (strike, release...) fired.
+var _event_clock := NO_EVENT
 
 @onready var _head: Node2D = get_node_or_null("Visual/Head") as Node2D
+@onready var _sprite: AnimatedSprite2D = get_node_or_null("Visual/AnimatedSprite2D") as AnimatedSprite2D
 
 
 func _ready() -> void:
@@ -254,6 +297,7 @@ func _ready() -> void:
 		return
 	if _head != null:
 		_head_rest = _head.position
+	_setup_sprite()
 
 
 func _exit_tree() -> void:
@@ -404,6 +448,7 @@ func _tick(delta: float) -> void:
 	_pulse = maxf(_pulse - delta / maxf(pulse_time, 0.01), 0.0)
 	_steam_left = maxf(_steam_left - delta, 0.0)
 	_apply_head_pose()
+	_sync_sprite()
 	if _attack_visuals_on and _state != State.ATTACK:
 		_hide_attack_visuals()
 	queue_redraw()
@@ -715,6 +760,7 @@ func _begin_attack_phase(attack_id: int, phase_id: AttackPhase) -> void:
 			_begin_telegraph(attack_id)
 		AttackPhase.ACTIVE:
 			_begin_active(attack_id)
+	_sync_sprite()
 
 
 func _update_attack_phase(attack_id: int, phase_id: AttackPhase, _delta: float) -> void:
@@ -782,9 +828,11 @@ func _dispatch_events() -> void:
 	while _event_cursor <= due and _event_cursor < _event_count():
 		_fire_event(_event_cursor)
 		_event_cursor += 1
+	_sync_sprite()
 
 
 func _fire_event(k: int) -> void:
+	_event_clock = _clock
 	match int(_step.get("attack", NO_ATTACK)):
 		Attack.THRUST:
 			_fire_thrust(k)
@@ -1131,9 +1179,196 @@ func _reset_ai() -> void:
 	_pending_step = {}
 	_step = {}
 	_steam_left = 0.0
+	_event_clock = NO_EVENT
 	_attack_log.clear()
 	_apply_head_pose()
 	queue_redraw()
+
+
+## -- Sprite ---------------------------------------------------------------------------------
+
+## Shows the sprite and hides the placeholder polygons when the manifest has art; with
+## none he looks exactly as before. The metronome head swell is dropped with art (the
+## head is baked into the frames): the floor ring still pulses on every beat.
+func _setup_sprite() -> void:
+	if _sprite == null:
+		return
+	_catalog = BossAnimationCatalog.new(animation_manifest, CLIP_FALLBACKS, CLIP_SPEEDS, LOOPING_CLIPS)
+	_art_on = _catalog.has_art()
+	_sprite.visible = _art_on
+	_set_placeholders_visible(not _art_on)
+	if not _art_on:
+		return
+	_sprite.sprite_frames = _catalog.build_sprite_frames()
+	_sprite.offset = _catalog.sprite_offset()
+	_sprite_scale = _catalog.sprite_scale()
+	_visual.move_child(_sprite, 0)
+	_apply_art_silhouette()
+	_clip = &""
+	_apply_visual()
+
+
+func _set_placeholders_visible(on: bool) -> void:
+	for node_name: String in PLACEHOLDERS:
+		var node := _visual.get_node_or_null(node_name) as CanvasItem if _visual != null else null
+		if node != null:
+			node.visible = on
+
+
+## The hit flash and the telegraph glow trace the sprite, not the short placeholder.
+func _apply_art_silhouette() -> void:
+	var outline := PackedVector2Array(ART_SILHOUETTE)
+	if _flash != null:
+		_flash.polygon = outline
+	if _telegraph != null:
+		_telegraph.set_glow_polygon(outline)
+
+
+func has_art() -> bool:
+	return _art_on
+
+
+## The contract clip last requested.
+func get_clip() -> StringName:
+	return _clip
+
+
+func _apply_visual() -> void:
+	super._apply_visual()
+	_cancel_visual_pose()
+	_sync_sprite()
+
+
+## The drawn clips already carry the slump of the corpse, so the sprite undoes `Visual`'s
+## tilt and squash; only the facing flip is left on it.
+func _cancel_visual_pose() -> void:
+	if not _art_on or _visual == null:
+		return
+	var pose := Transform2D(_visual.rotation, _visual.scale, 0.0, Vector2.ZERO)
+	var wanted := Transform2D(0.0, Vector2(_visual.scale.x, 1.0), 0.0, Vector2.ZERO)
+	var basis := pose.affine_inverse() * wanted
+	_sprite.transform = Transform2D(basis.x * _sprite_scale, basis.y * _sprite_scale, _sprite.position)
+
+
+## Plays the contract clip `clip` (or the closest drawn one) stretched to last
+## `duration` seconds (0: default speed). A corpse restored from an earlier run shows
+## the last frame at once.
+func _play(clip: StringName, duration := 0.0) -> void:
+	if not _art_on:
+		return
+	_clip = clip
+	var resolved := _catalog.resolve_clip(clip)
+	if resolved.is_empty():
+		return
+	var frames := _sprite.sprite_frames
+	var count := frames.get_frame_count(resolved)
+	var fps := frames.get_animation_speed(resolved)
+	var fit := 1.0
+	if duration > 0.0 and count > 0 and fps > 0.0:
+		fit = (float(count) / fps) / duration
+	_sprite.play(resolved, fit)
+	if _state == State.DEFEATED and _defeat_left <= 0.0:
+		_sprite.pause()
+		_sprite.frame = count - 1
+
+
+## Picks the clip for what the state machine is doing and plays it when it changes. A
+## pure read of the logic: no state or timer is touched.
+func _sync_sprite() -> void:
+	# A new attack enters ATTACK before its first phase opens: its timers are stale.
+	if not _art_on or (_state == State.ATTACK and not _attack_open):
+		return
+	var request := _clip_request()
+	if request[0] != _clip:
+		_play(request[0], request[1])
+
+
+## [clip, duration] for the current state; duration 0 plays at the clip's own speed.
+func _clip_request() -> Array:
+	match _state:
+		State.DEFEATED:
+			return [&"defeat", defeat_time]
+		State.STUN:
+			return [&"overheat", 0.0]
+		State.TRANSITION:
+			return [&"phase_change", phase_transition_time]
+		State.ATTACK:
+			return _attack_clip_request()
+		State.IDLE:
+			if _intro_left > 0.0:
+				return [&"intro", _intro_left]
+		State.FIGHT:
+			if absf(velocity.x) >= WALK_CLIP_SPEED:
+				return [&"walk", 0.0]
+	return [&"idle", 0.0]
+
+
+func _attack_clip_request() -> Array:
+	match _attack:
+		Attack.THRUST:
+			return _thrust_clip_request()
+		Attack.BRIEFCASE:
+			return _briefcase_clip_request()
+		Attack.KICK:
+			match _attack_phase:
+				AttackPhase.TELEGRAPH:
+					return [&"kick_windup", _telegraph_total]
+				AttackPhase.ACTIVE:
+					return [&"kick_strike", kick_active_time]
+			return [&"kick_recover", maxf(_state_left, MIN_CLIP_TIME)]
+		Attack.SOUND_WAVE:
+			return _beat_loop_request(&"conduct")
+		Attack.NOTE_BOUNCE:
+			return _beat_loop_request(&"notes")
+		Attack.DICTATION:
+			return _beat_loop_request(&"lecture")
+		Attack.BASS_DROP:
+			match _attack_phase:
+				AttackPhase.TELEGRAPH:
+					return [&"bass_lift", _telegraph_total]
+				AttackPhase.ACTIVE:
+					return [&"bass_slam", shock_time + 0.08]
+			return [&"bass_slam", 0.0]
+	return [&"idle", 0.0]
+
+
+## One cycle of a looping clip per beat while the pattern lasts, then back to idle.
+func _beat_loop_request(clip: StringName) -> Array:
+	if _attack_phase == AttackPhase.RECOVER:
+		return [&"idle", 0.0]
+	return [clip, get_beat_interval()]
+
+
+func _thrust_clip_request() -> Array:
+	var heights := _heights()
+	if _attack_phase == AttackPhase.TELEGRAPH:
+		return [_thrust_clip(int(heights[0]), "windup"), _telegraph_total]
+	if _attack_phase == AttackPhase.ACTIVE:
+		var index := clampi(_event_cursor - 1, 0, heights.size() - 1)
+		if _clock - _event_clock < thrust_strike_time:
+			return [_thrust_clip(int(heights[index]), "strike"), thrust_strike_time]
+		if index + 1 < heights.size():
+			return [_thrust_clip(int(heights[index + 1]), "windup"), maxf(_time_to_beat(1), MIN_CLIP_TIME)]
+		return [_thrust_clip(int(heights[index]), "recover"), maxf(_state_left, MIN_CLIP_TIME)]
+	return [_thrust_clip(int(heights[heights.size() - 1]), "recover"), maxf(_state_left, MIN_CLIP_TIME)]
+
+
+func _thrust_clip(height: int, part: String) -> StringName:
+	return StringName("thrust_%s_%s" % ["high" if height == Height.HIGH else "low", part])
+
+
+## Release, the empty-handed wait while it flies and the catch when it comes home.
+func _briefcase_clip_request() -> Array:
+	match _attack_phase:
+		AttackPhase.TELEGRAPH:
+			return [&"throw_windup", _telegraph_total]
+		AttackPhase.ACTIVE:
+			if _clock - _event_clock < THROW_RELEASE_TIME:
+				return [&"throw_release", THROW_RELEASE_TIME]
+			if _state_left <= THROW_CATCH_TIME:
+				return [&"throw_catch", THROW_CATCH_TIME]
+			return [&"throw_wait", 0.0]
+	return [&"idle", 0.0]
 
 
 ## -- Placeholder drawing ----------------------------------------------------------------------------

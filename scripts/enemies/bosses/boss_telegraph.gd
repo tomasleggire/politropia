@@ -71,6 +71,12 @@ func bind_body(body: Polygon2D) -> void:
 	parent.move_child(_glow, body.get_index() + 1)
 
 
+## Replaces the silhouette of the glow (a boss whose art is taller than its placeholder).
+func set_glow_polygon(polygon: PackedVector2Array) -> void:
+	if _glow != null:
+		_glow.polygon = polygon
+
+
 ## Tints the body with `color`; `amount` 0 hides it and 1 is the full glow.
 func set_glow(color: Color, amount: float) -> void:
 	if _glow == null:
