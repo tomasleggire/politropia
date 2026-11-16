@@ -49,6 +49,12 @@ const CHECKS := {
 	"case_reset_clears_everything": 13,
 	"case_light_overlay": 8,
 	"case_defeat_and_arena": 16,
+	"case_unreachable_noise_erupts_in_place": 8,
+	"case_empty_draw_falls_back_to_eruption": 6,
+	"case_ridge_ignores_invalid_words": 6,
+	"case_ridge_fits_narrow_arena": 5,
+	"case_corpse_restored_on_reload": 12,
+	"case_corpse_made_before_entering_the_tree": 10,
 }
 
 var checks := 0
@@ -182,6 +188,26 @@ func _cleanup() -> void:
 	_registry().clear()
 	_progress().clear()
 	root.get_node("MusicManager").stop_music()
+
+
+## Replaces the rig's boss with the one-drag arena prefab and takes its beast.
+func _arena_beast() -> void:
+	if is_instance_valid(_boss) and _boss.get_parent() != null:
+		_boss.get_parent().remove_child(_boss)
+		_boss.free()
+	_arena = (load(ARENA_PREFAB) as PackedScene).instantiate() as BossArena
+	_arena.arena_rect = ARENA_RECT
+	for key: String in ARENA_TIMINGS:
+		_arena.set(key, ARENA_TIMINGS[key])
+	_rig.add_child(_arena)
+	await _frames(20)
+	_boss = _arena.get_boss() as BlindBeastBoss
+	_boss.hit_stop_time = 0.0
+	_boss.final_freeze_time = 0.0
+	_boss.final_slowmo_time = 0.0
+	_boss.defeat_time = 0.2
+	_boss.phase_transition_time = 0.3
+	_boss.patience_time = 999.0
 
 
 func _frames(n: int) -> void:
@@ -346,7 +372,7 @@ func case_burrowed_and_exposed() -> void:
 	check(_boss.is_exposed() == false and not _boss.is_hittable(), "after the window it is untargetable again at once")
 	await _secs(0.5)
 	check(not _boss._visual.visible and not _hit(), "the dig-in ends hidden and untargetable")
-	check(_boss.get_state() != BossEnemy.State.STUN, "it went back to the fight")
+	check(_boss.get_state() == BossEnemy.State.FIGHT, "it went back to the fight")
 
 
 func case_eruption_targets_newest_noise() -> void:
@@ -389,7 +415,7 @@ func case_eruption_hit_and_miss() -> void:
 	check(_taken() == 1, "the column hurts once per eruption")
 	await _secs(1.0)
 	check(_boss.is_burrowed(), "it digs in again after the short window")
-	check(_boss.get_state() != BossEnemy.State.ATTACK, "and the fight moves on")
+	check(_boss.get_state() == BossEnemy.State.FIGHT, "and the fight moves on")
 
 
 func case_probe() -> void:
@@ -580,13 +606,13 @@ func case_tremor_pulse() -> void:
 		if now > 0 and previous == 0:
 			bursts += 1
 		previous = now
-		if _boss.get_state() != BossEnemy.State.ATTACK:
+		if _in_phase(BlindBeastBoss.Attack.TREMOR_PULSE, BossEnemy.AttackPhase.RECOVER):
 			break
 		await physics_frame
 	check(bursts == 3, "three fast eruptions in all (%d)" % bursts)
 	check(_taken() >= 1, "a column that finds her hurts")
 	check(_boss.get_crack_xs().is_empty() and _boss.get_column_xs().is_empty(), "the chase leaves nothing behind")
-	check(_boss.is_exposed() or _boss.is_stunned() or _boss.get_state() == BossEnemy.State.FIGHT, "it comes up after the chase")
+	check(_in_phase(BlindBeastBoss.Attack.TREMOR_PULSE, BossEnemy.AttackPhase.RECOVER) and _boss.is_exposed() and _boss.is_hittable(), "it comes up exposed and hittable when the chase ends")
 
 
 func case_chain_eruption() -> void:
@@ -614,7 +640,7 @@ func case_chain_eruption() -> void:
 	check(order.size() == 3 and order[0] < order[1] and order[1] < order[2], "it erupts oldest to newest")
 	check(order.size() == 3 and absf(float(stamps[1] - stamps[0]) / 60.0 - 0.45) < 0.08, "about 0.45 s apart")
 	check(_taken() == 0, "Luz away from the spots is never touched")
-	check(_boss.is_stunned() or _boss.is_exposed(), "it comes up where it ended")
+	check(_boss.is_stunned() and _boss.is_exposed() and _boss.is_hittable(), "it comes up stunned and hittable where it ended")
 	check(_boss.get_crack_xs().is_empty(), "no crack is left")
 	await _fight_rig(func(boss: BlindBeastBoss) -> void: boss.noise_memory = 3)
 	await _place_luz(0.0)
@@ -823,26 +849,12 @@ func case_light_overlay() -> void:
 	_boss._surface()
 	_hit(21)
 	check(_boss.get_phase() == 3 and not _boss.has_light_overlay(), "the overlay can be switched off")
-	check(_boss.is_exposed() or _boss.get_state() == BossEnemy.State.TRANSITION, "and the mechanics do not depend on it")
+	check(_boss.get_state() == BossEnemy.State.TRANSITION and _boss.is_exposed(), "and the mechanics do not depend on it")
 
 
 func case_defeat_and_arena() -> void:
 	await _build_rig()
-	_boss.get_parent().remove_child(_boss)
-	_boss.free()
-	_arena = (load(ARENA_PREFAB) as PackedScene).instantiate() as BossArena
-	_arena.arena_rect = ARENA_RECT
-	for key: String in ARENA_TIMINGS:
-		_arena.set(key, ARENA_TIMINGS[key])
-	_rig.add_child(_arena)
-	await _frames(20)
-	_boss = _arena.get_boss() as BlindBeastBoss
-	_boss.hit_stop_time = 0.0
-	_boss.final_freeze_time = 0.0
-	_boss.final_slowmo_time = 0.0
-	_boss.defeat_time = 0.2
-	_boss.phase_transition_time = 0.3
-	_boss.patience_time = 999.0
+	await _arena_beast()
 	var completion := root.get_node("GameCompletion")
 	_player.global_position = IN_TRIGGER
 	_player.velocity = Vector2.ZERO
@@ -875,3 +887,143 @@ func case_defeat_and_arena() -> void:
 	check(_progress().is_defeated(BOSS_ID), "BossProgress records the defeat under the enemy id")
 	check(_arena.get_reward() == null, "no reward spawns")
 	check(_boss.get_rock_landing_xs().is_empty(), "the rocks are gone")
+
+
+## A wall on the floor line: the tunnel can never reach the noise behind it.
+func case_unreachable_noise_erupts_in_place() -> void:
+	await _fight_rig()
+	LevelGeometry.add_solid(_rig, Rect2(150.0, -200.0, 20.0, 200.0), Color.DIM_GRAY)
+	_boss.register_noise(0.0, &"test")
+	var frames := await _frames_until(func() -> bool: return _boss.is_exposed(), 60 * 8)
+	check(frames >= 0 and _boss.is_hittable(), "a beast stuck behind a wall still surfaces and becomes hittable (%d frames)" % frames)
+	check(frames >= int(_boss.stuck_tunnel_time * 60.0), "it only gave up after the stuck time (%d frames)" % frames)
+	check(_boss.get_attack() == BlindBeastBoss.Attack.ERUPTION, "the answer is a plain eruption")
+	check(_boss.global_position.x > 170.0 and absf(_boss.global_position.x - _boss.get_noise_xs()[0]) > 100.0, "it came up where the wall stopped it (x %.0f)" % _boss.global_position.x)
+	check(_boss._pending_noise_index() == -1, "the noise counts as answered")
+	check(_hit() and _taken() == 0, "Luz can punish it and was never touched")
+	await _fight_rig(func(boss: BlindBeastBoss) -> void: boss.tunnel_speed = 0.0)
+	_boss.register_noise(100.0, &"test")
+	var idle := await _frames_until(func() -> bool: return _boss.is_exposed(), 60 * 8)
+	check(idle >= 0 and _boss.is_hittable(), "a beast that cannot tunnel at all surfaces too (%d frames)" % idle)
+	check(absf(_boss.global_position.x - BOSS_AT.x) < 1.0, "right where it was")
+
+
+## A designer zeroed the weights: the beast must still answer the noise.
+func case_empty_draw_falls_back_to_eruption() -> void:
+	await _fight_rig(func(boss: BlindBeastBoss) -> void: boss.weights_phase_one = PackedFloat32Array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+	check(_boss._draw_attack(_boss._attack_weights()) == BossEnemy.NO_ATTACK, "all-zero weights draw nothing")
+	_boss.register_noise(100.0, &"test")
+	var seen := await _wait_until(func() -> bool: return _in_telegraph(BlindBeastBoss.Attack.ERUPTION), 6.0)
+	check(seen, "it erupts anyway")
+	check(_boss.get_crack_xs().size() == 1 and absf(_boss.get_crack_xs()[0] - 100.0) < 1.0, "at the noise spot")
+	check(_boss._pending_noise_index() == -1, "the noise counts as answered")
+	var up := await _wait_until(func() -> bool: return _boss.is_exposed(), 3.0)
+	check(up and _boss.is_hittable(), "it surfaces and becomes hittable")
+	await _secs(1.0)
+	check(_boss.get_attack() == BlindBeastBoss.Attack.ERUPTION, "the only attack that ran was the eruption")
+
+
+func case_ridge_ignores_invalid_words() -> void:
+	await _fight_rig(func(boss: BlindBeastBoss) -> void: boss.ridge_words = PackedStringArray(["", "LUZ", "  "]))
+	var always_luz := true
+	for i: int in 20:
+		always_luz = always_luz and _boss._ridge_pattern(43) == WORD_PATTERNS[0]
+	check(always_luz, "empty words are skipped and the valid one is always chosen")
+	await _fight_rig(func(boss: BlindBeastBoss) -> void: boss.ridge_words = PackedStringArray(["", " ", "123"]))
+	_boss.start_attack(BlindBeastBoss.Attack.BRAILLE_RIDGE)
+	check(_boss.get_attack() == BlindBeastBoss.Attack.ERUPTION and _boss.get_ridge_slots().is_empty(), "a list with no valid word skips the ridge for an eruption")
+	var up := await _wait_until(func() -> bool: return _boss.is_exposed(), 4.0)
+	check(up and _boss.is_hittable(), "and he still surfaces, hittable")
+	await _fight_rig(func(boss: BlindBeastBoss) -> void: boss.ridge_words = PackedStringArray())
+	_boss.start_attack(BlindBeastBoss.Attack.BRAILLE_RIDGE)
+	check(_boss.get_attack() == BlindBeastBoss.Attack.ERUPTION, "an empty list falls back to the eruption too")
+	await _fight_rig(func(boss: BlindBeastBoss) -> void:
+		boss.ridge_words = PackedStringArray([""])
+		boss.weights_phase_two = PackedFloat32Array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]))
+	_boss._phase = 2
+	_boss.register_noise(100.0, &"test")
+	var drawn := await _wait_until(func() -> bool: return _boss.get_state() == BossEnemy.State.ATTACK, 6.0)
+	check(drawn and _boss.get_attack() == BlindBeastBoss.Attack.ERUPTION, "a drawn ridge with no valid word becomes an eruption")
+	var surfaced := await _wait_until(func() -> bool: return _boss.is_exposed(), 3.0)
+	check(surfaced and _boss.is_hittable() and _boss._pending_noise_index() == -1, "the noise is answered and he is hittable: no soft-lock")
+
+
+func case_ridge_fits_narrow_arena() -> void:
+	await _fight_rig()
+	_boss.set_arena_limits(-100.0, 100.0)
+	_boss.start_attack(BlindBeastBoss.Attack.BRAILLE_RIDGE)
+	await _frames(2)
+	var slots := _boss.get_ridge_slots()
+	check(slots.size() > 0 and slots.size() <= 10, "a pattern longer than the arena is cut to what fits (%d slots)" % slots.size())
+	var inside := true
+	for slot: Dictionary in slots:
+		inside = inside and float(slot["x"]) - float(slot["width"]) * 0.5 >= -100.0 - 0.01 and float(slot["x"]) + float(slot["width"]) * 0.5 <= 100.0 + 0.01 and float(slot["width"]) >= BlindBeastBoss.MIN_SLOT_WIDTH
+	check(inside, "every slot rectangle lies inside the limits")
+	_boss.ridge_words = PackedStringArray(["LUZ", "L"])
+	check(_boss._ridge_pattern(10) == "###...", "a word that fits is preferred over cutting a longer one")
+	_boss.set_arena_limits(-37.0, 41.0)
+	_boss.start_attack(BlindBeastBoss.Attack.BRAILLE_RIDGE)
+	await _frames(2)
+	var odd := _boss.get_ridge_slots()
+	check(not odd.is_empty() and float(odd[0]["x"]) - float(odd[0]["width"]) * 0.5 >= -37.0 - 0.01 and float(odd[odd.size() - 1]["x"]) + float(odd[odd.size() - 1]["width"]) * 0.5 <= 41.0 + 0.01, "an off-centre narrow arena is respected as well")
+	_boss.set_arena_limits(-7.0, 7.0)
+	_boss.start_attack(BlindBeastBoss.Attack.BRAILLE_RIDGE)
+	check(_boss.get_ridge_slots().is_empty() and _boss.get_attack() == BlindBeastBoss.Attack.ERUPTION, "an arena too narrow for one slot skips the ridge")
+
+
+## An arena beast beaten and its room reloaded: a second arena and beast with the
+## same enemy_id must come up as the same harmless corpse.
+func case_corpse_restored_on_reload() -> void:
+	await _build_rig()
+	await _arena_beast()
+	_player.global_position = IN_TRIGGER
+	_player.velocity = Vector2.ZERO
+	await _wait_until(func() -> bool: return _arena.get_state() == BossArena.FightState.ACTIVE, 2.0)
+	await _frames(40)
+	_boss._surface()
+	_hit(21)
+	await _frames(20)
+	_boss._surface()
+	check(_boss.has_light_overlay() and _boss.receive_hit(99, HIT_FROM, &"attack_1"), "the first beast falls in its last phase, dimmed")
+	await _frames(90)
+	check(_progress().is_defeated(BOSS_ID), "BossProgress holds the defeat")
+	_boss = null
+	_arena.free()
+	await _arena_beast()
+	check(_arena.get_boss() == _boss and _arena.get_state() == BossArena.FightState.DEFEATED, "the second arena starts defeated")
+	await _check_inert_corpse()
+
+
+func case_corpse_made_before_entering_the_tree() -> void:
+	await _build_rig()
+	_boss.get_parent().remove_child(_boss)
+	_boss.free()
+	_boss = _make_boss()
+	_boss.make_corpse_at(Vector2(120.0, 0.0), -1)
+	check(_boss.is_dead(), "outside the tree it is already dead")
+	_rig.add_child(_boss)
+	await _frames(3)
+	await _check_inert_corpse()
+
+
+## Nine checks: the end state of a beast that was beaten earlier.
+func _check_inert_corpse() -> void:
+	check(_boss.is_dead() and _boss.get_state() == BossEnemy.State.DEFEATED, "it is dead and defeated from the start")
+	check(_boss._visual.visible and _boss._visual.position.y == 0.0, "the body lies visible above ground")
+	check(not _boss._mound_visible(), "no dirt mound")
+	check(_boss.hazard_count() == 0 and not _boss.has_light_overlay(), "no hazard and no dim overlay")
+	check(not _boss.is_hittable() and _boss.collision_layer == 0, "it is not hittable")
+	var health := _boss.get_health()
+	check(not _hit() and _boss.get_health() == health, "it refuses hits")
+	_player.set_physics_process(true)
+	_player.global_position = Vector2(-200.0, -150.0)
+	await _secs(1.0)
+	check(_boss.get_noise_xs().is_empty(), "Luz landing records no noise")
+	_luz_swings()
+	await _frames(4)
+	_player.open_eyes_activated.emit()
+	check(_boss.get_noise_xs().is_empty(), "a swing and Hyperfocus record no noise either")
+	_luz_idles()
+	_boss.start_attack(BlindBeastBoss.Attack.ERUPTION)
+	await _secs(0.5)
+	check(_boss.get_state() == BossEnemy.State.DEFEATED and _boss.get_attack() == BossEnemy.NO_ATTACK and _boss.hazard_count() == 0, "it never starts an attack")

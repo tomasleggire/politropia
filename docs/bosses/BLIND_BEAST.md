@@ -30,6 +30,8 @@ Each loud event stores a **noise spot** (Luz's x on the floor line) and draws a 
 4. He is **exposed** above ground and hittable: `exposed_hit_time` (0.8 s) if the column hit Luz, a disoriented `stun` of `missed_stun_time` (1.8 s) if it missed. Then he digs in (`dig_in_time`, untargetable at once).
 5. **Anti-stall:** if he heard nothing for `patience_time` (4 s) he probes: three evenly spaced, telegraphed eruptions sweeping the arena, then he surfaces for `probe_exposed_time` (1.2 s).
 
+6. **Never stuck:** if the tunnel makes no headway toward the noise for `stuck_tunnel_time` (3 s: a wall, a step in the floor, no arena limits, `tunnel_speed` 0), he erupts where he is, at the closest point he could reach, and the noise counts as answered. A normal tunnel keeps closing in, so crossing the whole arena never trips it. If the weighted draw comes back empty (every weight zeroed), the plain ERUPTION answers the noise instead. Either way he surfaces and can be hit: Luz is never left with an untargetable boss that does nothing.
+
 Contact damage stays off for the whole fight: every hurt comes from a telegraphed hazard.
 
 ## Attacks
@@ -58,13 +60,15 @@ Everything is `@export`, grouped on the `BlindBeast` node: `Noise`, `Burrow`, `E
 
 - Make it kinder: raise `patience_time`, `crack_time`, `exposed_hit_time`; lower `tunnel_speed`.
 - Fight length: Luz deals 1 per hit, so the 30 health come from exposed windows (about 3 hits in a 1.8 s one, 2 in a 0.8 s one). Tune `missed_stun_time` first.
-- The ridge words (`ridge_words`) use the letters L U Z O J; `BRAILLE_LETTERS` holds the six-dot cells.
+- The ridge words (`ridge_words`) use the letters L U Z O J; `BRAILLE_LETTERS` holds the six-dot cells. Empty words, or words with none of those letters, are skipped; with no valid word the ridge is skipped for a plain ERUPTION.
+- The ridge always fits between the arena limits: a slot is never narrower than 20 px (`MIN_SLOT_WIDTH`), so it picks a word that fits, or cuts the pattern to the slots that fit. An arena too narrow for a single slot skips the ridge.
+- `stuck_tunnel_time` (Burrow, 3 s): how long the tunnel may make no headway before he erupts where he is. Raise it only if you slow `tunnel_speed` a lot on purpose.
 - Sound slots under `Sfx`: the base cues plus `Heard`, `Dig`, `Erupt`, `Claw`, `Ridge`, `Debris`, `Pulse` (empty streams; each fires `sfx_cue`).
 
 ## Place the prefab
 
 1. Drag `scenes/enemies/bosses/blind_beast_boss_arena.tscn` into the level, origin on the **floor line** at the **centre of the room** (936 px wide like Artemis's room).
-2. The arena feeds the boss its walls: the ridge, the probe and the pulse adapt to any `arena_rect` (a narrower one makes a smaller ridge). Resize the arena rects in the inspector; do not scale or rotate the node.
+2. The arena feeds the boss its walls: the ridge, the probe and the pulse adapt to any `arena_rect` (a narrower one makes a smaller, or shorter, ridge that never leaves the walls). Resize the arena rects in the inspector; do not scale or rotate the node.
 3. Keep the floor flat: noise spots, cracks and slots sit on the floor line of the boss. Platforms are fine for Luz, but a column (90 px) cannot reach them.
 4. Put a Stillness Desk before the arena. See `docs/bosses/BOSS_ARENA.md`.
 

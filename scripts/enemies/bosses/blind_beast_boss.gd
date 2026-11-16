@@ -95,6 +95,8 @@ const RIPPLE_MAX_RADIUS := 80.0
 const RIPPLE_SQUASH := 0.28
 const LIGHT_FADE_RATE := 0.8
 const FAR_AWAY := 1.0e9
+## Closing in on a noise spot by less than this (px) is not progress.
+const TUNNEL_PROGRESS_STEP := 0.5
 
 @export_group("Noise")
 ## How many noise spots the beast remembers (a chain eruption walks through them).
@@ -121,6 +123,10 @@ const FAR_AWAY := 1.0e9
 @export var show_mound := true
 ## Seconds between two decisions while it is underground.
 @export var think_interval := 0.1
+## Seconds the tunnel may make no headway toward a noise spot (a wall, a step, no
+## limits) before he erupts where he is. A normal tunnel always closes in, so
+## crossing the whole arena never trips it.
+@export var stuck_tunnel_time := 3.0
 
 @export_group("Eruption")
 ## The cracks warn this long before the column bursts.
@@ -236,6 +242,9 @@ var _digging := false
 var _dig_left := 0.0
 var _silence := 0.0
 var _since_noise := FAR_AWAY
+var _best_gap := FAR_AWAY
+var _stuck_time := 0.0
+var _erupt_in_place := false
 var _hyperfocus_left := 0.0
 var _swing_x := 0.0
 var _swing_pending := false
@@ -326,6 +335,7 @@ func register_noise(x: float, kind: StringName = &"") -> void:
 	_ripples.append(ripple)
 	_since_noise = 0.0
 	_silence = 0.0
+	_reset_tunnel_progress()
 	if kind == KIND_SWING:
 		_swing_x = spot.x
 		_swing_pending = true
@@ -470,8 +480,12 @@ func _choose_next_action() -> int:
 	var index := _pending_noise_index()
 	if index >= 0:
 		if absf(_noise[index].x - global_position.x) > arrive_tolerance + 1.0:
-			return NO_ATTACK
-		return _draw_attack(_attack_weights())
+			if _stuck_time < stuck_tunnel_time:
+				return NO_ATTACK
+			_erupt_in_place = true
+			return Attack.ERUPTION
+		var drawn := _draw_attack(_attack_weights())
+		return Attack.ERUPTION if drawn == NO_ATTACK else drawn
 	if _silence >= patience_time:
 		return Attack.PROBE
 	return NO_ATTACK
@@ -586,6 +600,8 @@ func _reset_ai() -> void:
 	_noise.clear()
 	_silence = 0.0
 	_since_noise = FAR_AWAY
+	_erupt_in_place = false
+	_reset_tunnel_progress()
 	_hyperfocus_left = 0.0
 	_swing_pending = false
 	_luz_air_time = 0.0
@@ -693,7 +709,17 @@ func _tunnel_toward_noise(delta: float) -> void:
 	var gap := _noise[index].x - global_position.x
 	if absf(gap) <= arrive_tolerance:
 		return
+	if absf(gap) < _best_gap - TUNNEL_PROGRESS_STEP:
+		_best_gap = absf(gap)
+		_stuck_time = 0.0
+	else:
+		_stuck_time += delta
 	velocity.x = signf(gap) * minf(tunnel_speed, absf(gap) / maxf(delta, 0.001))
+
+
+func _reset_tunnel_progress() -> void:
+	_best_gap = FAR_AWAY
+	_stuck_time = 0.0
 
 
 func _start_dig_in() -> void:
@@ -749,6 +775,7 @@ func _surface_at(x: float) -> void:
 func _show_corpse() -> void:
 	_exposed = true
 	_digging = false
+	_set_hittable(false)
 	if _visual != null:
 		_visual.visible = true
 		_visual.position.y = 0.0
@@ -759,6 +786,7 @@ func _show_corpse() -> void:
 func _begin_telegraph(attack_id: int) -> void:
 	_silence = 0.0
 	_column_hit_luz = false
+	_reset_tunnel_progress()
 	match attack_id:
 		Attack.ERUPTION, Attack.DEBRIS_TOSS:
 			_plan_single_eruption()
@@ -769,6 +797,10 @@ func _begin_telegraph(attack_id: int) -> void:
 		Attack.BRAILLE_RIDGE:
 			_answer_noise()
 			_plan_ridge()
+			if _ridge_slots.is_empty():
+				# Nothing valid to raise: a plain eruption answers the noise.
+				_attack = Attack.ERUPTION
+				_plan_single_eruption()
 		Attack.TREMOR_PULSE:
 			_answer_noise()
 			_surface_at(global_position.x)
@@ -837,7 +869,8 @@ func _update_recover(attack_id: int) -> void:
 ## -- Eruption, probe and chain -----------------------------------------------------
 
 func _plan_single_eruption() -> void:
-	_attack_x = _newest_noise_x()
+	_attack_x = global_position.x if _erupt_in_place else _newest_noise_x()
+	_erupt_in_place = false
 	_answer_noise()
 	_add_crack(_attack_x, maxf(crack_time, MIN_TELEGRAPH), 0)
 
@@ -957,29 +990,50 @@ func _update_claw() -> void:
 ## -- Braille ridge ----------------------------------------------------------------
 
 func _plan_ridge() -> void:
-	var pattern := _ridge_pattern()
-	var bounds := _arena_bounds()
-	var count := maxi(pattern.length(), 1)
-	var slot_width := clampf((bounds.y - bounds.x) / float(count), MIN_SLOT_WIDTH, ridge_slot_width)
-	var start := (bounds.x + bounds.y) * 0.5 - float(count) * slot_width * 0.5
 	_ridge_slots.clear()
+	_ridge_time = 0.0
+	var bounds := _arena_bounds()
+	var width := bounds.y - bounds.x
+	var pattern := _ridge_pattern(int(width / MIN_SLOT_WIDTH))
+	if pattern.is_empty():
+		return
+	var count := pattern.length()
+	var slot_width := clampf(width / float(count), MIN_SLOT_WIDTH, maxf(ridge_slot_width, MIN_SLOT_WIDTH))
+	var start := (bounds.x + bounds.y) * 0.5 - float(count) * slot_width * 0.5
 	for i: int in count:
 		var slot := RidgeSlot.new()
 		slot.width = slot_width
 		slot.x = start + (float(i) + 0.5) * slot_width
 		slot.raised = pattern[i] == "#"
 		_ridge_slots.append(slot)
-	_ridge_time = 0.0
 
 
-func _ridge_pattern() -> String:
-	if ridge_words.is_empty():
-		return FLAT_CELL
-	var word := ridge_words[rng.randi() % ridge_words.size()].to_upper()
+## The cells of one valid word, never longer than `max_slots` (what fits between the
+## walls at the minimum slot width). A word that fits is preferred; else the
+## pattern is cut. Empty when no word is valid or nothing fits.
+func _ridge_pattern(max_slots: int) -> String:
+	var patterns: Array[String] = []
+	for word: String in ridge_words:
+		var pattern := _word_pattern(word)
+		if not pattern.is_empty():
+			patterns.append(pattern)
+	if patterns.is_empty() or max_slots < 1:
+		return ""
+	var fitting: Array[String] = patterns.filter(func(pattern: String) -> bool: return pattern.length() <= max_slots)
+	if not fitting.is_empty():
+		return fitting[rng.randi() % fitting.size()]
+	return patterns[rng.randi() % patterns.size()].left(max_slots)
+
+
+## Braille cells of `word` with a flat slot between letters; empty when the word
+## has no letter of the table.
+func _word_pattern(word: String) -> String:
 	var cells := PackedStringArray()
-	for letter: String in word:
+	var known := false
+	for letter: String in word.strip_edges().to_upper():
+		known = known or BRAILLE_LETTERS.has(letter)
 		cells.append(String(BRAILLE_LETTERS.get(letter, FLAT_CELL)))
-	return ".".join(cells)
+	return ".".join(cells) if known else ""
 
 
 func _update_ridge(delta: float) -> void:
