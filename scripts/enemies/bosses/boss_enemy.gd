@@ -165,6 +165,8 @@ var _has_arena_limits := false
 var _arena_left := 0.0
 var _arena_right := 0.0
 var _transition_pending := false
+## Facing of a corpse made before `_ready` (0: none), which would reset it.
+var _corpse_facing := 0
 var _interrupt_left := 0.0
 var _hittable := true
 var _defeat_left := 0.0
@@ -184,6 +186,14 @@ func _ready() -> void:
 	super._ready()
 	if Engine.is_editor_hint():
 		return
+	# `Enemy._ready` resets the layer, the contact and the facing of a corpse made
+	# before the boss entered the tree: put the corpse's back.
+	if _dead:
+		collision_layer = 0
+		_set_contact(false)
+		if _corpse_facing != 0:
+			_facing = _corpse_facing
+			_apply_visual()
 	var body := get_node_or_null("CollisionShape2D") as CollisionShape2D
 	if body != null and body.shape is RectangleShape2D:
 		_half_width = (body.shape as RectangleShape2D).size.x * 0.5
@@ -402,6 +412,8 @@ func make_corpse_at(at: Vector2, facing: int) -> void:
 		_clear_telegraph()
 		clear_projectiles()
 		_clear_hazards()
+	else:
+		_corpse_facing = 1 if facing >= 0 else -1
 	super.make_corpse_at(at, facing)
 	_defeat_left = defeat_time if _play_defeat else 0.0
 	if is_node_ready():

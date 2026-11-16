@@ -261,7 +261,8 @@ func _apply() -> void:
 	_apply_extra_notches(inner_pos, inner)
 
 
-## One reused ColorRect per extra threshold, built on demand and hidden when unused.
+## One reused ColorRect per extra threshold, built on demand and hidden when unused
+## or when its ratio is not strictly between 0 and 1 (it would sit off the bar).
 func _apply_extra_notches(inner_pos: Vector2, inner: Vector2) -> void:
 	while _extra_notches.size() < _extra_notch_ratios.size():
 		var notch := ColorRect.new()
@@ -271,7 +272,7 @@ func _apply_extra_notches(inner_pos: Vector2, inner: Vector2) -> void:
 		_extra_notches.append(notch)
 	for i: int in _extra_notches.size():
 		var notch := _extra_notches[i]
-		notch.visible = i < _extra_notch_ratios.size()
+		notch.visible = i < _extra_notch_ratios.size() and _extra_notch_ratios[i] > 0.0 and _extra_notch_ratios[i] < 1.0
 		if notch.visible:
 			notch.size = Vector2(notch_width, inner.y + 4.0)
 			notch.position = Vector2(inner_pos.x + inner.x * _extra_notch_ratios[i] - notch_width * 0.5, inner_pos.y - 2.0)

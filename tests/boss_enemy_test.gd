@@ -30,7 +30,11 @@ const CHECKS := {
 	"case_health_phases": 12,
 	"case_big_hit_crosses_two_thresholds": 3,
 	"case_event_driven_phases": 6,
-	"case_stun": 10,
+	"case_phase_beat_waits_for_active_strike": 8,
+	"case_phase_beat_waits_for_stun": 6,
+	"case_phase_beat_during_telegraph": 4,
+	"case_stagger": 8,
+	"case_stun": 11,
 	"case_interrupt_and_super_armor": 6,
 	"case_hittable_states_and_root_layer": 9,
 	"case_no_recoil": 3,
@@ -38,6 +42,9 @@ const CHECKS := {
 	"case_final_blow_and_corpse": 11,
 	"case_reset_to_fresh": 12,
 	"case_arena_integration": 20,
+	"case_corpse_restored_on_reload": 17,
+	"case_corpse_made_before_entering_the_tree": 8,
+	"case_bar_extra_notch_range": 3,
 }
 
 var checks := 0
@@ -201,6 +208,48 @@ func _record_phases() -> void:
 	_boss.phase_changed.connect(func(phase: int) -> void: _phases_seen.append(phase))
 
 
+## An engaged 30 HP boss with one threshold at 0.66: a single 11 damage hit crosses it.
+func _phased_boss() -> void:
+	await _build_rig()
+	_boss.phase_thresholds = PackedFloat32Array([0.66])
+	await _frames(3)
+	_boss.engage()
+	_record_phases()
+	_signals.clear()
+	_boss.sfx_cue.connect(func(cue: StringName) -> void: _signals.append("cue:" + String(cue)))
+
+
+func _until_attack_phase(attack_phase: BossEnemy.AttackPhase) -> void:
+	var frames := 0
+	while _boss.get_attack_phase() != attack_phase and frames < 240:
+		await physics_frame
+		frames += 1
+
+
+func _until_state_changes_from(state: BossEnemy.State) -> void:
+	var frames := 0
+	while _boss.get_state() == state and frames < 240:
+		await physics_frame
+		frames += 1
+
+
+## Puts `boss` under a fresh test arena (moving it out of its parent) and adds the
+## arena to the rig.
+func _wrap_boss_in_arena(boss: DummyBoss) -> BossArena:
+	if boss.get_parent() != null:
+		boss.get_parent().remove_child(boss)
+	var arena := (load(ARENA_SCENE) as PackedScene).instantiate() as BossArena
+	arena.arena_rect = ARENA_RECT
+	for key: String in ARENA_TIMINGS:
+		arena.set(key, ARENA_TIMINGS[key])
+	arena.boss_name = "Test Boss"
+	arena.reward_enabled = false
+	arena.add_child(boss)
+	boss.position = BOSS_AT
+	_rig.add_child(arena)
+	return arena
+
+
 # -- Cases ------------------------------------------------------------------------------
 
 func case_untouchable_until_engage() -> void:
@@ -303,7 +352,7 @@ func case_health_phases() -> void:
 	_hits(9)
 	check(_phases_seen == [2, 3], "the second threshold emits phase_changed(3) once")
 	check(_boss.get_phase() == 3 and _boss.entered_phases == [2, 3], "_on_phase_entered ran for each phase")
-	check(_boss.get_state() == BossEnemy.State.ATTACK or _boss.get_state() == BossEnemy.State.TRANSITION, "the beat waits for a strike in progress at most")
+	check(_boss.get_state() == BossEnemy.State.TRANSITION, "a threshold crossed during a telegraph starts the beat at once")
 	_hits(5)
 	check(_phases_seen == [2, 3], "no phase beyond the last threshold")
 
@@ -340,6 +389,79 @@ func case_event_driven_phases() -> void:
 	check(_phases_seen == [2, 4], "a subclass may jump to any later phase")
 
 
+func case_phase_beat_waits_for_active_strike() -> void:
+	await _phased_boss()
+	_boss.active_time = 0.5
+	_boss.start_attack(DummyBoss.Attack.SLAM)
+	await _until_attack_phase(BossEnemy.AttackPhase.ACTIVE)
+	_hit(11)
+	check(_phases_seen == [2] and _boss.entered_phases == [2], "the crossing announces the phase at once")
+	check(_boss.get_state() == BossEnemy.State.ATTACK and _boss.get_attack_phase() == BossEnemy.AttackPhase.ACTIVE, "the beat does not cut a strike in its active phase")
+	await _secs(0.2)
+	check(_boss.get_state() == BossEnemy.State.ATTACK and _boss.get_attack_phase() == BossEnemy.AttackPhase.ACTIVE, "the strike is still active and the beat still waits")
+	await _until_attack_phase(BossEnemy.AttackPhase.RECOVER)
+	check(_boss.get_state() == BossEnemy.State.ATTACK and _boss.get_attack_phase() == BossEnemy.AttackPhase.RECOVER, "the beat does not start on the frame the strike ends")
+	await _frames(1)
+	check(_boss.get_state() == BossEnemy.State.TRANSITION, "the beat starts on the next think once the active phase ended")
+	check(_boss.events.count("end:1:1") == 1 and _boss.events.count("end:1:2") == 1, "the active phase ended once, then the recovery was closed once by the beat")
+	check(not _boss.stun(0.3), "a stun is refused during the beat")
+	await _secs(0.5)
+	check(_boss.get_state() == BossEnemy.State.FIGHT and _signals.count("cue:PhaseChange") == 1, "one beat ran and the boss is back in the fight")
+
+
+func case_phase_beat_waits_for_stun() -> void:
+	await _phased_boss()
+	_boss.start_attack(DummyBoss.Attack.SLAM)
+	check(_boss.stun(0.5), "the boss is stunned")
+	_hit(11)
+	check(_phases_seen == [2], "the crossing announces the phase at once")
+	check(_boss.get_state() == BossEnemy.State.STUN, "the crossing does not end the stun")
+	await _secs(0.3)
+	check(_boss.get_state() == BossEnemy.State.STUN and not _signals.has("cue:PhaseChange"), "the beat has not started while the stun runs")
+	await _until_state_changes_from(BossEnemy.State.STUN)
+	check(_boss.get_state() == BossEnemy.State.FIGHT and _boss.stun_ended_count == 1, "the stun ends first and the beat is still pending")
+	await _frames(1)
+	check(_boss.get_state() == BossEnemy.State.TRANSITION, "the beat starts on the next think after the stun")
+
+
+func case_phase_beat_during_telegraph() -> void:
+	await _phased_boss()
+	_boss.start_attack(DummyBoss.Attack.SLAM)
+	check(_boss.is_telegraphing(), "the attack is winding up")
+	_hit(11)
+	check(_boss.get_state() == BossEnemy.State.TRANSITION, "a crossing during a telegraph starts the beat inside the hit")
+	check(_boss.events.count("end:1:0") == 1 and _phases_seen == [2], "the wind-up was closed once and the phase announced once")
+	await _secs(0.5)
+	check(_boss.get_state() == BossEnemy.State.FIGHT and _signals.count("cue:PhaseChange") == 1, "the beat ends back in the fight with a single beat")
+
+
+func case_stagger() -> void:
+	await _awake_boss()
+	_boss.stagger_hits = 3
+	_boss.stagger_window = 0.5
+	_boss.stagger_time = 0.4
+	var cues: Array[StringName] = []
+	_boss.sfx_cue.connect(func(cue: StringName) -> void: cues.append(cue))
+	_boss.start_attack(DummyBoss.Attack.SLAM)
+	_hits(2)
+	check(_boss.get_state() == BossEnemy.State.ATTACK and _boss.is_telegraphing(), "two hits inside the window do not stagger")
+	_hit()
+	check(_boss.get_state() == BossEnemy.State.STAGGER, "the third hit inside the window staggers the boss")
+	check(_boss.events.count("end:1:0") == 1, "the stagger cut the running attack and its phase hook ran once")
+	check(cues.count(&"Stagger") == 1, "the Stagger cue fired once")
+	await _secs(0.2)
+	check(_boss.get_state() == BossEnemy.State.STAGGER, "the boss stays staggered for stagger_time")
+	await _secs(0.3)
+	check(_boss.get_state() == BossEnemy.State.FIGHT, "the boss returns to the fight afterwards")
+	for i: int in 4:
+		_hit()
+		await _secs(0.4)
+	check(_boss.get_state() == BossEnemy.State.FIGHT and cues.count(&"Stagger") == 1, "hits spread wider than the window never stagger")
+	_boss.stagger_hits = 0
+	_hits(5)
+	check(_boss.get_state() == BossEnemy.State.FIGHT and cues.count(&"Stagger") == 1, "stagger_hits = 0 never staggers")
+
+
 func case_stun() -> void:
 	await _awake_boss()
 	check(not _boss.stun(0.0), "a zero stun is refused")
@@ -353,8 +475,8 @@ func case_stun() -> void:
 	check(_boss.get_state() == BossEnemy.State.STUN, "a hit does not end the stun")
 	await _secs(0.5)
 	check(_boss.get_state() == BossEnemy.State.FIGHT and _boss.stun_ended_count == 1, "the stun ends back in the fight")
-	_boss.set_manual_engage(true)
-	check(not _boss.stun(0.4) or _boss.get_state() == BossEnemy.State.STUN, "a stun never throws")
+	check(_boss.stun(0.4) and _boss.get_state() == BossEnemy.State.STUN and _boss.stun_count == 2, "a stun applies again from the fight")
+	check(_boss.stun(1.0) and _boss.get_state_time_left() > 0.9 and _boss.stun_count == 2, "a longer stun extends the running one without running _on_stunned again")
 	await _build_rig()
 	await _frames(3)
 	check(not _boss.stun(0.4), "an awaiting boss cannot be stunned")
@@ -426,10 +548,9 @@ func case_projectile_pool() -> void:
 	check(_boss.active_projectile_count() == 0, "clear_projectiles parks them all")
 	var again := _boss._launch_projectile(scene, _boss.global_position, Vector2.UP, 100.0)
 	check(again == shot, "a parked projectile is reused")
-	var parent := _boss.get_parent()
 	_boss.free()
 	await _frames(2)
-	check(not is_instance_valid(shot) or shot.is_queued_for_deletion() or shot.get_parent() != parent, "freeing the boss frees its projectiles")
+	check(not is_instance_valid(shot), "freeing the boss frees its projectiles")
 	_boss = null
 
 
@@ -459,7 +580,7 @@ func case_final_blow_and_corpse() -> void:
 	check(_signals.has("settled"), "corpse_settled fires once the corpse rests")
 	check(not _boss.is_physics_processing(), "a settled corpse stops processing")
 	check(not _boss.receive_hit(1, HIT_FROM, &"attack_1"), "a corpse takes no hits")
-	check(_boss.is_on_floor() or _boss.global_position.y >= -1.0, "the corpse rests on the floor")
+	check(_boss.is_on_floor() and absf(_boss.global_position.y) <= 1.0, "the corpse rests on the floor")
 
 
 func _wait_real(condition: Callable, seconds: float) -> bool:
@@ -502,17 +623,8 @@ func case_reset_to_fresh() -> void:
 
 func case_arena_integration() -> void:
 	await _build_rig(false)
-	_boss.get_parent().remove_child(_boss)
 	_boss.phase_thresholds = PackedFloat32Array([0.66, 0.33])
-	_arena = (load(ARENA_SCENE) as PackedScene).instantiate() as BossArena
-	_arena.arena_rect = ARENA_RECT
-	for key: String in ARENA_TIMINGS:
-		_arena.set(key, ARENA_TIMINGS[key])
-	_arena.boss_name = "Test Boss"
-	_arena.reward_enabled = false
-	_arena.add_child(_boss)
-	_boss.position = BOSS_AT
-	_rig.add_child(_arena)
+	_arena = _wrap_boss_in_arena(_boss)
 	await _frames(20)
 	var completion := root.get_node("GameCompletion")
 	check(_arena.get_boss() == _boss and _arena.get_state() == BossArena.FightState.ARMED, "the arena finds the boss and is armed")
@@ -537,9 +649,87 @@ func case_arena_integration() -> void:
 	check(_progress().is_defeated(BOSS_ID), "BossProgress marks the boss defeated under its enemy_id")
 	check(_music_stream() == root.get_node("MusicManager").GAMEPLAY_MUSIC, "gameplay music is requested when the arena opens")
 	check(_arena.get_boss_reset_count() == 0, "the arena never had to reset the boss")
-	# A second arena instance over the same progress restores the corpse.
 	var corpse: Dictionary = _progress().get_corpse(BOSS_ID)
 	check(corpse.has("position"), "the corpse spot was stored")
 	check(_boss.is_dead(), "the boss stays a corpse")
 	check(not _boss.is_in_group(Enemy.GROUP_RESETTABLE), "it left the checkpoint contract")
 	check(root.get_node("BossProgress").to_dict().size() > 0, "the progress is serializable")
+
+
+## A room reload: the boss was beaten inside an arena, then a second arena and boss
+## with the same enemy_id appear (the registry and the arena both restore the corpse).
+func case_corpse_restored_on_reload() -> void:
+	await _build_rig(false)
+	_arena = _wrap_boss_in_arena(_boss)
+	await _frames(10)
+	_boss.engage()
+	check(_boss.receive_hit(99, HIT_FROM, &"attack_1"), "the first boss falls inside its arena")
+	await _frames(60)
+	check(_progress().is_defeated(BOSS_ID), "BossProgress holds the defeat")
+	var corpse: Dictionary = _progress().get_corpse(BOSS_ID)
+	_arena.free()
+	_boss = _make_boss()
+	_arena = _wrap_boss_in_arena(_boss)
+	_boss.auto_attack = true
+	await _frames(10)
+	check(_boss.is_dead() and _boss.get_state() == BossEnemy.State.DEFEATED, "the reloaded boss is dead and defeated from the start")
+	check(_boss.collision_layer == 0, "its root collision layer is 0")
+	check(not _hit(), "it refuses hits")
+	check(_boss.get_health() == _boss.max_health, "a refused hit changes nothing")
+	_boss.start_attack(DummyBoss.Attack.POKE)
+	await _frames(60)
+	check(_boss.get_state() == BossEnemy.State.DEFEATED and _boss.get_attack() == BossEnemy.NO_ATTACK and _boss.events.is_empty(), "it never starts an attack")
+	check(_boss.active_projectile_count() == 0 and _rig.find_children("*", "EnemyProjectile", true, false).is_empty(), "no projectile exists")
+	check(_boss.global_position.distance_to(corpse["position"]) < 1.5, "it lies where the first one fell")
+	check(not _boss.is_in_group(Enemy.GROUP_RESETTABLE), "it is outside the checkpoint contract")
+	check(_arena.get_boss() == _boss and _arena.get_state() == BossArena.FightState.DEFEATED, "the arena is in its defeated state")
+	check(not _arena.is_trigger_armed(), "the trigger is disabled")
+	check(not _arena.are_doors_closed(), "the doors are open")
+	check(not _arena.get_bar().is_bar_shown(), "the bar is hidden")
+	check(_arena.get_reward() == null, "no reward is spawned with reward_enabled off")
+	_player.global_position = IN_TRIGGER
+	_player.velocity = Vector2.ZERO
+	await _frames(20)
+	check(_arena.get_state() == BossArena.FightState.DEFEATED and not _arena.are_doors_closed(), "Luz walking into the old trigger starts nothing")
+	await _secs(0.5)
+	check(not _boss.is_physics_processing(), "the restored corpse settled and stopped processing")
+
+
+## The registry restores a corpse while the base `_ready` is still running, but a
+## caller may also do it before the boss enters the tree at all.
+func case_corpse_made_before_entering_the_tree() -> void:
+	await _build_rig(false)
+	var boss := _make_boss()
+	boss.enemy_id = &"test_dummy_boss_direct"
+	boss.make_corpse_at(Vector2(120.0, 0.0), -1)
+	check(boss.is_dead() and boss.get_state() == BossEnemy.State.IDLE, "outside the tree it is dead and the state machine has not started")
+	_rig.add_child(boss)
+	_boss = boss
+	await _frames(3)
+	check(boss.is_dead() and boss.get_state() == BossEnemy.State.DEFEATED, "once ready it ends in the defeated state")
+	check(boss.collision_layer == 0 and boss.get_facing() == -1, "it has no collision and keeps its facing")
+	check(boss._contact != null and not boss._contact.monitoring, "its contact damage is off")
+	check(not boss.receive_hit(1, HIT_FROM, &"attack_1"), "it refuses hits")
+	check(boss.global_position.distance_to(Vector2(120.0, 0.0)) < 1.5, "it rests where it was put")
+	await _secs(0.6)
+	check(not boss.is_physics_processing(), "it settles and stops processing")
+	check(boss.get_active_projectiles().is_empty() and boss.events.is_empty(), "it started nothing")
+
+
+func case_bar_extra_notch_range() -> void:
+	await _build_rig(false)
+	var bar := (load("res://scenes/ui/boss_health_bar.tscn") as PackedScene).instantiate() as BossHealthBar
+	_rig.add_child(bar)
+	var ratios := PackedFloat32Array([0.25, 1.5, -0.1, 0.0, 1.0, 0.75])
+	bar.setup("Test", 10, 0.5, ratios)
+	var shown: Array[bool] = []
+	for notch: ColorRect in bar._extra_notches:
+		shown.append(notch.visible)
+	check(shown == [true, false, false, false, false, true], "only extra notches strictly between 0 and 1 are shown: %s" % [shown])
+	check(bar.get_extra_notch_ratios() == ratios, "get_extra_notch_ratios still returns what setup received")
+	bar.setup("Test", 10, 0.5, PackedFloat32Array([0.4, 0.2]))
+	shown.clear()
+	for notch: ColorRect in bar._extra_notches:
+		shown.append(notch.visible)
+	check(shown == [true, true, false, false, false, false], "a later setup with in-range ratios shows them and hides the unused ones")
+	bar.free()
