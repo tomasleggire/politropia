@@ -52,6 +52,7 @@ const CHECKS := {
 	"case_unreachable_noise_erupts_in_place": 8,
 	"case_empty_draw_falls_back_to_eruption": 6,
 	"case_ridge_ignores_invalid_words": 6,
+	"case_ridge_fallback_keeps_the_crack": 4,
 	"case_ridge_fits_narrow_arena": 5,
 	"case_corpse_restored_on_reload": 12,
 	"case_corpse_made_before_entering_the_tree": 10,
@@ -946,6 +947,26 @@ func case_ridge_ignores_invalid_words() -> void:
 	check(drawn and _boss.get_attack() == BlindBeastBoss.Attack.ERUPTION, "a drawn ridge with no valid word becomes an eruption")
 	var surfaced := await _wait_until(func() -> bool: return _boss.is_exposed(), 3.0)
 	check(surfaced and _boss.is_hittable() and _boss._pending_noise_index() == -1, "the noise is answered and he is hittable: no soft-lock")
+
+
+## The ridge falls back to an eruption inside `_begin_telegraph`, after the noise was
+## answered: the crack must still sit at the noise spot, warn long enough, and the
+## column must burst right there.
+func case_ridge_fallback_keeps_the_crack() -> void:
+	await _fight_rig(func(boss: BlindBeastBoss) -> void: boss.ridge_words = PackedStringArray(["", "123"]))
+	_boss.register_noise(150.0, &"test")
+	_boss.start_attack(BlindBeastBoss.Attack.BRAILLE_RIDGE)
+	var cracks := _boss.get_crack_xs()
+	check(_boss.get_attack() == BlindBeastBoss.Attack.ERUPTION and cracks.size() == 1 and absf(cracks[0] - 150.0) < 1.0, "the fallback's crack sits at the noise spot")
+	var shown := 0
+	var crack_x := cracks[0] if cracks.size() == 1 else 0.0
+	while _boss.get_column_xs().is_empty() and shown < 300:
+		await physics_frame
+		shown += 1
+	check(float(shown) / 60.0 >= 0.35 - 0.03, "the crack is shown at least 0.35 s before the column bursts (%.2f s)" % (float(shown) / 60.0))
+	var columns := _boss.get_column_xs()
+	check(columns.size() == 1 and absf(columns[0] - crack_x) < 1.0, "the column bursts where the crack was")
+	check(_boss.get_crack_xs().is_empty(), "the crack is gone once the column bursts")
 
 
 func case_ridge_fits_narrow_arena() -> void:

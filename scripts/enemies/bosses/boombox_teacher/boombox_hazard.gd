@@ -9,8 +9,10 @@ extends Node2D
 ##
 ## Motions: STATIC stays put, LINEAR moves with `velocity` (plus gravity and an
 ## optional floor bounce), BOOMERANG flies out to `far_point` and comes back to `home`.
-## Her dash i-frames are respected for free: `take_damage` refuses and the hazard
-## tries again on the next frame.
+## Dash i-frames: a hazard that touches her while she is dash-invulnerable is DODGED
+## and cannot hurt her until it has stopped overlapping her (so her i-frames ending
+## inside the same hazard never hurts). A hit refused for any other reason, such as
+## the i-frames after a hurt, is retried on the next frame.
 
 enum Motion { STATIC, LINEAR, BOOMERANG }
 enum Look { RECT, POINTER, DISC, GLYPH }
@@ -56,6 +58,7 @@ var _age := 0.0
 var _origin := Vector2.ZERO
 var _alive := true
 var _spent := false
+var _dodged := false
 
 
 func _init() -> void:
@@ -127,6 +130,11 @@ func has_hurt() -> bool:
 	return _spent
 
 
+## True while Luz dashed into the hazard and is still inside it.
+func is_dodged() -> bool:
+	return _dodged
+
+
 ## Hides, stops and frees the hazard at once: it can no longer hurt her this frame.
 func retire() -> void:
 	if not _alive:
@@ -175,5 +183,11 @@ func _advance_boomerang() -> void:
 func _try_hurt() -> void:
 	if _spent or _age < arm_delay or not is_instance_valid(target):
 		return
-	if get_rect().intersects(luz_rect(target)) and target.take_damage(damage, global_position):
+	if not get_rect().intersects(luz_rect(target)):
+		_dodged = false
+		return
+	if target.is_dash_invulnerable():
+		_dodged = true
+		return
+	if not _dodged and target.take_damage(damage, global_position):
 		_spent = true

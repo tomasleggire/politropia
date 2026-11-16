@@ -3,7 +3,9 @@ extends SceneTree
 ## that start on a beat, the avoidance of every attack (crouch or jump the thrusts, jump
 ## the low waves, stay grounded for the high ones, be airborne for the bass drop), the
 ## wave pattern rules, the dictation columns, phrases and finales, the overheat punish
-## window, the arena limits, the reset, and the one-drag prefab with its defeat.
+## window, the arena limits, the tempo that never changes in the middle of an attack,
+## degenerate designer values, a boss with no arena limits, real dashes through the
+## hazards, the reset, and the one-drag prefab with its defeat.
 ## Run: godot --headless --path . --script res://tests/boombox_teacher_boss_test.gd
 ## Exits 0 when every check passes, 1 otherwise.
 
@@ -14,7 +16,10 @@ const WATCHDOG_SECONDS := 420.0
 ## Game seconds run per real second (physics frames then last that much longer).
 ## Timing cases run at 1; the long fights and avoidance runs at the faster default.
 const FAST_SCALE := 3.0
-const TIMING_CASES := ["case_beat_clock_and_tempo", "case_strikes_start_on_a_beat", "case_minimum_telegraph_at_high_tempo"]
+const TIMING_CASES := [
+	"case_beat_clock_and_tempo", "case_strikes_start_on_a_beat", "case_minimum_telegraph_at_high_tempo",
+	"case_tempo_holds_in_telegraph", "case_tempo_holds_in_active", "case_dash_through_hazards",
+]
 const FLOOR_RECT := Rect2(-500.0, 0.0, 1000.0, 100.0)
 const LUZ_START := Vector2(-400.0, 0.0)
 const IN_TRIGGER := Vector2(0.0, 0.0)
@@ -51,6 +56,11 @@ const CHECKS := {
 	"case_phase_three_cycle": 14,
 	"case_kick_when_hugged": 4,
 	"case_stays_inside_the_arena": 4,
+	"case_tempo_holds_in_telegraph": 10,
+	"case_tempo_holds_in_active": 24,
+	"case_degenerate_tunables": 10,
+	"case_no_arena_limits": 5,
+	"case_dash_through_hazards": 10,
 	"case_reset_clears_every_hazard": 12,
 	"case_arena_reset_after_luz_dies": 5,
 	"case_defeat_through_the_arena": 16,
@@ -853,6 +863,297 @@ func case_stays_inside_the_arena() -> void:
 	_boss.global_position.x = 900.0
 	await _frames(3)
 	check(_boss.global_position.x <= LIMITS.y - 12.0, "a boss placed outside is pulled back in")
+
+
+## Plays `step` while a threshold is crossed: `cross_hits` land once `after_events`
+## events fired (-1: ten frames into the telegraph), on a boss that first took `pre_hits`.
+## Returns what the clock and the events did until the transition beat started.
+func _crossing_run(step: Dictionary, pre_hits: int, cross_hits: int, after_events: int) -> Dictionary:
+	await _awake_boss()
+	await _frames(3)
+	if pre_hits > 0:
+		_hit(pre_hits)
+		await _wait(0.8)
+	var event_frames: Array[int] = []
+	var intervals: Array[float] = []
+	var result := {"old": _boss.get_beat_interval(), "crossed": false, "phase_at_cross": -1}
+	_boss.plan_step(step)
+	_boss.start_attack(int(step["attack"]))
+	var seen := {}
+	var frames := 0
+	while frames < MAX_CYCLE_FRAMES:
+		await physics_frame
+		frames += 1
+		_player.heal(30)
+		var fresh := false
+		for hazard: BoomboxHazard in _boss.get_hazards():
+			if not seen.has(hazard.get_instance_id()):
+				seen[hazard.get_instance_id()] = true
+				fresh = true
+		if fresh:
+			event_frames.append(Engine.get_physics_frames())
+		if _boss.get_state() == BossEnemy.State.ATTACK:
+			intervals.append(_boss.get_beat_interval())
+		elif _boss.get_state() == BossEnemy.State.TRANSITION:
+			break
+		var due := frames == 10 if after_events < 0 else event_frames.size() >= after_events
+		if not result["crossed"] and due:
+			result["crossed"] = true
+			result["phase_at_cross"] = int(_boss.get_attack_phase())
+			_hit(cross_hits)
+	result["event_frames"] = event_frames
+	result["intervals"] = intervals
+	result["state_at_end"] = int(_boss.get_state())
+	result["hazards_at_end"] = _boss.hazard_count()
+	var mark := _beat_frames.size()
+	await _wait(2.0)
+	result["new_gaps"] = _interval_frames(mark + 1)
+	result["new_interval"] = _boss.get_beat_interval()
+	return result
+
+
+func _tempo_kept(result: Dictionary) -> bool:
+	var intervals: Array[float] = result["intervals"]
+	for value: float in intervals:
+		if not is_equal_approx(value, float(result["old"])):
+			return false
+	return not intervals.is_empty()
+
+
+func _tempo_changed_after(result: Dictionary, bpm: float) -> bool:
+	var gaps: Array[float] = result["new_gaps"]
+	return is_equal_approx(float(result["new_interval"]), 60.0 / bpm) and gaps.size() >= 2 and _all_close(gaps, 60.0 / bpm)
+
+
+func _event_gaps(result: Dictionary) -> Array[float]:
+	var gaps: Array[float] = []
+	var frames: Array[int] = result["event_frames"]
+	for i: int in range(1, frames.size()):
+		gaps.append(float(frames[i] - frames[i - 1]) * _dt())
+	return gaps
+
+
+func _events_on_beat(result: Dictionary) -> bool:
+	var frames: Array[int] = result["event_frames"]
+	for frame: int in frames:
+		if _gap_to_beat(frame) > 2:
+			return false
+	return true
+
+
+func _event_count(result: Dictionary) -> int:
+	return (result["event_frames"] as Array[int]).size()
+
+
+func case_tempo_holds_in_telegraph() -> void:
+	var low := BoomboxTeacherBoss.WAVE_LOW
+	var high := BoomboxTeacherBoss.WAVE_HIGH
+	var waves := {"attack": BoomboxTeacherBoss.Attack.SOUND_WAVE, "pattern": [high, low, high]}
+	var run := await _crossing_run(waves, 0, 13, -1)
+	check(run["crossed"] and run["phase_at_cross"] == BossEnemy.AttackPhase.TELEGRAPH and _boss.get_phase() == 2, "phase two is reached in the middle of a wave wind-up")
+	check(run["state_at_end"] == BossEnemy.State.TRANSITION and _event_count(run) == 0 and run["hazards_at_end"] == 0, "the wind-up is cut at the transition beat before any wave fires")
+	check(_tempo_kept(run), "the wind-up keeps its tempo until the transition beat")
+	check(_boss.get_wave_pips().is_empty(), "the cut wind-up leaves no pips behind")
+	check(_tempo_changed_after(run, 110.0), "the 110 bpm tempo starts after the transition beat")
+	var dictation := {"attack": BoomboxTeacherBoss.Attack.DICTATION}
+	run = await _crossing_run(dictation, 13, 12, -1)
+	check(run["crossed"] and run["phase_at_cross"] == BossEnemy.AttackPhase.TELEGRAPH and _boss.get_phase() == 3, "phase three is reached in the middle of a dictation wind-up")
+	check(run["state_at_end"] == BossEnemy.State.TRANSITION and _event_count(run) == 0 and run["hazards_at_end"] == 0, "the dictation is cut at the transition beat before any letter falls")
+	check(_tempo_kept(run), "the dictation wind-up keeps the phase two tempo")
+	check(_boss.get_board() == null and _boss.get_columns().is_empty(), "the cut dictation takes its board and columns down")
+	check(_tempo_changed_after(run, 132.0), "the 132 bpm tempo starts after the transition beat")
+
+
+func case_tempo_holds_in_active() -> void:
+	var low := BoomboxTeacherBoss.WAVE_LOW
+	var high := BoomboxTeacherBoss.Height.HIGH
+	var down := BoomboxTeacherBoss.Height.LOW
+	var thrusts := {"attack": BoomboxTeacherBoss.Attack.THRUST, "heights": [high, down, high]}
+	var waves := {"attack": BoomboxTeacherBoss.Attack.SOUND_WAVE, "pattern": [low, low, low, low]}
+	var runs := [
+		["sound waves into phase two", waves, 0, 13, 4, 2, 110.0],
+		["thrust chain into phase two", thrusts, 0, 13, 3, 2, 110.0],
+		["sound waves into phase three", waves, 13, 12, 4, 3, 132.0],
+		["thrust chain into phase three", thrusts, 13, 12, 3, 3, 132.0],
+	]
+	for entry: Array in runs:
+		var label: String = entry[0]
+		var run := await _crossing_run(entry[1], entry[2], entry[3], 1)
+		var gaps := _event_gaps(run)
+		check(run["crossed"] and run["phase_at_cross"] == BossEnemy.AttackPhase.ACTIVE and _boss.get_phase() == entry[5], "%s: the threshold falls during the strike" % label)
+		check(_event_count(run) == entry[4], "%s: every event still fires (%d of %d)" % [label, _event_count(run), entry[4]])
+		check(gaps.size() == entry[4] - 1 and _all_close(gaps, float(run["old"])), "%s: the events stay one telegraphed beat apart (%s)" % [label, gaps])
+		check(_events_on_beat(run), "%s: every event fires on a beat" % label)
+		check(_tempo_kept(run), "%s: the beat interval never changes during the attack" % label)
+		check(run["state_at_end"] == BossEnemy.State.TRANSITION and _tempo_changed_after(run, entry[6]), "%s: the new tempo starts at the transition beat, after the last event" % label)
+
+
+## Plausible but degenerate designer values: the boss keeps attacking and never errors.
+func case_degenerate_tunables() -> void:
+	await _build_rig(func(boss: BoomboxTeacherBoss) -> void:
+		boss.auto_phrases = true
+		boss.walk_speed = 70.0
+		boss.finale_every = 0
+		boss.bpm_by_phase = PackedFloat32Array()
+		boss.overheat_times = PackedFloat32Array()
+		boss.wave_min_beats = 0
+		boss.wave_max_beats = -3
+		boss.note_count_min = 0
+		boss.note_count_max = -1
+		boss.column_spacing_min = 0.0
+		boss.max_clear_beats = 0
+		boss.note_gravity = 0.0
+		boss.note_apex = -5.0
+		boss.rest_beats = 0
+		boss.opening_beats = -2
+		boss.thrust_chain_max = 0
+		boss.thrust_telegraph_beats = 0
+		boss.briefcase_telegraph_beats = 0
+		boss.wave_telegraph_beats = -1
+		boss.note_telegraph_beats = 0
+		boss.dictation_telegraph_beats = 0
+		boss.bass_telegraph_beats = 0)
+	await _frames(3)
+	_boss.set_arena_limits(LIMITS.x, LIMITS.y)
+	_boss.engage()
+	_hit(25)
+	var tally := {"phrases": 0, "finales": 0}
+	_boss.phrase_started.connect(func(_attacks: Array, finale: bool) -> void:
+		tally["phrases"] += 1
+		tally["finales"] += 1 if finale else 0)
+	var stunned := false
+	for frame: int in MAX_CYCLE_FRAMES:
+		_player.heal(30)
+		await physics_frame
+		stunned = stunned or _boss.is_stunned()
+		if _boss.get_attack_log().size() >= 14:
+			break
+	check(_boss.get_attack_log().size() >= 14, "the boss keeps attacking with degenerate values (%d attacks)" % _boss.get_attack_log().size())
+	check(tally["phrases"] >= 3 and tally["finales"] == 0, "finale_every 0 means no finales (%d of %d phrases)" % [tally["finales"], tally["phrases"]])
+	check(not stunned and not _boss.is_overheat_pending(), "no finale, so no overheat")
+	check(_boss.get_phase() == 3 and is_equal_approx(_boss.get_bpm(), 132.0), "an empty bpm table falls back to 90, 110, 132")
+	check(is_equal_approx(_boss.overheat_duration(), 1.8), "an empty overheat table falls back to 2.2, 2.0, 1.8")
+	var waves_ok := true
+	var notes_ok := true
+	for i: int in 30:
+		waves_ok = waves_ok and (_boss._make_step(BoomboxTeacherBoss.Attack.SOUND_WAVE)["pattern"] as Array).size() >= 1
+		notes_ok = notes_ok and int(_boss._make_step(BoomboxTeacherBoss.Attack.NOTE_BOUNCE)["count"]) >= 1
+	check(waves_ok, "a wave pattern is never empty")
+	check(notes_ok, "a note throw has at least one note")
+	var columns := _boss._make_columns()
+	check(columns.size() >= 4 and columns.size() <= 9, "a zero column spacing still gives four to nine columns (%d)" % columns.size())
+	check(is_finite(_boss._note_hop_time()) and _boss._note_hop_time() > 0.0, "a zero note gravity keeps a finite hop")
+	_boss.bpm_by_phase = PackedFloat32Array([1.0e9])
+	var fast := _boss.get_bpm()
+	_boss.bpm_by_phase = PackedFloat32Array([0.0])
+	check(fast == BoomboxTeacherBoss.MAX_BPM and _boss.get_bpm() == BoomboxTeacherBoss.MIN_BPM, "the bpm is clamped to a playable range")
+
+
+## A boss that never got arena limits (the base falls back to a box around him).
+func case_no_arena_limits() -> void:
+	var A := BoomboxTeacherBoss.Attack
+	await _build_rig()
+	await _frames(3)
+	_boss.engage()
+	var interval := _boss.get_beat_interval()
+	_boss.plan_step({"attack": A.SOUND_WAVE, "pattern": [BoomboxTeacherBoss.WAVE_LOW, BoomboxTeacherBoss.WAVE_REST, BoomboxTeacherBoss.WAVE_LOW]})
+	_boss.start_attack(A.SOUND_WAVE)
+	var guard := 0
+	while _boss.get_state() == BossEnemy.State.ATTACK and guard < MAX_ATTACK_FRAMES:
+		_player.heal(30)
+		await physics_frame
+		guard += 1
+	check(_boss.get_state() != BossEnemy.State.ATTACK, "sound waves end and he leaves the recovery with no arena limits (%d frames)" % guard)
+	_boss.start_attack(A.DICTATION)
+	await _frames(3)
+	var columns := _boss.get_columns()
+	var finite := true
+	for x: float in columns:
+		finite = finite and is_finite(x)
+	check(columns.size() >= 4 and columns.size() <= 9 and finite, "the dictation finds four to nine finite columns (%d)" % columns.size())
+	guard = 0
+	while _boss.get_state() == BossEnemy.State.ATTACK and guard < MAX_ATTACK_FRAMES:
+		_player.heal(30)
+		await physics_frame
+		guard += 1
+	check(_boss.get_state() != BossEnemy.State.ATTACK, "the dictation ends with no arena limits (%d frames)" % guard)
+	_boss.arena_half_width = 1.0e12
+	var cap := float(BoomboxTeacherBoss.WAVE_CLEAR_MAX_BEATS + 1) * interval
+	check(_boss._recover_time(A.SOUND_WAVE) <= cap, "a huge arena never makes the wave recovery wait longer than the cap (%.1f s)" % _boss._recover_time(A.SOUND_WAVE))
+	check(_boss._make_columns().size() == 9, "a huge arena still gives a finite column count")
+
+
+## Distance from Luz's right side to the nearest hazard approaching from the right.
+func _incoming_gap() -> float:
+	var luz := BoomboxHazard.luz_rect(_player)
+	var gap := INF
+	for hazard: BoomboxHazard in _boss.get_hazards():
+		if hazard.get_rect().position.x > luz.end.x - 1.0:
+			gap = minf(gap, hazard.get_rect().position.x - luz.end.x)
+	return gap
+
+
+## True once the wind-up has `left` seconds to go.
+func _wind_up_left(left: float) -> Callable:
+	return func() -> bool: return _boss.is_telegraphing() and _boss.get_state_time_left() <= left
+
+
+## Luz dashes (a real ground dash, from rest, facing right) once `trigger` is true.
+## Records the hazard overlaps while she was dash-invulnerable and after; stops when
+## the dash ends (`to_dash_end`) or when the attack and its hazards are gone.
+func _dash_run(step: Dictionary, luz_x: float, trigger: Callable, to_dash_end: bool) -> Dictionary:
+	await _awake_boss()
+	await _frames(3)
+	_player.global_position = Vector2(luz_x, 0.0)
+	_player.velocity = Vector2.ZERO
+	_player.face_direction(1)
+	await _frames(3)
+	var before := _player.get_health()
+	var result := {"started": false, "overlap_dashing": false, "overlap_after": false, "lost": 0, "dash_frames": 0}
+	_boss.plan_step(step)
+	_boss.start_attack(int(step["attack"]))
+	var guard := 0
+	while (_boss.get_state() == BossEnemy.State.ATTACK or _boss.hazard_count() > 0) and guard < MAX_ATTACK_FRAMES:
+		await physics_frame
+		guard += 1
+		if not result["started"] and trigger.call():
+			_player.request_dash()
+			result["started"] = _player.is_dash_invulnerable()
+		var dashing := _player.is_dash_invulnerable()
+		result["dash_frames"] += 1 if dashing else 0
+		var luz := BoomboxHazard.luz_rect(_player)
+		for hazard: BoomboxHazard in _boss.get_hazards():
+			if hazard.get_rect().intersects(luz):
+				if dashing:
+					result["overlap_dashing"] = true
+				elif result["started"]:
+					result["overlap_after"] = true
+		if to_dash_end and result["started"] and not dashing:
+			break
+	result["lost"] = before - _player.get_health()
+	return result
+
+
+## The dash i-frames cover the whole dash (about 0.51 s from rest: 0.08 s lean-back and
+## 0.43 s slide). A hazard that touched her during the dash cannot hurt her afterwards
+## while it still overlaps; one that reaches her after the dash ended still hurts.
+func case_dash_through_hazards() -> void:
+	var A := BoomboxTeacherBoss.Attack
+	var near := func() -> bool: return _incoming_gap() < 80.0
+	var wave := await _dash_run({"attack": A.SOUND_WAVE, "pattern": [BoomboxTeacherBoss.WAVE_LOW]}, 50.0, near, true)
+	check(wave["started"] and wave["overlap_dashing"], "a dash runs into the low wave")
+	check(wave["lost"] == 0, "a dash passes through a sound wave")
+	var briefcase := await _dash_run({"attack": A.BRIEFCASE}, 100.0, near, true)
+	check(briefcase["started"] and briefcase["overlap_dashing"], "a dash runs into the briefcase")
+	check(briefcase["lost"] == 0, "a dash passes through the briefcase")
+	var bass := await _dash_run({"attack": A.BASS_DROP}, -250.0, _wind_up_left(0.40), false)
+	check(bass["started"] and bass["overlap_dashing"], "the dash starts in time and meets the shock")
+	check(bass["overlap_after"], "the i-frames end while the same shock still covers her")
+	check(bass["lost"] == 0, "a dash that met the shock passes it even after its i-frames end")
+	check(float(bass["dash_frames"]) * _dt() >= 0.45, "the dash i-frames last about half a second (%.2f s)" % (float(bass["dash_frames"]) * _dt()))
+	var spent := await _dash_run({"attack": A.BASS_DROP}, -250.0, _wind_up_left(0.85), false)
+	check(spent["started"] and not spent["overlap_dashing"] and spent["lost"] == 1, "a dash that ended before the shock does not protect her")
+	check(spent["overlap_after"], "the shock reached her after the dash ended")
 
 
 func case_reset_clears_every_hazard() -> void:

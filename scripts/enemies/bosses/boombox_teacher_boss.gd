@@ -59,6 +59,16 @@ const WAVE_WEIGHT_REST := 0.2
 ## Eight beats of waves in the Encore: high, low, a rest to land, repeated.
 const ENCORE_WAVES: Array[int] = [WAVE_HIGH, WAVE_LOW, WAVE_REST, WAVE_HIGH, WAVE_LOW, WAVE_REST, WAVE_HIGH, WAVE_LOW]
 
+## Fallbacks and limits for the tunables a designer can plausibly break.
+const DEFAULT_BPM: Array[float] = [90.0, 110.0, 132.0]
+const DEFAULT_OVERHEAT: Array[float] = [2.2, 2.0, 1.8]
+const MIN_BPM := 30.0
+const MAX_BPM := 300.0
+const MIN_OVERHEAT := 0.1
+const MIN_NOTE_PHYSICS := 1.0
+## The recovery after sound waves never waits longer than this many beats.
+const WAVE_CLEAR_MAX_BEATS := 12
+
 const RING_MIN := 10.0
 const RING_MAX := 44.0
 const RING_ACCENT_MAX := 66.0
@@ -107,7 +117,7 @@ const PHRASES := {
 }
 
 @export_group("Beat")
-## Beats per minute of phases one, two and three.
+## Beats per minute of phases one, two and three (empty: 90, 110, 132; clamped to 30..300).
 @export var bpm_by_phase := PackedFloat32Array([90.0, 110.0, 132.0])
 ## Seconds the metronome pulse takes to fade after a beat.
 @export var pulse_time := 0.28
@@ -121,9 +131,9 @@ const PHRASES := {
 @export var rest_beats := 4
 ## Beats before the very first phrase.
 @export var opening_beats := 2
-## Every Nth phrase of a phase is its finale.
+## Every Nth phrase of a phase is its finale (0 or less: no finales, no overheat).
 @export var finale_every := 3
-## Seconds of overheat after the finale of phase one, two and three.
+## Seconds of overheat after the finale of phase one, two and three (empty: 2.2, 2.0, 1.8).
 @export var overheat_times := PackedFloat32Array([2.2, 2.0, 1.8])
 @export var walk_speed := 70.0
 ## Distance he keeps from Luz while resting.
@@ -168,10 +178,12 @@ const PHRASES := {
 ## Height of the underside of a high wave above the floor (above a standing Luz).
 @export var wave_high_clearance := 50.0
 @export var wave_high_height := 30.0
+## Pattern length in beats; both are raised to at least 1 (max never below min).
 @export var wave_min_beats := 4
 @export var wave_max_beats := 8
 
 @export_group("Notes")
+## Notes per throw; both are raised to at least 1 (max never below min).
 @export var note_count_min := 2
 @export var note_count_max := 3
 @export var note_speed := 180.0
@@ -198,9 +210,12 @@ const PHRASES := {
 
 @export_group("Hazards")
 @export var hazard_damage := 1
-## A note's flight never makes the boss wait more than this many beats.
+## A note's flight never makes the boss wait more than this many beats (at least 1).
 @export var max_clear_beats := 4
 
+## The phase whose bpm the clock plays. It follows `_phase` only when the transition
+## beat starts, which never happens during a strike, so no attack changes tempo.
+var _tempo_phase := FIRST_PHASE
 var _beat_running := false
 var _beat_index := 0
 var _beat_left := 0.0
@@ -266,7 +281,8 @@ func get_beat_index() -> int:
 
 
 func get_bpm() -> float:
-	return bpm_by_phase[clampi(_phase - FIRST_PHASE, 0, bpm_by_phase.size() - 1)]
+	var table: Array = Array(bpm_by_phase) if not bpm_by_phase.is_empty() else DEFAULT_BPM
+	return clampf(float(table[clampi(_tempo_phase - FIRST_PHASE, 0, table.size() - 1)]), MIN_BPM, MAX_BPM)
 
 
 ## Seconds between two beats at the current phase.
@@ -348,7 +364,8 @@ func finale_attacks(phase: int) -> Array[int]:
 
 ## The overheat duration for the current phase.
 func overheat_duration() -> float:
-	return overheat_times[clampi(_phase - FIRST_PHASE, 0, overheat_times.size() - 1)]
+	var table: Array = Array(overheat_times) if not overheat_times.is_empty() else DEFAULT_OVERHEAT
+	return maxf(float(table[clampi(_phase - FIRST_PHASE, 0, table.size() - 1)]), MIN_OVERHEAT)
 
 
 ## Starts the beat clock with the next beat one interval away.
@@ -444,7 +461,7 @@ func _apply_head_pose() -> void:
 ## Whole beats to the strike: the time to the Nth next beat, raised one beat at a time
 ## while it would be shorter than the minimum telegraph. Remembers the beat it ends on.
 func _telegraph_time(attack_id: int) -> float:
-	var beats := _telegraph_beats(attack_id)
+	var beats := maxi(_telegraph_beats(attack_id), 1)
 	while _time_to_beat(beats) < MIN_TELEGRAPH:
 		beats += 1
 	_anchor_beat = _beat_index + beats
@@ -489,25 +506,25 @@ func _active_time(attack_id: int) -> float:
 
 
 ## Every recovery ends on a beat, so the next telegraph starts on the grid. Waves wait
-## until they left the arena (the overheat must never start under a wave); notes wait
-## at most `max_clear_beats`.
+## until they left the arena (the overheat must never start under a wave) and notes at
+## most `max_clear_beats`; both waits are capped, whatever the arena size.
 func _recover_time(attack_id: int) -> float:
 	match attack_id:
 		Attack.SOUND_WAVE:
-			return _clear_wait(_wave_travel_time(), 0)
+			return _clear_wait(_wave_travel_time(), WAVE_CLEAR_MAX_BEATS)
 		Attack.NOTE_BOUNCE:
-			return _clear_wait(_note_travel_time(), max_clear_beats)
+			return _clear_wait(_note_travel_time(), maxi(max_clear_beats, 1))
 		Attack.BASS_DROP:
 			return _beat_aligned(get_beat_interval())
 	return _beat_aligned(MIN_RECOVER)
 
 
-## A beat-aligned wait for something that needs `travel` seconds to leave (`cap` beats
-## at most; 0 means no cap).
+## A beat-aligned wait for something that needs `travel` seconds to leave, `cap` beats
+## at most (a non-finite travel counts as one beat).
 func _clear_wait(travel: float, cap: int) -> float:
-	var beats := maxi(ceili(travel / get_beat_interval()), 1)
-	if cap > 0:
-		beats = mini(beats, cap)
+	var beats := 1
+	if is_finite(travel):
+		beats = clampi(ceili(travel / get_beat_interval()), 1, cap)
 	return _beat_aligned(maxf(_time_to_beat(beats), MIN_RECOVER))
 
 
@@ -521,9 +538,16 @@ func _note_travel_time() -> float:
 	return maxf(global_position.x - bounds.x, bounds.y - global_position.x) / maxf(note_speed, 1.0)
 
 
+func _note_gravity() -> float:
+	return maxf(note_gravity, MIN_NOTE_PHYSICS)
+
+
+func _note_rise_speed() -> float:
+	return sqrt(2.0 * _note_gravity() * maxf(note_apex, MIN_NOTE_PHYSICS))
+
+
 func _note_hop_time() -> float:
-	var rise_speed := sqrt(2.0 * note_gravity * note_apex)
-	return 2.0 * rise_speed / note_gravity
+	return 2.0 * _note_rise_speed() / _note_gravity()
 
 
 ## -- Phrases and the fight loop ---------------------------------------------------------
@@ -533,8 +557,8 @@ func _fight_delay() -> float:
 		return 0.0
 	if _opening:
 		_opening = false
-		return _time_to_beat(opening_beats)
-	return _time_to_beat(rest_beats)
+		return _time_to_beat(maxi(opening_beats, 1))
+	return _time_to_beat(maxi(rest_beats, 1))
 
 
 func _update_fight(_delta: float) -> void:
@@ -552,7 +576,8 @@ func _walk_to_mid_range() -> void:
 	global_position.x = _clamp_to_arena(global_position.x)
 	var wanted := _clamp_to_arena(_luz.global_position.x - float(_dir_to_luz()) * mid_range)
 	var gap := wanted - global_position.x
-	velocity.x = clampf(gap * WALK_GAIN, -walk_speed, walk_speed) if absf(gap) > WALK_DEADZONE else 0.0
+	var limit := absf(walk_speed)
+	velocity.x = clampf(gap * WALK_GAIN, -limit, limit) if absf(gap) > WALK_DEADZONE else 0.0
 
 
 func _choose_next_action() -> int:
@@ -575,7 +600,7 @@ func _kick_due() -> bool:
 
 func _plan_phrase() -> void:
 	_phrase_count += 1
-	_finale_phrase = _phrase_count % finale_every == 0
+	_finale_phrase = finale_every > 0 and _phrase_count % finale_every == 0
 	_phrase = _finale_steps(_phase) if _finale_phrase else _regular_steps()
 	var attacks: Array[int] = []
 	for step: Dictionary in _phrase:
@@ -584,6 +609,8 @@ func _plan_phrase() -> void:
 
 
 func _pop_step() -> int:
+	if _phrase.is_empty():
+		_phrase = _regular_steps()
 	var step: Dictionary = _phrase.pop_front()
 	_pending_step = step
 	if _phrase.is_empty() and _finale_phrase:
@@ -631,10 +658,12 @@ func _make_step(attack: int, size := 0) -> Dictionary:
 				heights.append((first + i) % 2)
 			return {"attack": attack, "heights": heights}
 		Attack.SOUND_WAVE:
-			var beats := size if size > 0 else rng.randi_range(wave_min_beats, maxi(wave_max_beats, wave_min_beats))
+			var shortest := maxi(wave_min_beats, 1)
+			var beats := size if size > 0 else rng.randi_range(shortest, maxi(wave_max_beats, shortest))
 			return {"attack": attack, "pattern": _make_wave_pattern(beats)}
 		Attack.NOTE_BOUNCE:
-			return {"attack": attack, "count": rng.randi_range(note_count_min, maxi(note_count_max, note_count_min))}
+			var fewest := maxi(note_count_min, 1)
+			return {"attack": attack, "count": rng.randi_range(fewest, maxi(note_count_max, fewest))}
 	return {"attack": attack}
 
 
@@ -643,7 +672,7 @@ func _make_step(attack: int, size := 0) -> Dictionary:
 func _make_wave_pattern(length: int) -> Array[int]:
 	var pattern: Array[int] = []
 	var low_run := 0
-	for i: int in length:
+	for i: int in maxi(length, 1):
 		var previous := pattern[i - 1] if i > 0 else WAVE_REST
 		var weights := PackedFloat32Array([WAVE_WEIGHT_LOW, WAVE_WEIGHT_HIGH, WAVE_WEIGHT_REST if i > 0 else 0.0])
 		if previous == WAVE_LOW:
@@ -877,9 +906,9 @@ func _throw_note(k: int) -> void:
 	var hazard := _spawn_hazard(Vector2(global_position.x + float(side) * (_half_width + note_radius + BRIEFCASE_ORIGIN_GAP), ground), Vector2(note_radius, note_radius), NOTE_COLOR)
 	hazard.look = BoomboxHazard.Look.DISC
 	hazard.motion = BoomboxHazard.Motion.LINEAR
-	var rise_speed := sqrt(2.0 * note_gravity * note_apex)
+	var rise_speed := _note_rise_speed()
 	hazard.velocity = Vector2(float(side) * note_speed, -rise_speed)
-	hazard.gravity = note_gravity
+	hazard.gravity = _note_gravity()
 	hazard.bounce_speed = rise_speed
 	hazard.floor_y = ground
 	hazard.wall_left = bounds.x
@@ -927,7 +956,8 @@ func _make_columns() -> PackedFloat32Array:
 	var bounds := _arena_bounds()
 	var left := bounds.x + column_margin
 	var span := maxf(bounds.y - column_margin - left, 0.0)
-	var count := clampi(int(span / column_spacing_min) + 1, MIN_COLUMNS, MAX_COLUMNS)
+	var fit := span / maxf(column_spacing_min, 1.0)
+	var count := clampi(int(fit) + 1, MIN_COLUMNS, MAX_COLUMNS) if is_finite(fit) else MAX_COLUMNS
 	var columns := PackedFloat32Array()
 	for i: int in count:
 		columns.append(left + span * float(i) / float(count - 1))
@@ -1070,6 +1100,12 @@ func _on_phase_entered(_phase_id: int) -> void:
 	_pending_step = {}
 
 
+## The transition beat never starts during a strike: the new phase's tempo begins here,
+## so every attack keeps the tempo it was telegraphed with.
+func _on_transition_started(_phase_id: int) -> void:
+	_tempo_phase = _phase
+
+
 func _on_stunned(duration: float) -> void:
 	_steam_left = duration
 	play_cue(CUE_OVERHEAT)
@@ -1081,6 +1117,7 @@ func _on_stun_ended() -> void:
 
 func _reset_ai() -> void:
 	super._reset_ai()
+	_tempo_phase = FIRST_PHASE
 	_stop_beat_clock()
 	_beat_index = 0
 	_accent = false
