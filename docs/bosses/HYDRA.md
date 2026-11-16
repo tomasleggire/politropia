@@ -15,7 +15,10 @@ A target-priority and platforming fight. A static body at the right wall has thr
 
 - The root body is not hittable (`_root_layer()` is 0) and hurts on touch. The heads (`Heads/LowHead`, `MidHead`, `HighHead`) are `Area2D` hurtboxes on layer 8.
 - The heads rest at the lowest level, the middle level and the highest level read from the platforms, 190 px left of the body and 34 px above their level.
-- Platforms live in `Platforms` (a child of the arena root, not of the boss): one-way `StaticBody2D`s on collision layer 2 in the group `hydra_platform`, each with a `CollisionShape2D` rectangle. The boss reads them when the fight starts (and on reset), so **you can move, add or remove platforms freely**; the heads, the sweep bands and the venom spots follow. Keep three rules: steps of about 56 px between levels (one jump is 120 px), a standing place near each head, and every platform reachable from another surface by one jump.
+- Platforms live in `Platforms` (a child of the arena root, not of the boss): one-way `StaticBody2D`s on collision layer 2 in the group `hydra_platform`, each with a `RectangleShape2D` in a child **named exactly `CollisionShape2D`**. The boss reads them when the fight starts (and on reset), so **you can move, add or remove platforms freely**; the heads, the sweep bands and the venom spots follow. Keep three rules: steps of about 56 px between levels (one jump is 120 px), a standing place near each head, and every platform reachable from another surface by one jump.
+- The scan is scoped to the `Platforms` node of the closest ancestor that has one (the arena that holds the boss), so two Hydra arenas in one scene never share platforms; the group is only a filter on its children. A boss with no such ancestor falls back to the whole group in the tree.
+- A platform whose shape node has another name, or whose shape is not a rectangle, is skipped and `push_warning` names it (once per platform). Fix the node instead of ignoring the warning: the level it would have given is missing.
+- With fewer than three levels (the floor plus fewer than two distinct platform tops) the heads use fixed steps instead: low at the floor, mid 112 px above it and high 224 px above it. The platforms still count for venom spots.
 - Shipped layout (arena-local, surface y; floor 0): `PlatformLowLeft` (-280, -56), `PlatformLowRight` (-80, -56), `PlatformMid` (100, -112), `PlatformUpper` (-40, -168), `PlatformTop` (130, -224); each 160 px wide. Levels: 0, -56, -112, -168, -224. Low head at 0, mid head at -112, high head at -224.
 
 ## Heads
@@ -58,4 +61,4 @@ All are exported and grouped on `HydraBoss`: Layout (`right_wall_margin`, `head_
 
 ## Tests
 
-`tests/hydra_boss_test.gd`.
+`tests/hydra_boss_test.gd` (case names after `--` run alone). Beyond injected hits, it drives Luz's real slash (her `AttackHitbox` overlap) into each head, severs heads mid-attack, relays out the platforms (moved, removed, fewer than three levels, two arenas, bad shapes) and measures the enrage effects (marked spots, wind-up and sweep times) instead of reading private helpers.

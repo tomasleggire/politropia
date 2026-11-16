@@ -177,10 +177,12 @@ func _hurt_overlapping() -> void:
 			return
 
 
+## Deferred: a severing hit can release the pool from inside a physics callback,
+## where changing a shape or an area is forbidden.
 func _set_pool_active(on: bool) -> void:
 	if _shape != null:
-		_shape.disabled = not on
-	monitoring = on
+		_shape.set_deferred(&"disabled", not on)
+	set_deferred(&"monitoring", on)
 
 
 func _draw_marker(rate: float) -> void:

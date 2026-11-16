@@ -5,7 +5,8 @@ extends SceneTree
 ## numbers, the pacing per phase, reset, the final blow, the corpse and the arena
 ## integration.
 ## Run: godot --headless --path . --script res://tests/hydra_boss_test.gd
-## Exits 0 when every check passes, 1 otherwise.
+## Exits 0 when every check passes, 1 otherwise. Case names after `--` run alone
+## (`-- case_real_attack_hits_heads`); such a partial run is judged on its cases only.
 
 const ARENA_SCENE := "res://scenes/enemies/bosses/hydra_boss_arena.tscn"
 const PLAYER_SCENE := "res://scenes/player/player.tscn"
@@ -35,6 +36,17 @@ const CHECKS := {
 	"case_defeat_and_arena": 16,
 	"case_corpse_reload": 9,
 	"case_stays_in_arena": 4,
+	"case_real_attack_hits_heads": 9,
+	"case_echo_telegraph_in_duo": 9,
+	"case_sever_mid_attack": 25,
+	"case_platforms_moved": 5,
+	"case_platforms_removed": 5,
+	"case_platforms_fallback": 3,
+	"case_two_arenas": 4,
+	"case_platform_shape_warnings": 4,
+	"case_enrage_volley_count": 4,
+	"case_enrage_sweep_timing": 6,
+	"case_venom_release_in_callback": 5,
 }
 
 var checks := 0
@@ -48,6 +60,21 @@ var _arena: BossArena
 var _phases_seen: Array[int] = []
 var _defeats := 0
 var _settled := 0
+var _tap: LogTap
+var _only: PackedStringArray = []
+
+
+## Collects the engine's errors and warnings while a case runs.
+class LogTap extends Logger:
+	var errors: Array[String] = []
+	var warnings: Array[String] = []
+
+	func _log_error(_function: String, _file: String, _line: int, code: String, rationale: String, _editor_notify: bool, error_type: int, _backtraces: Array[ScriptBacktrace]) -> void:
+		var text := "%s %s" % [code, rationale]
+		if error_type == Logger.ERROR_TYPE_WARNING:
+			warnings.append(text)
+		else:
+			errors.append(text)
 
 
 func _initialize() -> void:
@@ -57,7 +84,10 @@ func _initialize() -> void:
 func run() -> void:
 	await process_frame
 	create_timer(WATCHDOG_SECONDS).timeout.connect(_on_watchdog)
+	_only = OS.get_cmdline_user_args()
 	for case_name: String in CHECKS:
+		if not _only.is_empty() and not _only.has(case_name):
+			continue
 		_expected_total += CHECKS[case_name]
 		await _run_case(case_name, CHECKS[case_name])
 	finish()
@@ -147,6 +177,7 @@ func _build(auto := false, defeated := false) -> void:
 
 
 func _cleanup() -> void:
+	_untap_logs()
 	BossFeel.cancel()
 	Engine.time_scale = 1.0
 	if is_instance_valid(_rig):
@@ -189,6 +220,57 @@ func _put_luz(at: Vector2) -> void:
 func _platform_spot(platform_name: String) -> Vector2:
 	var platform := _arena.get_node("Platforms/" + platform_name) as Node2D
 	return platform.global_position + Vector2(0.0, -8.0)
+
+
+func _tap_logs() -> void:
+	_untap_logs()
+	_tap = LogTap.new()
+	OS.add_logger(_tap)
+
+
+func _untap_logs() -> void:
+	if _tap != null:
+		OS.remove_logger(_tap)
+		_tap = null
+
+
+func _warnings_naming(text: String) -> int:
+	var count := 0
+	for warning: String in _tap.warnings:
+		count += 1 if warning.contains(text) else 0
+	return count
+
+
+func _platform(platform_name: String) -> StaticBody2D:
+	return _arena.get_node("Platforms/" + platform_name) as StaticBody2D
+
+
+func _remove_platform(platform_name: String) -> void:
+	var platform := _platform(platform_name)
+	platform.get_parent().remove_child(platform)
+	platform.free()
+
+
+## Luz goes to `spot` facing right and swings once through her own attack path:
+## the slash is the AttackHitbox overlap, resolved in the physics frames.
+func _real_slash(spot: Vector2) -> void:
+	await _put_luz(spot)
+	_player.request_attack(0)
+	await _secs(0.5)
+
+
+## The venom spots currently painted on the ground.
+func _marked_spots() -> int:
+	var count := 0
+	for venom: HydraVenom in _boss.get_active_venoms():
+		count += 1 if venom.is_marker_visible() else 0
+	return count
+
+
+## Luz at full strength so long runs never end on her death.
+func _tough_luz() -> void:
+	_player.set_max_health(500)
+	_player.heal(500)
 
 
 func _head(kind: HydraHead.Kind) -> HydraHead:
@@ -759,3 +841,365 @@ func case_stays_in_arena() -> void:
 	var boss_gap := world.end.x - _boss.global_position.x
 	check(boss_gap >= _boss.right_wall_margin - 0.5 and _boss.global_position.x > world.position.x, "the body stays at the right wall")
 	check(_boss.get_head_health_sum() == _boss.get_health(), "the pool equalled the heads after a long fight")
+
+
+# -- Review follow-ups: real attacks, duo telegraph, severing mid-attack, platforms --------
+
+func case_real_attack_hits_heads() -> void:
+	await _awake()
+	var tiers := _boss.get_tiers()
+	for kind: HydraHead.Kind in [HydraHead.Kind.BITER, HydraHead.Kind.SWEEPER, HydraHead.Kind.SPITTER]:
+		var head := _head(kind)
+		var label := str(HydraHead.Kind.keys()[kind]).to_lower()
+		var health := head.health
+		var pool := _boss.get_health()
+		var soul := _player.get_soul()
+		# Luz stands on the head's own tier, a stride to its right, and swings once.
+		await _real_slash(Vector2(head.global_position.x - 40.0, tiers.tier_y(int(head.tier)) - 1.0))
+		var dealt := _player.attack_damage
+		check(head.health == health - dealt, "a real ground slash takes %d from the %s head (%d -> %d)" % [dealt, label, health, head.health])
+		check(_boss.get_health() == pool - dealt and _boss.get_head_health_sum() == _boss.get_health(), "the same damage leaves the shared pool by the %s hit" % label)
+		check(_player.get_soul() > soul, "a real slash on the %s head gives Luz soul" % label)
+
+
+## Phase two with `dead` already severed, the boss free to start a duo, and Luz away.
+func _duo_ready(dead: HydraHead.Kind) -> void:
+	await _awake()
+	_boss.duo_offset = 0.3
+	_tough_luz()
+	await _put_luz(Vector2(-350.0, 0.0))
+	_slash(_head(dead), 12)
+	await _secs(1.0)
+	_boss.auto_attack = true
+
+
+func _both_attacking() -> bool:
+	return _boss.get_attacking_heads().size() == 2
+
+
+func case_echo_telegraph_in_duo() -> void:
+	var telegraph: BossTelegraph
+	# The sweeper leads and the biter echoes: the echo's aim line is slot 1.
+	await _duo_ready(HydraHead.Kind.SPITTER)
+	telegraph = _boss.get_telegraph()
+	_boss.start_attack(HydraBoss.Attack.NECK_SWEEP)
+	await _wait_for(_both_attacking, 2.0)
+	check(telegraph.is_aim_line_visible(HydraBoss.ECHO_SLOT), "the echo bite paints its own aim line on slot 1")
+	check(telegraph.is_floor_marker_visible(HydraBoss.LEAD_SLOT * HydraBoss.MARKERS_PER_RUN), "the lead sweep keeps its band while the echo winds up")
+	check(not telegraph.is_aim_line_visible(HydraBoss.LEAD_SLOT), "a sweep lead has no aim line, so the line on slot 0 stays off")
+	# The biter leads and the sweeper echoes: the echo's band starts at marker 8.
+	await _duo_ready(HydraHead.Kind.SPITTER)
+	telegraph = _boss.get_telegraph()
+	_boss.start_attack(HydraBoss.Attack.BITE_LUNGE)
+	await _wait_for(_both_attacking, 2.0)
+	var echo_marker := HydraBoss.ECHO_SLOT * HydraBoss.MARKERS_PER_RUN
+	check(telegraph.is_floor_marker_visible(echo_marker), "the echo sweep paints its band on marker %d" % echo_marker)
+	check(telegraph.is_aim_line_visible(HydraBoss.LEAD_SLOT), "the lead bite keeps its aim line while the echo winds up")
+	check(not telegraph.is_floor_marker_visible(HydraBoss.LEAD_SLOT * HydraBoss.MARKERS_PER_RUN), "a bite lead has no band, so marker 0 stays off")
+	check(HydraBoss.ECHO_SLOT < BossTelegraph.LINE_POOL_SIZE and HydraBoss.LEAD_SLOT < BossTelegraph.LINE_POOL_SIZE, "both run slots exist in the aim-line pool")
+	check((HydraBoss.ECHO_SLOT + 1) * HydraBoss.MARKERS_PER_RUN <= BossTelegraph.MARKER_POOL_SIZE, "both runs' marker ranges fit the marker pool")
+	var sweeper := _head(HydraHead.Kind.SWEEPER)
+	await _wait_for(func() -> bool: return _boss.get_run_phase(sweeper) == BossEnemy.AttackPhase.ACTIVE, 3.0)
+	await _frames(2)
+	check(not telegraph.is_floor_marker_visible(echo_marker), "the echo's band goes away once its sweep is active")
+
+
+## Waits for `head`'s run to reach `phase`, then a frame so its effects are live.
+func _await_run_phase(head: HydraHead, phase: int) -> void:
+	await _wait_for(func() -> bool: return _boss.get_run_phase(head) == phase, 4.0)
+	await _frames(1)
+
+
+## True once a living head (never one in `dead`) is attacking again.
+func _attacks_again(dead: Array[HydraHead]) -> bool:
+	return await _wait_for(func() -> bool:
+		var heads := _boss.get_attacking_heads()
+		return not heads.is_empty() and heads.all(func(h: HydraHead) -> bool: return not dead.has(h) and not h.is_severed()), 10.0)
+
+
+func _planned_venom_count() -> int:
+	return _boss.get_active_venoms().filter(func(v: HydraVenom) -> bool: return v.get_state() == HydraVenom.State.PLANNED).size()
+
+
+func case_sever_mid_attack() -> void:
+	# A lunging biter dies in its ACTIVE phase.
+	await _awake()
+	_tough_luz()
+	await _put_luz(Vector2(60.0, 0.0))
+	var low := _head(HydraHead.Kind.BITER)
+	_boss.start_attack(HydraBoss.Attack.BITE_LUNGE)
+	await _await_run_phase(low, BossEnemy.AttackPhase.ACTIVE)
+	check(low.is_hitbox_armed(), "the biter's hitbox is armed in the lunge")
+	_slash(low, 12)
+	await _frames(3)
+	check(not low.is_hitbox_armed(), "a biter severed mid-lunge drops its hitbox")
+	check(_boss.get_run_attack(low) == BossEnemy.NO_ATTACK, "a biter severed mid-lunge has no run left")
+	check(_boss.get_state() != BossEnemy.State.ATTACK, "the boss leaves the attack state when its lead head dies")
+	_boss.auto_attack = true
+	check(await _attacks_again([low]), "the remaining heads attack again after the biter died")
+	# A sweeping neck dies in its ACTIVE phase.
+	await _awake()
+	_tough_luz()
+	await _put_luz(Vector2(-200.0, 0.0))
+	var mid := _head(HydraHead.Kind.SWEEPER)
+	_boss.start_attack(HydraBoss.Attack.NECK_SWEEP)
+	await _await_run_phase(mid, BossEnemy.AttackPhase.ACTIVE)
+	check(mid.is_hitbox_armed(), "the sweeper's hitbox is armed in the sweep")
+	_slash(mid, 12)
+	await _frames(3)
+	check(not mid.is_hitbox_armed(), "a sweeper severed mid-sweep drops its hitbox")
+	check(_boss.get_run_attack(mid) == BossEnemy.NO_ATTACK, "a sweeper severed mid-sweep has no run left")
+	check(_boss.get_state() != BossEnemy.State.ATTACK, "the boss leaves the attack state when the sweeper dies")
+	_boss.auto_attack = true
+	check(await _attacks_again([mid]), "the remaining heads attack again after the sweeper died")
+	# A spitter dies after the first glob left and before the others were thrown.
+	await _awake()
+	_tough_luz()
+	await _put_luz(Vector2(-350.0, 0.0))
+	var high := _head(HydraHead.Kind.SPITTER)
+	_boss.start_attack(HydraBoss.Attack.VENOM_VOLLEY)
+	await _await_run_phase(high, BossEnemy.AttackPhase.ACTIVE)
+	await _wait_for(func() -> bool: return _boss.get_active_venoms().any(func(v: HydraVenom) -> bool: return v.is_flying()), 1.0)
+	var planned_before := _planned_venom_count()
+	check(planned_before > 0, "a glob is in flight and others are still only planned (%d)" % planned_before)
+	_slash(high, 12)
+	await _frames(3)
+	check(_planned_venom_count() == 0, "the dead spitter's planned venom is withdrawn (%d left)" % _planned_venom_count())
+	check(_boss.get_run_attack(high) == BossEnemy.NO_ATTACK, "a spitter severed mid-volley has no run left")
+	check(_boss.get_state() != BossEnemy.State.ATTACK, "the boss leaves the attack state when the spitter dies")
+	_boss.auto_attack = true
+	check(await _attacks_again([high]), "the remaining heads attack again after the spitter died")
+	# A duo: the lead sweeper dies while the echo bite is also striking.
+	await _duo_ready(HydraHead.Kind.SPITTER)
+	low = _head(HydraHead.Kind.BITER)
+	mid = _head(HydraHead.Kind.SWEEPER)
+	_boss.start_attack(HydraBoss.Attack.NECK_SWEEP)
+	await _await_run_phase(low, BossEnemy.AttackPhase.ACTIVE)
+	check(mid.is_hitbox_armed() and low.is_hitbox_armed(), "both duo heads are armed at once")
+	_slash(mid, 12)
+	await _frames(3)
+	check(not mid.is_hitbox_armed() and not low.is_hitbox_armed(), "killing the lead disarms the lead and the echo")
+	check(_boss.get_attacking_heads().is_empty(), "no run survives the lead's death")
+	check(_boss.get_state() != BossEnemy.State.ATTACK, "the boss leaves the attack state when the duo lead dies")
+	check(await _attacks_again([mid]), "the last head attacks again after the duo lead died")
+	# A duo: the echo biter dies while the lead sweeper is still sweeping.
+	await _duo_ready(HydraHead.Kind.SPITTER)
+	low = _head(HydraHead.Kind.BITER)
+	mid = _head(HydraHead.Kind.SWEEPER)
+	_boss.start_attack(HydraBoss.Attack.NECK_SWEEP)
+	await _await_run_phase(low, BossEnemy.AttackPhase.ACTIVE)
+	check(low.is_hitbox_armed(), "the echo biter is armed in its lunge")
+	_slash(low, 12)
+	await _frames(3)
+	check(not low.is_hitbox_armed(), "a dead echo drops its hitbox")
+	check(_boss.get_run_attack(low) == BossEnemy.NO_ATTACK, "a dead echo has no run left")
+	check(_boss.get_run_attack(mid) == HydraBoss.Attack.NECK_SWEEP, "the lead sweep goes on after the echo died")
+	check(await _attacks_again([low]), "the lead head attacks again after the echo died")
+
+
+func case_platforms_moved() -> void:
+	await _build()
+	await _frames(3)
+	_tough_luz()
+	# The middle platform sinks 8 px and the top one rises 84: both heads follow.
+	_platform("PlatformMid").position.y = -100.0
+	_platform("PlatformTop").position.y = -300.0
+	_boss.engage()
+	await _frames(2)
+	var tiers := _boss.get_tiers()
+	var mid := _head(HydraHead.Kind.SWEEPER)
+	var high := _head(HydraHead.Kind.SPITTER)
+	check(is_equal_approx(tiers.tier_y(1), -108.0) and is_equal_approx(tiers.tier_y(2), -308.0), "the tiers follow the moved platforms (%.0f, %.0f)" % [tiers.tier_y(1), tiers.tier_y(2)])
+	check(is_equal_approx(mid.global_position.y, -108.0 - _boss.head_rest_height), "the middle head rests on its moved tier")
+	check(is_equal_approx(high.global_position.y, -308.0 - _boss.head_rest_height), "the high head rests on its moved tier")
+	await _put_luz(Vector2(100.0, -110.0))
+	_boss.start_attack(HydraBoss.Attack.NECK_SWEEP)
+	await _frames(2)
+	check(is_equal_approx(_boss.get_run_slab(mid).position.y, -108.0 - _boss.sweep_band_height + 4.0), "the sweep band marks the moved platform")
+	await _put_luz(Vector2(130.0, -310.0))
+	_boss.start_attack(HydraBoss.Attack.VENOM_VOLLEY)
+	var spots := _boss.get_run_spots(high)
+	check(not spots.is_empty() and is_equal_approx(spots[0].y, -308.0), "the first venom spot lands on the moved platform")
+
+
+func case_platforms_removed() -> void:
+	await _build()
+	await _frames(3)
+	_tough_luz()
+	_remove_platform("PlatformMid")
+	_boss.engage()
+	await _frames(2)
+	var tiers := _boss.get_tiers()
+	var mid := _head(HydraHead.Kind.SWEEPER)
+	check(tiers.level_count() == 4, "removing a platform removes its level (%d)" % tiers.level_count())
+	check(is_equal_approx(tiers.tier_y(1), -168.0), "the middle tier moves to the next level (%.0f)" % tiers.tier_y(1))
+	check(is_equal_approx(mid.global_position.y, -168.0 - _boss.head_rest_height), "the middle head rests on the new middle level")
+	await _put_luz(_platform_spot("PlatformUpper"))
+	_boss.start_attack(HydraBoss.Attack.NECK_SWEEP)
+	await _frames(2)
+	check(is_equal_approx(_boss.get_run_slab(mid).position.y, -168.0 - _boss.sweep_band_height + 4.0), "the sweep band marks the surviving platform")
+	_boss.start_attack(HydraBoss.Attack.VENOM_VOLLEY)
+	var dropped := false
+	for spot: Vector2 in _boss.get_run_spots(_head(HydraHead.Kind.SPITTER)):
+		dropped = dropped or (absf(spot.x - 110.0) < 1.0 and is_equal_approx(spot.y, 0.0))
+	check(dropped, "a venom spot where the platform was drops to the floor")
+
+
+func case_platforms_fallback() -> void:
+	await _build()
+	await _frames(3)
+	_tap_logs()
+	for platform_name: String in ["PlatformLowRight", "PlatformMid", "PlatformUpper", "PlatformTop"]:
+		_remove_platform(platform_name)
+	_boss.engage()
+	await _frames(2)
+	var tiers := _boss.get_tiers()
+	var step := HydraTiers.DEFAULT_TIER_STEP
+	check(tiers.level_count() == 2 and is_equal_approx(tiers.tier_y(1), -step) and is_equal_approx(tiers.tier_y(2), -2.0 * step), "with fewer than three levels the heads use the default steps")
+	var on_fallback := true
+	for kind: HydraHead.Kind in [HydraHead.Kind.BITER, HydraHead.Kind.SWEEPER, HydraHead.Kind.SPITTER]:
+		var head := _head(kind)
+		on_fallback = on_fallback and is_equal_approx(head.global_position.y, tiers.tier_y(int(head.tier)) - _boss.head_rest_height)
+	check(on_fallback, "every head rests on its fallback tier")
+	check(_tap.errors.is_empty(), "the fallback layout logs no engine error (%s)" % str(_tap.errors))
+
+
+func case_two_arenas() -> void:
+	await _build()
+	await _frames(3)
+	var other := (load(ARENA_SCENE) as PackedScene).instantiate() as BossArena
+	other.position = Vector2(0.0, -2000.0)
+	var other_boss := other.get_node("Hydra") as HydraBoss
+	other_boss.enemy_id = &"greece_hydra_other"
+	other_boss.auto_attack = false
+	# It has no floor under it in this rig, so its rest points are what is compared.
+	_rig.add_child(other)
+	await _frames(3)
+	_boss.engage()
+	await _frames(2)
+	var tiers := _boss.get_tiers()
+	var own := true
+	for top: Rect2 in tiers.platform_tops():
+		own = own and top.position.y > -300.0
+	check(tiers.level_count() == 5 and own, "a second arena's platforms never join this boss's tiers (%d levels)" % tiers.level_count())
+	check(is_equal_approx(_head(HydraHead.Kind.SPITTER).global_position.y, -224.0 - _boss.head_rest_height), "this boss's high head stays on its own top platform")
+	var other_tiers := other_boss.get_tiers()
+	check(other_tiers.level_count() == 5 and is_equal_approx(other_tiers.floor_y, -2000.0), "the second boss reads only its own five levels (%d)" % other_tiers.level_count())
+	var other_high := other_boss.get_head(HydraHead.Kind.SPITTER)
+	check(is_equal_approx(other_high.rest_global.y, -2224.0 - other_boss.head_rest_height), "the second boss's high head rests on its own arena (y %.1f)" % other_high.rest_global.y)
+
+
+func case_platform_shape_warnings() -> void:
+	await _build()
+	_tap_logs()
+	await _frames(3)
+	var shape_node := _platform("PlatformMid").get_node("CollisionShape2D") as CollisionShape2D
+	shape_node.name = &"Shape"
+	(_platform("PlatformUpper").get_node("CollisionShape2D") as CollisionShape2D).shape = CircleShape2D.new()
+	_boss.engage()
+	await _frames(2)
+	check(_warnings_naming("PlatformMid") == 1, "a platform whose shape node is misnamed is reported by name (%s)" % str(_tap.warnings))
+	check(_warnings_naming("PlatformUpper") == 1, "a platform with a non-rectangle shape is reported by name")
+	check(_boss.get_tiers().level_count() == 3, "both platforms are skipped (%d levels)" % _boss.get_tiers().level_count())
+	_boss.reset_to_spawn()
+	await _frames(3)
+	check(_warnings_naming("PlatformMid") == 1, "the same platform is not reported again at every layout")
+
+
+func case_enrage_volley_count() -> void:
+	await _awake()
+	_tough_luz()
+	await _put_luz(Vector2(-350.0, 0.0))
+	_boss.start_attack(HydraBoss.Attack.VENOM_VOLLEY)
+	await _frames(2)
+	check(_marked_spots() == _boss.venom_count, "three heads: a volley marks %d spots" % _boss.venom_count)
+	_slash(_head(HydraHead.Kind.BITER), 12)
+	await _secs(1.0)
+	_boss.start_attack(HydraBoss.Attack.VENOM_VOLLEY)
+	await _frames(2)
+	check(_marked_spots() == _boss.venom_count + 1, "one head down: a volley marks one more spot (%d)" % _marked_spots())
+	_slash(_head(HydraHead.Kind.SWEEPER), 12)
+	await _secs(1.0)
+	_boss.start_attack(HydraBoss.Attack.VENOM_VOLLEY)
+	await _frames(2)
+	check(_marked_spots() == _boss.venom_count + 2, "two heads down: a volley marks two more spots (%d)" % _marked_spots())
+	# The last head is the sweeper: its volley is the weaker version.
+	await _awake()
+	_tough_luz()
+	await _put_luz(Vector2(-350.0, 0.0))
+	_slash(_head(HydraHead.Kind.BITER), 12)
+	await _secs(1.0)
+	_slash(_head(HydraHead.Kind.SPITTER), 12)
+	await _secs(1.0)
+	_boss.start_attack(HydraBoss.Attack.VENOM_VOLLEY)
+	await _frames(2)
+	check(_marked_spots() == _boss.weak_venom_count, "a weaker volley marks only %d spots (%d)" % [_boss.weak_venom_count, _marked_spots()])
+
+
+## Seconds from the call to the sweep's ACTIVE phase, and from there to the neck
+## reaching the left end, both counted in physics frames.
+func _time_sweep() -> Array[float]:
+	var sweeper := _head(HydraHead.Kind.SWEEPER)
+	var end_x := _arena.get_world_rect().position.x + _boss.sweep_end_margin
+	_boss.start_attack(HydraBoss.Attack.NECK_SWEEP)
+	var telegraph_frames := 0
+	while _boss.get_attack_phase() != BossEnemy.AttackPhase.ACTIVE and telegraph_frames < 300:
+		telegraph_frames += 1
+		await physics_frame
+	var travel_frames := 0
+	while sweeper.global_position.x > end_x + 2.0 and travel_frames < 300:
+		travel_frames += 1
+		await physics_frame
+	await _wait_for(_attack_is_over, 4.0)
+	return [float(telegraph_frames) / 60.0, float(travel_frames) / 60.0]
+
+
+func case_enrage_sweep_timing() -> void:
+	await _awake()
+	_tough_luz()
+	await _put_luz(Vector2(-350.0, 0.0))
+	var sweeper := _head(HydraHead.Kind.SWEEPER)
+	var start_x := _boss.global_position.x + sweeper.shoulder.x - _boss.sweep_start_gap
+	var distance := start_x - (_arena.get_world_rect().position.x + _boss.sweep_end_margin) - 2.0
+	var dead_heads: Array[HydraHead.Kind] = [HydraHead.Kind.SPITTER, HydraHead.Kind.BITER]
+	for dead: int in 3:
+		if dead > 0:
+			_slash(_head(dead_heads[dead - 1]), 12)
+			await _secs(1.0)
+		var timing := await _time_sweep()
+		var wanted_wind_up := _boss.sweep_telegraph * pow(_boss.enrage_telegraph_scale, float(dead))
+		var speed := _boss.sweep_speed * (1.0 + _boss.enrage_sweep_speed_gain * float(dead))
+		if dead == 2:
+			speed *= _boss.frenzy_strength
+		check(absf(timing[0] - wanted_wind_up) < 0.07, "%d heads down: the sweep wind-up lasts %.2f s (measured %.2f)" % [dead, wanted_wind_up, timing[0]])
+		check(absf(timing[1] - distance / speed) < 0.07, "%d heads down: the neck crosses in %.2f s (measured %.2f)" % [dead, distance / speed, timing[1]])
+
+
+func case_venom_release_in_callback() -> void:
+	await _awake()
+	_tap_logs()
+	_tough_luz()
+	await _put_luz(Vector2(-350.0, 0.0))
+	var low := _head(HydraHead.Kind.BITER)
+	_slash(_head(HydraHead.Kind.SWEEPER), 12)
+	await _secs(1.0)
+	_slash(_head(HydraHead.Kind.SPITTER), 12)
+	await _secs(1.0)
+	_slash(low, low.health - 1)
+	# The last head throws a (weaker) volley on spots far from Luz, who then walks up
+	# to the head and waits there for a puddle before the real killing blow.
+	_boss.start_attack(HydraBoss.Attack.VENOM_VOLLEY)
+	await _put_luz(Vector2(low.global_position.x - 40.0, -1.0))
+	var live := await _wait_for(func() -> bool: return _boss.get_active_venoms().any(func(v: HydraVenom) -> bool: return v.is_pool()), 5.0)
+	var pools := _boss.get_active_venoms()
+	var errors_before := _tap.errors.size()
+	check(live and low.health == 1, "a puddle is live while the last head has one health left")
+	_player.request_attack(0)
+	await _secs(0.5)
+	check(_boss.is_dead() and low.health == 0, "Luz's real slash lands the killing blow")
+	check(_boss.get_active_venoms().is_empty(), "the killing blow withdraws every puddle")
+	var still_watching := false
+	for venom: HydraVenom in pools:
+		still_watching = still_watching or venom.monitoring
+	check(not still_watching, "no released puddle keeps monitoring")
+	check(_tap.errors.size() == errors_before, "releasing the puddles from the hit logs no engine error (%s)" % str(_tap.errors))

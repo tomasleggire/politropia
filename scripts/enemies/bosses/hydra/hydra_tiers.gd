@@ -4,6 +4,10 @@ extends RefCounted
 ## The vertical map of the Hydra fight, read from the one-way platforms of the
 ## arena (group `hydra_platform`) instead of hardcoded heights, so a teammate can
 ## move the platforms and the heads, the sweep bands and the venom spots follow.
+## The boss scopes the scan to the `Platforms` node of its own arena, so a second
+## Hydra arena in the same scene never mixes its platforms in; the group is the
+## filter. A platform needs a rectangular child named `CollisionShape2D`: any other
+## one is skipped with a warning.
 ##
 ## A level is the y of a standing surface: the floor plus every distinct platform
 ## top, ordered from the floor upwards. The three heads sit at the lowest level,
@@ -22,17 +26,17 @@ var floor_y := 0.0
 
 var _tops: Array[Rect2] = []
 var _levels: Array[float] = []
+var _warned: Dictionary = {}
 
 
-## Re-reads the platforms in the scene tree. `new_floor_y` is the floor surface.
-func rebuild(tree: SceneTree, new_floor_y: float) -> void:
+## Re-reads the platforms. `new_floor_y` is the floor surface. With a `scope` only
+## its children in the group count; without one, the whole tree does.
+func rebuild(tree: SceneTree, new_floor_y: float, scope: Node = null) -> void:
 	floor_y = new_floor_y
 	_tops.clear()
 	_levels.clear()
 	_levels.append(floor_y)
-	if tree == null:
-		return
-	for node: Node in tree.get_nodes_in_group(GROUP):
+	for node: Node in _candidates(tree, scope):
 		var top := _top_rect(node)
 		if top.size.x <= 0.0:
 			continue
@@ -96,6 +100,17 @@ func surface_below(x: float, feet_y: float) -> float:
 	return best
 
 
+func _candidates(tree: SceneTree, scope: Node) -> Array[Node]:
+	var found: Array[Node] = []
+	if scope != null:
+		for child: Node in scope.get_children():
+			if child.is_in_group(GROUP):
+				found.append(child)
+	elif tree != null:
+		found.assign(tree.get_nodes_in_group(GROUP))
+	return found
+
+
 func _has_level(y: float) -> bool:
 	for level: float in _levels:
 		if absf(level - y) <= SAME_LEVEL:
@@ -107,7 +122,17 @@ func _has_level(y: float) -> bool:
 func _top_rect(node: Node) -> Rect2:
 	var shape_node := node.get_node_or_null("CollisionShape2D") as CollisionShape2D
 	if shape_node == null or not (shape_node.shape is RectangleShape2D):
+		_warn_skipped(node)
 		return Rect2()
 	var size := (shape_node.shape as RectangleShape2D).size
 	var center := shape_node.global_position
 	return Rect2(center.x - size.x * 0.5, center.y - size.y * 0.5, size.x, size.y)
+
+
+## Once per platform: the boss rebuilds the tiers at every engage and reset.
+func _warn_skipped(node: Node) -> void:
+	var id := node.get_instance_id()
+	if _warned.has(id):
+		return
+	_warned[id] = true
+	push_warning("Hydra platform '%s' is ignored: it needs a RectangleShape2D child named 'CollisionShape2D'." % node.name)

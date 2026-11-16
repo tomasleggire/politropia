@@ -24,8 +24,8 @@ extends BossEnemy
 ## blow and the engage gate all stay in the base. The pool always equals the sum
 ## of the heads.
 ##
-## The platforms are discovered from the group `hydra_platform` (see HydraTiers),
-## so they can be moved freely. Hazards (venom, markers, hitboxes) live in the
+## The platforms are discovered from the group `hydra_platform` under the `Platforms`
+## node of the arena that holds this boss (see HydraTiers), so they can be moved freely. Hazards (venom, markers, hitboxes) live in the
 ## world beside the boss and are all removed by `_clear_hazards()`.
 
 enum Attack { BITE_LUNGE, VENOM_VOLLEY, NECK_SWEEP }
@@ -490,11 +490,23 @@ func _collect_heads() -> void:
 func _begin_layout() -> void:
 	if not is_inside_tree():
 		return
-	_tiers.rebuild(get_tree(), _spawn_position.y)
+	_tiers.rebuild(get_tree(), _spawn_position.y, _platforms_root())
 	for head: HydraHead in _heads:
 		head.rest_global = _rest_point(head)
 		if not head.is_severed():
 			head.snap_to(head.rest_global)
+
+
+## The `Platforms` node of the closest ancestor that has one (this boss's own
+## arena); null when the boss stands alone, which falls back to the whole tree.
+func _platforms_root() -> Node:
+	var host := get_parent()
+	while host != null:
+		var platforms := host.get_node_or_null("Platforms")
+		if platforms != null:
+			return platforms
+		host = host.get_parent()
+	return null
 
 
 func _rest_point(head: HydraHead) -> Vector2:
