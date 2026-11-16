@@ -1,0 +1,57 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/bosses/boss_enemy.gd" id="1_boss"]
+[ext_resource type="PackedScene" path="res://scenes/world/contact_damage.tscn" id="2_contact"]
+[ext_resource type="Script" path="res://scripts/enemies/bosses/boss_telegraph.gd" id="3_telegraph"]
+[ext_resource type="Script" path="res://scripts/enemies/bosses/screen_flash.gd" id="4_flash"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(26, 56)
+
+[node name="BossEnemy" type="CharacterBody2D"]
+collision_layer = 8
+collision_mask = 3
+script = ExtResource("1_boss")
+max_health = 30
+knockback_resistance = 1.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -28)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Visual" type="Node2D" parent="."]
+
+[node name="Body" type="Polygon2D" parent="Visual"]
+color = Color(0.7, 0.62, 0.78, 1)
+polygon = PackedVector2Array(-10, 0, 10, 0, 9, -20, 12, -38, 8, -50, 3, -56, -5, -56, -9, -48, -11, -34, -8, -20)
+
+[node name="ContactDamage" parent="." instance=ExtResource("2_contact")]
+
+[node name="Telegraph" type="Node2D" parent="."]
+script = ExtResource("3_telegraph")
+
+[node name="Sfx" type="Node2D" parent="."]
+
+[node name="Intro" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="PhaseChange" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="Stun" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="Flinch" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="Stagger" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="Defeat" type="AudioStreamPlayer2D" parent="Sfx"]
+
+[node name="FinalFlash" type="CanvasLayer" parent="."]
+layer = 100
+script = ExtResource("4_flash")
+
+[node name="Rect" type="ColorRect" parent="FinalFlash"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0)

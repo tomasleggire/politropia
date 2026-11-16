@@ -34,7 +34,7 @@ Audience: level designers. One scene gives you a complete Artemis fight.
 - She **stays dead for the whole run, as a corpse where she fell.** A desk rest, Luz dying, or leaving and coming back never revives her, and the corpse has no collision, no contact damage and gives no soul.
 - If Luz leaves before taking the pickup, it **appears again** the next time the arena loads, until it is claimed. A reload can never lose the double jump.
 - `BossProgress` (autoload) holds all of this per boss: defeated, where the corpse lies, reward claimed.
-- **Save system note:** the project has no disk save yet. When one exists, save `BossProgress.to_dict()` and `AbilityProgress.to_dict()` together and restore both with `from_dict()`. `AbilityProgress` (autoload) is what keeps the double jump when Luz changes zone: every zone has its own Player node, which restores the ability in `_ready`. Out of sync they can softlock the zone.
+- **Persistence:** `SaveService` writes `BossProgress.to_dict()` and `AbilityProgress.to_dict()` together in the same save and restores both with `from_dict()`, so a defeated boss and a claimed double jump survive a reload. `AbilityProgress` (autoload) is what keeps the double jump when Luz changes zone: every zone has its own Player node, which restores the ability in `_ready`. Out of sync they can softlock the zone.
 
 ## Test it
 
@@ -53,3 +53,12 @@ The fight lives in a Greece room built with the zone tiles (floor, walls, ceilin
 - The prefab sits at the floor line, in the middle of the room. The top row of every surface tile has no collision, so the real floor and walls start one tile (8 px) inside the drawn ones: place the arena on the collision floor.
 - `DemoEndToast` (`scenes/world/demo_end_toast.tscn`) shows "Fin de la demo / Gracias por jugar" after Luz takes the double jump. Turn `Enabled` off to remove it.
 - Headless coverage: `tests/artemis_room_test.gd` (room contents, tiles closing the arena, door pairing, one double jump, the end toast, reload, new game).
+
+## Building a new boss
+
+Other bosses extend `BossEnemy` (`scripts/enemies/bosses/boss_enemy.gd`), the shared base. Full guide: `docs/bosses/BOSS_ENEMY.md`. Short recipe:
+
+1. Inherit `scenes/enemies/bosses/boss_enemy.tscn` and attach a script that `extends BossEnemy`.
+2. Wrap it: new scene inheriting `scenes/enemies/bosses/boss_arena.tscn`, boss as a child, then set `boss_name`, a **unique** `enemy_id` (BossProgress is global for the whole run) and `reward_enabled = false` unless the boss really grants the double jump.
+3. Only `ArtemisBoss` ends the game (`BossArena._is_final_boss()`); any other boss opens the arena and the level music comes back.
+4. Phase notches: the bar draws a notch at `phase_two_threshold` (the first entry of `phase_thresholds`) and one more for each further entry when there are more than two phases.
