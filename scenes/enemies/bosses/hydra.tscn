@@ -1,0 +1,53 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/enemies/bosses/boss_enemy.tscn" id="1_base"]
+[ext_resource type="Script" path="res://scripts/enemies/bosses/hydra_boss.gd" id="2_boss"]
+[ext_resource type="Script" path="res://scripts/enemies/bosses/hydra/hydra_head.gd" id="3_head"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(96, 140)
+
+[node name="Hydra" instance=ExtResource("1_base")]
+script = ExtResource("2_boss")
+max_health = 36
+phase_thresholds = PackedFloat32Array(0.667, 0.333)
+phases_from_health = false
+phase_transition_time = 1.2
+super_armor = true
+stagger_hits = 0
+defeat_time = 1.2
+start_facing = -1
+
+[node name="CollisionShape2D" parent="." index="0"]
+position = Vector2(0, -70)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Body" parent="Visual" index="0"]
+color = Color(0.2, 0.34, 0.3, 1)
+polygon = PackedVector2Array(-54, 0, 54, 0, 50, -50, 38, -100, 20, -140, -10, -152, -34, -130, -50, -90, -58, -40)
+
+[node name="Heads" type="Node2D" parent="."]
+
+[node name="LowHead" type="Area2D" parent="Heads"]
+script = ExtResource("3_head")
+kind = 0
+tier = 0
+rest_dx = -190.0
+shoulder = Vector2(-46, -30)
+head_color = Color(0.85, 0.27, 0.25, 1)
+
+[node name="MidHead" type="Area2D" parent="Heads"]
+script = ExtResource("3_head")
+kind = 2
+tier = 1
+rest_dx = -190.0
+shoulder = Vector2(-46, -72)
+head_color = Color(0.58, 0.4, 0.9, 1)
+
+[node name="HighHead" type="Area2D" parent="Heads"]
+script = ExtResource("3_head")
+kind = 1
+tier = 2
+rest_dx = -190.0
+shoulder = Vector2(-46, -114)
+head_color = Color(0.4, 0.8, 0.3, 1)
