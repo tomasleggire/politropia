@@ -4,7 +4,7 @@ Contract: `docs/bosses/BOOMBOX_TEACHER_ANIMATIONS.md`. Approved design: `concept
 
 Eight Codex runs, one per raw sheet, in parallel, with the approved concept and `luz_identity_ref.png` as `-i`. Raw sheets go to `../raw/boombox_teacher_<sheet>_raw.png`; `tools/process_boombox_teacher_sheets.py` keys the magenta, splits frames by connected components per grid cell, applies one scale, aligns the lowest sole on the feet row and writes `assets/enemies/boombox_teacher/`.
 
-All sheets are 1536x1024: 4 columns x 2 rows of 384x512 cells, except `thrust` (3 x 2 cells of 512x512). Every character sheet asks for the same standing height (about 360 raw px, sole to the top of the boombox), but Codex does not keep it (about 370 to 445 px in practice), so the processing script scales each sheet by the size of the boombox head (see ).
+All sheets are 1536x1024: 4 columns x 2 rows of 384x512 cells, except `thrust` (3 x 2 cells of 512x512). Every character sheet asks for the same standing height (about 360 raw px, sole to the top of the boombox), but Codex does not keep it (about 370 to 445 px in practice), so the processing script scales each sheet by the size of the boombox head (see `tools/process_boombox_teacher_sheets.py`).
 
 | Raw sheet | Grid | Clips (raw cell indices) |
 |---|---|---|
@@ -103,7 +103,7 @@ Run from a scratch directory, never from the repository. Generated PNGs land in 
 
 ## Batch 2: hazards and effects
 
-Two more Codex runs with the same  images, after the first in-game capture showed the hazards still drawn as placeholder boxes. Raw files:  (one blank blackboard; the game writes the dictation text on it) and  (4x2 cells of 384x512:  0,  1,  2,  3,  4-7).
+Two more Codex runs with the same `-i` images, after the first in-game capture showed the hazards still drawn as placeholder boxes. Raw files: `../raw/boombox_teacher_blackboard_raw.png` (one blank blackboard; the game writes the dictation text on it) and `../raw/boombox_teacher_fx_raw.png` (4x2 cells of 384x512: `wave_low` 0, `wave_high` 1, `bass_shock` 2, `chalk_dust` 3, `steam` 4-7).
 
 ### Blackboard prompt
 
