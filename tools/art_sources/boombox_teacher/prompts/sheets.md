@@ -4,7 +4,7 @@ Contract: `docs/bosses/BOOMBOX_TEACHER_ANIMATIONS.md`. Approved design: `concept
 
 Eight Codex runs, one per raw sheet, in parallel, with the approved concept and `luz_identity_ref.png` as `-i`. Raw sheets go to `../raw/boombox_teacher_<sheet>_raw.png`; `tools/process_boombox_teacher_sheets.py` keys the magenta, splits frames by connected components per grid cell, applies one scale, aligns the lowest sole on the feet row and writes `assets/enemies/boombox_teacher/`.
 
-All sheets are 1536x1024: 4 columns x 2 rows of 384x512 cells, except `thrust` (3 x 2 cells of 512x512). Every character sheet asks for the same standing height (about 360 raw px, sole to the top of the boombox), so one scale fits all.
+All sheets are 1536x1024: 4 columns x 2 rows of 384x512 cells, except `thrust` (3 x 2 cells of 512x512). Every character sheet asks for the same standing height (about 360 raw px, sole to the top of the boombox), but Codex does not keep it (about 370 to 445 px in practice), so the processing script scales each sheet by the size of the boombox head (see ).
 
 | Raw sheet | Grid | Clips (raw cell indices) |
 |---|---|---|
@@ -100,3 +100,27 @@ Run from a scratch directory, never from the repository. Generated PNGs land in 
 > Cell 6 = two beamed sixteenth notes, same style, about 80 px tall.
 > Cell 7 = a small puff of steam: three soft round cel-shaded lobes, light grey and white, about 90 px wide.
 > Cell 8 = a spark burst: a small jagged six-point star, amber and white, about 70 px wide.
+
+## Batch 2: hazards and effects
+
+Two more Codex runs with the same  images, after the first in-game capture showed the hazards still drawn as placeholder boxes. Raw files:  (one blank blackboard; the game writes the dictation text on it) and  (4x2 cells of 384x512:  0,  1,  2,  3,  4-7).
+
+### Blackboard prompt
+
+> Generate an image with your built-in image generation tool from the following prompt. Do not create or modify any file. Prompt:
+>
+> Prop sprite for EL PROFESOR, the boombox-headed English teacher boss of a 2D side-scrolling metroidvania. The FIRST attached image is his approved character design, the SECOND is the player character Luz: draw the prop in exactly their rendering style: illustrated pixel-styled look, thick uniform dark outline #1A1410, cel shading with 2-3 value steps, big flat colour shapes, slightly painterly texture. No glow, no rim light.
+> Object: one classroom BLACKBOARD seen straight from the front, wide landscape shape about 3.4 times wider than tall, filling most of the image width: a dark green slate (#1F3A2E with a slightly lighter worn area #2C4A3B and faint old chalk smudges), a light warm wooden frame (#B98A55 with shadow #7E5A35) about one twentieth of the board height thick, a narrow wooden chalk tray along the bottom edge with two short white chalk sticks and a small felt eraser. The slate is BLANK: no writing, no letters, no drawings. Centered in the image, nothing else.
+> Image 1536x1024, landscape. Flat opaque magenta #FF00FF background everywhere around the board, no shadow, no text, no labels, no frame around the image.
+
+### Effects prompt
+
+> Generate an image with your built-in image generation tool from the following prompt. Do not create or modify any file. Prompt:
+>
+> Effect sprite sheet for EL PROFESOR, the boombox-headed teacher boss of a 2D side-scrolling metroidvania whose attacks follow a musical beat. The FIRST attached image is his approved character design, the SECOND is the player character Luz: draw every effect in exactly their rendering style: illustrated pixel-styled look, thick uniform dark outline #1A1410, cel shading with 2-3 value steps, big flat colour shapes. No soft glow, no blur, no gradients beyond the cel steps.
+> Image 1536x1024, landscape, grid of 4 columns x 2 rows (8 equal cells of 384x512, reading order left-to-right, top-to-bottom). Each effect alone and centred in its cell, fully inside it with at least 24 px padding. Flat opaque magenta #FF00FF background everywhere, no character, no text, no labels, no grid lines, no frames.
+> Cell 1 = LOW SOUND WAVE: three nested curved arcs like ")))" travelling to the right, warm AMBER (#F2A33A, light #FFD27A, shadow #B4651E), each arc thick and chunky, about 120 px tall and 110 px wide in total.
+> Cell 2 = HIGH SOUND WAVE: the same three nested arcs ")))" but cool CYAN (#4FC3E8, light #A8ECFF, shadow #2479A0), same size.
+> Cell 3 = BASS SHOCK CREST: a wide, low ground shockwave crest seen from the side, an amber wave of cracked energy hugging the floor line, about 300 px wide and 90 px tall, flat bottom edge.
+> Cell 4 = CHALK DUST PUFF: a small burst of white chalk dust, three or four round cel-shaded lobes, white and pale grey, about 110 px wide.
+> Cells 5-8 = STEAM LOOP (4 frames): a puff of grey-white steam rising and dissolving: 5 a small round puff, 6 bigger and rising, 7 biggest with lobes separating, 8 thin wisps breaking apart; about 100 to 150 px wide, round cel-shaded lobes, light grey #D9D6D2 and white with grey shadow #9C9893.
