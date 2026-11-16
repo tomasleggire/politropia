@@ -98,6 +98,36 @@ const FAR_AWAY := 1.0e9
 ## Closing in on a noise spot by less than this (px) is not progress.
 const TUNNEL_PROGRESS_STEP := 0.5
 
+## Art. Clip names are the contract of docs/bosses/BLIND_BEAST_ANIMATIONS.md.
+const MIN_CLIP_TIME := 0.05
+## The slam frame outlives the first moments of the pulse: it is held, never a timer.
+const SLAM_STRIKE_TIME := 0.3
+const PLACEHOLDERS: Array[String] = ["Body", "Nose", "Claws"]
+const CLIP_SPEEDS := {
+	"exposed_idle": 8.0, "dazed": 8.0, "emerge": 12.0, "dig_in": 12.0,
+	"claw_windup": 12.0, "claw_strike": 12.0, "claw_recover": 12.0,
+	"slam_windup": 12.0, "slam_strike": 12.0, "phase_change": 8.0, "intro": 8.0, "defeat": 8.0,
+}
+## Clips that repeat; every other clip plays once and holds its last frame.
+const LOOPING_CLIPS := ["exposed_idle", "dazed"]
+## Contract clip -> candidates, closest first, for a clip with no art yet (then `exposed_idle`).
+const CLIP_FALLBACKS := {
+	"claw_windup": ["slam_windup"], "claw_strike": ["claw_windup"], "claw_recover": ["claw_strike"],
+	"slam_windup": ["claw_windup"], "slam_strike": ["slam_windup"],
+}
+## Hazard art, in px on screen: the mound is this wide, the pulse and the rocks fit these boxes.
+const MOUND_ART_WIDTH := 40.0
+const PULSE_ART_SIZE := Vector2(40.0, 24.0)
+const ROCK_ART_FACTOR := 1.8
+const ROCK_SPIN := 6.0
+const DUST_WIDTH := 40.0
+const CRACK_MIN_ALPHA := 0.35
+
+@export_group("Art")
+## The animation manifest of his sprite sheets. Without it (or without its sheets) he
+## keeps the placeholder polygons.
+@export_file("*.json") var animation_manifest := "res://assets/enemies/blind_beast/animation_manifest.json"
+
 @export_group("Noise")
 ## How many noise spots the beast remembers (a chain eruption walks through them).
 @export var noise_memory := 3
@@ -255,6 +285,19 @@ var _floor_y := 0.0
 var _field: Node2D
 var _overlay: CanvasLayer
 var _overlay_rect: ColorRect
+var _catalog: BossAnimationCatalog
+var _art_on := false
+var _sprite_scale := 1.0
+var _sprite_fx: BossSpriteFx
+var _hazard_art: BlindBeastHazardArt
+## The contract clip last requested through `_play` (not the fallback it resolved to).
+var _clip: StringName = &""
+## True while the drawn eruption shows him rising out of the ground (still untargetable).
+var _emerging := false
+## True while the intro clip shows him although he is burrowed.
+var _intro_shown := false
+
+@onready var _sprite: AnimatedSprite2D = get_node_or_null("Visual/AnimatedSprite2D") as AnimatedSprite2D
 
 
 ## One remembered loud spot (Luz's x). `answered` once an eruption went for it.
@@ -285,6 +328,7 @@ class Column extends RefCounted:
 
 ## A tossed rock: it flies `flight` seconds and lands at `landing_x` on the floor.
 class Rock extends RefCounted:
+	var alt := false
 	var origin := Vector2.ZERO
 	var landing_x := 0.0
 	var age := 0.0
@@ -312,6 +356,7 @@ func _ready() -> void:
 		return
 	_floor_y = global_position.y
 	_build_field()
+	_setup_sprite()
 	_set_contact(false)
 	if _dead:
 		_show_corpse()
@@ -456,6 +501,9 @@ func _tick(delta: float) -> void:
 	_update_columns(delta)
 	_update_rocks(delta)
 	_update_light(delta)
+	_update_intro_art()
+	_sync_sprite()
+	_sync_hazard_art()
 	if _field != null:
 		_field.queue_redraw()
 
@@ -589,6 +637,7 @@ func _clear_hazards() -> void:
 	_ripples.clear()
 	_rocks.clear()
 	_free_overlay()
+	_sync_hazard_art()
 	if _field != null:
 		_field.queue_redraw()
 
@@ -727,13 +776,15 @@ func _start_dig_in() -> void:
 	_digging = true
 	_dig_left = dig_in_time
 	_set_hittable(false)
+	_puff(BlindBeastHazardArt.DIG_DIRT, global_position.x)
 	play_cue(CUE_DIG)
 
 
 func _update_dig_in(delta: float) -> void:
 	_dig_left -= delta
 	var progress := 1.0 if dig_in_time <= 0.0 else 1.0 - clampf(_dig_left / dig_in_time, 0.0, 1.0)
-	if _visual != null:
+	# The drawn `dig_in` is already cut at the floor line: it must not sink as well.
+	if _visual != null and not _art_on:
 		_visual.position.y = dig_depth * progress
 	if _dig_left <= 0.0:
 		_digging = false
@@ -750,6 +801,8 @@ func _bury() -> void:
 
 
 func _hide_body() -> void:
+	_emerging = false
+	_intro_shown = false
 	if _visual != null:
 		_visual.visible = false
 		_visual.position.y = 0.0
@@ -759,6 +812,7 @@ func _surface() -> void:
 	var was_buried := not _exposed
 	_exposed = true
 	_digging = false
+	_emerging = false
 	if _visual != null:
 		_visual.visible = true
 		_visual.position.y = 0.0
@@ -775,6 +829,7 @@ func _surface_at(x: float) -> void:
 func _show_corpse() -> void:
 	_exposed = true
 	_digging = false
+	_emerging = false
 	_set_hittable(false)
 	if _visual != null:
 		_visual.visible = true
@@ -812,8 +867,10 @@ func _begin_active(attack_id: int) -> void:
 	match attack_id:
 		Attack.ERUPTION:
 			_burst_single()
+			_start_emerge()
 		Attack.DEBRIS_TOSS:
 			_burst_single()
+			_start_emerge()
 			_toss_debris(_attack_x)
 		Attack.PROBE, Attack.CHAIN_ERUPTION:
 			_seq_time = 0.0
@@ -942,6 +999,7 @@ func _spawn_column(x: float) -> void:
 	column.x = x
 	_columns.append(column)
 	_last_burst_x = x
+	_puff(BlindBeastHazardArt.DUST, x)
 	play_cue(CUE_ERUPT)
 	_shake(eruption_shake, 0.2)
 
@@ -1073,6 +1131,7 @@ func _toss_debris(center_x: float) -> void:
 	for i: int in maxi(debris_count, 0):
 		var rock := Rock.new()
 		var reach := debris_spread * float(1 + i / 2)
+		rock.alt = i % 2 == 1
 		rock.landing_x = clampf(center_x + side * reach, bounds.x + debris_radius, bounds.y - debris_radius)
 		rock.origin = origin
 		rock.flight = flight
@@ -1093,6 +1152,7 @@ func _update_rocks(delta: float) -> void:
 
 
 func _land_rock(rock: Rock) -> void:
+	_puff(BlindBeastHazardArt.ROCK_IMPACT, rock.landing_x)
 	var size := debris_radius * 2.0
 	if _rect_hits_luz(Rect2(rock.landing_x - debris_radius, _floor_y - size, size, size)):
 		_hurt_luz(debris_damage, Vector2(rock.landing_x, _floor_y))
@@ -1307,20 +1367,21 @@ func _draw_ripples(y: float) -> void:
 
 
 func _mound_visible() -> bool:
-	return show_mound and not _exposed and not _digging and not _dead
+	return show_mound and not _exposed and not _digging and not _dead and not _emerging
 
 
 func _draw_mound(y: float) -> void:
 	if not _mound_visible():
 		return
 	var moving := absf(velocity.x) > 1.0
-	var height := MOUND_HEIGHT + (sin(_clock * 12.0) * 1.5 if moving else 0.0)
-	var points := PackedVector2Array()
-	for i: int in MOUND_STEPS + 1:
-		var angle := PI + PI * float(i) / float(MOUND_STEPS)
-		points.append(Vector2(global_position.x + cos(angle) * MOUND_HALF_WIDTH, y + sin(angle) * height))
-	_field.draw_colored_polygon(points, DIRT_COLOR)
-	_field.draw_polyline(points, DIRT_DARK, 2.0)
+	if not _has_hazard_art(BoomboxEffectArt.PROPS, BlindBeastHazardArt.MOUND):
+		var height := MOUND_HEIGHT + (sin(_clock * 12.0) * 1.5 if moving else 0.0)
+		var points := PackedVector2Array()
+		for i: int in MOUND_STEPS + 1:
+			var angle := PI + PI * float(i) / float(MOUND_STEPS)
+			points.append(Vector2(global_position.x + cos(angle) * MOUND_HALF_WIDTH, y + sin(angle) * height))
+		_field.draw_colored_polygon(points, DIRT_COLOR)
+		_field.draw_polyline(points, DIRT_DARK, 2.0)
 	if moving:
 		var trail := -signf(velocity.x) * (MOUND_HALF_WIDTH + 6.0)
 		_field.draw_circle(Vector2(global_position.x + trail, y - 3.0), 3.0, DIRT_COLOR)
@@ -1329,11 +1390,14 @@ func _draw_mound(y: float) -> void:
 
 func _draw_cracks(y: float) -> void:
 	var half := column_size.x * 0.5
+	var crack_art := _has_hazard_art(BoomboxEffectArt.PROPS, BlindBeastHazardArt.CRACK)
 	for crack: Crack in _cracks:
 		var progress := clampf(crack.age / crack.dur, 0.0, 1.0)
 		var color := BossTelegraph.MELEE_COLOR
 		_field.draw_rect(Rect2(crack.x - half, y - FOOTPRINT_HEIGHT, half * 2.0, FOOTPRINT_HEIGHT), Color(color, 0.2 + 0.4 * progress))
 		_field.draw_rect(Rect2(crack.x - half, y - column_size.y, half * 2.0, column_size.y), Color(color, 0.1 + 0.2 * progress), false, 1.5)
+		if crack_art:
+			continue
 		var points := PackedVector2Array()
 		for i: int in CRACK_ZIGZAG.size():
 			var x := crack.x - half + half * 2.0 * float(i) / float(CRACK_ZIGZAG.size() - 1)
@@ -1342,6 +1406,8 @@ func _draw_cracks(y: float) -> void:
 
 
 func _draw_columns(y: float) -> void:
+	if _has_hazard_art(BoomboxEffectArt.FX, BlindBeastHazardArt.COLUMN):
+		return
 	for column: Column in _columns:
 		var rect := _column_rect(column)
 		var points := PackedVector2Array([
@@ -1370,6 +1436,8 @@ func _draw_ridge(y: float) -> void:
 	for slot: RidgeSlot in _ridge_slots:
 		var half := slot.width * 0.5
 		if slot.height > 0.0:
+			if _has_hazard_art(BoomboxEffectArt.PROPS, BlindBeastHazardArt.SPIKE):
+				continue
 			var top := y - ridge_spike_height * slot.height
 			_field.draw_colored_polygon(PackedVector2Array([Vector2(slot.x - half, y), Vector2(slot.x + half, y), Vector2(slot.x, top)]), Color(0.95, 0.9, 0.85))
 			_field.draw_polyline(PackedVector2Array([Vector2(slot.x - half, y), Vector2(slot.x, top), Vector2(slot.x + half, y)]), BossTelegraph.MELEE_COLOR, 3.0)
@@ -1396,6 +1464,8 @@ func _draw_rock_markers(y: float) -> void:
 
 
 func _draw_rocks() -> void:
+	if _has_hazard_art(BoomboxEffectArt.PROPS, BlindBeastHazardArt.ROCK):
+		return
 	for rock: Rock in _rocks:
 		var at := _rock_position(rock)
 		_field.draw_circle(at, debris_radius * 0.7, ROCK_COLOR)
@@ -1403,6 +1473,8 @@ func _draw_rocks() -> void:
 
 
 func _draw_pulses(y: float) -> void:
+	if _has_hazard_art(BoomboxEffectArt.FX, BlindBeastHazardArt.PULSE):
+		return
 	for pulse: Pulse in _pulses:
 		var trail := -float(pulse.dir) * 28.0
 		var points := PackedVector2Array([
@@ -1412,3 +1484,280 @@ func _draw_pulses(y: float) -> void:
 		])
 		_field.draw_colored_polygon(points, Color(BossTelegraph.RANGED_COLOR, 0.8))
 		_field.draw_polyline(PackedVector2Array([points[0], points[1], points[2]]), BossTelegraph.RANGED_COLOR, 3.0)
+
+
+## -- Sprite ---------------------------------------------------------------------------
+
+## Shows the sprite and hides the placeholder polygons when the manifest has art; with
+## none he looks exactly as before. The props and effects are independent of it: each
+## hazard dresses itself when its clip exists and keeps its placeholder when not.
+func _setup_sprite() -> void:
+	if _sprite == null:
+		return
+	_catalog = BossAnimationCatalog.new(animation_manifest, CLIP_FALLBACKS, CLIP_SPEEDS, LOOPING_CLIPS, &"exposed_idle")
+	_hazard_art = BlindBeastHazardArt.new(_catalog)
+	_art_on = _catalog.has_art()
+	_sprite.visible = _art_on
+	_set_placeholders_visible(not _art_on)
+	if not _art_on:
+		return
+	_sprite.sprite_frames = _catalog.build_sprite_frames()
+	_sprite.offset = _catalog.sprite_offset()
+	_sprite_scale = _catalog.sprite_scale()
+	_visual.move_child(_sprite, 0)
+	_bind_sprite_fx()
+	_clip = &""
+	_apply_visual()
+
+
+func _set_placeholders_visible(on: bool) -> void:
+	for node_name: String in PLACEHOLDERS:
+		var node := _visual.get_node_or_null(node_name) as CanvasItem if _visual != null else null
+		if node != null:
+			node.visible = on
+
+
+## The hit flash and the telegraph glow are drawn by a shader on the sprite itself, so
+## they follow its exact silhouette; the polygon overlays stay hidden.
+func _bind_sprite_fx() -> void:
+	_sprite_fx = BossSpriteFx.new(_sprite)
+	if _flash != null:
+		_flash.visible = false
+	if _telegraph != null:
+		_telegraph.bind_sprite_fx(_sprite_fx)
+
+
+## With art the flash is the sprite's own; without it, the white polygon as always.
+func _set_flash_visible(visible_now: bool) -> void:
+	if _sprite_fx != null:
+		_sprite_fx.set_flash(visible_now)
+		return
+	super._set_flash_visible(visible_now)
+
+
+## True while the hit flash shows, on the sprite or on the placeholder.
+func is_flash_visible() -> bool:
+	if _sprite_fx != null:
+		return _sprite_fx.is_flashing()
+	return _flash != null and _flash.visible
+
+
+func has_art() -> bool:
+	return _art_on
+
+
+## The contract clip last requested.
+func get_clip() -> StringName:
+	return _clip
+
+
+func _apply_visual() -> void:
+	super._apply_visual()
+	_cancel_visual_pose()
+	_sync_sprite()
+
+
+## The drawn clips already carry the slump of the corpse, so the sprite undoes `Visual`'s
+## tilt and squash; only the facing flip is left on it.
+func _cancel_visual_pose() -> void:
+	if not _art_on or _visual == null:
+		return
+	var pose := Transform2D(_visual.rotation, _visual.scale, 0.0, Vector2.ZERO)
+	var wanted := Transform2D(0.0, Vector2(_visual.scale.x, 1.0), 0.0, Vector2.ZERO)
+	var basis := pose.affine_inverse() * wanted
+	_sprite.transform = Transform2D(basis.x * _sprite_scale, basis.y * _sprite_scale, _sprite.position)
+
+
+func _has_clip(clip: StringName) -> bool:
+	return _art_on and _sprite.sprite_frames.has_animation(clip)
+
+
+## Plays the contract clip `clip` (or the closest drawn one) stretched to last
+## `duration` seconds (0: default speed). A corpse restored from an earlier run shows
+## the last frame at once.
+func _play(clip: StringName, duration := 0.0) -> void:
+	if not _art_on:
+		return
+	_clip = clip
+	var resolved := _catalog.resolve_clip(clip)
+	if resolved.is_empty():
+		return
+	var frames := _sprite.sprite_frames
+	var count := frames.get_frame_count(resolved)
+	var fps := frames.get_animation_speed(resolved)
+	var fit := 1.0
+	if duration > 0.0 and count > 0 and fps > 0.0:
+		fit = (float(count) / fps) / duration
+	_sprite.play(resolved, fit)
+	if _state == State.DEFEATED and _defeat_left <= 0.0:
+		_sprite.pause()
+		_sprite.frame = count - 1
+
+
+## Picks the clip for what the state machine is doing and plays it when it changes. A
+## pure read of the logic: no state or timer is touched.
+func _sync_sprite() -> void:
+	# A new attack enters ATTACK before its first phase opens: its timers are stale.
+	if not _art_on or (_state == State.ATTACK and not _attack_open):
+		return
+	var request := _clip_request()
+	if request[0] != _clip:
+		_play(request[0], request[1])
+
+
+## [clip, duration] for the current state; duration 0 plays at the clip's own speed.
+func _clip_request() -> Array:
+	match _state:
+		State.DEFEATED:
+			return [&"defeat", defeat_time]
+		State.STUN:
+			return [&"dazed", 0.0]
+		State.TRANSITION:
+			return [&"phase_change", phase_transition_time]
+		State.ATTACK:
+			return _attack_clip_request()
+		State.IDLE:
+			if _intro_left > 0.0:
+				return [&"intro", _intro_left]
+		State.FIGHT:
+			if _digging:
+				return [&"dig_in", dig_in_time]
+	return [&"exposed_idle", 0.0]
+
+
+func _attack_clip_request() -> Array:
+	match _attack:
+		Attack.CLAW_COUNTER:
+			match _attack_phase:
+				AttackPhase.TELEGRAPH:
+					return [&"claw_windup", maxf(_telegraph_time(_attack), MIN_CLIP_TIME)]
+				AttackPhase.ACTIVE:
+					return [&"claw_strike", maxf(claw_active_time, MIN_CLIP_TIME)]
+			return [&"claw_recover", maxf(_state_left, MIN_CLIP_TIME)]
+		Attack.TREMOR_PULSE:
+			match _attack_phase:
+				AttackPhase.TELEGRAPH:
+					return [&"slam_windup", maxf(_telegraph_time(_attack), MIN_CLIP_TIME)]
+				AttackPhase.ACTIVE:
+					return [&"slam_strike", SLAM_STRIKE_TIME]
+		Attack.ERUPTION, Attack.DEBRIS_TOSS:
+			if _attack_phase == AttackPhase.ACTIVE and _emerging:
+				return [&"emerge", maxf(column_active_time, MIN_CLIP_TIME)]
+	return [&"exposed_idle", 0.0]
+
+
+## The drawn eruption shows him rising through the column. He is still burrowed for the
+## rules (`is_burrowed`, untargetable): only the picture changes.
+func _start_emerge() -> void:
+	if not _has_clip(&"emerge") or _visual == null:
+		return
+	_emerging = true
+	_visual.visible = true
+	_visual.position.y = 0.0
+
+
+## The intro clip shows the old man turning into the beast although he is burrowed; when
+## the intro is over he goes under again.
+func _on_intro(_duration: float) -> void:
+	if _dead or not _has_clip(&"intro") or _visual == null:
+		return
+	_intro_shown = true
+	_visual.visible = true
+
+
+func _update_intro_art() -> void:
+	if _intro_shown and _intro_left <= 0.0:
+		_intro_shown = false
+		if not _exposed:
+			_hide_body()
+
+
+## -- Hazard art -------------------------------------------------------------------------
+
+func _has_hazard_art(key: String, clip: StringName) -> bool:
+	return _hazard_art != null and _hazard_art.has_clip(key, clip)
+
+
+## One sprite per live hazard that has art; the placeholders of the others stay.
+func _sync_hazard_art() -> void:
+	if _hazard_art == null or _field == null:
+		return
+	var mound: Array = [self] if _mound_visible() else []
+	_hazard_art.sync(_field, &"mound", mound, _make_mound, _place_mound)
+	_hazard_art.sync(_field, &"crack", _cracks, _make_crack, _place_crack)
+	_hazard_art.sync(_field, &"column", _columns, _make_column, _place_column)
+	_hazard_art.sync(_field, &"spike", _rising_slots(), _make_spike, _place_spike)
+	_hazard_art.sync(_field, &"rock", _rocks, _make_rock, _place_rock)
+	_hazard_art.sync(_field, &"pulse", _pulses, _make_pulse, _place_pulse)
+
+
+## The braille slots that are spikes right now (the flat and telegraphed ones are drawn).
+func _rising_slots() -> Array:
+	return _ridge_slots.filter(func(slot: RidgeSlot) -> bool: return slot.raised and slot.height > 0.0)
+
+
+func _make_mound(_item: Variant) -> AnimatedSprite2D:
+	return _hazard_art.fit_sprite(BoomboxEffectArt.PROPS, BlindBeastHazardArt.MOUND, Vector2(MOUND_ART_WIDTH, MOUND_ART_WIDTH), BoomboxHazard.ArtFit.WIDTH)
+
+
+func _place_mound(_item: Variant, sprite: AnimatedSprite2D) -> void:
+	_hazard_art.stand_on_floor(sprite, BoomboxEffectArt.PROPS, BlindBeastHazardArt.MOUND, global_position.x, _floor_y)
+
+
+func _make_crack(_item: Variant) -> AnimatedSprite2D:
+	return _hazard_art.fit_sprite(BoomboxEffectArt.PROPS, BlindBeastHazardArt.CRACK, Vector2(column_size.x, column_size.x), BoomboxHazard.ArtFit.WIDTH)
+
+
+## The crack opens as the warning runs down; the floor footprint under it keeps its red.
+func _place_crack(crack: Crack, sprite: AnimatedSprite2D) -> void:
+	_hazard_art.stand_on_floor(sprite, BoomboxEffectArt.PROPS, BlindBeastHazardArt.CRACK, crack.x, _floor_y)
+	sprite.modulate.a = lerpf(CRACK_MIN_ALPHA, 1.0, clampf(crack.age / crack.dur, 0.0, 1.0))
+
+
+func _make_column(_item: Variant) -> AnimatedSprite2D:
+	return _hazard_art.fit_sprite(BoomboxEffectArt.FX, BlindBeastHazardArt.COLUMN, column_size, BoomboxHazard.ArtFit.STRETCH)
+
+
+## The art fills the box that hurts, rising with it, and follows the column's own clock.
+func _place_column(column: Column, sprite: AnimatedSprite2D) -> void:
+	var rect := _column_rect(column)
+	sprite.scale = BoomboxHazard.art_scale(_hazard_art.art_size(BoomboxEffectArt.FX, BlindBeastHazardArt.COLUMN), rect.size, BoomboxHazard.ArtFit.STRETCH)
+	sprite.position = rect.get_center()
+	_hazard_art.show_progress(sprite, column.age / maxf(column_active_time, 0.001))
+
+
+func _make_spike(_item: Variant) -> AnimatedSprite2D:
+	return _hazard_art.fit_sprite(BoomboxEffectArt.PROPS, BlindBeastHazardArt.SPIKE, Vector2.ONE, BoomboxHazard.ArtFit.STRETCH)
+
+
+## The spike fills the box that hurts (`SPIKE_HIT_SHARE` of the slot wide, as tall as it is raised).
+func _place_spike(slot: RidgeSlot, sprite: AnimatedSprite2D) -> void:
+	var box := Vector2(slot.width * SPIKE_HIT_SHARE, ridge_spike_height * slot.height)
+	sprite.scale = BoomboxHazard.art_scale(_hazard_art.art_size(BoomboxEffectArt.PROPS, BlindBeastHazardArt.SPIKE), box, BoomboxHazard.ArtFit.STRETCH)
+	sprite.position = Vector2(slot.x, _floor_y - box.y * 0.5)
+
+
+func _make_rock(rock: Rock) -> AnimatedSprite2D:
+	var clip := BlindBeastHazardArt.ROCK_ALT if rock.alt and _has_hazard_art(BoomboxEffectArt.PROPS, BlindBeastHazardArt.ROCK_ALT) else BlindBeastHazardArt.ROCK
+	return _hazard_art.fit_sprite(BoomboxEffectArt.PROPS, clip, Vector2.ONE * debris_radius * ROCK_ART_FACTOR, BoomboxHazard.ArtFit.CONTAIN)
+
+
+func _place_rock(rock: Rock, sprite: AnimatedSprite2D) -> void:
+	sprite.position = _rock_position(rock)
+	sprite.rotation = rock.age * ROCK_SPIN
+
+
+func _make_pulse(pulse: Pulse) -> AnimatedSprite2D:
+	return _hazard_art.fit_sprite(BoomboxEffectArt.FX, BlindBeastHazardArt.PULSE, PULSE_ART_SIZE, BoomboxHazard.ArtFit.STRETCH, pulse.dir < 0)
+
+
+## The ripple travels along the floor, opening to the side it moves to.
+func _place_pulse(pulse: Pulse, sprite: AnimatedSprite2D) -> void:
+	_hazard_art.stand_on_floor(sprite, BoomboxEffectArt.FX, BlindBeastHazardArt.PULSE, pulse.x, _floor_y)
+
+
+## A one-shot dust, dirt or rock puff on the floor at `x` (nothing without that art).
+func _puff(clip: StringName, x: float) -> void:
+	if _hazard_art == null or _field == null or not _has_hazard_art(BoomboxEffectArt.FX, clip):
+		return
+	_hazard_art.puff(_field, BoomboxEffectArt.FX, clip, Vector2(x, _floor_y), DUST_WIDTH)

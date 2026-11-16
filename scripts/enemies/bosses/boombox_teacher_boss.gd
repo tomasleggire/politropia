@@ -1290,7 +1290,7 @@ func _bind_sprite_fx() -> void:
 ## them when they exist and keeps its placeholder when not.
 func _setup_effect_art() -> void:
 	_effects = BoomboxEffectArt.new(_catalog)
-	_steam_sprite = _effects.sprite(BoomboxEffectArt.FX, &"steam", Vector2.ONE * (STEAM_ART_WIDTH / maxf(_effects.content(BoomboxEffectArt.FX, &"steam").x, 1.0)))
+	_steam_sprite = _effects.sprite(BoomboxEffectArt.FX, &"steam", Vector2.ONE * (STEAM_ART_WIDTH / maxf(_effects.art_size(BoomboxEffectArt.FX, &"steam").x, 1.0)))
 	if _steam_sprite == null:
 		return
 	_steam_sprite.position = STEAM_ART_POSITION

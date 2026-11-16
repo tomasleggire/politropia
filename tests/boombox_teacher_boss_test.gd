@@ -85,6 +85,7 @@ const CHECKS := {
 	"case_art_scale_relation": 6,
 	"case_art_hazards_wear_the_sprites": 17,
 	"case_art_steam_over_the_boombox": 6,
+	"case_art_effects_without_a_content_box": 7,
 	"case_art_dictation_on_chalk": 11,
 	"case_art_absent_hazards_stay_placeholders": 7,
 }
@@ -1683,6 +1684,32 @@ func case_art_hazards_wear_the_sprites() -> void:
 	check(sparks.size() == 1 and sparks[0].scale.x * 80.0 <= BoomboxTeacherBoss.SPARK_WIDTH + 0.01, "a spark punctuates the slam")
 	await _wait(1.0)
 	check(_puffs(&"spark").is_empty(), "the spark frees itself")
+	_remove_art_fixture()
+
+
+## A clip the manifest gives no content box scales from one cell, never from "1 px" or "scale 1",
+## so a missing box can no longer blow the art up past the hazard it dresses.
+func case_art_effects_without_a_content_box() -> void:
+	_write_art_fixture()
+	var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ART_MANIFEST))
+	for key: String in ["props", "fx"]:
+		(manifest[key] as Dictionary).erase("content")
+	FileAccess.open(ART_MANIFEST, FileAccess.WRITE).store_string(JSON.stringify(manifest))
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(2)
+	var effects := BoomboxEffectArt.new(BossAnimationCatalog.new(ART_MANIFEST))
+	var cell := Vector2.ONE * float(ART_CELL)
+	check(effects.content(BoomboxEffectArt.PROPS, &"note") == Vector2.ZERO, "the manifest names no content box")
+	check(effects.art_size(BoomboxEffectArt.PROPS, &"note") == cell, "the size falls back to one cell")
+	check(effects.art_size(BoomboxEffectArt.PROPS, &"missing") == Vector2.ZERO, "a clip that does not exist has no size")
+	var node := effects.fit_sprite(BoomboxEffectArt.PROPS, &"note", Vector2(20.0, 20.0), BoomboxHazard.ArtFit.CONTAIN)
+	check(node != null and node.scale.is_equal_approx(Vector2.ONE * 5.0), "a sprite fits its box from the cell size")
+	node.free()
+	var puff := effects.puff(_rig, BoomboxEffectArt.FX, &"chalk_dust", Vector2.ZERO, 30.0)
+	check(puff != null and absf(puff.scale.x * float(ART_CELL) - 30.0 * BoomboxEffectArt.PUFF_START_SCALE) < 0.01, "a puff starts at its width, not 30 times it")
+	var steam := _boss._steam_sprite
+	check(steam != null and absf(steam.scale.x * float(ART_CELL) - BoomboxTeacherBoss.STEAM_ART_WIDTH) < 0.01, "the steam is its width without a box too")
+	check(effects.floor_sprites(BoomboxEffectArt.FX, &"bass_shock", Vector2(240.0, 34.0)).is_empty(), "a floor strip with no box keeps its placeholder")
 	_remove_art_fixture()
 
 

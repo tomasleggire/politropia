@@ -29,6 +29,18 @@ const ARENA_TIMINGS := {
 	"camera_blend_time": 0.0, "defeat_beat": 0.2,
 }
 
+const ART_DIR := "user://blind_beast_art_fixture"
+const ART_MANIFEST := ART_DIR + "/animation_manifest.json"
+const NO_ART_MANIFEST := ART_DIR + "/missing.json"
+const ART_CELL := 4
+const ART_COLUMNS := 4
+## Content boxes (sheet px) the fixture manifest declares for the hazard clips, and the
+## frames of the clips that have more than one.
+const FIXTURE_PROPS := {"mound": [120, 60], "rock": [80, 80], "rock_alt": [90, 70], "crack": [160, 40], "spike": [60, 200]}
+const FIXTURE_FX := {"erupt_column": [150, 300], "pulse_wave": [120, 70], "dust_puff": [100, 80], "rock_impact": [100, 80], "dig_dirt": [100, 80]}
+const FIXTURE_FRAMES := {"mound": 4, "erupt_column": 3, "pulse_wave": 2}
+const PLACEHOLDER_NODES := ["Visual/Body", "Visual/Nose", "Visual/Claws"]
+
 const CHECKS := {
 	"case_prefab_one_drag": 7,
 	"case_noise_rules": 13,
@@ -56,6 +68,13 @@ const CHECKS := {
 	"case_ridge_fits_narrow_arena": 5,
 	"case_corpse_restored_on_reload": 12,
 	"case_corpse_made_before_entering_the_tree": 10,
+	"case_art_absent_keeps_the_placeholders": 12,
+	"case_art_shows_the_sprite_and_hides_when_burrowed": 20,
+	"case_art_clip_per_state": 19,
+	"case_art_glow_and_flash_on_the_sprite": 8,
+	"case_art_defeat_and_corpse_frame": 10,
+	"case_art_hazards_wear_the_sprites": 24,
+	"case_art_missing_effect_sheets_keep_placeholders": 6,
 }
 
 var checks := 0
@@ -1048,3 +1067,372 @@ func _check_inert_corpse() -> void:
 	_boss.start_attack(BlindBeastBoss.Attack.ERUPTION)
 	await _secs(0.5)
 	check(_boss.get_state() == BossEnemy.State.DEFEATED and _boss.get_attack() == BossEnemy.NO_ATTACK and _boss.hazard_count() == 0, "it never starts an attack")
+
+
+# -- Art (a fixture manifest, never the real sheets) -----------------------------------
+
+## A manifest with every contract clip as two frames of a tiny sheet, plus the props and
+## the fx the hazards wear.
+func _write_art_fixture(with_props := true, with_fx := true) -> void:
+	DirAccess.make_dir_recursive_absolute(ART_DIR)
+	var clips := {}
+	var next := 0
+	for clip_name: String in BlindBeastBoss.CLIP_SPEEDS:
+		clips[clip_name] = [next, next + 1]
+		next += 2
+	var rows := ceili(float(next) / float(ART_COLUMNS))
+	_save_white_sheet("fixture_sheet.png", rows)
+	var manifest := {
+		"cell": 448, "feet_row": 416, "sprite_scale": 0.2896,
+		"sheets": {"fixture_sheet.png": {
+			"grid": {"columns": ART_COLUMNS, "rows": rows, "cell_width": ART_CELL, "cell_height": ART_CELL},
+			"clips": clips, "events": {},
+		}},
+	}
+	if with_props:
+		manifest["props"] = _write_effect_sheet("fixture_props.png", FIXTURE_PROPS)
+	if with_fx:
+		manifest["fx"] = _write_effect_sheet("fixture_fx.png", FIXTURE_FX)
+	var file := FileAccess.open(ART_MANIFEST, FileAccess.WRITE)
+	file.store_string(JSON.stringify(manifest))
+
+
+func _save_white_sheet(file_name: String, rows: int) -> void:
+	var image := Image.create_empty(ART_COLUMNS * ART_CELL, rows * ART_CELL, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	image.save_png(ART_DIR.path_join(file_name))
+
+
+## A props or fx entry: one white cell per frame, and the declared content box of each clip.
+func _write_effect_sheet(file_name: String, content: Dictionary) -> Dictionary:
+	var clips := {}
+	var next := 0
+	for clip_name: String in content:
+		var count: int = FIXTURE_FRAMES.get(clip_name, 1)
+		clips[clip_name] = range(next, next + count)
+		next += count
+	var rows := ceili(float(next) / float(ART_COLUMNS))
+	_save_white_sheet(file_name, rows)
+	return {
+		"sheet": file_name, "sprite_scale": 0.2896, "clips": clips, "content": content,
+		"grid": {"columns": ART_COLUMNS, "rows": rows, "cell_width": ART_CELL, "cell_height": ART_CELL},
+	}
+
+
+func _remove_art_fixture() -> void:
+	if not DirAccess.dir_exists_absolute(ART_DIR):
+		return
+	for file_name: String in DirAccess.get_files_at(ART_DIR):
+		DirAccess.remove_absolute(ART_DIR.path_join(file_name))
+	DirAccess.remove_absolute(ART_DIR)
+
+
+func _with_manifest(path: String) -> Callable:
+	return func(boss: BlindBeastBoss) -> void:
+		boss.animation_manifest = path
+
+
+func _sprite() -> AnimatedSprite2D:
+	return _boss.get_node("Visual/AnimatedSprite2D") as AnimatedSprite2D
+
+
+## The speed the sprite plays `clip` at must make it last `duration` seconds.
+func _lasts(clip: StringName, duration: float, tolerance := 0.05) -> bool:
+	var frames := _sprite().sprite_frames
+	var wanted := (float(frames.get_frame_count(clip)) / frames.get_animation_speed(clip)) / duration
+	return _sprite().animation == clip and absf(_sprite().get_playing_speed() - wanted) <= tolerance * wanted
+
+
+## Seconds until the attack is in `phase` (false on timeout).
+func _until_phase(attack: int, phase: BossEnemy.AttackPhase, seconds := 4.0) -> bool:
+	return await _wait_until(func() -> bool: return _in_phase(attack, phase), seconds)
+
+
+## The live sprites of `clip` that hazards or puffs keep under the beast's hazard field.
+func _field_sprites(clip: StringName) -> Array[AnimatedSprite2D]:
+	var found: Array[AnimatedSprite2D] = []
+	for child: Node in _boss._field.get_children():
+		if child is AnimatedSprite2D and (child as AnimatedSprite2D).animation == clip and not child.is_queued_for_deletion():
+			found.append(child as AnimatedSprite2D)
+	return found
+
+
+func _content(sheet: Dictionary, clip: String) -> Vector2:
+	var box: Array = sheet[clip]
+	return Vector2(float(box[0]), float(box[1]))
+
+
+func case_art_absent_keeps_the_placeholders() -> void:
+	await _fight_rig(_with_manifest(NO_ART_MANIFEST))
+	check(not _boss.has_art(), "a manifest that does not exist means no art")
+	check(not _sprite().visible, "the sprite stays hidden without art")
+	check(_sprite().material == null, "the sprite has no glow shader without art")
+	for path: String in PLACEHOLDER_NODES:
+		check((_boss.get_node(path) as CanvasItem).visible, "%s is still drawn without art" % path)
+	_boss.stun(1.0)
+	await _frames(3)
+	check(_boss.get_clip() == &"", "no clip is requested without art")
+	check(_boss._hazard_art != null and _boss._hazard_art.sprite_count() == 0, "no hazard wears a sprite without art")
+	_boss.receive_hit(1, HIT_FROM, &"attack_1")
+	check(_boss.is_flash_visible() and _boss._flash.visible, "a hit flashes the white polygon as before")
+	await _secs(_boss.flash_time + 0.1)
+	_boss.start_attack(BlindBeastBoss.Attack.TREMOR_PULSE)
+	await _frames(3)
+	check(_boss.get_telegraph()._glow.visible, "the telegraph glows on the polygon as before")
+	var shape := _boss.get_node("CollisionShape2D") as CollisionShape2D
+	check((shape.shape as RectangleShape2D).size == Vector2(40.0, 64.0), "the body collision covers the drawn height")
+	check(shape.position == Vector2(0.0, -32.0), "the body collision is centred on the torso")
+
+
+func case_art_shows_the_sprite_and_hides_when_burrowed() -> void:
+	_write_art_fixture()
+	await _fight_rig(_with_manifest(ART_MANIFEST))
+	var sprite := _sprite()
+	check(_boss.has_art(), "a manifest with the default clip means art")
+	check(sprite.visible, "the sprite shows")
+	for path: String in PLACEHOLDER_NODES:
+		check(not (_boss.get_node(path) as CanvasItem).visible, "%s is hidden with art" % path)
+	check(sprite.offset == Vector2(0.0, -192.0), "the offset puts the feet row on the origin")
+	check(is_equal_approx(absf(sprite.scale.x), 0.2896), "the sprite uses the manifest scale")
+	check(sprite.get_index() == 0, "the sprite is the first child of Visual, under the flash and the glow")
+	check(sprite.material is ShaderMaterial, "the glow and the flash are a shader on the sprite")
+	check(not _boss.get_telegraph()._glow.visible and not _boss._flash.visible, "no polygon overlay is drawn over the sprite")
+	check(_boss.is_burrowed() and not _boss._visual.visible and not sprite.is_visible_in_tree(), "burrowed, the sprite is hidden: he is never drawn underground")
+	check(_boss._mound_visible(), "the mound is what shows instead")
+	check(_boss.stun(1.0) and sprite.is_visible_in_tree() and _boss.get_clip() == &"dazed", "a stun brings him up dazed")
+	await _secs(1.15)
+	check(_boss.get_clip() == &"dig_in" and _lasts(&"dig_in", _boss.dig_in_time), "he digs in with the drawn clip, as long as the dig")
+	check(_boss._visual.position.y == 0.0 and sprite.is_visible_in_tree(), "the drawn dig-in is cut at the floor: the node does not sink as well")
+	await _secs(0.45)
+	check(not _boss._visual.visible and not sprite.is_visible_in_tree(), "the dig-in ends hidden")
+	check(_boss.is_burrowed() and _boss.get_state() == BossEnemy.State.FIGHT, "back to the tunnel")
+	_boss.set_facing(-1)
+	_boss._apply_visual()
+	check(sprite.get_global_transform().x.x < 0.0, "facing left flips the sprite through Visual")
+	check(is_equal_approx(sprite.get_global_transform().y.length(), 0.2896), "and keeps the scale")
+	# A beast whose `emerge` is not drawn never shows while the column is up.
+	await _fight_rig(_with_manifest(ART_MANIFEST))
+	_boss._sprite.sprite_frames.remove_animation(&"emerge")
+	_boss.start_attack(BlindBeastBoss.Attack.ERUPTION)
+	await _until_phase(BlindBeastBoss.Attack.ERUPTION, BossEnemy.AttackPhase.ACTIVE)
+	await _frames(2)
+	check(not _boss._visual.visible and not _boss._emerging, "without an emerge clip he stays hidden under the column")
+	_remove_art_fixture()
+
+
+## Every state, attack and phase asks for its clip, stretched to the logic's own duration.
+func case_art_clip_per_state() -> void:
+	_write_art_fixture()
+	await _fight_rig(_with_manifest(ART_MANIFEST))
+	check(_boss.get_clip() == &"exposed_idle", "the default clip is the idle one")
+	_boss.start_attack(BlindBeastBoss.Attack.ERUPTION)
+	await _frames(3)
+	check(_boss.get_clip() == &"exposed_idle" and not _boss._visual.visible, "the telegraph of an eruption shows nothing: he is under the cracks")
+	await _until_phase(BlindBeastBoss.Attack.ERUPTION, BossEnemy.AttackPhase.ACTIVE)
+	await _frames(2)
+	check(_boss.get_clip() == &"emerge" and _lasts(&"emerge", _boss.column_active_time), "the column shows him rising, as long as the column is up")
+	check(_boss._visual.visible and _boss.is_burrowed() and not _boss.is_hittable(), "emerging is only a picture: he is still untargetable")
+	check(not _boss._mound_visible(), "the mound gives way to the rising body")
+	await _wait_until(func() -> bool: return _boss.get_state() == BossEnemy.State.STUN, 2.0)
+	await _frames(2)
+	check(_boss.get_clip() == &"dazed" and _boss.is_exposed(), "a missed column leaves him dazed")
+	await _wait_until(func() -> bool: return _boss.get_state() == BossEnemy.State.FIGHT, 3.0)
+	await _frames(2)
+	_boss.start_attack(BlindBeastBoss.Attack.CLAW_COUNTER)
+	await _frames(2)
+	check(_boss.get_clip() == &"claw_windup" and _lasts(&"claw_windup", _boss.claw_telegraph_time), "the claw winds up as long as its telegraph")
+	await _until_phase(BlindBeastBoss.Attack.CLAW_COUNTER, BossEnemy.AttackPhase.ACTIVE)
+	await _frames(2)
+	check(_boss.get_clip() == &"claw_strike" and _lasts(&"claw_strike", _boss.claw_active_time), "the strike frame shows when the zone starts to hurt")
+	await _until_phase(BlindBeastBoss.Attack.CLAW_COUNTER, BossEnemy.AttackPhase.RECOVER)
+	await _frames(2)
+	check(_boss.get_clip() == &"claw_recover" and _lasts(&"claw_recover", _boss.claw_recover_time, 0.1), "the recovery holds for the rest of the phase")
+	await _wait_until(func() -> bool: return _boss.get_state() == BossEnemy.State.FIGHT, 2.0)
+	_boss.start_attack(BlindBeastBoss.Attack.TREMOR_PULSE)
+	await _frames(2)
+	check(_boss.get_clip() == &"slam_windup" and _lasts(&"slam_windup", _boss.tremor_telegraph_time), "the slam winds up as long as the telegraph")
+	check(_boss._visual.visible and _boss.is_exposed(), "the pulse surfaces him in the telegraph")
+	await _until_phase(BlindBeastBoss.Attack.TREMOR_PULSE, BossEnemy.AttackPhase.ACTIVE)
+	await _frames(2)
+	check(_boss.get_clip() == &"slam_strike" and _lasts(&"slam_strike", BlindBeastBoss.SLAM_STRIKE_TIME), "the slam frame shows when the pulses leave")
+	await _wait_until(func() -> bool: return _boss.get_state() == BossEnemy.State.STUN, 6.0)
+	await _frames(2)
+	check(_boss.get_clip() == &"dazed", "a pulse that felt nothing leaves him confused")
+	_boss._enter_state(BossEnemy.State.TRANSITION, 0.5)
+	await _frames(2)
+	check(_boss.get_clip() == &"phase_change" and _lasts(&"phase_change", _boss.phase_transition_time), "the phase change lasts the transition")
+	_boss._enter_state(BossEnemy.State.FLINCH, 0.2)
+	await _frames(2)
+	check(_boss.get_clip() == &"exposed_idle", "a flinch is the exposed pose")
+	# The intro: a burrowed beast shows the old man turning into the beast, then goes under.
+	await _build_rig(_with_manifest(ART_MANIFEST))
+	await _frames(5)
+	_boss.set_arena_limits(LEFT_LIMIT, RIGHT_LIMIT)
+	_boss.set_manual_engage(true)
+	_boss.play_intro(0.8)
+	await _frames(3)
+	check(_boss.get_clip() == &"intro" and _lasts(&"intro", 0.8, 0.15), "the intro lasts the arena's intro time")
+	check(_boss._visual.visible and _boss.is_burrowed(), "he shows during the intro although he is burrowed")
+	_boss.engage()
+	await _frames(3)
+	check(not _boss._visual.visible and _boss.get_clip() == &"exposed_idle", "the fight starts with him underground")
+	await _build_rig(_with_manifest(ART_MANIFEST))
+	await _frames(5)
+	_boss._sprite.sprite_frames.remove_animation(&"intro")
+	_boss.set_manual_engage(true)
+	_boss.play_intro(0.8)
+	await _frames(3)
+	check(not _boss._visual.visible, "without an intro clip he stays hidden")
+	_remove_art_fixture()
+
+
+func case_art_glow_and_flash_on_the_sprite() -> void:
+	_write_art_fixture()
+	await _fight_rig(_with_manifest(ART_MANIFEST))
+	var material := _sprite().material as ShaderMaterial
+	var telegraph := _boss.get_telegraph()
+	check(not telegraph.is_glowing() and is_zero_approx(float(material.get_shader_parameter(&"glow_amount"))), "no glow at rest")
+	_boss.start_attack(BlindBeastBoss.Attack.TREMOR_PULSE)
+	await _frames(4)
+	check(telegraph.is_glowing() and float(material.get_shader_parameter(&"glow_amount")) > 0.0, "the slam wind-up lights the sprite")
+	check((material.get_shader_parameter(&"glow_color") as Color).is_equal_approx(BossTelegraph.MELEE_COLOR), "a melee wind-up glows red")
+	check(not telegraph._glow.visible, "the polygon glow stays hidden with art")
+	await _until_phase(BlindBeastBoss.Attack.TREMOR_PULSE, BossEnemy.AttackPhase.ACTIVE)
+	await _frames(2)
+	check(not telegraph.is_glowing(), "the glow clears when the pulses leave")
+	check(not _boss.is_flash_visible(), "no flash before a hit")
+	_boss.receive_hit(1, HIT_FROM, &"attack_1")
+	check(_boss.is_flash_visible() and is_equal_approx(float(material.get_shader_parameter(&"flash_amount")), 1.0) and not _boss._flash.visible, "a hit flashes the sprite white, not the polygon")
+	await _secs(_boss.flash_time + 0.1)
+	check(not _boss.is_flash_visible() and is_zero_approx(float(material.get_shader_parameter(&"flash_amount"))), "the flash ends after flash_time")
+	_remove_art_fixture()
+
+
+func case_art_defeat_and_corpse_frame() -> void:
+	_write_art_fixture()
+	await _fight_rig(_with_manifest(ART_MANIFEST))
+	_boss._surface()
+	check(_boss.receive_hit(99, HIT_FROM, &"attack_1"), "the killing blow lands")
+	await _frames(3)
+	check(_boss.get_clip() == &"defeat" and _lasts(&"defeat", _boss.defeat_time, 0.1), "he falls with the defeat clip, as long as the defeat")
+	check(_boss._visual.visible, "a dead beast is drawn above ground")
+	await _secs(0.8)
+	var last: int = _sprite().sprite_frames.get_frame_count(&"defeat") - 1
+	check(_sprite().animation == &"defeat" and _sprite().frame == last and not _sprite().is_playing(), "the corpse is the last frame of the defeat clip")
+	check(is_equal_approx(_sprite().get_global_transform().y.length(), 0.2896) and absf(_sprite().get_global_transform().x.y) < 0.001, "the drawn slump replaces the placeholder's tilt and squash")
+	# A corpse restored from an earlier run shows the last frame at once, before it enters the tree.
+	_boss.get_parent().remove_child(_boss)
+	_boss.free()
+	_boss = _make_boss()
+	_boss.animation_manifest = ART_MANIFEST
+	_boss.make_corpse_at(Vector2(120.0, 0.0), -1)
+	_rig.add_child(_boss)
+	await _frames(3)
+	check(_boss.has_art() and _boss.get_clip() == &"defeat", "a restored corpse asks for the defeat clip")
+	check(_sprite().frame == last and not _sprite().is_playing(), "and shows its last frame without playing")
+	check(_boss._visual.visible and _sprite().is_visible_in_tree(), "lying above ground, visible")
+	check(is_equal_approx(_sprite().get_global_transform().y.length(), 0.2896) and _sprite().get_global_transform().x.x < 0.0, "undone squash, facing kept")
+	check(_boss.hazard_count() == 0 and _boss._hazard_art.sprite_count() == 0, "no hazard sprite is left")
+	_remove_art_fixture()
+
+
+## Every hazard wears its drawn sprite scaled to the box that hurts; boxes and timings are the placeholder's.
+func case_art_hazards_wear_the_sprites() -> void:
+	_write_art_fixture()
+	await _fight_rig(_with_manifest(ART_MANIFEST))
+	await _frames(3)
+	var mounds := _field_sprites(&"mound")
+	var mound_box := _content(FIXTURE_PROPS, "mound")
+	check(mounds.size() == 1 and mounds[0].sprite_frames.get_animation_loop(&"mound"), "the mound heaves where he tunnels")
+	check(is_equal_approx(mounds[0].scale.x * mound_box.x, BlindBeastBoss.MOUND_ART_WIDTH), "the mound is as wide as the dome it replaces")
+	check(is_equal_approx(mounds[0].position.y + mound_box.y * mounds[0].scale.y * 0.5, _boss._floor_y), "it stands on the floor")
+	# Eruption: a crack that opens, then the column and a puff of dust.
+	_boss.start_attack(BlindBeastBoss.Attack.ERUPTION)
+	await _frames(4)
+	var cracks := _field_sprites(&"crack")
+	check(cracks.size() == 1 and is_equal_approx(cracks[0].scale.x * 160.0, _boss.column_size.x), "the crack is as wide as the column it warns of")
+	check(cracks[0].modulate.a >= BlindBeastBoss.CRACK_MIN_ALPHA and cracks[0].modulate.a < 1.0, "it fades in as the warning runs down")
+	check(_boss.get_crack_xs().size() == 1, "the warning itself is unchanged")
+	await _until_phase(BlindBeastBoss.Attack.ERUPTION, BossEnemy.AttackPhase.ACTIVE)
+	await _secs(0.15)
+	var columns := _field_sprites(&"erupt_column")
+	var column_box := _content(FIXTURE_FX, "erupt_column")
+	check(columns.size() == 1 and _field_sprites(&"crack").is_empty(), "the column replaces the crack")
+	check(is_equal_approx(columns[0].scale.x * column_box.x, _boss.column_size.x) and is_equal_approx(columns[0].scale.y * column_box.y, _boss.column_size.y), "the column art fills the box that hurts")
+	check(is_equal_approx(columns[0].position.y, _boss._floor_y - _boss.column_size.y * 0.5), "standing on the floor")
+	check(_field_sprites(&"dust_puff").size() == 1, "a puff of dust marks the burst")
+	await _wait_until(func() -> bool: return _boss.get_column_xs().is_empty(), 1.0)
+	await _frames(2)
+	check(_field_sprites(&"erupt_column").is_empty(), "the column art goes with the column")
+	await _wait_until(func() -> bool: return _boss.get_state() == BossEnemy.State.FIGHT, 4.0)
+	check(_boss._hazard_art.sprite_count() == _field_sprites(&"mound").size() or _boss._hazard_art.sprite_count() == 0, "no hazard sprite lingers")
+	await _wait_until(func() -> bool: return _boss.is_burrowed() and not _boss._digging, 3.0)
+	# Debris: rocks alternate the two drawings and puff where they land.
+	_boss.start_attack(BlindBeastBoss.Attack.DEBRIS_TOSS)
+	await _wait_until(func() -> bool: return not _boss.get_rock_landing_xs().is_empty(), 2.0)
+	await _frames(2)
+	var rocks := _field_sprites(&"rock")
+	var alts := _field_sprites(&"rock_alt")
+	check(rocks.size() == 2 and alts.size() == 1, "three rocks alternate the two drawings")
+	var rock_box := Vector2.ONE * _boss.debris_radius * BlindBeastBoss.ROCK_ART_FACTOR
+	check(rocks[0].scale.is_equal_approx(BoomboxHazard.art_scale(_content(FIXTURE_PROPS, "rock"), rock_box, BoomboxHazard.ArtFit.CONTAIN)), "a rock fits its box")
+	check(_boss.get_rock_landing_xs().size() == 3, "the landing markers are unchanged")
+	await _wait_until(func() -> bool: return _boss.get_rock_landing_xs().is_empty(), 2.0)
+	await _frames(2)
+	check(_field_sprites(&"rock").is_empty() and _field_sprites(&"rock_impact").size() >= 1, "landed rocks go and leave their impact")
+	await _wait_until(func() -> bool: return _boss.get_state() == BossEnemy.State.FIGHT, 4.0)
+	# Tremor pulse: one ripple per side, mirrored for the left-going one.
+	_boss.start_attack(BlindBeastBoss.Attack.TREMOR_PULSE)
+	await _until_phase(BlindBeastBoss.Attack.TREMOR_PULSE, BossEnemy.AttackPhase.ACTIVE)
+	await _frames(3)
+	var pulses := _field_sprites(&"pulse_wave")
+	check(pulses.size() == 2 and pulses[0].scale.x * pulses[1].scale.x < 0.0, "the pulse is two ripples, one mirrored")
+	var pulse_box := _content(FIXTURE_FX, "pulse_wave")
+	check(is_equal_approx(absf(pulses[0].scale.x) * pulse_box.x, BlindBeastBoss.PULSE_ART_SIZE.x) and is_equal_approx(pulses[0].scale.y * pulse_box.y, BlindBeastBoss.PULSE_ART_SIZE.y), "each fills its box")
+	check(pulses[0].sprite_frames.get_animation_loop(&"pulse_wave"), "the ripple loops")
+	await _wait_until(func() -> bool: return _boss.get_state() == BossEnemy.State.STUN, 6.0)
+	await _frames(2)
+	check(_field_sprites(&"pulse_wave").is_empty(), "the ripples leave with the pulse")
+	_boss._clear_hazards()
+	_boss.stun(0.1)
+	await _wait_until(func() -> bool: return _boss.get_state() == BossEnemy.State.FIGHT, 3.0)
+	await _wait_until(func() -> bool: return _boss.is_burrowed() and not _boss._digging, 3.0)
+	# Braille ridge: each spike that is up fills the box that hurts.
+	_boss.start_attack(BlindBeastBoss.Attack.BRAILLE_RIDGE)
+	await _until_phase(BlindBeastBoss.Attack.BRAILLE_RIDGE, BossEnemy.AttackPhase.ACTIVE)
+	await _wait_until(func() -> bool: return _field_sprites(&"spike").size() >= 2, 1.5)
+	await _frames(2)
+	var spikes := _field_sprites(&"spike")
+	var up := 0
+	for slot: Dictionary in _boss.get_ridge_slots():
+		up += 1 if slot["raised"] and float(slot["height"]) > 0.0 else 0
+	check(spikes.size() >= 2 and spikes.size() <= up + 1, "one spike per raised slot that is up")
+	var spike_box := _content(FIXTURE_PROPS, "spike")
+	var slot_width := float(_boss.get_ridge_slots()[0]["width"])
+	check(is_equal_approx(spikes[0].scale.x * spike_box.x, slot_width * BlindBeastBoss.SPIKE_HIT_SHARE), "a spike is as wide as the box that hurts")
+	check(spikes[0].scale.y * spike_box.y <= _boss.ridge_spike_height + 0.01, "and never taller than the full spike")
+	_boss._clear_hazards()
+	await _frames(2)
+	check(_field_sprites(&"spike").is_empty() and _boss._hazard_art.sprite_count() <= 1, "clearing the hazards clears their sprites")
+	_remove_art_fixture()
+
+
+## A manifest without props or fx keeps every placeholder: art can arrive sheet by sheet.
+func case_art_missing_effect_sheets_keep_placeholders() -> void:
+	_write_art_fixture(true, false)
+	await _fight_rig(_with_manifest(ART_MANIFEST))
+	await _frames(3)
+	check(_boss.has_art() and _boss._has_hazard_art(BoomboxEffectArt.PROPS, &"mound"), "the character and the props are drawn")
+	check(not _boss._has_hazard_art(BoomboxEffectArt.FX, &"erupt_column"), "the fx sheet is missing")
+	_boss.start_attack(BlindBeastBoss.Attack.ERUPTION)
+	await _until_phase(BlindBeastBoss.Attack.ERUPTION, BossEnemy.AttackPhase.ACTIVE)
+	await _frames(3)
+	check(_field_sprites(&"erupt_column").is_empty() and _field_sprites(&"dust_puff").is_empty(), "no column or dust art without that sheet")
+	check(_boss.get_column_xs().size() == 1, "the column placeholder is the one that shows")
+	_remove_art_fixture()
+	_write_art_fixture(false, false)
+	await _fight_rig(_with_manifest(ART_MANIFEST))
+	await _frames(3)
+	check(_boss.has_art() and _field_sprites(&"mound").is_empty(), "with no props the mound dome is the placeholder")
+	check(_boss._hazard_art.sprite_count() == 0, "and no hazard wears a sprite")
+	_remove_art_fixture()

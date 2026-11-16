@@ -38,9 +38,23 @@ func content(key: String, clip: StringName) -> Vector2:
 	return _catalog.content_size(key, clip)
 
 
+## `content`, or, when the manifest names no content box for the clip, the size of one
+## frame (the whole cell). A safe stand-in: scaling from it never oversizes the art, which
+## a missing box read as "1 px" or "scale 1" would. ZERO only when there is no such clip.
+func art_size(key: String, clip: StringName) -> Vector2:
+	var box := content(key, clip)
+	if box.x > 0.0 and box.y > 0.0:
+		return box
+	if not has_clip(key, clip):
+		return Vector2.ZERO
+	var frames := _frames[key] as SpriteFrames
+	var texture := frames.get_frame_texture(clip, 0) if frames.get_frame_count(clip) > 0 else null
+	return texture.get_size() if texture != null else Vector2.ZERO
+
+
 ## A playing sprite of `clip` scaled to fit the hazard `box`; null when there is no such clip.
 func fit_sprite(key: String, clip: StringName, box: Vector2, fit: BoomboxHazard.ArtFit, flip := false) -> AnimatedSprite2D:
-	return sprite(key, clip, BoomboxHazard.art_scale(content(key, clip), box, fit), flip)
+	return sprite(key, clip, BoomboxHazard.art_scale(art_size(key, clip), box, fit), flip)
 
 
 ## A playing sprite of `clip` at `scale`, centred on its node; null when there is no such clip.
@@ -73,8 +87,7 @@ func floor_sprites(key: String, clip: StringName, strip: Vector2) -> Array[Anima
 
 ## A one-shot puff of `clip` that is `width` px wide: grows, rises, fades and frees itself.
 func puff(parent: Node, key: String, clip: StringName, at: Vector2, width: float) -> Node2D:
-	var box := content(key, clip)
-	var node := sprite(key, clip, Vector2.ONE * (width / maxf(box.x, 1.0)))
+	var node := sprite(key, clip, Vector2.ONE * (width / maxf(art_size(key, clip).x, 1.0)))
 	if node == null or parent == null:
 		return null
 	node.top_level = true
@@ -96,8 +109,14 @@ func blackboard() -> Texture2D:
 
 
 func _loop_clips(frames: SpriteFrames) -> SpriteFrames:
-	for clip: StringName in LOOP_FPS:
+	var fps := _loop_fps()
+	for clip: StringName in fps:
 		if frames.has_animation(clip):
 			frames.set_animation_loop(clip, true)
-			frames.set_animation_speed(clip, float(LOOP_FPS[clip]))
+			frames.set_animation_speed(clip, float(fps[clip]))
 	return frames
+
+
+## The looping clips and their speed; a boss with other loops overrides it.
+func _loop_fps() -> Dictionary:
+	return LOOP_FPS

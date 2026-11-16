@@ -4,7 +4,7 @@
 [ext_resource type="Script" path="res://scripts/enemies/bosses/blind_beast_boss.gd" id="2_beast"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
-size = Vector2(46, 38)
+size = Vector2(40, 64)
 
 [node name="BlindBeast" instance=ExtResource("1_base")]
 script = ExtResource("2_beast")
@@ -13,18 +13,23 @@ phase_thresholds = PackedFloat32Array(0.66, 0.33)
 max_health = 30
 
 [node name="CollisionShape2D" parent="." index="0"]
-position = Vector2(0, -19)
+position = Vector2(0, -32)
 shape = SubResource("RectangleShape2D_body")
 
-[node name="Body" parent="Visual" index="0"]
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Visual" index="0"]
+texture_filter = 4
+scale = Vector2(0.2896, 0.2896)
+offset = Vector2(0, -192)
+
+[node name="Body" parent="Visual" index="1"]
 color = Color(0.33, 0.27, 0.3, 1)
 polygon = PackedVector2Array(-22, 0, -24, -14, -18, -30, -6, -38, 10, -35, 20, -26, 30, -20, 34, -13, 26, -8, 26, 0)
 
-[node name="Nose" type="Polygon2D" parent="Visual" index="1"]
+[node name="Nose" type="Polygon2D" parent="Visual" index="2"]
 color = Color(0.86, 0.55, 0.6, 1)
 polygon = PackedVector2Array(28, -21, 35, -17, 34, -12, 29, -13)
 
-[node name="Claws" type="Polygon2D" parent="Visual" index="2"]
+[node name="Claws" type="Polygon2D" parent="Visual" index="3"]
 color = Color(0.9, 0.86, 0.78, 1)
 polygon = PackedVector2Array(20, -6, 34, -14, 46, -10, 40, -8, 46, -4, 38, -3, 42, 0, 24, 0)
 
