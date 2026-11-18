@@ -18,7 +18,6 @@ extends Node
 ##    `checkpoint_resettable` group, as every enemy does, and
 ##    CheckpointService.reset_resettable_enemies() (called by the desk and by
 ##    the player's respawn, after she has been moved) reaches all of them.
-##
 ## Performance: enemies outside the current room are paused (no AI, no
 ## gravity). An empty active room means the level does no room tracking and
 ## nothing is paused.
