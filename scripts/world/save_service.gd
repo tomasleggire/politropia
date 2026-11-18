@@ -4,6 +4,7 @@ extends Node
 
 const SAVE_PATH := "user://politropia_save.dat"
 const SAVE_VERSION := 1
+const DEFAULT_SCENE := "res://scenes/levels/library/zone_1.tscn"
 
 
 func has_save() -> bool:
@@ -29,26 +30,46 @@ func save_checkpoint() -> bool:
 	return _write_payload(_build_payload(scene_path))
 
 
+## Keeps SaveService in sync with current game/checkpoint state even without a stillness desk.
+func sync_from_state(target_scene_path: String = "") -> bool:
+	var scene := ""
+	if CheckpointService != null and CheckpointService.has_active_checkpoint():
+		scene = CheckpointService.get_active_scene_path()
+	if scene.is_empty() and not target_scene_path.is_empty() and ResourceLoader.exists(target_scene_path):
+		scene = target_scene_path
+	if scene.is_empty() or not ResourceLoader.exists(scene):
+		scene = DEFAULT_SCENE
+	return _write_payload(_build_payload(scene))
+
+
 func continue_game() -> bool:
 	var payload := _read_payload()
 	if payload.is_empty():
 		return false
-	var scene_path: String = payload["scene_path"]
+	var scene_path: String = payload.get("scene_path", "")
 	var saved_checkpoint: Variant = payload.get("checkpoint", {})
 	var has_saved_checkpoint := false
 	if saved_checkpoint is Dictionary:
 		var saved_checkpoint_id: Variant = saved_checkpoint.get("active_id", "")
 		var saved_checkpoint_scene: Variant = saved_checkpoint.get("scene_path", "")
-		if saved_checkpoint_id is String and not saved_checkpoint_id.is_empty():
-			if saved_checkpoint_scene is String and not saved_checkpoint_scene.is_empty():
-				scene_path = saved_checkpoint_scene
+		if saved_checkpoint_id is String and not (saved_checkpoint_id as String).is_empty():
+			if saved_checkpoint_scene is String and not (saved_checkpoint_scene as String).is_empty() and ResourceLoader.exists(saved_checkpoint_scene as String):
+				scene_path = saved_checkpoint_scene as String
 				has_saved_checkpoint = true
-	var packed_scene := ResourceLoader.load(scene_path) as PackedScene
+	if CheckpointService != null and CheckpointService.has_active_checkpoint():
+		var active_scene := CheckpointService.get_active_scene_path()
+		if not active_scene.is_empty() and ResourceLoader.exists(active_scene):
+			scene_path = active_scene
+			has_saved_checkpoint = true
+	if scene_path.is_empty() or not ResourceLoader.exists(scene_path):
+		scene_path = DEFAULT_SCENE
+
+	var packed_scene := load_packed_scene(scene_path)
 	if packed_scene == null:
 		push_error("SaveService: could not load saved scene resource: %s" % scene_path)
 		return false
 	_restore_progress(payload)
-	if has_saved_checkpoint and CheckpointService.has_active_checkpoint():
+	if has_saved_checkpoint or (CheckpointService != null and CheckpointService.has_active_checkpoint()):
 		CheckpointService.queue_pending_restore()
 	var transition_cover := _create_transition_cover()
 	_fade_transition_cover_after_scene_load(transition_cover)
@@ -59,6 +80,23 @@ func continue_game() -> bool:
 		push_error("SaveService: could not load saved scene (%d)." % error)
 		return false
 	return true
+
+
+func load_packed_scene(path: String) -> PackedScene:
+	if ResourceLoader.has_cached(path):
+		return ResourceLoader.load(path) as PackedScene
+	var status := ResourceLoader.load_threaded_get_status(path)
+	if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		while ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			OS.delay_msec(10)
+		status = ResourceLoader.load_threaded_get_status(path)
+	if status == ResourceLoader.THREAD_LOAD_LOADED:
+		return ResourceLoader.load_threaded_get(path) as PackedScene
+	return ResourceLoader.load(path) as PackedScene
+
+
+func _load_packed_scene(path: String) -> PackedScene:
+	return load_packed_scene(path)
 
 
 func _create_transition_cover() -> ColorRect:

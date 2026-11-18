@@ -66,7 +66,7 @@ func _on_fragment_state_changed(level_key: String, id: int, state: int) -> void:
 	_set_fragment_icon(id - 1, state)
 
 
-func _on_scene_changed(_scene: Node) -> void:
+func _on_scene_changed(_scene: Variant = null) -> void:
 	_refresh_fragment_indicator()
 
 
