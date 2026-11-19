@@ -54,7 +54,7 @@ func register(enemy: Enemy) -> void:
 		enemy.died.connect(_on_enemy_died)
 	if _kills.has(key):
 		var record: Dictionary = _kills[key]
-		enemy.make_corpse_at(record["position"], record["facing"])
+		#enemy.make_corpse_at(record["position"], record["facing"])
 
 
 func unregister(enemy: Enemy) -> void:

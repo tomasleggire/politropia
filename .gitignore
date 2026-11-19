@@ -12,3 +12,5 @@ AGENTS.md
 .atl/
 politropia.apk
 politropia.apk.idsig
+*.apk
+*.apk.idsig
