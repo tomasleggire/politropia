@@ -47,7 +47,7 @@ All raw sheets are 1536x1024.
 
 - Strategy: ask-on-risk. Forecast: about 1500 authored lines (contract, processing script, integration, tests) plus binary art, above the 400-line budget. Chain strategy: pending, asked before any pull request together with the rest of `feat/new-bosses`.
 - TDD: off (source: project convention, `odd/tasks/artemis-polish.md:27`). Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/<name>_test.gd` (one Godot process at a time).
-- Receipt-driven development: on by default; consent `granted` by standing user instruction. Last reviewed boundary when this document was created: `6255adb`.
+- Receipt-driven development: on by default; consent `granted` by standing user instruction. Last reviewed boundary when this document was created: `6255adb`; after T2: `b35bfb4`.
 
 ## Tasks
 
@@ -75,6 +75,7 @@ All raw sheets are 1536x1024.
 - 2026-11-19, T3: six sheet runs launched right after the eight Topo sheets; all six failed with "ERROR: Your workspace is out of credits. Ask your workspace owner to refill in order to continue." The Codex credits lasted for 2 Topo concepts, 8 Topo sheets and 2 Hydra concepts.
 
 - 2026-11-19, T2 (writer run plus parent spot check on the integrated branch): `hydra_boss_test` `PASS 314/314` (228 before, 86 new art checks), `blind_beast_boss_test` `PASS 349/349`, `boss_animation_catalog_test` `PASS 41/41`, `boss_enemy_test` `PASS 178/178`, all exit 0; import with no script errors; `tools/process_hydra_sheets.py` with no raw sheets prints the skips and exits 0; smoke load of `scenes/levels/test/hydra_arena.tscn` exit 0. The writer also reported `boss_test_hub_test` `PASS 213/213`, `boombox_teacher_boss_test` `PASS 412/412` and an end-to-end run on synthetic sheets. Untested without the real art: the head anchor, the neck tile seam, the platform proportions, whether the 525 px body needs a slight upscale from the 512 px raw cell, and the rendered flash and glow.
+- 2026-11-19, native review of `34cc8dd..b35bfb4` (assessed high: `process_boundary` on `tools/process_hydra_sheets.py`; 14 paths, 1553 lines): consent `granted` (standing user instruction), four lenses, approved, acknowledged (lineage `review-c016520fea489c4e`, authority burned). The reviewed boundary is `b35bfb4`. Non-blocking follow-ups to take in T4, when the script runs on real sheets: `load_frames` drops empty cells and the builders then index by raw cell number, correct only while every cell is used (`tools/process_hydra_sheets.py:94-95`, two lenses); sheets are saved one by one and the manifest only at the end, so an error mid-run leaves new textures beside an old manifest (`:283-291`, two lenses); no automated test for the script, and a reference cell emptied by `drop_specks` would divide by zero (`:100-103`); `NECK_PAD` is 2 but the docstrings and section 2.3 of the contract say one row (`:65`); `roar(duration, clip)` also carries the spitter's attack (`hydra_head.gd:226-228`); `_ready` dresses the platforms twice without a comment (`hydra_boss.gd:174`); a stale comment on `GLOB_ART_SIZE` (`hydra_venom.gd:33`); the moved-platform check cannot fail and some art checks read private members (`tests/hydra_boss_test.gd:1631`, `:1352`).
 
 ## Next step
 
