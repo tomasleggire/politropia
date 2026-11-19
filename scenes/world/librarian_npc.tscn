@@ -3,6 +3,8 @@
 [ext_resource type="Texture2D" uid="uid://cvjdmwt7wk0da" path="res://assets/ui/librarian.png" id="1_1oqjc"]
 [ext_resource type="Script" uid="uid://esr7sh3cwqgi" path="res://scripts/world/librarian_npc.gd" id="1_ts6vr"]
 [ext_resource type="PackedScene" uid="uid://do5yura3snuld" path="res://scenes/ui/librarian_speech_bubble.tscn" id="3_p8m32"]
+[ext_resource type="PackedScene" path="res://scenes/ui/interaction_prompt.tscn" id="4_prompt"]
+[ext_resource type="PackedScene" uid="uid://dfi8n3n7j5qnj" path="res://scenes/ui/ability_unlock_popup.tscn" id="5_umqrt"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ts6vr"]
 size = Vector2(53, 15)
@@ -32,3 +34,10 @@ shape = SubResource("CircleShape2D_davfq")
 
 [node name="LibrarianSpeechBubble" parent="." unique_id=1025694301 instance=ExtResource("3_p8m32")]
 position = Vector2(223, 158)
+
+[node name="InteractionPrompt" parent="." unique_id=688852151 instance=ExtResource("4_prompt")]
+position = Vector2(187, 205)
+prompt_text = "Hablar"
+
+[node name="AbilityUnlockPopup" parent="." unique_id=1976063548 instance=ExtResource("5_umqrt")]
+position = Vector2(251, 294)

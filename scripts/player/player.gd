@@ -2564,7 +2564,13 @@ func _set_soul(value: int) -> void:
 ## True when a focus heal would be worth starting: enough soul and a missing
 ## pip. The touch Focus button follows this.
 func is_focus_available() -> bool:
-	return not _dead and _health > 0 and _health < max_health and _soul >= focus_cost
+	return (
+		not _dead
+		and _health > 0
+		and _health < max_health
+		and _soul >= focus_cost
+		and AbilityProgress.is_unlocked(&"focus")
+	)
 
 
 func is_focusing() -> bool:
