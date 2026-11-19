@@ -71,6 +71,7 @@ Everything is `@export`, grouped on the `BlindBeast` node: `Noise`, `Burrow`, `E
 2. The arena feeds the boss its walls: the ridge, the probe and the pulse adapt to any `arena_rect` (a narrower one makes a smaller, or shorter, ridge that never leaves the walls). Resize the arena rects in the inspector; do not scale or rotate the node.
 3. Keep the floor flat: noise spots, cracks and slots sit on the floor line of the boss. Platforms are fine for Luz, but a column (90 px) cannot reach them.
 4. Put a Stillness Desk before the arena. See `docs/bosses/BOSS_ARENA.md`.
+5. The boss instance sits at the centre of the arena (x 0) on purpose: his intro clip (the old man turning into the beast) plays there, and the centre is inside the 640 px view from either entrance. He starts burrowed and untargetable, so moving him only changes where his first tunnel begins; keep him where the camera can see the intro.
 
 Test it: open `scenes/levels/test/blind_beast_arena.tscn` and run the scene. Headless: `godot --headless --path . --script res://tests/blind_beast_boss_test.gd`.
 
