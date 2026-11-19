@@ -1,0 +1,77 @@
+# Hydra art (La Hidra)
+
+Locator: `odd/tasks/hydra-art.md`. Engram mirror: `odd/hydra-art/tasks` (project `politropia`), pending: `mem_save` is refused in auto mode because a hook rewrites the call.
+Branch: `feat/new-bosses` (single branch by user preference; no stacked art branch).
+
+## Objective
+
+Give La Hidra (`HydraBoss`) final art in the same style as Luz, Artemis, El Profesor and El Topo, with the same workflow (Codex concept, Codex raw sheets, `tools/boss_sheet_pipeline.py`, `BossAnimationCatalog`, `BossSpriteFx`). Gameplay (timings, hitboxes, hurtboxes, head positions, hazards, platform rules) does not change.
+
+## Problem
+
+The Hydra is drawn with placeholder polygons: one body polygon, three heads drawn in `HydraHead._draw` (head and jaw polygons, a straight 16 px line as the neck, a stump line when severed), venom drawn in `HydraVenom` and five grey platform slabs. It is the only one of the three new bosses with no art plan.
+
+## Why
+
+Requested by the user on 2026-11-19: resume the Codex art of the three new bosses and advance as far as possible.
+
+## Decisions
+
+- Design: the Lernaean Hydra as a massive coiled serpent, dark teal scales with a pale ochre belly. The three heads keep their gameplay colours so target priority still reads: the biter (low) is crimson with a heavy jaw and big fangs, the sweeper (mid) is violet with a long flat blade-like snout and crest, the spitter (high) is acid green with a cobra hood and venom sacs. Prompt: `tools/art_sources/hydra/prompts/character_concept.md`.
+- Multi-part boss: one body sprite under `Visual`, one sprite per head inside each `HydraHead`, and a procedural neck (a textured `Line2D` with a seamless neck tile from the fixed shoulder to the moving head). Heads never rotate. The art is drawn facing RIGHT; `Visual` is mirrored already and the head sprites are flipped in code.
+- On-screen sizes stay those of the placeholders: body about 112 x 152 px, each head about 56 x 42 px (crests and fangs may overhang a little), platforms 160 px wide. Shoulder points are visual only and may move to match the neck roots of the art; head rest positions do not move.
+- With art on, the defeat clip of the body shows the severed necks itself and the `Heads` node is hidden from the start of the defeat; without art everything behaves as today.
+- Per-sheet scale reference: the content height of the first idle cell (body) and the content width of the first idle cell (each head). No colour block is needed because every cell holds one isolated object.
+- Code-driven and unchanged: telegraph markers (aim line, sweep band, venom markers), hurt flash (moved to a per-head sprite shader), the stuck mark.
+
+## Sheet plan (raw cells, reading order)
+
+All raw sheets are 1536x1024.
+
+| Sheet | Grid | Clips |
+|---|---|---|
+| `body` | 3x2 (512x512) | `idle` 0-3 (loop), `roar` 4-5 (phase change and intro) |
+| `defeat` | 3x2 (512x512) | `defeat` 0-5 (4-5 = corpse) |
+| `head_biter` | 4x2 (384x512) | `idle` 0-2 (loop), `telegraph` 3, `attack` 4-5, `roar` 6, `dazed` 7 (stuck) |
+| `head_sweeper` | 4x2 | `idle` 0-2 (loop), `telegraph` 3, `attack` 4-5, `roar` 6, `dazed` 7 |
+| `head_spitter` | 4x2 | `idle` 0-2 (loop), `telegraph` 3, `attack` 4-5, `roar` 6, `dazed` 7 |
+| `props` | 4x2 | `neck` 0, `stump` 1, `venom_glob` 2, `venom_pool` 3-4 (loop), `venom_splash` 5, `platform` 6, `platform_alt` 7 |
+
+## Constraints
+
+- AGENTS.md conventions; no hand-edited `.uid` files; node names referenced by scripts and tests stay stable (the platform collision child stays `CollisionShape2D`).
+- No asset on disk means the placeholders stay exactly as today (same fallback rule as El Profesor and El Topo).
+- Artemis, Profesor and Topo assets and behaviour stay unchanged.
+
+## Delivery
+
+- Strategy: ask-on-risk. Forecast: about 1500 authored lines (contract, processing script, integration, tests) plus binary art, above the 400-line budget. Chain strategy: pending, asked before any pull request together with the rest of `feat/new-bosses`.
+- TDD: off (source: project convention, `odd/tasks/artemis-polish.md:27`). Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/<name>_test.gd` (one Godot process at a time).
+- Receipt-driven development: on by default; consent `granted` by standing user instruction. Last reviewed boundary when this document was created: `6255adb`.
+
+## Tasks
+
+- [ ] T1 Concept in the game style (route: inline, two Codex runs by the parent).
+- [ ] T2 Contract `docs/bosses/HYDRA_ANIMATIONS.md`, `tools/process_hydra_sheets.py`, integration with fallbacks (body sprite, head sprites, textured neck, stump, venom, platforms), tests (route: delegated writer; trigger: 2+ non-trivial files).
+- [ ] T3 Raw sheets (route: inline, six parallel Codex runs by the parent). Prompts in `tools/art_sources/hydra/prompts/sheets.md`.
+- [ ] T4 Process the sheets and tune the integration on the real art (route: delegated writer).
+- [ ] T5 Visual check in the real game (route: inline): movie maker capture, video for the user.
+
+## Acceptance criteria
+
+- With the processed assets present, the Hydra shows the body, the three heads, textured necks, stumps, venom and platforms as sprites, each head plays the clip of its state, and no placeholder polygon is visible.
+- With the assets absent, the fight looks and plays exactly as before.
+- `tests/hydra_boss_test.gd` stays green (228 before this feature) with new art cases; `tests/boss_animation_catalog_test.gd`, `tests/boss_enemy_test.gd` and `tests/boss_test_hub_test.gd` stay green.
+
+## Checks
+
+- The suites above, plus `Godot --headless --path . --import` with no script or parse errors.
+- Artemis, Profesor and Topo assets unchanged after re-running their processing scripts.
+
+## Progress and evidence
+
+- 2026-11-19: Codex has credits again. Hydra visual inventory mapped (read-only mapper). Feature document created with 5 tasks.
+
+## Next step
+
+T1: write the concept prompt and launch two Codex concept runs.
