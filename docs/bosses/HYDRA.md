@@ -61,4 +61,6 @@ All are exported and grouped on `HydraBoss`: Layout (`right_wall_margin`, `head_
 
 ## Tests
 
+Art: the sprite contract, the processing script (`tools/process_hydra_sheets.py`) and the fallback rule are in `HYDRA_ANIMATIONS.md`; with no art on disk the fight looks and plays as described here. The `case_art_*` cases use a fixture manifest under `user://`, never the real sheets, and every other case pins the boss to "no art".
+
 `tests/hydra_boss_test.gd` (case names after `--` run alone). Beyond injected hits, it drives Luz's real slash (her `AttackHitbox` overlap) into each head, severs heads mid-attack, relays out the platforms (moved, removed, fewer than three levels, two arenas, bad shapes) and measures the enrage effects (marked spots, wind-up and sweep times) instead of reading private helpers.

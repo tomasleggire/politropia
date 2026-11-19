@@ -6,6 +6,10 @@ extends Area2D
 ## FLIGHT (a glob on an arc, harmless) -> POOL (a puddle that hurts on contact
 ## until it dries) -> IDLE (parked, invisible, harmless). It lives in the world,
 ## beside the boss, so nothing about the boss moves or hides it.
+##
+## Art (docs/bosses/HYDRA_ANIMATIONS.md): `bind_art` gives it a glob sprite, a puddle sprite
+## and a splash where the glob lands. Each one replaces only its own placeholder; the
+## amber markers are always drawn by code.
 
 signal landed(point: Vector2)
 
@@ -25,6 +29,8 @@ const FLIGHT_PULSE_RATE := 18.0
 ## The puddle blinks during its last seconds.
 const DRY_WARNING_TIME := 0.7
 const ELLIPSE_POINTS := 20
+## Art: the glob fits this box (px) and the puddle sprite blinks like the drawn one.
+const GLOB_ART_SIZE := 19.0
 
 var damage := 1
 ## Seconds between two hits while Luz keeps standing in the puddle.
@@ -41,6 +47,9 @@ var _pool_left := 0.0
 var _rehit_left := 0.0
 var _clock := 0.0
 var _shape: CollisionShape2D
+var _art: HydraArt
+var _glob_sprite: AnimatedSprite2D
+var _pool_sprite: AnimatedSprite2D
 
 
 func _ready() -> void:
@@ -75,6 +84,25 @@ func _draw() -> void:
 			_draw_glob()
 		State.POOL:
 			_draw_pool()
+
+
+## Dresses the glob and the puddle with the drawn clips that exist (see `HydraArt`).
+func bind_art(art: HydraArt) -> void:
+	_art = art
+	_glob_sprite = art.fit_sprite(HydraArt.PROPS, HydraArt.VENOM_GLOB, Vector2.ONE * GLOB_ART_SIZE, BoomboxHazard.ArtFit.CONTAIN)
+	_pool_sprite = art.width_sprite(HydraArt.VENOM_POOL, _width)
+	for sprite: AnimatedSprite2D in [_glob_sprite, _pool_sprite]:
+		if sprite != null:
+			sprite.visible = false
+			add_child(sprite)
+
+
+func get_glob_sprite() -> AnimatedSprite2D:
+	return _glob_sprite
+
+
+func get_pool_sprite() -> AnimatedSprite2D:
+	return _pool_sprite
 
 
 func get_state() -> State:
@@ -117,6 +145,7 @@ func plan(spot: Vector2, width: float, flight_time: float, arc_height: float, po
 	_state = State.PLANNED
 	_set_pool_active(false)
 	visible = true
+	_sync_art()
 	queue_redraw()
 
 
@@ -127,6 +156,7 @@ func launch(from: Vector2) -> void:
 	_start = from
 	_flight_left = _flight_time
 	_state = State.FLIGHT
+	_sync_art()
 	queue_redraw()
 
 
@@ -135,6 +165,7 @@ func release() -> void:
 	_state = State.IDLE
 	_set_pool_active(false)
 	visible = false
+	_sync_art()
 	queue_redraw()
 
 
@@ -143,6 +174,7 @@ func _update_flight(delta: float) -> void:
 	if _flight_left <= 0.0:
 		_land()
 		return
+	_sync_art()
 	queue_redraw()
 
 
@@ -154,6 +186,10 @@ func _land() -> void:
 	shape.size = Vector2(_width, POOL_HEIGHT)
 	_shape.position = Vector2(0.0, -POOL_HEIGHT * 0.5)
 	_set_pool_active(true)
+	_fit_pool_sprite()
+	_sync_art()
+	if _art != null:
+		_art.puff(self, HydraArt.PROPS, HydraArt.VENOM_SPLASH, global_position + Vector2(0.0, -POOL_HEIGHT), _width)
 	landed.emit(global_position)
 	queue_redraw()
 
@@ -166,6 +202,7 @@ func _update_pool(delta: float) -> void:
 	_rehit_left = maxf(_rehit_left - delta, 0.0)
 	if _rehit_left <= 0.0:
 		_hurt_overlapping()
+	_sync_art()
 	queue_redraw()
 
 
@@ -185,6 +222,33 @@ func _set_pool_active(on: bool) -> void:
 	set_deferred(&"monitoring", on)
 
 
+## The pool sprite is as wide as the puddle that hurts, standing on its surface.
+func _fit_pool_sprite() -> void:
+	if _pool_sprite == null:
+		return
+	var content := _art.art_size(HydraArt.PROPS, HydraArt.VENOM_POOL)
+	var fit := BoomboxHazard.art_scale(content, Vector2(_width, _width), BoomboxHazard.ArtFit.WIDTH)
+	_pool_sprite.scale = fit
+	_pool_sprite.position = Vector2(0.0, -content.y * fit.y * 0.5)
+
+
+## Shows the sprite of what the venom is doing now; a clip with no art leaves the drawing.
+func _sync_art() -> void:
+	if _glob_sprite != null:
+		_glob_sprite.visible = _state == State.FLIGHT
+		if _state == State.FLIGHT:
+			_glob_sprite.position = to_local(_glob_point())
+	if _pool_sprite != null:
+		_pool_sprite.visible = _state == State.POOL
+		_pool_sprite.modulate.a = _pool_fade()
+
+
+func _pool_fade() -> float:
+	if _state == State.POOL and _pool_left < DRY_WARNING_TIME:
+		return 0.55 + 0.45 * sin(_clock * FLIGHT_PULSE_RATE)
+	return 1.0
+
+
 func _draw_marker(rate: float) -> void:
 	var pulse := 0.5 + 0.5 * sin(_clock * rate)
 	var rect := Rect2(-_width * 0.5, -MARKER_THICKNESS, _width, MARKER_THICKNESS)
@@ -196,17 +260,22 @@ func _draw_marker(rate: float) -> void:
 ## The glob rides a parabola: a straight line from the mouth to the spot plus a
 ## bump that peaks halfway (4 u (1 - u) reaches 1 at u = 0.5).
 func _draw_glob() -> void:
-	var u := 1.0 - _flight_left / _flight_time
-	var point := _start.lerp(global_position, u) - Vector2(0.0, _arc_height * 4.0 * u * (1.0 - u))
-	var local := to_local(point)
+	if _glob_sprite != null:
+		return
+	var local := to_local(_glob_point())
 	draw_circle(local, GLOB_RADIUS, GLOB_COLOR)
 	draw_circle(local + Vector2(-2.5, -3.0), GLOB_RADIUS * 0.35, Color(0.85, 1.0, 0.8, 0.9))
 
 
+func _glob_point() -> Vector2:
+	var u := 1.0 - _flight_left / _flight_time
+	return _start.lerp(global_position, u) - Vector2(0.0, _arc_height * 4.0 * u * (1.0 - u))
+
+
 func _draw_pool() -> void:
-	var fade := 1.0
-	if _pool_left < DRY_WARNING_TIME:
-		fade = 0.55 + 0.45 * sin(_clock * FLIGHT_PULSE_RATE)
+	if _pool_sprite != null:
+		return
+	var fade := _pool_fade()
 	var points := PackedVector2Array()
 	for i: int in ELLIPSE_POINTS:
 		var angle := TAU * float(i) / float(ELLIPSE_POINTS)

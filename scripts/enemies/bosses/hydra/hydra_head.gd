@@ -9,6 +9,10 @@ extends Area2D
 ##
 ## A head with no health is severed for good (until the boss resets): no hurtbox,
 ## no hitbox, just a dark stump.
+##
+## Art (docs/bosses/HYDRA_ANIMATIONS.md): `bind_art` dresses the head with a sprite, the
+## neck with a textured line and the stump with a sprite. Each is independent: a piece
+## with no art keeps drawing its placeholder, so a missing sheet never breaks the others.
 
 enum Kind { BITER, SPITTER, SWEEPER }
 ## Which of the three tiers the head rests at: the lowest level, the middle one
@@ -29,6 +33,17 @@ const HEAD_POLYGON := [
 ]
 const JAW_POLYGON := [Vector2(-30.0, 5.0), Vector2(-20.0, 14.0), Vector2(6.0, 20.0), Vector2(0.0, 9.0)]
 const ROAR_GAPE := 9.0
+## Art: the neck sags a little between its ends (never in a sweep) and the stump is this wide.
+const NECK_SAG := 0.08
+const NECK_MAX_SAG := 12.0
+const NECK_SEGMENTS := 8
+const STUMP_ART_WIDTH := 38.0
+const STUMP_ROOT_INSET := 8.0
+const IDLE := &"idle"
+const TELEGRAPH := &"telegraph"
+const ATTACK := &"attack"
+const DAZED := &"dazed"
+const ROAR := &"roar"
 
 @export var kind := Kind.BITER
 @export var tier := Tier.LOW
@@ -66,6 +81,23 @@ var _stuck := false
 var _horizontal_neck := false
 var _flash_left := 0.0
 var _roar_left := 0.0
+var _roar_clip := ROAR
+var _roar_restart := false
+var _pose := IDLE
+var _clip := &""
+var _art: HydraArt
+var _sprite: AnimatedSprite2D
+var _sprite_fx: BossSpriteFx
+var _neck: Line2D
+var _stump_sprite: AnimatedSprite2D
+var _stuck_mark: StuckMark
+
+
+## The cross over a stuck head whose art has no `dazed` pose of its own.
+class StuckMark extends Node2D:
+	func _draw() -> void:
+		draw_line(Vector2(-10.0, -12.0), Vector2(-2.0, -4.0), Color.BLACK, 2.0)
+		draw_line(Vector2(-2.0, -12.0), Vector2(-10.0, -4.0), Color.BLACK, 2.0)
 
 
 func _ready() -> void:
@@ -84,19 +116,31 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_flash_left = maxf(_flash_left - delta, 0.0)
 	_roar_left = maxf(_roar_left - delta, 0.0)
+	_sync_art()
 	queue_redraw()
 
 
 func _draw() -> void:
 	var shoulder_local := to_local(_shoulder_global())
 	if _severed:
-		_draw_stump(shoulder_local)
+		if _stump_sprite == null:
+			_draw_stump(shoulder_local)
 		return
+	if _neck == null:
+		_draw_neck(shoulder_local)
+	if _sprite == null:
+		_draw_head()
+
+
+func _draw_neck(shoulder_local: Vector2) -> void:
 	var neck_from := shoulder_local
 	if _horizontal_neck:
 		neck_from = Vector2(shoulder_local.x, 0.0)
 	draw_line(neck_from, Vector2.ZERO, head_color.darkened(1.0 - NECK_COLOR_SHADE), NECK_WIDTH)
 	draw_circle(neck_from, NECK_WIDTH * 0.5, head_color.darkened(1.0 - NECK_COLOR_SHADE))
+
+
+func _draw_head() -> void:
 	draw_colored_polygon(PackedVector2Array(HEAD_POLYGON), head_color)
 	var jaw := PackedVector2Array(JAW_POLYGON)
 	if _roar_left > 0.0:
@@ -139,6 +183,23 @@ func is_flashing() -> bool:
 	return _flash_left > 0.0
 
 
+## The clip the head sprite is showing (the contract name asked for, not its fallback).
+func get_clip() -> StringName:
+	return _clip
+
+
+func get_sprite() -> AnimatedSprite2D:
+	return _sprite
+
+
+func get_neck() -> Line2D:
+	return _neck
+
+
+func get_stump_sprite() -> AnimatedSprite2D:
+	return _stump_sprite
+
+
 func is_hurtbox_enabled() -> bool:
 	return _hurtbox != null and not _hurtbox.disabled and monitorable
 
@@ -158,10 +219,22 @@ func get_shoulder_global() -> Vector2:
 
 func flash() -> void:
 	_flash_left = flash_time
+	if _sprite_fx != null:
+		_sprite_fx.set_flash(true)
 
 
-func roar(duration: float) -> void:
+## Opens the jaw for `duration` seconds. `clip` is the art that plays meanwhile: the roar of
+## a phase change, or the attack when the spitter throws a glob (each call restarts it).
+func roar(duration: float, clip := ROAR) -> void:
 	_roar_left = duration
+	_roar_clip = clip
+	_roar_restart = true
+
+
+## The clip of the attack in progress (`telegraph`, `attack`) or `idle`; a stuck head and a
+## roar override it. The boss sets it at the start of every phase of a run.
+func set_pose(clip: StringName) -> void:
+	_pose = clip
 
 
 func set_stuck(on: bool) -> void:
@@ -204,8 +277,10 @@ func sever() -> void:
 	_horizontal_neck = false
 	_flash_left = 0.0
 	_roar_left = 0.0
+	_pose = IDLE
 	_set_hurtbox(false)
 	_set_hitbox_off()
+	_sync_art()
 	queue_redraw()
 
 
@@ -216,13 +291,159 @@ func restore(point: Vector2) -> void:
 	_horizontal_neck = false
 	_flash_left = 0.0
 	_roar_left = 0.0
+	_pose = IDLE
+	_clip = &""
 	health = head_max_health
 	rest_global = point
 	global_position = point
 	goal = point
 	_set_hurtbox(true)
 	_set_hitbox_off()
+	_sync_art()
 	queue_redraw()
+
+
+## -- Art -------------------------------------------------------------------------------------
+
+## Dresses the head with whatever `art` draws: the head sprite, the textured neck and the
+## stump sprite. A piece the art does not have keeps its placeholder.
+func bind_art(art: HydraArt) -> void:
+	_art = art
+	_build_sprite()
+	_build_neck()
+	_build_stump()
+	_clip = &""
+	_sync_art()
+	queue_redraw()
+
+
+func _build_sprite() -> void:
+	if not _art.has_head(kind):
+		return
+	_sprite = AnimatedSprite2D.new()
+	_sprite.name = "Sprite"
+	_sprite.sprite_frames = _art.head_frames(kind)
+	_sprite.texture_filter = BoomboxEffectArt.FILTER
+	# The art faces right; the head faces the arena, to the left.
+	var art_scale := _art.head_scale(kind)
+	_sprite.scale = Vector2(-art_scale, art_scale)
+	add_child(_sprite)
+	_sprite_fx = BossSpriteFx.new(_sprite)
+	_stuck_mark = StuckMark.new()
+	_stuck_mark.visible = false
+	add_child(_stuck_mark)
+
+
+## A tiled line from the shoulder to the head: behind the head, never over it.
+func _build_neck() -> void:
+	var texture := _art.neck_texture()
+	if texture == null or _art.neck_thickness() <= 0.0:
+		return
+	_neck = Line2D.new()
+	_neck.name = "Neck"
+	_neck.texture = texture
+	_neck.texture_mode = Line2D.LINE_TEXTURE_TILE
+	_neck.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	_neck.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_neck.width = _art.neck_thickness()
+	_neck.show_behind_parent = true
+	add_child(_neck)
+
+
+func _build_stump() -> void:
+	_stump_sprite = _art.width_sprite(HydraArt.STUMP, STUMP_ART_WIDTH, true)
+	if _stump_sprite == null:
+		return
+	_stump_sprite.name = "Stump"
+	_stump_sprite.visible = false
+	add_child(_stump_sprite)
+
+
+## Keeps the art pieces in step with the head. A pure read of the head's own state.
+func _sync_art() -> void:
+	if _art == null:
+		return
+	_sync_neck()
+	_sync_stump()
+	_sync_sprite()
+
+
+func _sync_neck() -> void:
+	if _neck == null:
+		return
+	_neck.visible = not _severed
+	if not _severed:
+		_neck.points = _neck_points(to_local(_shoulder_global()))
+
+
+## From the shoulder to the head origin, flat in a sweep and with a slight sag otherwise.
+## Both ends are exact.
+func _neck_points(shoulder_local: Vector2) -> PackedVector2Array:
+	var from := shoulder_local
+	var sag := 0.0
+	if _horizontal_neck:
+		from.y = 0.0
+	else:
+		sag = minf(from.length() * NECK_SAG, NECK_MAX_SAG)
+	var points := PackedVector2Array([from])
+	for i: int in range(1, NECK_SEGMENTS):
+		var u := float(i) / float(NECK_SEGMENTS)
+		points.append(from.lerp(Vector2.ZERO, u) + Vector2(0.0, sag * sin(PI * u)))
+	points.append(Vector2.ZERO)
+	return points
+
+
+func _sync_stump() -> void:
+	if _stump_sprite == null:
+		return
+	_stump_sprite.visible = _severed
+	if not _severed:
+		return
+	var half := STUMP_ART_WIDTH * 0.5
+	_stump_sprite.position = to_local(_shoulder_global()) + Vector2(STUMP_ROOT_INSET - half, STUMP_DROOP * 0.5)
+
+
+func _sync_sprite() -> void:
+	if _sprite == null:
+		return
+	_sprite.visible = not _severed
+	if _severed:
+		_sprite_fx.set_flash(false)
+		_stuck_mark.visible = false
+		return
+	var wanted := _wanted_clip()
+	if wanted != _clip or _roar_restart:
+		_play(wanted)
+	_roar_restart = false
+	_sprite_fx.set_flash(_flash_left > 0.0)
+	_stuck_mark.visible = _stuck and _art.resolve_head_clip(kind, DAZED) != DAZED
+
+
+func _wanted_clip() -> StringName:
+	if _roar_left > 0.0:
+		return _roar_clip
+	if _stuck:
+		return DAZED
+	return _pose
+
+
+## Plays `clip` (or the closest drawn one); a clip asked for again restarts only when a roar
+## did it, so a pose held for a while is never reset.
+func _play(clip: StringName) -> void:
+	_clip = clip
+	var resolved := _art.resolve_head_clip(kind, clip)
+	if resolved.is_empty():
+		return
+	var duration := _roar_left if clip == _roar_clip and _roar_left > 0.0 else 0.0
+	var frames := _sprite.sprite_frames
+	var fit := 1.0
+	var count := frames.get_frame_count(resolved)
+	var fps := frames.get_animation_speed(resolved)
+	if duration > 0.0 and count > 0 and fps > 0.0:
+		fit = (float(count) / fps) / duration
+	if _sprite.animation == resolved and _roar_restart:
+		_sprite.stop()
+	_sprite.play(resolved, fit)
 
 
 func _shoulder_global() -> Vector2:

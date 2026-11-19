@@ -25,6 +25,7 @@ const DEFAULT_TIER_STEP := 112.0
 var floor_y := 0.0
 
 var _tops: Array[Rect2] = []
+var _nodes: Array[Node] = []
 var _levels: Array[float] = []
 var _warned: Dictionary = {}
 
@@ -34,6 +35,7 @@ var _warned: Dictionary = {}
 func rebuild(tree: SceneTree, new_floor_y: float, scope: Node = null) -> void:
 	floor_y = new_floor_y
 	_tops.clear()
+	_nodes.clear()
 	_levels.clear()
 	_levels.append(floor_y)
 	for node: Node in _candidates(tree, scope):
@@ -41,6 +43,7 @@ func rebuild(tree: SceneTree, new_floor_y: float, scope: Node = null) -> void:
 		if top.size.x <= 0.0:
 			continue
 		_tops.append(top)
+		_nodes.append(node)
 		if top.position.y < floor_y - SAME_LEVEL and not _has_level(top.position.y):
 			_levels.append(top.position.y)
 	# Floor first: the largest y is the lowest surface.
@@ -59,6 +62,11 @@ func level_count() -> int:
 ## World rectangles of the platform tops (x, surface y, width, thickness).
 func platform_tops() -> Array[Rect2]:
 	return _tops
+
+
+## The platform bodies the last scan counted (the same order as `platform_tops`).
+func platform_nodes() -> Array[Node]:
+	return _nodes
 
 
 ## The y of the surface a head of `tier` (0 low, 1 mid, 2 high) reaches along.

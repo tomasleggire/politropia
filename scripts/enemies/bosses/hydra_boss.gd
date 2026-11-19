@@ -27,6 +27,11 @@ extends BossEnemy
 ## The platforms are discovered from the group `hydra_platform` under the `Platforms`
 ## node of the arena that holds this boss (see HydraTiers), so they can be moved freely. Hazards (venom, markers, hitboxes) live in the
 ## world beside the boss and are all removed by `_clear_hazards()`.
+##
+## Art (docs/bosses/HYDRA_ANIMATIONS.md): every piece is optional and independent. The body
+## wears a sprite under `Visual`, each head its own sprite and a textured neck (`HydraHead`),
+## the venom its sprites (`HydraVenom`) and the platforms the boss scans a drawn slab. A piece
+## with no art keeps its placeholder; with none at all it looks and plays exactly as before.
 
 enum Attack { BITE_LUNGE, VENOM_VOLLEY, NECK_SWEEP }
 
@@ -111,6 +116,9 @@ const MOUTH_OFFSET := Vector2(-26.0, 0.0)
 ## With two heads left, seconds between the lead's start and the second head's.
 @export var duo_offset := 0.7
 
+@export_group("Art")
+@export_file("*.json") var animation_manifest := "res://assets/enemies/hydra/animation_manifest.json"
+
 @export_group("Testing")
 ## Off: the fight loop never starts an attack by itself (tests call `start_attack`).
 @export var auto_attack := true
@@ -124,8 +132,15 @@ var _next_head: HydraHead
 var _last_head: HydraHead
 var _hit_head: HydraHead
 var _venoms: Array[HydraVenom] = []
+var _art: HydraArt
+var _art_on := false
+var _sprite_scale := 1.0
+var _sprite_fx: BossSpriteFx
+## The contract clip last requested for the body (not the fallback it resolved to).
+var _clip: StringName = &""
 
 @onready var _heads_root: Node2D = get_node_or_null("Heads") as Node2D
+@onready var _sprite: AnimatedSprite2D = get_node_or_null("Visual/AnimatedSprite2D") as AnimatedSprite2D
 
 
 ## One head carrying out one attack: the shared state of the lead attack (driven
@@ -153,8 +168,10 @@ func _ready() -> void:
 	super._ready()
 	if Engine.is_editor_hint():
 		return
+	_setup_art()
 	_collect_heads()
 	_begin_layout()
+	_dress_platforms.call_deferred()
 	if _dead:
 		_sever_all_heads()
 
@@ -207,6 +224,19 @@ func get_enrage_scale() -> float:
 
 func get_tiers() -> HydraTiers:
 	return _tiers
+
+
+func has_art() -> bool:
+	return _art_on
+
+
+## The body clip last requested (empty without body art).
+func get_clip() -> StringName:
+	return _clip
+
+
+func get_art() -> HydraArt:
+	return _art
 
 
 ## The heads that are carrying out an attack right now (the lead and the echo).
@@ -327,6 +357,7 @@ func make_corpse_at(at: Vector2, facing: int) -> void:
 ## Per-frame work in every state: the echo attack, the returning heads, the
 ## telegraph drawing. The lead attack is driven by the base lifecycle.
 func _tick(delta: float) -> void:
+	_sync_sprite()
 	if _heads.is_empty():
 		return
 	if _lead != null and _lead.ended:
@@ -458,12 +489,122 @@ func _reset_ai() -> void:
 		for head: HydraHead in _heads:
 			head.restore(_rest_point(head))
 	super._reset_ai()
+	if _heads_root != null:
+		_heads_root.visible = true
+	_clip = &""
+	_cancel_visual_pose()
+	_sync_sprite()
 
 
 func _apply_visual() -> void:
 	super._apply_visual()
+	_cancel_visual_pose()
+	_sync_sprite()
 	if _heads_root != null:
-		_heads_root.modulate = CORPSE_TINT if (_dead or _state == State.DEFEATED) else Color.WHITE
+		var corpse := _dead or _state == State.DEFEATED
+		_heads_root.modulate = CORPSE_TINT if corpse else Color.WHITE
+		# The drawn defeat shows the severed necks itself.
+		_heads_root.visible = not (corpse and _has_clip(&"defeat"))
+
+
+## -- Art -------------------------------------------------------------------------------------
+
+## Reads the manifest and, when the body has art, shows its sprite and hides the placeholder
+## polygon. The heads, the venom and the platforms dress themselves from the same art, each one
+## independent of the body.
+func _setup_art() -> void:
+	_art = HydraArt.load_from(animation_manifest)
+	_art_on = _sprite != null and _art.has_body()
+	if _sprite == null:
+		return
+	_sprite.visible = _art_on
+	if not _art_on:
+		return
+	_sprite.sprite_frames = _art.catalog().build_sprite_frames()
+	_sprite.offset = _art.catalog().sprite_offset()
+	_sprite_scale = _art.catalog().sprite_scale()
+	_visual.move_child(_sprite, 0)
+	var placeholder := _visual.get_node_or_null("Body") as CanvasItem
+	if placeholder != null:
+		placeholder.visible = false
+	_bind_sprite_fx()
+	_clip = &""
+	_apply_visual()
+
+
+## The telegraph glow of the phase beat is drawn on the sprite itself, so it follows the art.
+func _bind_sprite_fx() -> void:
+	_sprite_fx = BossSpriteFx.new(_sprite)
+	if _telegraph != null:
+		_telegraph.bind_sprite_fx(_sprite_fx)
+
+
+## The drawn clips carry the slump of the corpse, so the sprite undoes `Visual`'s tilt and
+## squash and keeps only the facing flip.
+func _cancel_visual_pose() -> void:
+	if not _art_on or _visual == null:
+		return
+	var pose := Transform2D(_visual.rotation, _visual.scale, 0.0, Vector2.ZERO)
+	var wanted := Transform2D(0.0, Vector2(_visual.scale.x, 1.0), 0.0, Vector2.ZERO)
+	var basis := pose.affine_inverse() * wanted
+	_sprite.transform = Transform2D(basis.x * _sprite_scale, basis.y * _sprite_scale, _sprite.position)
+
+
+func _has_clip(clip: StringName) -> bool:
+	return _art_on and _sprite.sprite_frames.has_animation(clip)
+
+
+## Picks the body clip for what the state machine is doing and plays it when it changes. A
+## pure read of the logic: no state or timer is touched.
+func _sync_sprite() -> void:
+	if not _art_on:
+		return
+	var request := _clip_request()
+	if request[0] != _clip:
+		_play(request[0], request[1])
+
+
+## [clip, duration] for the current state; duration 0 plays at the clip's own speed.
+func _clip_request() -> Array:
+	match _state:
+		State.DEFEATED:
+			return [&"defeat", defeat_time]
+		State.TRANSITION:
+			return [&"roar", phase_transition_time]
+		State.IDLE:
+			if _intro_left > 0.0:
+				return [&"roar", _intro_left]
+	return [&"idle", 0.0]
+
+
+## Plays the contract clip `clip` (or the closest drawn one) stretched to last `duration`
+## seconds. A corpse restored from an earlier run shows the last frame at once.
+func _play(clip: StringName, duration := 0.0) -> void:
+	_clip = clip
+	var resolved := _art.catalog().resolve_clip(clip)
+	if resolved.is_empty():
+		return
+	var frames := _sprite.sprite_frames
+	var count := frames.get_frame_count(resolved)
+	var fps := frames.get_animation_speed(resolved)
+	var fit := 1.0
+	if duration > 0.0 and count > 0 and fps > 0.0:
+		fit = (float(count) / fps) / duration
+	_sprite.play(resolved, fit)
+	if _state == State.DEFEATED and _defeat_left <= 0.0:
+		_sprite.pause()
+		_sprite.frame = count - 1
+
+
+## Dresses the platforms the boss scans (the group inside its arena), the ones teammates moved
+## or added included: it runs at every rescan and never doubles a sprite.
+func _dress_platforms() -> void:
+	if _art == null or not is_inside_tree():
+		return
+	var alt := false
+	for platform: Node in _tiers.platform_nodes():
+		if is_instance_valid(platform) and _art.dress_platform(platform, alt):
+			alt = not alt
 
 
 ## -- Heads and layout ------------------------------------------------------------------
@@ -477,6 +618,7 @@ func _collect_heads() -> void:
 		var head := child as HydraHead
 		if head != null:
 			head.bind_boss(self)
+			head.bind_art(_art)
 			_heads.append(head)
 			total += head.head_max_health
 	# The pool is the sum of the heads by construction.
@@ -491,6 +633,7 @@ func _begin_layout() -> void:
 	if not is_inside_tree():
 		return
 	_tiers.rebuild(get_tree(), _spawn_position.y, _platforms_root())
+	_dress_platforms()
 	for head: HydraHead in _heads:
 		head.rest_global = _rest_point(head)
 		if not head.is_severed():
@@ -521,6 +664,7 @@ func _send_idle_heads_home() -> void:
 		head.speed = retract_speed
 		head.set_stuck(false)
 		head.set_horizontal_neck(false)
+		head.set_pose(HydraHead.IDLE)
 
 
 func _sever_head(head: HydraHead) -> void:
@@ -546,6 +690,7 @@ func _sever_all_heads() -> void:
 func _disarm(head: HydraHead) -> void:
 	head.set_stuck(false)
 	head.set_horizontal_neck(false)
+	head.set_pose(HydraHead.IDLE)
 	head.hitbox.set_deferred(&"monitoring", false)
 
 
@@ -634,6 +779,7 @@ func _finish_run(run: Run) -> void:
 
 
 func _run_begin(run: Run) -> void:
+	_pose_head(run)
 	match run.attack:
 		Attack.BITE_LUNGE:
 			_bite_begin(run)
@@ -651,6 +797,17 @@ func _run_update(run: Run) -> void:
 			_venom_update(run)
 		Attack.NECK_SWEEP:
 			_sweep_update(run)
+
+
+## The head shows the clip of the phase its attack is in; a stuck head and a roar override it.
+func _pose_head(run: Run) -> void:
+	match run.phase:
+		AttackPhase.TELEGRAPH:
+			run.head.set_pose(HydraHead.TELEGRAPH)
+		AttackPhase.ACTIVE:
+			run.head.set_pose(HydraHead.ATTACK)
+		_:
+			run.head.set_pose(HydraHead.IDLE)
 
 
 ## The hitbox is never left armed after a phase; the head's position is not
@@ -838,7 +995,7 @@ func _venom_update(run: Run) -> void:
 	run.spit_clock += get_physics_process_delta_time()
 	while run.spat < run.venoms.size() and run.spit_clock >= float(run.spat) * venom_interval:
 		run.venoms[run.spat].launch(run.head.global_position + MOUTH_OFFSET)
-		run.head.roar(venom_interval)
+		run.head.roar(venom_interval, HydraHead.ATTACK)
 		run.spat += 1
 
 
@@ -873,6 +1030,7 @@ func _acquire_venom() -> HydraVenom:
 		if is_instance_valid(venom) and not venom.is_active():
 			return venom
 	var extra := HydraVenom.new()
+	extra.bind_art(_art)
 	var host := get_parent()
 	if host == null:
 		host = self
