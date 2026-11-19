@@ -1,7 +1,7 @@
 # Blind Beast art (El Topo)
 
 Locator: `odd/tasks/blind-beast-art.md`. Engram mirror: `odd/blind-beast-art/tasks` (project `politropia`), pending while `mem_save` is refused in this session.
-Branch: `feat/blind-beast-art`, stacked on `feat/boombox-teacher-art` (`2b5413e`, not pushed), which is stacked on `feat/new-bosses`.
+Branch: `feat/new-bosses` (the stacked art branches were merged into it and deleted on 2026-11-16).
 
 ## Objective
 
@@ -35,7 +35,7 @@ Give El Topo (`BlindBeastBoss`) final art in the same style as Artemis, Luz and 
 
 ## Tasks
 
-- [ ] T1 Concept in the game style (route: inline, two Codex runs by the parent).
+- [x] T1 Concept in the game style (route: inline, two Codex runs by the parent). Commit: the `chore(art)` commit that adds `tools/art_sources/blind_beast/concept/topo_concept_v1.png`. Chosen variant: the cleaner one (suit, shirt collar and tie readable, flatter shapes, reads better at 70 px); the shaggier variant is kept as `topo_concept_v1_alt.png`.
 - [x] T2 Contract, processing script, integration with fallbacks, tests (route: delegated writer; trigger: 2+ non-trivial files). Commits `7397f29` (contract, `tools/process_blind_beast_sheets.py`, shared `color_block_size` / `require_box` / `clip_contents` in the pipeline, teacher script TypeError fixed) and `6255adb` (clips in `BlindBeastBoss`, `BlindBeastHazardArt` hooks for mound, cracks, column, spikes, rocks, pulse and puffs, `BoomboxEffectArt.art_size` fallback fix, collision 40x64 at y -32 on the Topo scene, tests). Writer decisions: cell 448, feet row 416, standing 242 px in the cell (70 on screen), nose colour block as the per-sheet reference with `size_cells` (`burrow` 0-4, `intro` 4-7, `defeat` 0-4), thin cane skipped by a 15% row-width rule; `emerge` plays while he stays untargetable; burrowed `Visual` is hidden. Writer verification: Topo `PASS 349/349` (250 + 99), teacher `PASS 412/412`, catalog `PASS 41/41`, `boss_enemy_test` `PASS 178/178`, `boss_test_hub_test` `PASS 213/213`, teacher and Artemis assets unchanged after re-running their scripts, Topo script with no raw sheets exits 0, synthetic sheets run end to end. Parent spot check: Topo `PASS 349/349`, exit 0. Untested on real art: nose colour tolerance and the cane rule.
 - [ ] T3 Raw sheets (route: inline, eight parallel Codex runs by the parent). Prompts in `tools/art_sources/blind_beast/prompts/sheets.md`.
 - [ ] T4 Process the sheets and hazard art: mound, cracks, column, spikes, rocks, pulse, dust (route: delegated writer).
@@ -53,6 +53,8 @@ Give El Topo (`BlindBeastBoss`) final art in the same style as Artemis, Luz and 
 
 - 2026-11-16, native review of `2b5413e..6255adb` (assessed high: `process_boundary` on `tools/process_blind_beast_sheets.py`; 16 paths, 1578 lines): consent `granted` (standing user instruction), four lenses, approved, acknowledged (lineage `review-fe8c8b023ff516fe`). Non-blocking follow-ups for T4: spike predicate drift (`blind_beast_boss.gd:1439-1440`, two lenses); sprite sync edge at `blind_beast_boss.gd:1650-1655`; `BlindBeastHazardArt` extends a Profesor-named base (`blind_beast_hazard_art.gd:2`, worth a neutral `BossEffectArt` name); loop fps literals; teacher `clip_contents` shim; Topo script error handling around `tools/process_blind_beast_sheets.py:131-133` and `:254-264`; one test at `tests/blind_beast_boss_test.gd:1366`.
 
+- 2026-11-19: the Codex workspace has credits again. T1: both concept runs produced an image (Codex sessions `01a1f455-038d-7ba1-b336-5f44da28661a`, chosen, and `01a1f455-038d-7053-90c2-2c081cd7b625`, alternative). T3: eight sheet runs launched with the chosen concept.
+
 ## Next step
 
-Blocked on art: the Codex workspace needs credits (the user's decision). When it is refilled, relaunch the two concept runs with the same prompt, then the eight sheets.
+T3: review the eight raw sheets, regenerate any that break the grid or the character, then T4.
