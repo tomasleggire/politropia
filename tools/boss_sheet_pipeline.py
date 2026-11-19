@@ -35,16 +35,20 @@ def sprite_scale_for(out_cell: int) -> float:
     return LUZ_SPRITE_SCALE * LUZ_REFERENCE_CELL / out_cell
 
 
-def key_magenta(raw: Image.Image) -> np.ndarray:
-    """Return float RGBA (0..255 alpha) with the magenta background keyed out."""
+def key_magenta(raw: Image.Image, low: int = 30, high: int = 100) -> np.ndarray:
+    """Return float RGBA (0..255 alpha) with the magenta background keyed out.
+
+    A pixel whose magenta excess (min(r, b) - g) is at most `low` is opaque, above `high`
+    transparent, and in between partly transparent. A sheet whose art encloses pockets of
+    a pinker background tone can lower `high` (the defaults are the shipped behaviour)."""
     arr = np.asarray(raw.convert("RGB")).astype(np.int32)
     r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
     m = np.minimum(r, b) - g
-    alpha = np.clip((100 - m) / 70.0, 0.0, 1.0)
-    alpha[m <= 30] = 1.0
-    alpha[m > 100] = 0.0
+    alpha = np.clip((high - m) / float(high - low), 0.0, 1.0)
+    alpha[m <= low] = 1.0
+    alpha[m > high] = 0.0
     # remove the magenta tint from the partially transparent fringe
-    fringe = (m > 30) & (m <= 100)
+    fringe = (m > low) & (m <= high)
     out = arr.copy()
     out[..., 0] = np.where(fringe, np.maximum(0, r - m), r)
     out[..., 2] = np.where(fringe, np.maximum(0, b - m), b)

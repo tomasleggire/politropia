@@ -15,7 +15,7 @@ widest row (`boss_sheet_pipeline.body_height`), not the very first drawn row. Co
 draws every sheet at a slightly different size, so each other sheet gets its own
 scale: the median size of the pink star nose (`boss_sheet_pipeline.color_block_size`;
 the nose exists in every pose that shows the head) is matched to the `exposed` median.
-`size_cells` restricts the measured cells (the first `intro` frames show the old man,
+`height_cells` (burrow, where the nose pose varies too much) measures the standing height of those cells instead. `size_cells` restricts the measured cells (the first `intro` frames show the old man,
 `dig_in` and `defeat` may hide the head); cells where the nose is not found are ignored,
 and a sheet with no nose in any measured cell stops with an error naming it. `scale_mult`
 tunes a sheet by hand.
@@ -58,6 +58,9 @@ NOSE_TARGETS = [(224, 122, 143), (168, 72, 94)]
 NOSE_TOLERANCE = 55.0
 EFFECT_CELL = 256
 EFFECT_SCALE = 0.5  # raw 384 x 512 cells fit a 256 px cell at this factor
+EFFECT_KEY_HIGH = 60  # magenta excess above which an effect pixel is background (pockets inside the column are pinker)
+LEAK_RED_OVER_GREEN = 25
+LEAK_MAGENTA_BLUE_OVER_GREEN = 45
 EFFECT_MIN_COMPONENT_PX = 40  # raw px; drops stray specks around the effects
 
 # sheet -> raw grid (cols, rows), clips (raw cell indices), events (clip -> frame index
@@ -74,8 +77,9 @@ SHEETS = {
         "grid": (4, 2),
         "body_feet": True,
         "min_component_px": 200,
-        # Emerging shows the head; the sinking frames of dig_in may hide it.
-        "size_cells": [0, 1, 2, 3, 4],
+        # The nose swings between side-on and front-on in this sheet, so it is a poor size
+        # reference here; the standing, cane-in-hand frame 3 is measured by height instead.
+        "height_cells": [3],
         "clips": {"emerge": [0, 1, 2, 3], "dig_in": [4, 5, 6, 7]},
     },
     "claw": {
@@ -159,12 +163,14 @@ def sheet_scales(prepared: dict[str, list[np.ndarray | None]]) -> tuple[dict[str
     unknown, so the sheets are measured against the first one present and a note says so."""
     sizes = {}
     for name, frames in prepared.items():
+        if SHEETS[name].get("height_cells"):
+            continue
         size, found = median_nose(frames, SHEETS[name])
         if size <= 0.0:
             raise ValueError(f"{name}: no pink nose found in the measured cells {measured_cells(SHEETS[name])}, so its scale cannot be derived. Check the raw sheet or list other cells in `size_cells`.")
         sizes[name] = size
         print(f"  {name}: nose seen in {found} of {len(measured_cells(SHEETS[name]))} measured cells")
-    ref = REFERENCE if REFERENCE in prepared else next(iter(prepared))
+    ref = REFERENCE if REFERENCE in prepared else next((n for n in prepared if n in sizes), None)
     if ref == REFERENCE:
         stand = idle_stand_height(prepared[ref], SHEETS[ref]["clips"]["exposed_idle"])
         if stand <= 0.0:
@@ -177,6 +183,13 @@ def sheet_scales(prepared: dict[str, list[np.ndarray | None]]) -> tuple[dict[str
     scales = {}
     for name in prepared:
         mult = SHEETS[name].get("scale_mult", 1.0)
+        cells = SHEETS[name].get("height_cells")
+        if cells:
+            height = float(np.median([pipeline.body_height(prepared[name][i], CANE_WIDTH_FRACTION) for i in cells]))
+            scales[name] = STAND_HEIGHT / height * mult
+            sizes[name] = height
+            print(f"  {name}: standing frames {cells} are {height:.0f} raw px -> scale {scales[name]:.4f}")
+            continue
         scales[name] = base * (sizes[ref] / sizes[name]) * mult
         print(f"  {name}: nose {sizes[name]:.0f} raw px -> scale {scales[name]:.4f}")
     return scales, sizes
@@ -191,11 +204,26 @@ def build_sheet(sheet: str, spec: dict, frames: list[np.ndarray | None], scale: 
     return pipeline.manifest_entry(image, OUT_CELL, clips, spec.get("events", {}))
 
 
+def clear_pink_leaks(rgba: np.ndarray) -> np.ndarray:
+    """Remove the magenta that bled into the effect sheets (the eruption column, the rock
+    impact). The art of these sheets is brown, beige and grey, so a bright pixel whose blue
+    exceeds its green (beige has green above blue) is bled background: a strongly magenta
+    one is made transparent, a pale pink one is the lit side of a dust puff and is turned
+    beige by capping its blue under its green. Bright warm pixels are the only candidates."""
+    r, g, b = rgba[..., 0], rgba[..., 1], rgba[..., 2]
+    warm = (r > 160) & (r - g >= LEAK_RED_OVER_GREEN)
+    magenta = warm & (b - g >= LEAK_MAGENTA_BLUE_OVER_GREEN)
+    out = rgba.copy()
+    out[..., 2] = np.where(warm & ~magenta, np.minimum(b, np.maximum(0.0, g - 24.0)), b)
+    out[..., 3] = np.where(magenta, 0.0, out[..., 3])
+    return out
+
+
 def build_effects(sheet: str, spec: dict, preview: Path | None) -> dict:
     """A props or fx sheet: one clip per effect, every frame cropped with the clip's one
     box (a looping mound keeps its motion, a single frame sits on the cell centre)."""
     cols, rows = spec["grid"]
-    cells = pipeline.split_cells(pipeline.key_magenta(Image.open(raw_path(sheet))), cols, rows, sheet, EFFECT_MIN_COMPONENT_PX)
+    cells = pipeline.split_cells(clear_pink_leaks(pipeline.key_magenta(Image.open(raw_path(sheet)), high=EFFECT_KEY_HIGH)), cols, rows, sheet, EFFECT_MIN_COMPONENT_PX)
     placed: dict[int, Image.Image] = {}
     for clip, indices in spec["clips"].items():
         left, top, right, bottom = pipeline.require_box([cells[i] for i in indices], f"{sheet} clip '{clip}' (cells {indices})")
@@ -255,7 +283,8 @@ def main() -> None:
         prepared = {name: load_frames(name, spec) for name, spec in present.items()}
         scales, sizes = sheet_scales(prepared)
         for name, spec in present.items():
-            label = f"nose {sizes[name]:.0f} raw px, scale {scales[name]:.3f}"
+            measure = "standing height" if SHEETS[name].get("height_cells") else "nose"
+            label = f"{measure} {sizes[name]:.0f} raw px, scale {scales[name]:.3f}"
             manifest["sheets"][sheet_file(name)] = build_sheet(name, spec, prepared[name], scales[name], args.preview, label)
             print(f"  {name}: done")
     for name, spec in effects.items():

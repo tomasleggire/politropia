@@ -54,12 +54,13 @@ Scale rules (script `tools/process_blind_beast_sheets.py`, helpers in `tools/bos
 
   | Sheet | `size_cells` | Why |
   |---|---|---|
-  | `burrow` | 0-4 | the sinking frames of `dig_in` (5-7) may hide the head |
+  | `burrow` | `height_cells` 3 | the nose swings between side-on and front-on in this sheet (measured 14 to 59 raw px), so the standing, cane-in-hand frame 3 is matched by body height to the `exposed` idle height instead of by nose |
   | `intro` | 4-7 | the first frames show the old man, before the nose exists |
   | `defeat` | 0-4 | the lying frames hide the head |
   | others | all | the nose is visible |
 
   `scale_mult` tunes a sheet by hand. A sheet whose nose measures 0 in every measured cell stops the script with an error naming the sheet.
+- `props` and `fx` are keyed with a stricter magenta cut (`EFFECT_KEY_HIGH` 60) and `clear_pink_leaks` makes strongly magenta bleed inside the eruption column transparent and turns pale pink dust beige (their art is brown, beige and grey only).
 - Props and effects have no figure: every cell keeps its place in the raw cell, each clip is cropped with one shared box and centred in a **256 px cell** at one fixed factor (`EFFECT_SCALE` 0.5, so a raw 384 x 512 cell fits). The game rescales each effect to its hazard from the per-clip `content` box.
 - A props or fx cell with no drawn pixels stops the script with an error naming the sheet and the cell.
 - Unused cells are dropped; clip indices in the manifest are for the compacted sheet.

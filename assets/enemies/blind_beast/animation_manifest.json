@@ -1,0 +1,251 @@
+{
+  "cell": 448,
+  "feet_row": 416,
+  "sprite_scale": 0.2896,
+  "sheets": {
+    "blind_beast_exposed_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "exposed_idle": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "dazed": [
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {}
+    },
+    "blind_beast_burrow_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "emerge": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "dig_in": [
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {}
+    },
+    "blind_beast_claw_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "claw_windup": [
+          0,
+          1
+        ],
+        "claw_strike": [
+          2,
+          3
+        ],
+        "claw_recover": [
+          4,
+          5
+        ]
+      },
+      "events": {
+        "claw_strike": 0
+      }
+    },
+    "blind_beast_slam_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "slam_windup": [
+          0,
+          1
+        ],
+        "slam_strike": [
+          2,
+          3
+        ],
+        "phase_change": [
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {
+        "slam_strike": 0
+      }
+    },
+    "blind_beast_intro_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "intro": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {}
+    },
+    "blind_beast_defeat_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "defeat": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {}
+    }
+  },
+  "props": {
+    "sheet": "blind_beast_props_sheet.png",
+    "sprite_scale": 0.2896,
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 256,
+      "cell_height": 256
+    },
+    "clips": {
+      "mound": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "rock": [
+        4
+      ],
+      "rock_alt": [
+        5
+      ],
+      "crack": [
+        6
+      ],
+      "spike": [
+        7
+      ]
+    },
+    "content": {
+      "mound": [
+        104,
+        54
+      ],
+      "rock": [
+        57,
+        48
+      ],
+      "rock_alt": [
+        55,
+        50
+      ],
+      "crack": [
+        158,
+        27
+      ],
+      "spike": [
+        46,
+        90
+      ]
+    }
+  },
+  "fx": {
+    "sheet": "blind_beast_fx_sheet.png",
+    "sprite_scale": 0.2896,
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 256,
+      "cell_height": 256
+    },
+    "clips": {
+      "erupt_column": [
+        0,
+        1,
+        2
+      ],
+      "pulse_wave": [
+        3,
+        4
+      ],
+      "dust_puff": [
+        5
+      ],
+      "rock_impact": [
+        6
+      ],
+      "dig_dirt": [
+        7
+      ]
+    },
+    "content": {
+      "erupt_column": [
+        131,
+        214
+      ],
+      "pulse_wave": [
+        173,
+        66
+      ],
+      "dust_puff": [
+        66,
+        58
+      ],
+      "rock_impact": [
+        81,
+        58
+      ],
+      "dig_dirt": [
+        104,
+        72
+      ]
+    }
+  }
+}
