@@ -51,9 +51,9 @@ All raw sheets are 1536x1024.
 
 ## Tasks
 
-- [ ] T1 Concept in the game style (route: inline, two Codex runs by the parent).
+- [x] T1 Concept in the game style (route: inline, two Codex runs by the parent). Commit `7d11749`: `tools/art_sources/hydra/concept/hydra_concept_v1.png` (chosen: thicker outline and bigger flat shapes, reads better at 56 px per head) and `hydra_concept_v1_alt.png`.
 - [ ] T2 Contract `docs/bosses/HYDRA_ANIMATIONS.md`, `tools/process_hydra_sheets.py`, integration with fallbacks (body sprite, head sprites, textured neck, stump, venom, platforms), tests (route: delegated writer; trigger: 2+ non-trivial files).
-- [ ] T3 Raw sheets (route: inline, six parallel Codex runs by the parent). Prompts in `tools/art_sources/hydra/prompts/sheets.md`.
+- [ ] T3 Raw sheets (route: inline, six parallel Codex runs by the parent). Prompts in `tools/art_sources/hydra/prompts/sheets.md` (commit `7d11749`). BLOCKED: the six runs of 2026-11-19 all failed with "Your workspace is out of credits"; no image was generated.
 - [ ] T4 Process the sheets and tune the integration on the real art (route: delegated writer).
 - [ ] T5 Visual check in the real game (route: inline): movie maker capture, video for the user.
 
@@ -71,7 +71,9 @@ All raw sheets are 1536x1024.
 ## Progress and evidence
 
 - 2026-11-19: Codex has credits again. Hydra visual inventory mapped (read-only mapper). Feature document created with 5 tasks.
+- 2026-11-19, T1: both concept runs produced an image (Codex sessions `01a1f459-84a6-79e0-87e5-3a128ff730f8`, chosen, and `01a1f459-84a6-76c0-bed2-5c89414dd5f7`, alternative). T2 writer launched in an isolated worktree (it does not need the art).
+- 2026-11-19, T3: six sheet runs launched right after the eight Topo sheets; all six failed with "ERROR: Your workspace is out of credits. Ask your workspace owner to refill in order to continue." The Codex credits lasted for 2 Topo concepts, 8 Topo sheets and 2 Hydra concepts.
 
 ## Next step
 
-T1: write the concept prompt and launch two Codex concept runs.
+T2 is in progress (writer). T3 is blocked on Codex credits (the user's decision): when the workspace is refilled, relaunch the six sheet runs with `prompts/sheets.md`, then T4 and T5.
