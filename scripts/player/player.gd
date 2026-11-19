@@ -358,6 +358,8 @@ var current_health: int:
 @export var hitbox_up := Rect2(-46, -110, 79, 77)
 @export var hitbox_air := Rect2(2, -56, 79, 38)
 
+@export_group("Open eyes")
+@export var open_eyes_soul_cost: int = 25
 @export var open_eyes_duration := 1.0
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
@@ -851,14 +853,18 @@ func open_eyes() -> void:
 	if _state != State.IDLE and _state != State.RUN:
 		return 
 	
-	##prueba##
-	_sprite.stop()
-	_enter_state(State.OPEN_EYES)##-->Funciona pero se tilda
-	_revelation_burst.play_burst()
-	##_enter_state(State.SKID)
-	##prueba##
-	open_eyes_activated.emit()
+	if not can_use_open_eyes():
+		return 
 	
+	_sprite.stop()
+	_enter_state(State.OPEN_EYES)
+	_revelation_burst.play_burst()
+	_set_soul(_soul - open_eyes_soul_cost)
+
+	open_eyes_activated.emit()
+
+func can_use_open_eyes() -> bool:
+	return _soul >= open_eyes_soul_cost
 
 func _update_open_eyes(delta: float) -> void:
 	velocity.x = 0.0

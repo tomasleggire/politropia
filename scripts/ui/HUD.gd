@@ -7,8 +7,10 @@ extends CanvasLayer
 var _fragment_icons: Array[TextureRect] = []
 var _deposit_marks: Array[Label] = []
 
+#Agregar misma logica generalizada para todos los iconos
 @export var heart_full_texture: Texture2D
 @export var heart_empty_texture: Texture2D
+
 
 @export_group("Layout")
 ## Scales the whole top-left block (portrait, hearts, energy bar, counter).
@@ -17,6 +19,14 @@ var _deposit_marks: Array[Label] = []
 	set(value):
 		hud_scale = value
 		_apply_scale()
+
+@onready var open_eyes_icon: TextureRect = $PlayerUI/SkillsContainer/OpenEyesIcon
+
+@export_group("Open Eyes")
+@export var open_eyes_available_texture: Texture2D
+@export var open_eyes_unavailable_texture: Texture2D
+
+var _player: Player
 
 func _ready() -> void:
 	_apply_scale()
@@ -73,6 +83,8 @@ func bind_player(player: Player) -> void:
 	if player == null:
 		return
 
+	_player = player
+
 	# Conectar señales
 	if not player.health_changed.is_connected(_on_player_health_changed):
 		player.health_changed.connect(_on_player_health_changed)
@@ -80,12 +92,25 @@ func bind_player(player: Player) -> void:
 	if not player.soul_changed.is_connected(_on_player_soul_changed):
 		player.soul_changed.connect(_on_player_soul_changed)
 
-	# DIBUJAR DE ENTRADA (Esto es lo que te faltaba):
+	
 	var cur_hp: int = player.get_health() if player.has_method("get_health") else player._health
 	var max_hp: int = player.get_max_health() if player.has_method("get_max_health") else player.max_health
 	_on_player_health_changed(cur_hp, max_hp)
 
 	_on_player_soul_changed(player.get_soul(), player.get_max_soul())
+	_update_open_eyes_icon()
+
+
+func _update_open_eyes_icon() -> void:
+	if not is_instance_valid(open_eyes_icon) or _player == null:
+		return
+	
+	var available :bool= _player.get_soul() >= _player.open_eyes_soul_cost
+	open_eyes_icon.texture = (
+		open_eyes_available_texture
+		if available
+		else open_eyes_unavailable_texture
+	)
 
 func _on_player_health_changed(current_health: int, max_health: int) -> void:
 	if hearts_container == null:
@@ -123,3 +148,4 @@ func _on_player_soul_changed(current_soul: int, max_soul: int) -> void:
 	if is_instance_valid(energy_bar):
 		energy_bar.max_value = max_soul
 		energy_bar.value = current_soul
+	_update_open_eyes_icon()

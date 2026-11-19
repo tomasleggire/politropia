@@ -145,4 +145,3 @@ func _set_phase(phase: Phase) -> void:
 		Phase.RECOVER:
 			_phase_left = recover_time
 	_apply_visual()
-
