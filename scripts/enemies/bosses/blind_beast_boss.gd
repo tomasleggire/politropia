@@ -1367,7 +1367,7 @@ func _draw_ripples(y: float) -> void:
 
 
 func _mound_visible() -> bool:
-	return show_mound and not _exposed and not _digging and not _dead and not _emerging
+	return show_mound and not _exposed and not _digging and not _dead and not _emerging and not _intro_shown
 
 
 func _draw_mound(y: float) -> void:
