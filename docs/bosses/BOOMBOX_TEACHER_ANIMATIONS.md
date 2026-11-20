@@ -42,7 +42,7 @@ Same style as Luz and Artemis: thick dark outline `#1A1410`, cel shading in 2-3 
 
 ### 2.3 Raw sheets and the pipeline
 
-Codex draws raw magenta sheets of **1536 x 1024**: `thrust` is **3 columns x 2 rows** (512 x 512 cells, the lunge is wide), every other sheet is **4 x 2** (384 x 512 cells). Codex does not keep exact geometry: the script splits by connected components per grid cell.
+Codex draws raw magenta sheets of **1536 x 1024**: `thrust` is **3 columns x 2 rows** (512 x 512 cells, the lunge is wide), every other sheet is **4 x 2** (384 x 512 cells). Codex does not keep exact geometry: the script splits by connected components per grid cell. The character sheets are keyed with `pipeline.despill_edges`, which un-mixes the antialiased silhouette edge from the magenta against the measured outline colour (no pink halo on semi-transparent edge pixels).
 Raw file: `tools/art_sources/boombox_teacher/raw/boombox_teacher_<sheet>_raw.png`. Output: `assets/enemies/boombox_teacher/boombox_teacher_<sheet>_sheet.png` + `animation_manifest.json` (`cell`, `feet_row`, `sprite_scale`, `sheets {file: {grid, clips, events}}`, `props {sheet, sprite_scale, grid, clips}`).
 
 Scale rules (script `tools/process_boombox_teacher_sheets.py`, helpers in `tools/boss_sheet_pipeline.py`):

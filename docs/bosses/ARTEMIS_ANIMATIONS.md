@@ -70,7 +70,7 @@ The silhouette must stay readable against dark navy backgrounds: keep a light va
 - One PNG sheet per skin (`artemis_p1.png`, `artemis_p2.png`) under `assets/art/greece/bosses/artemis/`, transparent background, one uniform grid, **one cell size for the whole sheet** (suggest 256 x 256, boss on the same pixel grid as Luz after scaling; Codex may choose another size but must keep it uniform and state it in the manifest).
 - Same pipeline as Luz: a JSON manifest (`animation_manifest.json`: `grid {columns, rows, cell_width, cell_height}`, `clips {name: [frame indices]}`, `events {name: frame index}`) and a repack script so feet land on the same row in every cell.
 - `p2` sheet has an identical layout and clip list (silver accents only).
-- Stag: separate small sheet `spectral_stag.png`, same rules.
+- Stag: separate sheet `spectral_stag_sheet.png`, same rules, with its own cell: 512 wide x 384 tall (the stretched gallop poses reach 239 px left of the feet, which sit on the cell centre), feet row 340, sprite scale 0.245. `stag_run` frames lose detached specks more than 24 px from the body; wisps close to the tail stay.
 
 ### 2.5 Registration: `artemis_animation_catalog.gd` (proposed)
 

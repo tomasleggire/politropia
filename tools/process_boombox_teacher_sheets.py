@@ -155,7 +155,8 @@ def median_block(frames: list[np.ndarray | None], spec: dict) -> float:
 def load_frames(sheet: str, spec: dict) -> list[np.ndarray | None]:
     cols, rows = spec["grid"]
     needed = {i for clip in spec["clips"].values() for i in clip}
-    frames = pipeline.split_frames(pipeline.key_magenta(Image.open(raw_path(sheet))), cols, rows, sheet, needed)
+    raw = Image.open(raw_path(sheet))
+    frames = pipeline.split_frames(pipeline.despill_edges(raw, pipeline.key_magenta(raw)), cols, rows, sheet, needed)
     min_px = spec.get("min_component_px")
     if min_px:
         frames = [None if f is None else pipeline.drop_specks(f, min_px) for f in frames]

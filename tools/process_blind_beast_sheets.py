@@ -37,6 +37,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
+from scipy import ndimage
 
 import boss_sheet_pipeline as pipeline
 
@@ -59,8 +60,28 @@ NOSE_TOLERANCE = 55.0
 EFFECT_CELL = 256
 EFFECT_SCALE = 0.5  # raw 384 x 512 cells fit a 256 px cell at this factor
 EFFECT_KEY_HIGH = 60  # magenta excess above which an effect pixel is background (pockets inside the column are pinker)
+# Colour match of every sheet to the reference sheet: the muted tones are compared per tone
+# class and lightness band and shifted. The jacket is the cool (purple-brown) class, the fur the
+# warm one; saturated accents (tie, nose) fade out of the shift.
+TONE_CENTRES = np.arange(10.0, 90.0, 4.0)
+TONE_HALF_WIDTH = 4.0
+TONE_MIN_WEIGHT = 150.0
+TONES = [
+    {"hue": (255.0, 350.0), "fade_start": 40.0, "fade_width": 14.0},  # jacket
+    {"hue": (350.0, 255.0), "fade_start": 28.0, "fade_width": 12.0},  # fur, skin, shirt
+]
+LEAK_MIN_RED = 160
 LEAK_RED_OVER_GREEN = 25
+LEAK_PINK_BLUE_MARGIN = 6  # beige has blue about 24 under green; blue above green - 6 is pink
 LEAK_MAGENTA_BLUE_OVER_GREEN = 45
+LEAK_FRINGE_PX = 5
+LEAK_LEFTOVER_MIN_RED = 90  # a hairline of faded pink; the dark outline and the grey rock are below or not red
+LEAK_FRINGE_MAX_ALPHA = 200.0  # fainter pixels near a bled pocket are its leftover fringe
+LEAK_OPEN_SHARE = 0.2  # measured: bled pockets 0.3 and more, painted puffs under 0.15
+LEAK_BEIGE_GAP = 24
+LEAK_PUFF_MIN_GREEN = 170
+LEAK_PUFF_MIN_RED = 200
+LEAK_PUFF_RED_OVER_GREEN = 26
 EFFECT_MIN_COMPONENT_PX = 40  # raw px; drops stray specks around the effects
 
 # sheet -> raw grid (cols, rows), clips (raw cell indices), events (clip -> frame index
@@ -149,7 +170,8 @@ def median_nose(frames: list[np.ndarray | None], spec: dict) -> tuple[float, int
 def load_frames(sheet: str, spec: dict) -> list[np.ndarray | None]:
     cols, rows = spec["grid"]
     needed = {i for clip in spec["clips"].values() for i in clip}
-    frames = pipeline.split_frames(pipeline.key_magenta(Image.open(raw_path(sheet))), cols, rows, sheet, needed)
+    raw = Image.open(raw_path(sheet))
+    frames = pipeline.split_frames(pipeline.despill_edges(raw, pipeline.key_magenta(raw)), cols, rows, sheet, needed)
     min_px = spec.get("min_component_px")
     if min_px:
         frames = [None if f is None else pipeline.drop_specks(f, min_px) for f in frames]
@@ -195,6 +217,26 @@ def sheet_scales(prepared: dict[str, list[np.ndarray | None]]) -> tuple[dict[str
     return scales, sizes
 
 
+def tone_references(frames: list[np.ndarray | None]) -> list[np.ndarray]:
+    return [pipeline.tone_band_means(frames, tone, TONE_CENTRES, TONE_HALF_WIDTH, TONE_MIN_WEIGHT) for tone in TONES]
+
+
+def harmonise_colours(prepared: dict[str, list[np.ndarray | None]]) -> None:
+    """Codex paints the jacket and the fur in a slightly different tone in every sheet (purple
+    in `claw`, olive in `burrow`, grey in `defeat`). Shift the muted tones of each sheet, in
+    place, to those of the reference sheet. Run after the scales are measured: the pink nose
+    is the size reference and is not touched anyway. Without the reference nothing changes."""
+    if REFERENCE not in prepared:
+        print(f"note: no {REFERENCE} sheet, colours not matched")
+        return
+    references = tone_references(prepared[REFERENCE])
+    for name, frames in prepared.items():
+        if name == REFERENCE:
+            continue
+        prepared[name] = pipeline.match_tones(frames, references, TONES, TONE_CENTRES, TONE_HALF_WIDTH, TONE_MIN_WEIGHT)
+        print(f"  {name}: colours matched to {REFERENCE}")
+
+
 def build_sheet(sheet: str, spec: dict, frames: list[np.ndarray | None], scale: float, preview: Path | None, label: str) -> dict:
     used, clips = pipeline.compact_clips(spec["clips"])
     cells = [pipeline.to_cell(frames[src], scale, f"{sheet}[{src}]", OUT_CELL, FEET_ROW, spec.get("body_feet", False)) for src in used]
@@ -204,18 +246,50 @@ def build_sheet(sheet: str, spec: dict, frames: list[np.ndarray | None], scale: 
     return pipeline.manifest_entry(image, OUT_CELL, clips, spec.get("events", {}))
 
 
-def clear_pink_leaks(rgba: np.ndarray) -> np.ndarray:
-    """Remove the magenta that bled into the effect sheets (the eruption column, the rock
-    impact). The art of these sheets is brown, beige and grey, so a bright pixel whose blue
-    exceeds its green (beige has green above blue) is bled background: a strongly magenta
-    one is made transparent, a pale pink one is the lit side of a dust puff and is turned
-    beige by capping its blue under its green. Bright warm pixels are the only candidates."""
+def open_pink_regions(pink: np.ndarray, background: np.ndarray) -> np.ndarray:
+    """The connected regions of `pink` whose outline borders `background` (pixels within one
+    px of it) for more than LEAK_OPEN_SHARE of its length."""
+    labels, count = ndimage.label(pink, structure=np.ones((3, 3)))
+    if count == 0:
+        return np.zeros_like(pink)
+    edge = pink & ~ndimage.binary_erosion(pink, structure=np.ones((3, 3)), border_value=1)
+    open_edge = edge & ndimage.binary_dilation(background, structure=np.ones((3, 3)))
+    index = range(1, count + 1)
+    share = np.asarray(ndimage.sum(open_edge, labels, index)) / np.maximum(np.asarray(ndimage.sum(edge, labels, index)), 1.0)
+    return np.isin(labels, [i for i, value in zip(index, share) if value > LEAK_OPEN_SHARE])
+
+
+def clear_pink_leaks(rgba: np.ndarray, cap_puffs: bool = True) -> np.ndarray:
+    """Clean the effect sheets (the eruption column, the rock impact) of the magenta that bled
+    into them. The art is brown, beige and grey, and beige has a green well above its blue, so
+    the pink pixels are the bright warm ones (red above LEAK_MIN_RED and above green by
+    LEAK_RED_OVER_GREEN) whose blue is within LEAK_PINK_BLUE_MARGIN of green or above it.
+    - A strongly magenta pixel (blue above green by LEAK_MAGENTA_BLUE_OVER_GREEN) is background.
+    - A connected pink region (kept pixels only) that borders the keyed background along more
+      than LEAK_OPEN_SHARE of its outline is bled background too (a pale pink pocket beside
+      the column): it becomes transparent, with the partly transparent fringe around it
+      (LEAK_FRINGE_PX: pixels fainter than LEAK_FRINGE_MAX_ALPHA and faded pink hairlines) so no
+      ghost outline is left.
+    - A pink region enclosed by outline (a dust puff that was painted pale pink) is turned
+      beige: its blue is lowered to LEAK_BEIGE_GAP under its green.
+    Warm pixels that are not pink only have their blue lowered to that gap. With `cap_puffs`
+    (the dust of the `fx` sheet; the props have light tan faces that must stay) the pale puffs
+    also get their red capped at LEAK_PUFF_RED_OVER_GREEN over green, so a puff that came out
+    peach is beige like the others. Everything else is left alone."""
     r, g, b = rgba[..., 0], rgba[..., 1], rgba[..., 2]
-    warm = (r > 160) & (r - g >= LEAK_RED_OVER_GREEN)
+    warm = (r > LEAK_MIN_RED) & (r - g >= LEAK_RED_OVER_GREEN)
+    pink = warm & (b - g >= -LEAK_PINK_BLUE_MARGIN)
     magenta = warm & (b - g >= LEAK_MAGENTA_BLUE_OVER_GREEN)
+    pink &= rgba[..., 3] > 0.0
+    bled = open_pink_regions(pink, rgba[..., 3] <= 0.0) | (magenta & (rgba[..., 3] > 0.0))
+    zone = ndimage.binary_dilation(bled, structure=np.ones((3, 3)), iterations=LEAK_FRINGE_PX)
+    leftover = (r >= LEAK_LEFTOVER_MIN_RED) & (r - g >= 10.0) & (b - g >= -LEAK_BEIGE_GAP + 4.0)
+    fringe = zone & ((rgba[..., 3] < LEAK_FRINGE_MAX_ALPHA) | leftover)
+    puff = cap_puffs & (g >= LEAK_PUFF_MIN_GREEN) & (r >= LEAK_PUFF_MIN_RED)
     out = rgba.copy()
-    out[..., 2] = np.where(warm & ~magenta, np.minimum(b, np.maximum(0.0, g - 24.0)), b)
-    out[..., 3] = np.where(magenta, 0.0, out[..., 3])
+    out[..., 0] = np.where(puff, np.minimum(r, g + LEAK_PUFF_RED_OVER_GREEN), r)
+    out[..., 2] = np.where(warm, np.minimum(b, np.maximum(0.0, g - LEAK_BEIGE_GAP)), b)
+    out[..., 3] = np.where(bled | fringe, 0.0, out[..., 3])
     return out
 
 
@@ -223,7 +297,7 @@ def build_effects(sheet: str, spec: dict, preview: Path | None) -> dict:
     """A props or fx sheet: one clip per effect, every frame cropped with the clip's one
     box (a looping mound keeps its motion, a single frame sits on the cell centre)."""
     cols, rows = spec["grid"]
-    cells = pipeline.split_cells(clear_pink_leaks(pipeline.key_magenta(Image.open(raw_path(sheet)), high=EFFECT_KEY_HIGH)), cols, rows, sheet, EFFECT_MIN_COMPONENT_PX)
+    cells = pipeline.split_cells(clear_pink_leaks(pipeline.key_magenta(Image.open(raw_path(sheet)), high=EFFECT_KEY_HIGH), cap_puffs=sheet == "fx"), cols, rows, sheet, EFFECT_MIN_COMPONENT_PX)
     placed: dict[int, Image.Image] = {}
     for clip, indices in spec["clips"].items():
         left, top, right, bottom = pipeline.require_box([cells[i] for i in indices], f"{sheet} clip '{clip}' (cells {indices})")
@@ -282,6 +356,7 @@ def main() -> None:
     if present:
         prepared = {name: load_frames(name, spec) for name, spec in present.items()}
         scales, sizes = sheet_scales(prepared)
+        harmonise_colours(prepared)
         for name, spec in present.items():
             measure = "standing height" if SHEETS[name].get("height_cells") else "nose"
             label = f"{measure} {sizes[name]:.0f} raw px, scale {scales[name]:.3f}"

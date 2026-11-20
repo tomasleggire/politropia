@@ -163,16 +163,10 @@ def key_background(raw: Image.Image) -> np.ndarray:
         on_border = set(np.unique(np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]])).tolist())
         keep = [i + 1 for i in range(count) if (i + 1) in on_border or sizes[i] >= POCKET_MIN_PX]
         background = np.isin(labels, keep)
-    fringe = ndimage.binary_dilation(background, structure=np.ones((3, 3)), iterations=FRINGE_PX) & ~background
-    axis = MAGENTA - OUTLINE
-    share = np.clip(((rgb - OUTLINE) @ axis) / float(axis @ axis), 0.0, 1.0)  # 1 = pure magenta
-    residual = np.linalg.norm(rgb - (OUTLINE + share[..., None] * axis), axis=-1)
-    unmixed = fringe & (residual < UNMIX_RESIDUAL)
+    share_alpha, out, unmixed = pipeline.unmix_fringe(rgb, background, OUTLINE, FRINGE_PX, UNMIX_RESIDUAL)
     alpha = np.ones(pure.shape, dtype=np.float32)
     alpha[background] = 0.0
-    alpha[unmixed] = 1.0 - share[unmixed]
-    out = rgb.copy()
-    out[unmixed & (share > 0.02)] = OUTLINE
+    alpha[unmixed] = share_alpha[unmixed]
     return np.dstack([out, alpha * 255.0]).astype(np.float32)
 
 

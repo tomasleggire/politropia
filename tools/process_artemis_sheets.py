@@ -201,9 +201,8 @@ SHEETS = {
 }
 
 
-def to_cell(frame: np.ndarray, scale: float, label: str, body_feet: bool = False, out_cell: int = OUT_CELL, feet_row: int = FEET_ROW) -> Image.Image:
-    # clamp_cell keeps the historical 256 px nudge for the 384 px stag sheet (byte-identical output).
-    return pipeline.to_cell(frame, scale, label, out_cell, feet_row, body_feet, clamp_cell=OUT_CELL)
+def to_cell(frame: np.ndarray, scale: float, label: str, body_feet: bool = False, out_cell: int = OUT_CELL, feet_row: int = FEET_ROW, cell_height: int | None = None) -> Image.Image:
+    return pipeline.to_cell(frame, scale, label, out_cell, feet_row, body_feet, cell_height)
 
 
 
@@ -247,7 +246,8 @@ def stag_body_anchor(arr: np.ndarray) -> tuple[float, float]:
 
 # Spectral stag: its own sheet and sprite scale (the sprite node uses STAG_SPRITE_SCALE).
 STAG_RAW = "artemis_stag_raw.png"
-STAG_CELL = 384
+STAG_CELL = 512  # cell width: the stretched gallop poses reach 239 px left of the feet, which sit on the cell centre
+STAG_CELL_HEIGHT = 384
 STAG_FEET_ROW = 340
 STAG_SPRITE_SCALE = 0.245  # sprite node scale in artemis.tscn (commit 0aa2d61); the sheet is NOT rescaled by it
 STAG_RENDER_SCALE = 0.2  # sizing basis of the sheet pixels (STAG_BODY_WIDTH is relative to this)
@@ -262,17 +262,22 @@ STAG_CLIPS = {
     "stag_run": list(range(3, 11)),
 }
 STAG_REF = 6
+STAG_RUN_CELLS = range(3, 11)
+STAG_SPECK_DISTANCE = 24.0  # raw px from the body; the tail wisps of the gallop are within 10
+STAG_SPECK_MAX_PX = 150
 
 
 def build_stag() -> dict:
     cols, rows = STAG_GRID
     needed = {i for clip in STAG_CLIPS.values() for i in clip}
     frames = split_frames(key_magenta(Image.open(RAW_DIR / STAG_RAW)), cols, rows, "stag", needed)
+    for src in STAG_RUN_CELLS:
+        frames[src] = pipeline.drop_distant_specks(frames[src], STAG_SPECK_DISTANCE, STAG_SPECK_MAX_PX)
     ref = frames[STAG_REF]
     scale = (STAG_BODY_WIDTH / STAG_RENDER_SCALE) / ref.shape[1]
     used = sorted(needed)
     remap = {src: dst for dst, src in enumerate(used)}
-    cells = [to_cell(frames[src], scale, f"stag[{src}]", True, STAG_CELL, STAG_FEET_ROW) for src in used]
+    cells = [to_cell(frames[src], scale, f"stag[{src}]", True, STAG_CELL, STAG_FEET_ROW, STAG_CELL_HEIGHT) for src in used]
     rows_out = (len(cells) + COLUMNS - 1) // COLUMNS
     clips = {clip: [remap[i] for i in idx] for clip, idx in STAG_CLIPS.items()}
     if (RAW_DIR / STAG_VANISH_RAW).exists():
@@ -280,19 +285,19 @@ def build_stag() -> dict:
         # a run frame would, the rest keep their position relative to it.
         vcols, vrows = STAG_VANISH_GRID
         full = split_cells(key_magenta(Image.open(RAW_DIR / STAG_VANISH_RAW)), vcols, vrows, "stag_vanish", 12)
-        placed = place_fixed(full, scale * STAG_VANISH_SCALE_MULT, STAG_CELL, stag_body_anchor, (STAG_CELL / 2, STAG_FEET_ROW), "stag_vanish")
+        placed = place_fixed(full, scale * STAG_VANISH_SCALE_MULT, STAG_CELL, stag_body_anchor, (STAG_CELL / 2, STAG_FEET_ROW), "stag_vanish", cell_height=STAG_CELL_HEIGHT)
         clips["stag_vanish"] = list(range(len(cells), len(cells) + len(placed)))
         cells.extend(placed)
     rows_out = (len(cells) + COLUMNS - 1) // COLUMNS
-    sheet = Image.new("RGBA", (COLUMNS * STAG_CELL, rows_out * STAG_CELL), (0, 0, 0, 0))
+    sheet = Image.new("RGBA", (COLUMNS * STAG_CELL, rows_out * STAG_CELL_HEIGHT), (0, 0, 0, 0))
     for index, cell in enumerate(cells):
-        sheet.alpha_composite(cell, ((index % COLUMNS) * STAG_CELL, (index // COLUMNS) * STAG_CELL))
+        sheet.alpha_composite(cell, ((index % COLUMNS) * STAG_CELL, (index // COLUMNS) * STAG_CELL_HEIGHT))
     sheet.save(OUT_DIR / "spectral_stag_sheet.png", optimize=True)
     return {
         "sheet": "spectral_stag_sheet.png",
         "sprite_scale": STAG_SPRITE_SCALE,
         "feet_row": STAG_FEET_ROW,
-        "grid": {"columns": COLUMNS, "rows": rows_out, "cell_width": STAG_CELL, "cell_height": STAG_CELL},
+        "grid": {"columns": COLUMNS, "rows": rows_out, "cell_width": STAG_CELL, "cell_height": STAG_CELL_HEIGHT},
         "clips": clips,
     }
 
