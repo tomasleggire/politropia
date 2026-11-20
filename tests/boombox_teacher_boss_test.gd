@@ -1714,8 +1714,7 @@ func case_art_thrust_streak() -> void:
 		check(not frames.get_animation_loop(&"thrust_streak") and is_equal_approx(float(frames.get_frame_count(&"thrust_streak")) / (frames.get_animation_speed(&"thrust_streak") * streak.speed_scale), _boss.thrust_strike_time), "four frames play once over the strike")
 		if side < 0.0:
 			check(streak.frame <= 1, "it starts on the first frame")
-			await _wait(_boss.thrust_strike_time * 0.7)
-			check(is_instance_valid(streak) and streak.frame >= 2, "and is on the late frames near the end")
+			check(await _streak_reaches_late_frames(streak), "and reaches the late frames before the strike ends")
 		await _finish_attack()
 	check(facings[0] != facings[1], "both facings were exercised")
 	_remove_art_fixture()
@@ -1758,6 +1757,18 @@ func case_art_effects_without_a_content_box() -> void:
 	check(steam != null and absf(steam.scale.x * float(ART_CELL) - BoomboxTeacherBoss.STEAM_ART_WIDTH) < 0.01, "the steam is its width without a box too")
 	check(effects.floor_sprites(BoomboxEffectArt.FX, &"bass_shock", Vector2(240.0, 34.0)).is_empty(), "a floor strip with no box keeps its placeholder")
 	_remove_art_fixture()
+
+
+## Polls the streak every physics frame until it shows frame 2 or later, or the hazard
+## (and with it the sprite) is gone. Never touches a freed sprite.
+func _streak_reaches_late_frames(streak: AnimatedSprite2D) -> bool:
+	for i: int in ceili(_boss.thrust_strike_time / _dt()) + 2:
+		if not is_instance_valid(streak):
+			return false
+		if streak.frame >= 2:
+			return true
+		await physics_frame
+	return false
 
 
 func case_art_steam_over_the_boombox() -> void:

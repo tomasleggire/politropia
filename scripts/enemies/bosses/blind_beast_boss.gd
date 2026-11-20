@@ -123,6 +123,8 @@ const ROCK_SPIN := 6.0
 const DUST_WIDTH := 40.0
 ## The scratch lines of the claw warning pulse between white and this red tint.
 const CLAW_WARNING_TINT := Color(1.0, 0.45, 0.4)
+## Radians per second of the pulse that warns of the claw: the zone fill and the sprite tint share it.
+const CLAW_WARNING_PULSE := 14.0
 const CRACK_MIN_ALPHA := 0.35
 
 @export_group("Art")
@@ -1427,7 +1429,7 @@ func _draw_claw() -> void:
 	if not _claw_visible:
 		return
 	var color := BossTelegraph.MELEE_COLOR
-	var alpha := 0.25 + 0.15 * sin(_clock * 14.0) if is_telegraphing() else 0.7
+	var alpha := 0.25 + 0.15 * sin(_clock * CLAW_WARNING_PULSE) if is_telegraphing() else 0.7
 	if _has_hazard_art(BoomboxEffectArt.CLAW_FX, BlindBeastHazardArt.CLAW):
 		# The swipe is drawn; only the warning keeps its zone fill under the scratch lines.
 		if is_telegraphing():
@@ -1774,7 +1776,7 @@ func _make_claw(_item: Variant) -> AnimatedSprite2D:
 func _place_claw(_item: Variant, sprite: AnimatedSprite2D) -> void:
 	_hazard_art.stand_on_floor(sprite, BoomboxEffectArt.CLAW_FX, BlindBeastHazardArt.CLAW, _claw_zone.get_center().x, _floor_y)
 	_hazard_art.show_frame(sprite, _claw_frame(sprite.sprite_frames.get_frame_count(BlindBeastHazardArt.CLAW)))
-	sprite.modulate = CLAW_WARNING_TINT.lerp(Color.WHITE, 0.5 - 0.5 * sin(_clock * 14.0)) if is_telegraphing() else Color.WHITE
+	sprite.modulate = CLAW_WARNING_TINT.lerp(Color.WHITE, 0.5 - 0.5 * sin(_clock * CLAW_WARNING_PULSE)) if is_telegraphing() else Color.WHITE
 
 
 ## Frame 0 warns; the frames up to the last but one are the strike, spread over the active

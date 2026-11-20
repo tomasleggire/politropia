@@ -15,6 +15,11 @@ const ROWS := 2
 const SPEEDS := {"idle": 8.0, "run": 12.0}
 const LOOPING := ["idle"]
 const FALLBACKS := {"jump": ["run", "idle"], "glide": ["nothing"]}
+const WIDE_CELL := Vector2i(6, 3)
+const SHIPPED_WIDE := {
+	"res://assets/enemies/boombox_teacher/animation_manifest.json": ["thrust_fx", &"thrust_streak", Vector2(400.0, 80.0)],
+	"res://assets/enemies/blind_beast/animation_manifest.json": ["claw_fx", &"claw_swipe", Vector2(400.0, 208.0)],
+}
 
 var checks := 0
 var failed: Array[String] = []
@@ -34,6 +39,8 @@ func run() -> void:
 	case_events_scale_and_offset()
 	case_props()
 	case_effect_entries()
+	case_non_square_grid()
+	case_shipped_non_square_grids()
 	case_duplicate_clip()
 	case_missing_manifest()
 	case_missing_texture()
@@ -72,6 +79,12 @@ func _write_sheet(file_name: String, columns: int, rows: int) -> void:
 	image.save_png(FIXTURE_DIR.path_join(file_name))
 
 
+func _write_wide_sheet(file_name: String, columns: int, rows: int) -> void:
+	var image := Image.create_empty(columns * WIDE_CELL.x, rows * WIDE_CELL.y, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	image.save_png(FIXTURE_DIR.path_join(file_name))
+
+
 func _write_json(path: String, data: Variant) -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	file.store_string(JSON.stringify(data) if not data is String else data)
@@ -87,6 +100,7 @@ func _write_fixture() -> void:
 	_write_sheet("props_sheet.png", COLUMNS, 1)
 	_write_sheet("zdup_sheet.png", COLUMNS, 1)
 	_write_sheet("board.png", COLUMNS, 1)
+	_write_wide_sheet("wide_sheet.png", 3, 2)
 	_write_json(MANIFEST, {
 		"cell": 448, "feet_row": 416, "sprite_scale": 0.25,
 		"sheets": {
@@ -99,6 +113,7 @@ func _write_fixture() -> void:
 		},
 		"props": {"sheet": "props_sheet.png", "sprite_scale": 0.25, "grid": _grid(COLUMNS, 1), "clips": {"spark": [0], "steam": [1, 2]}},
 		"fx": {"sheet": "props_sheet.png", "grid": _grid(COLUMNS, 1), "clips": {"wave": [0], "dust": [1, 2]}, "content": {"wave": [3, 2], "bad": [1], "dust": "x"}},
+		"wide_fx": {"sheet": "wide_sheet.png", "grid": {"columns": 3, "rows": 2, "cell_width": WIDE_CELL.x, "cell_height": WIDE_CELL.y}, "clips": {"sweep": [0, 1, 2, 3, 4]}},
 		"blackboard": {"texture": "board.png", "size": [16, 4]},
 	})
 
@@ -169,6 +184,36 @@ func case_effect_entries() -> void:
 	check(catalog.build_entry_frames("nothing").get_animation_names().is_empty(), "an entry the manifest lacks builds nothing")
 	var board := catalog.blackboard_texture()
 	check(board != null and board.get_size() == Vector2(COLUMNS * CELL, CELL), "the blackboard texture loads")
+
+
+## A grid whose cells are wider than tall slices into cells of that width and height.
+func case_non_square_grid() -> void:
+	var frames := _catalog().build_entry_frames("wide_fx")
+	check(frames.get_frame_count(&"sweep") == 5, "a non-square grid keeps the frames the manifest lists")
+	var sizes_ok := true
+	var origins_ok := true
+	for i: int in 5:
+		var cell := frames.get_frame_texture(&"sweep", i) as AtlasTexture
+		sizes_ok = sizes_ok and cell != null and cell.region.size == Vector2(WIDE_CELL)
+		origins_ok = origins_ok and cell != null and cell.region.position == Vector2((i % 3) * WIDE_CELL.x, floori(i / 3.0) * WIDE_CELL.y)
+	check(sizes_ok, "every frame region is one wide cell, not a square")
+	check(origins_ok, "frames wrap onto the second row at the cell height")
+
+
+## The shipped effect sheets are the first with different cell width and height: read
+## them through the same catalog the game uses.
+func case_shipped_non_square_grids() -> void:
+	for manifest: String in SHIPPED_WIDE:
+		var spec: Array = SHIPPED_WIDE[manifest]
+		var frames := BossAnimationCatalog.new(manifest, {}, {}, []).build_entry_frames(spec[0])
+		var clip: StringName = spec[1]
+		var count := frames.get_frame_count(clip) if frames.has_animation(clip) else 0
+		var sizes_ok := count > 0
+		for i: int in count:
+			var cell := frames.get_frame_texture(clip, i) as AtlasTexture
+			sizes_ok = sizes_ok and cell != null and cell.region.size == spec[2]
+		check(count == 4, "%s has four frames" % spec[0])
+		check(sizes_ok, "%s frames are %s cells" % [spec[0], spec[2]])
 
 
 ## A clip two sheets both draw keeps the first sheet's frames; it is never stacked.

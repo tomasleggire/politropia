@@ -72,7 +72,8 @@ func sprite(key: String, clip: StringName, scale: Vector2, flip := false) -> Ani
 	return node
 
 
-## Makes `node` play its clip once from the first to the last frame in `duration` seconds.
+## Sets the playback speed of `node` so its clip, once playing, spans `duration` seconds.
+## It does not start or restart the clip, and does nothing when the clip speed is 0.
 func play_over(node: AnimatedSprite2D, duration: float) -> void:
 	var frames := node.sprite_frames
 	var speed := frames.get_animation_speed(node.animation)

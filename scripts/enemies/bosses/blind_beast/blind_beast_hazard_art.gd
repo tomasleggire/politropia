@@ -90,8 +90,10 @@ func show_frame(sprite: AnimatedSprite2D, frame: int) -> void:
 ## A purely cosmetic one-shot: the last frame of `clip`, `width` px wide, standing on the
 ## floor at `at`, fading out and freeing itself. It is not one of the live hazard sprites.
 func linger(parent: Node, key: String, clip: StringName, at: Vector2, width: float, flip := false) -> Node2D:
+	if parent == null:
+		return null
 	var node := sprite(key, clip, Vector2.ONE * (width / maxf(art_size(key, clip).x, 1.0)), flip)
-	if node == null or parent == null:
+	if node == null:
 		return null
 	show_frame(node, node.sprite_frames.get_frame_count(clip) - 1)
 	node.top_level = true

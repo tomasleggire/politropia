@@ -76,7 +76,7 @@ const CHECKS := {
 	"case_art_defeat_and_corpse_frame": 10,
 	"case_art_hazards_wear_the_sprites": 24,
 	"case_art_missing_effect_sheets_keep_placeholders": 6,
-	"case_art_claw_swipe": 29,
+	"case_art_claw_swipe": 35,
 	"case_art_claw_without_its_sheet_keeps_the_rectangle": 4,
 }
 
@@ -1457,12 +1457,22 @@ func case_art_claw_swipe() -> void:
 		check(signf(swipe.scale.x) == float(_boss._facing) and _boss._facing == int(side), "it is mirrored toward the side he faces")
 		check(zone.size == _boss.claw_zone_size and absf(zone.get_center().x - origin) < 1.0 and _boss.is_claw_zone_visible(), "the zone that hurts is unchanged")
 		check(_boss.get_state_time_left() >= BlindBeastBoss.CLAW_MIN_TELEGRAPH - 0.06, "the telegraph lasts as long as before")
-		check(swipe.modulate.g < 1.0, "the warning is tinted red by its pulse")
+		check(_claw_tint_at(swipe, PI * 0.5).is_equal_approx(BlindBeastBoss.CLAW_WARNING_TINT), "the warning pulse peaks at the red tint")
+		check(_claw_tint_at(swipe, -PI * 0.5).is_equal_approx(Color.WHITE), "and falls back to white at the other extreme")
+		check(_boss._claw_frame(4) == 0, "the warning frame is the first one")
 		_luz_idles()
 		await _place_luz(-420.0 if origin > 0.0 else 420.0)
 		await _until_phase(BlindBeastBoss.Attack.CLAW_COUNTER, BossEnemy.AttackPhase.ACTIVE)
-		await _frames(2)
-		check(swipe.frame >= 1 and swipe.frame <= 2 and swipe.modulate == Color.WHITE, "the strike frames show while the zone is active")
+		var active_left := _boss._state_left
+		var progress_frames: Array[int] = []
+		for left: float in [_boss.claw_active_time, _boss.claw_active_time * 0.5, 0.0]:
+			_boss._state_left = left
+			progress_frames.append(_boss._claw_frame(4))
+		_boss._state_left = _boss.claw_active_time
+		_boss._place_claw(null, swipe)
+		check(swipe.frame == 1 and swipe.modulate == Color.WHITE, "the strike starts on frame 1, untinted")
+		_boss._state_left = active_left
+		check(progress_frames == [1, 2, 2], "the strike runs frames 1 then 2 over the active time and never shows the last one")
 		check(_boss.is_claw_zone_visible() and _boss.hazard_count() >= 1, "and the zone still counts as a hazard")
 		await _until_phase(BlindBeastBoss.Attack.CLAW_COUNTER, BossEnemy.AttackPhase.RECOVER)
 		await _frames(2)
@@ -1474,6 +1484,15 @@ func case_art_claw_swipe() -> void:
 		check(_field_sprites(&"claw_swipe").is_empty(), "the remnant fades and frees itself")
 	check(facings[0] != facings[1], "both sides were exercised")
 	_remove_art_fixture()
+
+
+## The claw sprite's tint with the boss clock set to `phase` radians of the warning pulse.
+func _claw_tint_at(sprite: AnimatedSprite2D, phase: float) -> Color:
+	var clock := _boss._clock
+	_boss._clock = phase / BlindBeastBoss.CLAW_WARNING_PULSE
+	_boss._place_claw(null, sprite)
+	_boss._clock = clock
+	return sprite.modulate
 
 
 ## Without the claw sheet the pulsing red rectangle is the claw.
