@@ -13,9 +13,10 @@ var _glow := 0.0
 var _flash := false
 
 
-## Puts the glow material on `sprite` (the sprite keeps it for its whole life).
-func _init(sprite: CanvasItem) -> void:
-	_material.shader = SHADER
+## Puts the glow material on `sprite` (the sprite keeps it for its whole life). A boss with
+## its own skin shader passes a `shader` that holds the same uniforms plus its skin.
+func _init(sprite: CanvasItem, shader: Shader = SHADER) -> void:
+	_material.shader = shader
 	sprite.material = _material
 	set_glow(Color.WHITE, 0.0)
 	set_flash(false)
@@ -26,6 +27,11 @@ func set_glow(color: Color, amount: float) -> void:
 	_glow = clampf(amount, 0.0, 1.0)
 	_material.set_shader_parameter(&"glow_color", color)
 	_material.set_shader_parameter(&"glow_amount", _glow)
+
+
+## Sets a uniform of a shader that extends the glow (a boss skin).
+func set_parameter(parameter: StringName, value: Variant) -> void:
+	_material.set_shader_parameter(parameter, value)
 
 
 func glow_amount() -> float:
