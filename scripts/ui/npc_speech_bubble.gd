@@ -1,4 +1,4 @@
-class_name LibrarianSpeechBubble
+class_name NpcSpeechBubble
 extends Node2D
 
 signal finished
@@ -8,60 +8,97 @@ signal finished
 
 @export var text_speed := 0.03
 
+var _dialogue: Array[String] = []
+var _current_index := 0
 var _is_typing := false
 var _tween: Tween
 
+
 func _ready() -> void:
 	hide()
+
 	if label:
 		label.bbcode_enabled = true
 		label.add_theme_font_size_override("normal_font_size", 32)
 		label.add_theme_constant_override("line_separation", 6)
-		# 🔹 1. Padding para separar las pastillas de colores horizontal y verticalmente
 		label.add_theme_constant_override("text_highlight_h_padding", 4)
 		label.add_theme_constant_override("text_highlight_v_padding", 4)
 		label.add_theme_color_override("default_color", Color("#FFF8E7"))
 		label.fit_content = true
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD
-		# 🔹 2. Cambiamos de Vector2(650, 0) a Vector2(380, 0)
 		label.custom_minimum_size = Vector2(380, 0)
-		
+
 	if panel:
 		panel.custom_minimum_size = Vector2(0, 0)
 
-func show_text(text: String) -> void:
+
+func start_dialogue(lines: Array[String]) -> void:
+	if lines.is_empty():
+		return
+
+	_dialogue = lines
+	_current_index = 0
+
 	show()
-	_is_typing = true
-	label.text = text
+	_show_current_line()
+
+
+func _show_current_line() -> void:
+	if _current_index >= _dialogue.size():
+		_end_dialogue()
+		return
+
+	if _tween and _tween.is_running():
+		_tween.kill()
+
+	label.text = _dialogue[_current_index]
 	label.visible_ratio = 0.0
-	
-	# Obligamos al panel a encoger su altura al contenido real
+
 	if panel:
 		panel.reset_size()
-	
+
+	_is_typing = true
+
 	var text_length := label.get_parsed_text().length()
 	var duration := text_length * text_speed
-	
-	if _tween:
-		_tween.kill()
+
 	_tween = create_tween()
 	_tween.tween_property(label, "visible_ratio", 1.0, duration)
-	_tween.finished.connect(func(): _is_typing = false)
+	_tween.finished.connect(func():
+		_is_typing = false
+	)
 
-func _unhandled_input(event: InputEvent) -> void:
+
+func advance_dialogue() -> void:
 	if not visible:
 		return
-		
-	if event.is_action_pressed("interact") or event.is_action_pressed("ui_accept"):
-		get_viewport().set_input_as_handled()
-		if _is_typing:
-			if _tween:
-				_tween.kill()
-			label.visible_ratio = 1.0
-			_is_typing = false
-		else:
-			_finish()
 
-func _finish() -> void:
+	# If text is still typing, finish it first.
+	if _is_typing:
+		if _tween and _tween.is_running():
+			_tween.kill()
+
+		label.visible_ratio = 1.0
+		_is_typing = false
+		return
+
+	# If this was the last line, close the dialogue.
+	if _current_index >= _dialogue.size() - 1:
+		_end_dialogue()
+		return
+
+	# Otherwise, advance to the next line.
+	_current_index += 1
+	_show_current_line()
+
+
+func _end_dialogue() -> void:
+	if _tween and _tween.is_running():
+		_tween.kill()
+
+	_is_typing = false
 	hide()
 	finished.emit()
+
+func is_dialogue_active() -> bool:
+	return visible
