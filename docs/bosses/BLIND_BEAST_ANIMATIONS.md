@@ -87,6 +87,7 @@ Missing raw sheets are skipped with a message (exit 0); sheets already processed
 | `intro` | `intro` 0-7 (the old man turning into the beast) |
 | `defeat` | `defeat` 0-7 (6-7 are the corpse) |
 | `props` (no figure) | `mound` 0-3 (loop), `rock` 4, `rock_alt` 5, `crack` 6, `spike` 7 |
+| `claw_fx` (2 x 2, one effect) | `claw_swipe` 0-3: three bone-coloured claw slashes sweeping from the upper left to the lower right and raking the ground (thin scratch lines, strike, follow-through with earth, remnants and dust) |
 | `fx` (no figure) | `erupt_column` 0-2, `pulse_wave` 3-4, `dust_puff` 5, `rock_impact` 6, `dig_dirt` 7 |
 
 ---
@@ -114,7 +115,7 @@ The boss asks for clips by these names. A clip that is not drawn resolves throug
 
 **Events** (manifest `events`: clip -> frame index of the strike inside the clip): `claw_strike` and `slam_strike` at frame 0, because the clip starts when ACTIVE starts.
 
-Gameplay overlays stay code-driven: ripples, floor cracks warnings, the claw zone, rock markers. The hit flash and the telegraph glow keep their logic and only change how they look (the shader on the sprite, as for El Profesor: `BossTelegraph.bind_sprite_fx`; a melee telegraph glows red on `claw_windup` and `slam_windup`).
+Gameplay overlays stay code-driven: ripples, floor cracks warnings, the claw zone's translucent warning fill, rock markers. The hit flash and the telegraph glow keep their logic and only change how they look (the shader on the sprite, as for El Profesor: `BossTelegraph.bind_sprite_fx`; a melee telegraph glows red on `claw_windup` and `slam_windup`).
 
 ## 4. Props and effects
 
@@ -131,6 +132,9 @@ Hazards keep their boxes, speeds and timings. With art each one shows a sprite a
 | Dust | fx `dust_puff` | a 40 px puff at the base of every eruption column |
 | Rock impact | fx `rock_impact` | a 40 px puff where a rock lands |
 | Dig dirt | fx `dig_dirt` | a 40 px puff where he starts to dig in |
+| Claw swipe | claw_fx `claw_swipe`, four frames | the claw zone (120 x 60 px on the floor, centred on the swing origin), `WIDTH` (uniform scale, about 61 px tall), standing on the floor, mirrored toward the side he faces. Telegraph: frame 0 (thin scratch lines) held and pulsing between white and a red tint over the zone's translucent red fill (the warning stays at least as readable as the old rectangle). Active: frames 1 and 2 split over `claw_active_time` (0.15 s). After it, frame 3 lingers 0.25 s and fades as a cosmetic one-shot that touches no zone, timer or `hazard_count()`. Without the sheet the pulsing striped rectangle stays |
+
+Processing: `claw_fx` is 2 x 2 raw cells of 768 x 512 holding four frames of one effect (about 708 x 360 raw px, flat ground edge shared by every frame). It is despilled but not recoloured (`clear_pink_leaks` would change its bone and earth colours), the frames keep their place relative to each other and are scaled by `CLAW_FX_SCALE` 0.52 (about 368 texels wide for the 120 px zone, so about 3 texels per game px) into one row of **400 x 208 px cells** (`CLAW_FX_CELL`), each with at least 8 px of empty margin. Manifest entry `claw_fx` (non-square grid, `cell_width` 400, `cell_height` 208). A missing raw sheet is skipped with a message.
 
 Processing: `props` and `fx` are 4 x 2 raw cells of 384 x 512 cropped per clip with one shared box and centred in a 256 px cell at one factor (`EFFECT_SCALE` 0.5). Manifest entries `props` and `fx` carry `sheet`, `sprite_scale`, `grid`, `clips` and `content`.
 

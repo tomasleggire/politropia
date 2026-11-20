@@ -5,11 +5,13 @@ extends RefCounted
 ## "thrust_fx", and the "blackboard" texture): builds the sprites its hazards and effects
 ## show and scales each one from the content box the manifest records. `BoomboxHazard`
 ## stays the one that hurts; this only decides what is seen. Without art every call
-## returns null and the caller keeps its placeholder.
+## returns null and the caller keeps its placeholder. It also loads El Topo's "claw_fx"
+## entry for `BlindBeastHazardArt`, which extends this class.
 
 const PROPS := "props"
 const FX := "fx"
 const THRUST_FX := "thrust_fx"
+const CLAW_FX := "claw_fx"
 const FILTER := CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 ## Frames per second of the looping effects (the briefcase tumble, the steam).
 const LOOP_FPS := {&"briefcase_spin": 10.0, &"steam": 6.0}
@@ -25,7 +27,7 @@ var _frames := {}
 
 func _init(catalog: BossAnimationCatalog) -> void:
 	_catalog = catalog
-	for key: String in [PROPS, FX, THRUST_FX]:
+	for key: String in [PROPS, FX, THRUST_FX, CLAW_FX]:
 		if not catalog.manifest_entry(key).is_empty():
 			_frames[key] = _loop_clips(catalog.build_entry_frames(key))
 

@@ -121,6 +121,8 @@ const PULSE_ART_SIZE := Vector2(40.0, 24.0)
 const ROCK_ART_FACTOR := 1.8
 const ROCK_SPIN := 6.0
 const DUST_WIDTH := 40.0
+## The scratch lines of the claw warning pulse between white and this red tint.
+const CLAW_WARNING_TINT := Color(1.0, 0.45, 0.4)
 const CRACK_MIN_ALPHA := 0.35
 
 @export_group("Art")
@@ -599,6 +601,7 @@ func _update_attack_phase(attack_id: int, phase_id: AttackPhase, delta: float) -
 
 func _end_attack_phase(_attack_id: int, phase_id: AttackPhase) -> void:
 	if phase_id == AttackPhase.ACTIVE:
+		_linger_claw()
 		_clear_sequences()
 
 
@@ -1425,6 +1428,11 @@ func _draw_claw() -> void:
 		return
 	var color := BossTelegraph.MELEE_COLOR
 	var alpha := 0.25 + 0.15 * sin(_clock * 14.0) if is_telegraphing() else 0.7
+	if _has_hazard_art(BoomboxEffectArt.CLAW_FX, BlindBeastHazardArt.CLAW):
+		# The swipe is drawn; only the warning keeps its zone fill under the scratch lines.
+		if is_telegraphing():
+			_field.draw_rect(_claw_zone, Color(color, alpha))
+		return
 	_field.draw_rect(_claw_zone, Color(color, alpha))
 	_field.draw_rect(_claw_zone, color, false, 2.0)
 	for i: int in 3:
@@ -1689,6 +1697,7 @@ func _sync_hazard_art() -> void:
 	_hazard_art.sync(_field, &"spike", _rising_slots(), _make_spike, _place_spike)
 	_hazard_art.sync(_field, &"rock", _rocks, _make_rock, _place_rock)
 	_hazard_art.sync(_field, &"pulse", _pulses, _make_pulse, _place_pulse)
+	_hazard_art.sync(_field, &"claw", [self] if _claw_visible else [], _make_claw, _place_claw)
 
 
 ## The braille slots that are spikes right now (the flat and telegraphed ones are drawn).
@@ -1754,6 +1763,35 @@ func _make_pulse(pulse: Pulse) -> AnimatedSprite2D:
 ## The ripple travels along the floor, opening to the side it moves to.
 func _place_pulse(pulse: Pulse, sprite: AnimatedSprite2D) -> void:
 	_hazard_art.stand_on_floor(sprite, BoomboxEffectArt.FX, BlindBeastHazardArt.PULSE, pulse.x, _floor_y)
+
+
+func _make_claw(_item: Variant) -> AnimatedSprite2D:
+	return _hazard_art.fit_sprite(BoomboxEffectArt.CLAW_FX, BlindBeastHazardArt.CLAW, _claw_zone.size, BoomboxHazard.ArtFit.WIDTH, _facing < 0)
+
+
+## The swipe stands on the floor centred on the zone: the scratch lines pulse red while he
+## telegraphs, then the strike and follow-through frames run across the active time.
+func _place_claw(_item: Variant, sprite: AnimatedSprite2D) -> void:
+	_hazard_art.stand_on_floor(sprite, BoomboxEffectArt.CLAW_FX, BlindBeastHazardArt.CLAW, _claw_zone.get_center().x, _floor_y)
+	_hazard_art.show_frame(sprite, _claw_frame(sprite.sprite_frames.get_frame_count(BlindBeastHazardArt.CLAW)))
+	sprite.modulate = CLAW_WARNING_TINT.lerp(Color.WHITE, 0.5 - 0.5 * sin(_clock * 14.0)) if is_telegraphing() else Color.WHITE
+
+
+## Frame 0 warns; the frames up to the last but one are the strike, spread over the active
+## time; the last one is the lingering remnant.
+func _claw_frame(count: int) -> int:
+	if is_telegraphing():
+		return 0
+	var strike_frames := maxi(count - 2, 1)
+	var progress := clampf(1.0 - _state_left / maxf(claw_active_time, 0.001), 0.0, 1.0)
+	return clampi(1 + int(progress * float(strike_frames)), 0, maxi(count - 2, 0))
+
+
+## The last frame of the swipe lingers where the claw struck (cosmetic only: no zone, no timer).
+func _linger_claw() -> void:
+	if _hazard_art == null or _field == null or not _claw_visible:
+		return
+	_hazard_art.linger(_field, BoomboxEffectArt.CLAW_FX, BlindBeastHazardArt.CLAW, Vector2(_claw_zone.get_center().x, _floor_y), _claw_zone.size.x, _facing < 0)
 
 
 ## A one-shot dust, dirt or rock puff on the floor at `x` (nothing without that art).

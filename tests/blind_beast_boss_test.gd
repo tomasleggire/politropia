@@ -38,7 +38,8 @@ const ART_COLUMNS := 4
 ## frames of the clips that have more than one.
 const FIXTURE_PROPS := {"mound": [120, 60], "rock": [80, 80], "rock_alt": [90, 70], "crack": [160, 40], "spike": [60, 200]}
 const FIXTURE_FX := {"erupt_column": [150, 300], "pulse_wave": [120, 70], "dust_puff": [100, 80], "rock_impact": [100, 80], "dig_dirt": [100, 80]}
-const FIXTURE_FRAMES := {"mound": 4, "erupt_column": 3, "pulse_wave": 2}
+const FIXTURE_CLAW := {"claw_swipe": [300, 150]}
+const FIXTURE_FRAMES := {"mound": 4, "erupt_column": 3, "pulse_wave": 2, "claw_swipe": 4}
 const PLACEHOLDER_NODES := ["Visual/Body", "Visual/Nose", "Visual/Claws"]
 
 const CHECKS := {
@@ -75,6 +76,8 @@ const CHECKS := {
 	"case_art_defeat_and_corpse_frame": 10,
 	"case_art_hazards_wear_the_sprites": 24,
 	"case_art_missing_effect_sheets_keep_placeholders": 6,
+	"case_art_claw_swipe": 29,
+	"case_art_claw_without_its_sheet_keeps_the_rectangle": 4,
 }
 
 var checks := 0
@@ -1073,7 +1076,7 @@ func _check_inert_corpse() -> void:
 
 ## A manifest with every contract clip as two frames of a tiny sheet, plus the props and
 ## the fx the hazards wear.
-func _write_art_fixture(with_props := true, with_fx := true) -> void:
+func _write_art_fixture(with_props := true, with_fx := true, with_claw := true) -> void:
 	DirAccess.make_dir_recursive_absolute(ART_DIR)
 	var clips := {}
 	var next := 0
@@ -1093,6 +1096,8 @@ func _write_art_fixture(with_props := true, with_fx := true) -> void:
 		manifest["props"] = _write_effect_sheet("fixture_props.png", FIXTURE_PROPS)
 	if with_fx:
 		manifest["fx"] = _write_effect_sheet("fixture_fx.png", FIXTURE_FX)
+	if with_claw:
+		manifest["claw_fx"] = _write_effect_sheet("fixture_claw_fx.png", FIXTURE_CLAW)
 	var file := FileAccess.open(ART_MANIFEST, FileAccess.WRITE)
 	file.store_string(JSON.stringify(manifest))
 
@@ -1416,6 +1421,72 @@ func case_art_hazards_wear_the_sprites() -> void:
 	_boss._clear_hazards()
 	await _frames(2)
 	check(_field_sprites(&"spike").is_empty() and _boss._hazard_art.sprite_count() <= 1, "clearing the hazards clears their sprites")
+	_remove_art_fixture()
+
+
+## Drives the real counter: the probe leaves him exposed, then Luz swings 60 px away on `side`
+## (-1 or 1) of him, and the claw telegraphs there. Returns the swing's origin.
+func _claw_counter_telegraph(side: float, manifest: String) -> float:
+	await _fight_rig(func(boss: BlindBeastBoss) -> void:
+		boss.animation_manifest = manifest
+		boss.patience_time = 0.6)
+	await _wait_until(func() -> bool: return _in_phase(BlindBeastBoss.Attack.PROBE, BossEnemy.AttackPhase.RECOVER), 6.0)
+	var origin := _boss.global_position.x + side * 60.0
+	await _place_luz(origin)
+	_luz_swings()
+	await _frames(3)
+	return origin
+
+
+## The claw swipe wears the zone that hurts: warning frame while he telegraphs, strike frames over
+## the active time, a cosmetic remnant after it, mirrored toward the side he faces.
+func case_art_claw_swipe() -> void:
+	_write_art_fixture()
+	var box := _content(FIXTURE_CLAW, "claw_swipe")
+	var facings: Array[int] = []
+	for side: float in [-1.0, 1.0]:
+		var origin := await _claw_counter_telegraph(side, ART_MANIFEST)
+		var zone := _boss.get_claw_zone()
+		var swipes := _field_sprites(&"claw_swipe")
+		check(_boss.get_attack() == BlindBeastBoss.Attack.CLAW_COUNTER and _boss.is_telegraphing() and swipes.size() == 1, "the telegraph shows one swipe sprite")
+		var swipe := swipes[0]
+		facings.append(_boss._facing)
+		check(swipe.frame == 0 and not swipe.is_playing(), "the warning is the first frame, held")
+		check(is_equal_approx(absf(swipe.scale.x), absf(swipe.scale.y)) and is_equal_approx(absf(swipe.scale.x) * box.x, _boss.claw_zone_size.x), "uniform scale to the zone width, not squashed")
+		check(is_equal_approx(swipe.position.x, zone.get_center().x) and is_equal_approx(swipe.position.y + box.y * absf(swipe.scale.y) * 0.5, _boss._floor_y), "centred on the zone and standing on the floor")
+		check(signf(swipe.scale.x) == float(_boss._facing) and _boss._facing == int(side), "it is mirrored toward the side he faces")
+		check(zone.size == _boss.claw_zone_size and absf(zone.get_center().x - origin) < 1.0 and _boss.is_claw_zone_visible(), "the zone that hurts is unchanged")
+		check(_boss.get_state_time_left() >= BlindBeastBoss.CLAW_MIN_TELEGRAPH - 0.06, "the telegraph lasts as long as before")
+		check(swipe.modulate.g < 1.0, "the warning is tinted red by its pulse")
+		_luz_idles()
+		await _place_luz(-420.0 if origin > 0.0 else 420.0)
+		await _until_phase(BlindBeastBoss.Attack.CLAW_COUNTER, BossEnemy.AttackPhase.ACTIVE)
+		await _frames(2)
+		check(swipe.frame >= 1 and swipe.frame <= 2 and swipe.modulate == Color.WHITE, "the strike frames show while the zone is active")
+		check(_boss.is_claw_zone_visible() and _boss.hazard_count() >= 1, "and the zone still counts as a hazard")
+		await _until_phase(BlindBeastBoss.Attack.CLAW_COUNTER, BossEnemy.AttackPhase.RECOVER)
+		await _frames(2)
+		check(not _boss.is_claw_zone_visible() and _boss.get_claw_zone().size == Vector2.ZERO, "the zone ends with the active phase")
+		var remnants := _field_sprites(&"claw_swipe")
+		check(remnants.size() == 1 and remnants[0].frame == 3 and remnants[0] != swipe, "one remnant frame lingers")
+		check(_boss._hazard_art.sprite_count() == 0, "it is not a live hazard sprite")
+		await _secs(BlindBeastHazardArt.LINGER_TIME + 0.2)
+		check(_field_sprites(&"claw_swipe").is_empty(), "the remnant fades and frees itself")
+	check(facings[0] != facings[1], "both sides were exercised")
+	_remove_art_fixture()
+
+
+## Without the claw sheet the pulsing red rectangle is the claw.
+func case_art_claw_without_its_sheet_keeps_the_rectangle() -> void:
+	_write_art_fixture(true, true, false)
+	var origin := await _claw_counter_telegraph(1.0, ART_MANIFEST)
+	check(not _boss._has_hazard_art(BoomboxEffectArt.CLAW_FX, &"claw_swipe"), "the claw sheet is missing")
+	check(_boss.is_telegraphing() and _boss.is_claw_zone_visible() and absf(_boss.get_claw_zone().get_center().x - origin) < 1.0, "the claw zone is still warned")
+	check(_field_sprites(&"claw_swipe").is_empty(), "no swipe sprite")
+	_luz_idles()
+	await _until_phase(BlindBeastBoss.Attack.CLAW_COUNTER, BossEnemy.AttackPhase.RECOVER)
+	await _frames(2)
+	check(_field_sprites(&"claw_swipe").is_empty() and _boss._hazard_art.sprite_count() == 0, "and no remnant either")
 	_remove_art_fixture()
 
 

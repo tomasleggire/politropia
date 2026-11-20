@@ -20,6 +20,9 @@ the nose exists in every pose that shows the head) is matched to the `exposed` m
 and a sheet with no nose in any measured cell stops with an error naming it. `scale_mult`
 tunes a sheet by hand.
 
+`claw_fx` (the claw swipe, 2 x 2 raw cells of one effect) is despilled but not recoloured and saved as
+one row of 400 x 208 px cells at CLAW_FX_SCALE, its frames kept in place so the ground edge is common.
+
 `props` and `fx` hold no figure: every cell keeps its place in the raw cell, each clip is
 cropped with ONE box (so a looping mound keeps its motion) and centred in a 256 px cell
 at one fixed factor (EFFECT_SCALE); the game rescales each effect to its hazard from the
@@ -82,6 +85,10 @@ LEAK_BEIGE_GAP = 24
 LEAK_PUFF_MIN_GREEN = 170
 LEAK_PUFF_MIN_RED = 200
 LEAK_PUFF_RED_OVER_GREEN = 26
+# The claw swipe is drawn 120 px wide in the game and the game runs at 3x on a device: 0.52 makes
+# its ~708 raw px about 368 texels, a 400 x 208 cell keeps at least 8 px around it.
+CLAW_FX_SCALE = 0.52
+CLAW_FX_CELL = (400, 208)
 EFFECT_MIN_COMPONENT_PX = 40  # raw px; drops stray specks around the effects
 
 # sheet -> raw grid (cols, rows), clips (raw cell indices), events (clip -> frame index
@@ -141,6 +148,8 @@ FX = {
     "grid": (4, 2),
     "clips": {"erupt_column": [0, 1, 2], "pulse_wave": [3, 4], "dust_puff": [5], "rock_impact": [6], "dig_dirt": [7]},
 }
+
+CLAW_FX = {"grid": (2, 2), "clips": {"claw_swipe": [0, 1, 2, 3]}}
 
 
 def raw_path(sheet: str) -> Path:
@@ -318,10 +327,36 @@ def build_effects(sheet: str, spec: dict, preview: Path | None) -> dict:
     }
 
 
-def write_preview(image: Image.Image, sheet: str, preview: Path | None, cell: int, label: str) -> None:
+def build_claw_fx(preview: Path | None) -> dict:
+    """The claw swipe: 2 x 2 raw cells of one effect (four frames of the clip), kept in place
+    relative to each other (so the flat ground edge stays common) and saved as one row of
+    non-square cells (`CLAW_FX_CELL`). Despilled only: its bone and earth colours are not
+    recoloured, unlike `props` and `fx`."""
+    raw = Image.open(raw_path("claw_fx"))
+    cells = pipeline.split_cells(pipeline.despill_edges(raw, pipeline.key_magenta(raw)), *CLAW_FX["grid"], "claw_fx", EFFECT_MIN_COMPONENT_PX)
+    cell_width, cell_height = CLAW_FX_CELL
+    image, clips = pipeline.effect_clip_sheet(cells, CLAW_FX["clips"], CLAW_FX_SCALE, cell_width, cell_height, "claw_fx")
+    image.save(OUT_DIR / sheet_file("claw_fx"), optimize=True)
+    write_preview(image, "claw_fx", preview, cell_width, f"claw_fx scale {CLAW_FX_SCALE}", cell_height)
+    entry = pipeline.manifest_entry(image, cell_width, clips, {}, cell_height)
+    return {
+        "sheet": sheet_file("claw_fx"),
+        "sprite_scale": round(SPRITE_SCALE, 4),
+        "grid": entry["grid"],
+        "clips": entry["clips"],
+        "content": pipeline.clip_contents(image, cell_width, entry["clips"], cell_height),
+    }
+
+
+def write_preview(image: Image.Image, sheet: str, preview: Path | None, cell: int, label: str, cell_height: int | None = None) -> None:
     if preview is None:
         return
     preview.mkdir(parents=True, exist_ok=True)
+    if cell_height is not None:
+        backdrop = Image.new("RGBA", image.size, (24, 32, 56, 255))
+        backdrop.alpha_composite(image)
+        backdrop.save(preview / sheet_file(sheet))
+        return
     references = {"Luz": pipeline.LUZ_HEIGHT, "Artemis": pipeline.ARTEMIS_HEIGHT, "Topo": BODY_HEIGHT}
     pipeline.write_preview(image, preview / sheet_file(sheet), cell, FEET_ROW, SPRITE_SCALE, references, label)
 
@@ -342,10 +377,11 @@ def main() -> None:
 
     present = {name: spec for name, spec in SHEETS.items() if raw_path(name).exists()}
     effects = {name: spec for name, spec in (("props", PROPS), ("fx", FX)) if raw_path(name).exists()}
-    for name in [*SHEETS, "props", "fx"]:
-        if name not in present and name not in effects:
+    claw_present = raw_path("claw_fx").exists()
+    for name in [*SHEETS, "props", "fx", "claw_fx"]:
+        if name not in present and name not in effects and not (name == "claw_fx" and claw_present):
             print(f"skip {name}: {raw_path(name)} not found")
-    if not present and not effects:
+    if not present and not effects and not claw_present:
         print("nothing to process")
         return
 
@@ -365,6 +401,9 @@ def main() -> None:
     for name, spec in effects.items():
         manifest[name] = build_effects(name, spec, args.preview)
         print(f"  {name}: done")
+    if claw_present:
+        manifest["claw_fx"] = build_claw_fx(args.preview)
+        print("  claw_fx: done")
     pipeline.write_manifest(OUT_DIR / "animation_manifest.json", manifest)
     print("wrote", OUT_DIR)
 
