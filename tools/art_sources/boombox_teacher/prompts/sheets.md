@@ -124,3 +124,17 @@ Two more Codex runs with the same `-i` images, after the first in-game capture s
 > Cell 3 = BASS SHOCK CREST: a wide, low ground shockwave crest seen from the side, an amber wave of cracked energy hugging the floor line, about 300 px wide and 90 px tall, flat bottom edge.
 > Cell 4 = CHALK DUST PUFF: a small burst of white chalk dust, three or four round cel-shaded lobes, white and pale grey, about 110 px wide.
 > Cells 5-8 = STEAM LOOP (4 frames): a puff of grey-white steam rising and dissolving: 5 a small round puff, 6 bigger and rising, 7 biggest with lobes separating, 8 thin wisps breaking apart; about 100 to 150 px wide, round cel-shaded lobes, light grey #D9D6D2 and white with grey shadow #9C9893.
+
+## Batch 3: pointer thrust streak
+
+One more Codex run (2026-11-20) with `concept/teacher_concept_v1.png` and `tools/art_sources/luz/refs/luz_identity_ref.png` as `-i` (in that order), after the placeholder audit (P4) found the pointer thrust still drawn as a placeholder shape. Session `01a1f7ae-ad9c-7532-bd3b-ce08167a831f`. Raw file: `../raw/boombox_teacher_thrust_fx_raw.png` (1536x1024, 2 columns x 2 rows of 768x512 cells, one effect in 4 frames).
+
+> Generate an image with your built-in image generation tool from the following prompt. Do not create or modify any file. Prompt:
+>
+> Effect sprite sheet for EL PROFESOR, a teacher boss with a boombox for a head in a 2D side-scrolling metroidvania set in a haunted library; he attacks by lunging with a telescopic pointer. The FIRST attached image is his approved character design and the SECOND is the player character Luz, only for rendering style: illustrated pixel-styled look, thick uniform dark outline #1A1410, cel shading with 2-3 value steps, big flat colour shapes. No soft glow, no blur, no gradients beyond the cel steps. Colours: hot red #F03C2E, light orange #FFC9A0, near-white core #FFF1DC, dark red shadow #9E1F1C. No pink, no purple and no magenta inside the drawings. Image 1536x1024, landscape, grid of 2 columns x 2 rows (4 equal cells of 768x512, reading order left-to-right, top-to-bottom); each drawing alone and centred in its cell, fully inside it with at least 40 px padding. Flat opaque magenta #FF00FF background everywhere, no character, no hand, no pointer stick, no text, no labels, no grid lines, no frames.
+>
+> All four cells = POINTER THRUST STREAK (4 animation frames of the same effect): a perfectly horizontal, long and very thin stab streak pointing to the RIGHT, like the trail left by a pointer thrust forward at great speed. About 680 px long and 90 px tall (about seven times longer than tall), the same length and the same position in every cell, straight and level, with a needle-sharp bright tip at the right end and a blunt start at the left end.
+> Cell 1: the strike at full force: one thick solid streak, near-white core, red body, sharp tip, two short speed lines above and below it.
+> Cell 2: the same streak slightly thinner, its core breaking into two long bands.
+> Cell 3: thinner still, splitting into three or four long thin parallel lines, with small sparks near the tip.
+> Cell 4: almost gone: a few thin broken lines and small sparks along the same length.

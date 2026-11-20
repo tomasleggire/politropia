@@ -92,3 +92,17 @@ For `intro`, add `-i tools/art_sources/blind_beast/concept/old_man_npc_ref.jpg` 
 > Cell 6 = DUST PUFF: a puff of brown-grey dust, round cel-shaded lobes, about 110 px wide.
 > Cell 7 = ROCK IMPACT: a small burst of rock fragments and dust where a rock hits the floor, flat bottom edge, about 120 px wide.
 > Cell 8 = DIG DIRT: a spray of dirt clods flung upward and backward, about 120 px wide.
+
+## Batch 3: claw swipe
+
+One more Codex run (2026-11-20) with `concept/topo_concept_v1.png` and `tools/art_sources/luz/refs/luz_identity_ref.png` as `-i` (in that order), after the placeholder audit (P4) found the claw counter still drawn as a placeholder shape. Session `01a1f7ae-ad9c-7fc1-a612-fd15116bc020`. Raw file: `../raw/blind_beast_claw_fx_raw.png` (1536x1024, 2 columns x 2 rows of 768x512 cells, one effect in 4 frames).
+
+> Generate an image with your built-in image generation tool from the following prompt. Do not create or modify any file. Prompt:
+>
+> Effect sprite sheet for EL TOPO, a giant blind mole boss of a 2D side-scrolling metroidvania who tunnels under the floor of a haunted library and swipes with huge claws. The FIRST attached image is his approved character design and the SECOND is the player character Luz, only for rendering style: illustrated pixel-styled look, thick uniform dark outline #1A1410, cel shading with 2-3 value steps, big flat colour shapes. No soft glow, no blur, no gradients beyond the cel steps. Colours: claw trail bone #F2E2C0, light #FFF6E0, shadow #C9A678; earth dark brown #4A3A30, mid #6E5644, light #9A7F63; dust #B9AC9C. No pink, no purple, no red and no magenta inside the drawings. Image 1536x1024, landscape, grid of 2 columns x 2 rows (4 equal cells of 768x512, reading order left-to-right, top-to-bottom); each drawing alone and centred in its cell, fully inside it with at least 40 px padding. Flat opaque magenta #FF00FF background everywhere, no character, no paw, no text, no labels, no grid lines, no frames.
+>
+> All four cells = CLAW SWIPE (4 animation frames of the same effect): three big parallel curved claw-slash trails, sweeping diagonally from the upper left down to the lower right and raking the ground, like the mark left in the air by the swipe of a giant three-clawed paw. The whole effect is about 660 px wide and 330 px tall (twice as wide as tall), with a flat bottom edge where it meets the ground, the same size and the same position in every cell.
+> Cell 1: anticipation: three thin, faint scratch lines tracing the path the claws will take.
+> Cell 2: the strike at full force: three thick, bold crescent slashes with sharp tapered ends and a light core.
+> Cell 3: follow-through: the slashes thinner, with clods of earth and dust kicked up along the flat bottom edge.
+> Cell 4: almost gone: thin broken remnants of the three trails and a little dust.
