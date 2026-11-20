@@ -300,5 +300,28 @@
       601,
       224
     ]
+  },
+  "thrust_fx": {
+    "sheet": "boombox_teacher_thrust_fx_sheet.png",
+    "grid": {
+      "columns": 4,
+      "rows": 1,
+      "cell_width": 400,
+      "cell_height": 80
+    },
+    "clips": {
+      "thrust_streak": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "content": {
+      "thrust_streak": [
+        377,
+        57
+      ]
+    }
   }
 }

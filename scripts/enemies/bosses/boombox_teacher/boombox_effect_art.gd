@@ -1,14 +1,15 @@
 class_name BoomboxEffectArt
 extends RefCounted
 
-## The drawn props and effects of the Boombox Teacher (manifest entries "props" and "fx",
-## and the "blackboard" texture): builds the sprites its hazards and effects show and
-## scales each one from the content box the manifest records. `BoomboxHazard` stays
-## the one that hurts; this only decides what is seen. Without art every call returns
-## null and the caller keeps its placeholder.
+## The drawn props and effects of the Boombox Teacher (manifest entries "props", "fx" and
+## "thrust_fx", and the "blackboard" texture): builds the sprites its hazards and effects
+## show and scales each one from the content box the manifest records. `BoomboxHazard`
+## stays the one that hurts; this only decides what is seen. Without art every call
+## returns null and the caller keeps its placeholder.
 
 const PROPS := "props"
 const FX := "fx"
+const THRUST_FX := "thrust_fx"
 const FILTER := CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 ## Frames per second of the looping effects (the briefcase tumble, the steam).
 const LOOP_FPS := {&"briefcase_spin": 10.0, &"steam": 6.0}
@@ -24,7 +25,7 @@ var _frames := {}
 
 func _init(catalog: BossAnimationCatalog) -> void:
 	_catalog = catalog
-	for key: String in [PROPS, FX]:
+	for key: String in [PROPS, FX, THRUST_FX]:
 		if not catalog.manifest_entry(key).is_empty():
 			_frames[key] = _loop_clips(catalog.build_entry_frames(key))
 
@@ -67,6 +68,14 @@ func sprite(key: String, clip: StringName, scale: Vector2, flip := false) -> Ani
 	node.scale = Vector2(-scale.x if flip else scale.x, scale.y)
 	node.play(clip)
 	return node
+
+
+## Makes `node` play its clip once from the first to the last frame in `duration` seconds.
+func play_over(node: AnimatedSprite2D, duration: float) -> void:
+	var frames := node.sprite_frames
+	var speed := frames.get_animation_speed(node.animation)
+	if speed > 0.0:
+		node.speed_scale = float(frames.get_frame_count(node.animation)) / maxf(duration, 0.001) / speed
 
 
 ## Crests of `clip` side by side along a floor `strip` (its centre on the node origin), as

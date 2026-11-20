@@ -165,6 +165,39 @@ class StagHelpersTest(unittest.TestCase):
         self.assertEqual(box[3], 341)
 
 
+class EffectClipSheetTest(unittest.TestCase):
+    def cells(self) -> list[np.ndarray]:
+        out = []
+        for width in (200, 150, 120, 60):  # one effect, a shared start on the left and a shared floor
+            cell = np.zeros((100, 300, 4), dtype=np.float32)
+            cell[40:90, 20 : 20 + width, :3] = (240, 200, 120)
+            cell[40:90, 20 : 20 + width, 3] = 255.0
+            out.append(cell)
+        return out
+
+    def test_one_row_of_non_square_cells_with_a_shared_box(self):
+        image, clips = pipeline.effect_clip_sheet(self.cells(), {"swipe": [0, 1, 2, 3]}, 0.5, 130, 44, "test")
+        self.assertEqual(image.size, (4 * 130, 44))
+        self.assertEqual(clips, {"swipe": [0, 1, 2, 3]})
+        entry = pipeline.manifest_entry(image, 130, clips, {}, 44)
+        self.assertEqual(entry["grid"], {"columns": 4, "rows": 1, "cell_width": 130, "cell_height": 44})
+        self.assertEqual(pipeline.clip_contents(image, 130, clips, 44), {"swipe": [100, 25]})
+        # the frames keep their left edge and floor: the narrower ones end earlier
+        boxes = [image.crop((i * 130, 0, (i + 1) * 130, 44)).getchannel("A").getbbox() for i in range(4)]
+        self.assertEqual({box[0] for box in boxes}, {boxes[0][0]})
+        self.assertEqual({box[3] for box in boxes}, {boxes[0][3]})
+
+    def test_an_effect_without_the_margin_stops_with_the_cell_named(self):
+        with self.assertRaisesRegex(ValueError, "margin"):
+            pipeline.effect_clip_sheet(self.cells(), {"swipe": [0, 1, 2, 3]}, 0.5, 108, 44, "test")
+
+    def test_an_empty_clip_is_named(self):
+        cells = self.cells()
+        cells[2][...] = 0.0
+        with self.assertRaisesRegex(ValueError, "test clip 'swipe'"):
+            pipeline.effect_clip_sheet([cells[2]] * 4, {"swipe": [0, 1, 2, 3]}, 0.5, 130, 44, "test")
+
+
 class PinkLeakTest(unittest.TestCase):
     def sheet(self) -> np.ndarray:
         rgba = np.zeros((120, 160, 4), dtype=np.float32)

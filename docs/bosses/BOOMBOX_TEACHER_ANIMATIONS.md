@@ -75,6 +75,7 @@ Missing raw sheets are skipped with a message; sheets already processed stay in 
 | `defeat` | `defeat` 0-7 (6-7 are the corpse) |
 | `props` (no figure) | `briefcase_spin` 0-3 (front, edge, back, edge), `note` 4, `note_pair` 5, `steam` 6 (unused), `spark` 7 |
 | `fx` (no figure) | `wave_low` 0, `wave_high` 1, `bass_shock` 2 (flat bottom), `chalk_dust` 3, `steam` 4-7 (loop) |
+| `thrust_fx` (2 x 2, one effect) | `thrust_streak` 0-3: a horizontal stab streak pointing right (full force, thinner, splitting into lines with sparks, almost gone) |
 | `blackboard` (one image) | one blank blackboard, keyed and cropped to its box |
 
 ---
@@ -124,6 +125,7 @@ Hazards keep their boxes, speeds and timings. With art each one shows a sprite a
 |---|---|---|
 | Briefcase | props `briefcase_spin` (front, edge, back, edge), loops at 10 fps | BRIEFCASE 30 x 22 box, `WIDTH`: the front view is 30 px wide (the handle rises above the box) |
 | Notes | props `note`, `note_pair` | NOTE_BOUNCE disc of radius 10, `CONTAIN` in 20 x 20; the pair on every second note |
+| Pointer thrust | thrust_fx `thrust_streak`, four frames played once over `thrust_strike_time` (0.18 s) | the thrust box (120 px reach x 16 px high band or 14 px low band), `WIDTH`: the streak spans the 120 px at uniform scale (its natural height is close to the box), blunt end at his front edge, tip at the far end, mirrored when he faces left. Without the sheet the red arrow stays |
 | Sound waves | fx `wave_low` (amber) and `wave_high` (cyan) | wave box (24 x 22 low, 24 x 30 high), `STRETCH`; arcs drawn opening to the right and mirrored when the wave travels left |
 | Bass shock | fx `bass_shock` | the floor band (arena width x `shock_height`): crests as tall as the band, side by side, standing on its bottom edge, enough of them to cover the width |
 | Overheat steam | fx `steam`, four-frame loop at 6 fps | a sprite 40 px wide over the boombox at `(0, -100)` while he is stunned; it replaces the code-drawn puffs |
@@ -133,6 +135,8 @@ Hazards keep their boxes, speeds and timings. With art each one shows a sprite a
 | Spark | props `spark` | a 40 px puff on the floor in front of him at the bass slam, where the boombox lands. The briefcase catch gets no spark: the catch is already marked by the clip |
 
 The props `steam` cell is not used (the fx loop replaces it). Telegraph lines, floor markers, wave pips and the beat ring stay as they are: they are gameplay readability.
+
+Processing: the `thrust_fx` raw sheet is 2 x 2 cells of 768 x 512 holding four frames of one effect (the stab streak, about 685 x 104 raw px, the same length and place in every cell). It is despilled, the frames keep their place relative to each other and are scaled by `THRUST_FX_SCALE` 0.55 (the streak is about 377 texels long, so 120 game px keep about 3 texels per px for a 3x device) into one row of **400 x 80 px cells** (`THRUST_FX_CELL`), each leaving at least 8 px of empty margin (`pipeline.effect_clip_sheet` stops with an error otherwise). The manifest entry `thrust_fx` has a non-square grid (`cell_width` 400, `cell_height` 80). A missing raw sheet is skipped with a message.
 
 Processing: the `fx` sheet is 4 x 2 raw cells of 384 x 512, cropped per clip with one shared box and centred in a 256 px cell at one factor (`FX_SCALE` 0.7); the `blackboard` raw image is keyed, cropped to its box and saved as one texture (`boombox_teacher_blackboard.png`, manifest key `blackboard`). Manifest entries `props` and `fx` carry `sheet`, `grid`, `clips` and `content`.
 

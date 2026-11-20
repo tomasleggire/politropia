@@ -893,6 +893,9 @@ func _fire_thrust(k: int) -> void:
 	hazard.dir = _facing
 	hazard.lifetime = thrust_strike_time
 	hazard.bound = true
+	var streak := _dress(hazard, BoomboxEffectArt.THRUST_FX, &"thrust_streak", BoomboxHazard.ArtFit.WIDTH, _facing < 0)
+	if streak != null:
+		_effects.play_over(streak, thrust_strike_time)
 	if k + 1 < _heights().size():
 		_show_thrust_line(int(_heights()[k + 1]))
 	elif _telegraph != null:
@@ -1305,13 +1308,15 @@ func _update_steam_art() -> void:
 		_steam_sprite.visible = _steam_left > 0.0 and not _dead
 
 
-## Dresses `hazard` with the drawn `clip` of `key`, fitted to its box; no art keeps the placeholder.
-func _dress(hazard: BoomboxHazard, key: String, clip: StringName, fit := BoomboxHazard.ArtFit.CONTAIN, flip := false) -> void:
+## Dresses `hazard` with the drawn `clip` of `key`, fitted to its box, and returns that sprite;
+## no art keeps the placeholder and returns null.
+func _dress(hazard: BoomboxHazard, key: String, clip: StringName, fit := BoomboxHazard.ArtFit.CONTAIN, flip := false) -> AnimatedSprite2D:
 	if _effects == null:
-		return
+		return null
 	var sprite := _effects.fit_sprite(key, clip, hazard.half_extents * 2.0, fit, flip)
 	if sprite != null:
 		hazard.attach_art(sprite)
+	return sprite
 
 
 ## With art the flash is the sprite's own; without it, the white polygon as always.

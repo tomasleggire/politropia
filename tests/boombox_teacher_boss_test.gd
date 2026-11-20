@@ -19,7 +19,7 @@ const FAST_SCALE := 3.0
 const TIMING_CASES := [
 	"case_beat_clock_and_tempo", "case_strikes_start_on_a_beat", "case_minimum_telegraph_at_high_tempo",
 	"case_tempo_holds_in_telegraph", "case_tempo_holds_in_active", "case_dash_through_hazards",
-	"case_art_thrust_and_briefcase_clips",
+	"case_art_thrust_and_briefcase_clips", "case_art_thrust_streak",
 ]
 const FLOOR_RECT := Rect2(-500.0, 0.0, 1000.0, 100.0)
 const LUZ_START := Vector2(-400.0, 0.0)
@@ -47,6 +47,7 @@ const ART_COLUMNS := 4
 ## Content boxes (sheet px) the fixture manifest declares for the effect clips.
 const FIXTURE_PROPS := {"briefcase_spin": [100, 120], "note": [60, 90], "note_pair": [90, 90], "spark": [80, 80]}
 const FIXTURE_FX := {"wave_low": [100, 130], "wave_high": [100, 130], "bass_shock": [240, 70], "chalk_dust": [100, 80], "steam": [150, 150]}
+const FIXTURE_THRUST := {"thrust_streak": [300, 45]}
 const FIXTURE_BOARD := Vector2(120.0, 40.0)
 const PLACEHOLDER_NODES := ["Visual/Body", "Visual/Tie", "Visual/Pointer", "Visual/Head"]
 
@@ -84,6 +85,7 @@ const CHECKS := {
 	"case_art_state_clips": 15,
 	"case_art_scale_relation": 6,
 	"case_art_hazards_wear_the_sprites": 17,
+	"case_art_thrust_streak": 16,
 	"case_art_steam_over_the_boombox": 6,
 	"case_art_effects_without_a_content_box": 7,
 	"case_art_dictation_on_chalk": 11,
@@ -1303,6 +1305,7 @@ func _write_art_fixture(with_effects := true) -> void:
 	if with_effects:
 		manifest["props"] = _write_effect_sheet("fixture_props.png", FIXTURE_PROPS)
 		manifest["fx"] = _write_effect_sheet("fixture_fx.png", FIXTURE_FX)
+		manifest["thrust_fx"] = _write_effect_sheet("fixture_thrust_fx.png", FIXTURE_THRUST)
 		var board := Image.create_empty(int(FIXTURE_BOARD.x), int(FIXTURE_BOARD.y), false, Image.FORMAT_RGBA8)
 		board.fill(Color.WHITE)
 		board.save_png(ART_DIR + "/fixture_board.png")
@@ -1312,12 +1315,12 @@ func _write_art_fixture(with_effects := true) -> void:
 
 
 ## A props or fx entry: one white cell per clip, and the declared content box of each clip.
-## Every clip but the 4-frame `steam` and `briefcase_spin` has one frame.
+## Every clip but the 4-frame `steam`, `briefcase_spin` and `thrust_streak` has one frame.
 func _write_effect_sheet(file_name: String, content: Dictionary) -> Dictionary:
 	var clips := {}
 	var next := 0
 	for clip_name: String in content:
-		var count := 4 if clip_name in ["steam", "briefcase_spin"] else 1
+		var count := 4 if clip_name in ["steam", "briefcase_spin", "thrust_streak"] else 1
 		clips[clip_name] = range(next, next + count)
 		next += count
 	var rows := ceili(float(next) / float(ART_COLUMNS))
@@ -1684,6 +1687,50 @@ func case_art_hazards_wear_the_sprites() -> void:
 	check(sparks.size() == 1 and sparks[0].scale.x * 80.0 <= BoomboxTeacherBoss.SPARK_WIDTH + 0.01, "a spark punctuates the slam")
 	await _wait(1.0)
 	check(_puffs(&"spark").is_empty(), "the spark frees itself")
+	_remove_art_fixture()
+
+
+## The thrust streak wears the pointer box: uniform scale across its length, blunt end at his
+## front edge (mirrored with his facing), four frames played once over the strike. Without the
+## sheet the red arrow stays; the box and the lifetime are the same either way.
+func case_art_thrust_streak() -> void:
+	_write_art_fixture()
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(2)
+	var box := _content(FIXTURE_THRUST, "thrust_streak")
+	var facings: Array[int] = []
+	for side: float in [-1.0, 1.0]:
+		_player.global_position = Vector2(_boss.global_position.x + side * 120.0, 0.0)
+		await _frames(4)
+		await _into_active(_thrust(BoomboxTeacherBoss.Height.HIGH))
+		var hazard := _boss.get_hazards()[0]
+		var streak := _art_of(hazard)
+		facings.append(_boss._facing)
+		check(hazard.has_art() and streak.animation == &"thrust_streak", "the thrust is the streak clip")
+		check(is_equal_approx(absf(streak.scale.x), absf(streak.scale.y)) and is_equal_approx(absf(streak.scale.x) * box.x, _boss.thrust_reach), "uniform scale: as long as the reach, not squashed")
+		check(signf(streak.scale.x) == float(_boss._facing), "it points the way he faces")
+		check(is_equal_approx(hazard.get_rect().size.x, _boss.thrust_reach) and is_equal_approx(hazard.lifetime, _boss.thrust_strike_time), "the box and the lifetime are unchanged")
+		var frames := streak.sprite_frames
+		check(not frames.get_animation_loop(&"thrust_streak") and is_equal_approx(float(frames.get_frame_count(&"thrust_streak")) / (frames.get_animation_speed(&"thrust_streak") * streak.speed_scale), _boss.thrust_strike_time), "four frames play once over the strike")
+		if side < 0.0:
+			check(streak.frame <= 1, "it starts on the first frame")
+			await _wait(_boss.thrust_strike_time * 0.7)
+			check(is_instance_valid(streak) and streak.frame >= 2, "and is on the late frames near the end")
+		await _finish_attack()
+	check(facings[0] != facings[1], "both facings were exercised")
+	_remove_art_fixture()
+	_write_art_fixture()
+	var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ART_MANIFEST))
+	manifest.erase("thrust_fx")
+	FileAccess.open(ART_MANIFEST, FileAccess.WRITE).store_string(JSON.stringify(manifest))
+	await _awake_boss(_with_manifest(ART_MANIFEST))
+	await _frames(2)
+	await _into_active(_thrust(BoomboxTeacherBoss.Height.LOW))
+	var plain := _boss.get_hazards()[0]
+	check(not plain.has_art() and plain.look == BoomboxHazard.Look.POINTER, "without the sheet the red arrow stays")
+	check(is_equal_approx(plain.get_rect().size.x, _boss.thrust_reach) and is_equal_approx(plain.lifetime, _boss.thrust_strike_time), "its box and lifetime are the same")
+	await _finish_attack()
+	check(_boss._effects.has_clip(BoomboxEffectArt.FX, &"wave_low"), "the other effects are still drawn")
 	_remove_art_fixture()
 
 

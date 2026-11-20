@@ -296,23 +296,49 @@ def place_fixed(frames: list[np.ndarray], scale: float, out_cell: int, anchor_of
     return out
 
 
-def centered_cell(frame: np.ndarray, scale: float, out_cell: int, label: str) -> Image.Image:
-    """A prop frame (not a figure): scaled and centred in the cell, no feet row."""
+def centered_cell(frame: np.ndarray, scale: float, out_cell: int, label: str, cell_height: int | None = None) -> Image.Image:
+    """A prop frame (not a figure): scaled and centred in the cell, no feet row. The cell
+    is `out_cell` wide and `cell_height` tall (default square)."""
     arr = scale_rgba(frame, scale)
     h, w = arr.shape[:2]
-    if w > out_cell or h > out_cell:
-        raise ValueError(f"{label} is {w}x{h}, larger than its {out_cell} px cell")
-    cell = Image.new("RGBA", (out_cell, out_cell), (0, 0, 0, 0))
-    cell.alpha_composite(Image.fromarray(arr, "RGBA"), ((out_cell - w) // 2, (out_cell - h) // 2))
+    ch = cell_height or out_cell
+    if w > out_cell or h > ch:
+        raise ValueError(f"{label} is {w}x{h}, larger than its {out_cell}x{ch} px cell")
+    cell = Image.new("RGBA", (out_cell, ch), (0, 0, 0, 0))
+    cell.alpha_composite(Image.fromarray(arr, "RGBA"), ((out_cell - w) // 2, (ch - h) // 2))
     return cell
 
 
-def assemble_sheet(cells: list[Image.Image], out_cell: int, columns: int = COLUMNS) -> Image.Image:
-    """Lay the cells out left to right, top to bottom on one transparent sheet."""
+EFFECT_MARGIN_PX = 8  # empty border an effect keeps inside its cell, so filtering never clips it
+
+
+def effect_clip_sheet(cells: list[np.ndarray], clips: dict[str, list[int]], scale: float, cell_width: int, cell_height: int, label: str) -> tuple[Image.Image, dict[str, list[int]]]:
+    """A sheet of one-row effect clips from full raw `cells` (`split_cells`): every clip is
+    cropped with ONE box (its frames keep their place relative to each other, so a shared
+    ground line stays shared), scaled by `scale` and centred in a `cell_width` x `cell_height`
+    cell. Returns the sheet (one row, unused raw cells dropped) and the clips re-indexed to
+    it. An effect that leaves less than EFFECT_MARGIN_PX of empty border stops with an error."""
+    placed: dict[int, Image.Image] = {}
+    for clip, indices in clips.items():
+        left, top, right, bottom = require_box([cells[i] for i in indices], f"{label} clip '{clip}' (cells {indices})")
+        for i in indices:
+            cell = centered_cell(cells[i][top:bottom, left:right], scale, cell_width, f"{label}[{i}]", cell_height)
+            box = cell.getchannel("A").point(lambda a: 255 if a > 20 else 0).getbbox()
+            if box is not None and min(box[0], box[1], cell_width - box[2], cell_height - box[3]) < EFFECT_MARGIN_PX:
+                raise ValueError(f"{label}[{i}] leaves under {EFFECT_MARGIN_PX} px of margin in its {cell_width}x{cell_height} cell; lower the scale or enlarge the cell")
+            placed[i] = cell
+    used, compact = compact_clips(clips)
+    return assemble_sheet([placed[i] for i in used], cell_width, columns=len(used), cell_height=cell_height), compact
+
+
+def assemble_sheet(cells: list[Image.Image], out_cell: int, columns: int = COLUMNS, cell_height: int | None = None) -> Image.Image:
+    """Lay the cells out left to right, top to bottom on one transparent sheet
+    (`out_cell` wide, `cell_height` tall, default square)."""
+    ch = cell_height or out_cell
     rows = (len(cells) + columns - 1) // columns
-    sheet = Image.new("RGBA", (columns * out_cell, rows * out_cell), (0, 0, 0, 0))
+    sheet = Image.new("RGBA", (columns * out_cell, rows * ch), (0, 0, 0, 0))
     for index, cell in enumerate(cells):
-        sheet.alpha_composite(cell, ((index % columns) * out_cell, (index // columns) * out_cell))
+        sheet.alpha_composite(cell, ((index % columns) * out_cell, (index // columns) * ch))
     return sheet
 
 
@@ -324,29 +350,31 @@ def compact_clips(clips: dict[str, list[int]]) -> tuple[list[int], dict[str, lis
     return used, {clip: [remap[i] for i in idx] for clip, idx in clips.items()}
 
 
-def clip_contents(image: Image.Image, cell: int, clips: dict[str, list[int]]) -> dict[str, list[int]]:
+def clip_contents(image: Image.Image, cell: int, clips: dict[str, list[int]], cell_height: int | None = None) -> dict[str, list[int]]:
     """Per clip, the [width, height] in sheet px of the box that holds its art in every frame
     of a sheet laid out by `assemble_sheet` (clips with no drawn pixel are left out)."""
     sheet = np.asarray(image).astype(np.float32)
     columns = image.width // cell
+    ch = cell_height or cell
     contents = {}
     for clip, indices in clips.items():
         frames = []
         for i in indices:
             row, col = divmod(i, columns)
-            frames.append(sheet[row * cell : (row + 1) * cell, col * cell : (col + 1) * cell])
+            frames.append(sheet[row * ch : (row + 1) * ch, col * cell : (col + 1) * cell])
         box = union_box(frames)
         if box is not None:
             contents[clip] = [box[2] - box[0], box[3] - box[1]]
     return contents
 
 
-def manifest_entry(sheet: Image.Image, out_cell: int, clips: dict[str, list[int]], events: dict[str, int]) -> dict:
+def manifest_entry(sheet: Image.Image, out_cell: int, clips: dict[str, list[int]], events: dict[str, int], cell_height: int | None = None) -> dict:
     """The manifest block of one sheet: grid, clips (compacted indices) and events."""
+    ch = cell_height or out_cell
     columns = sheet.width // out_cell
-    rows = sheet.height // out_cell
+    rows = sheet.height // ch
     return {
-        "grid": {"columns": columns, "rows": rows, "cell_width": out_cell, "cell_height": out_cell},
+        "grid": {"columns": columns, "rows": rows, "cell_width": out_cell, "cell_height": ch},
         "clips": clips,
         "events": events,
     }

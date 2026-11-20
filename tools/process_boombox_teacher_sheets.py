@@ -18,7 +18,9 @@ boombox: the briefcase of its cell 0 is scaled to BRIEFCASE_GAME_WIDTH on screen
 hazard is 30 px wide) and every prop uses that factor (`PROPS_SCALE_MULT` tunes it).
 The `fx` sheet (wave arcs, ground crest, chalk dust, steam loop) uses one fixed factor
 (`FX_SCALE`); the game rescales each effect to its hazard from the per-clip `content`
-box the manifest records. The `blackboard` raw image is keyed, cropped and saved as one
+box the manifest records. The `thrust_fx` sheet (the pointer thrust streak, 2 x 2 raw cells
+of one effect) is despilled, kept in place across its frames and saved as one row of
+400 x 80 px cells at `THRUST_FX_SCALE`, so the 120 px streak keeps about 3 texels per game px. The `blackboard` raw image is keyed, cropped and saved as one
 texture. A sheet whose boombox block measures 0 stops with a clear error.
 
 Usage: python tools/process_boombox_teacher_sheets.py [--preview DIR]
@@ -55,6 +57,10 @@ FALLBACK_BASE_SCALE = 0.8
 FX_CELL = 256
 FX_SCALE = 0.7  # one factor for the whole fx sheet; the game rescales each effect to its hazard
 FX_MIN_COMPONENT_PX = 40  # raw px; drops stray specks around the effects
+# The pointer thrust streak is drawn 120 px long in the game and the game runs at 3x on a device:
+# 0.55 makes its ~685 raw px about 377 texels, a 400 x 80 cell keeps at least 8 px around it.
+THRUST_FX_SCALE = 0.55
+THRUST_FX_CELL = (400, 80)
 BLACKBOARD_SCALE = 0.4
 BLACKBOARD_FILE = "boombox_teacher_blackboard.png"
 
@@ -132,6 +138,8 @@ FX = {
     "grid": (4, 2),
     "clips": {"wave_low": [0], "wave_high": [1], "bass_shock": [2], "chalk_dust": [3], "steam": [4, 5, 6, 7]},
 }
+
+THRUST_FX = {"grid": (2, 2), "clips": {"thrust_streak": [0, 1, 2, 3]}}
 
 
 def raw_path(sheet: str) -> Path:
@@ -249,6 +257,24 @@ def build_fx(preview: Path | None) -> dict:
     }
 
 
+def build_thrust_fx(preview: Path | None) -> dict:
+    """The thrust streak: 2 x 2 raw cells of one effect (four frames of the clip), kept in place
+    relative to each other, in one row of non-square cells (`THRUST_FX_CELL`)."""
+    raw = Image.open(raw_path("thrust_fx"))
+    cells = pipeline.split_cells(pipeline.despill_edges(raw, pipeline.key_magenta(raw)), *THRUST_FX["grid"], "thrust_fx", FX_MIN_COMPONENT_PX)
+    cell_width, cell_height = THRUST_FX_CELL
+    image, clips = pipeline.effect_clip_sheet(cells, THRUST_FX["clips"], THRUST_FX_SCALE, cell_width, cell_height, "thrust_fx")
+    image.save(OUT_DIR / sheet_file("thrust_fx"), optimize=True)
+    write_preview(image, "thrust_fx", preview, cell_width, f"thrust_fx scale {THRUST_FX_SCALE}", cell_height)
+    entry = pipeline.manifest_entry(image, cell_width, clips, {}, cell_height)
+    return {
+        "sheet": sheet_file("thrust_fx"),
+        "grid": entry["grid"],
+        "clips": entry["clips"],
+        "content": pipeline.clip_contents(image, cell_width, entry["clips"], cell_height),
+    }
+
+
 def build_blackboard(preview: Path | None) -> dict:
     """The blank blackboard keyed, cropped to its box and scaled: one texture."""
     frame = pipeline.key_magenta(Image.open(raw_path("blackboard")))
@@ -265,10 +291,15 @@ def build_blackboard(preview: Path | None) -> dict:
     return {"texture": BLACKBOARD_FILE, "size": [image.width, image.height]}
 
 
-def write_preview(image: Image.Image, sheet: str, preview: Path | None, cell: int, label: str) -> None:
+def write_preview(image: Image.Image, sheet: str, preview: Path | None, cell: int, label: str, cell_height: int | None = None) -> None:
     if preview is None:
         return
     preview.mkdir(parents=True, exist_ok=True)
+    if cell_height is not None:
+        backdrop = Image.new("RGBA", image.size, (24, 32, 56, 255))
+        backdrop.alpha_composite(image)
+        backdrop.save(preview / sheet_file(sheet))
+        return
     references = {"Luz": pipeline.LUZ_HEIGHT, "Artemis": pipeline.ARTEMIS_HEIGHT, "Profesor": BODY_HEIGHT}
     pipeline.write_preview(image, preview / sheet_file(sheet), cell, FEET_ROW, SPRITE_SCALE, references, label)
 
@@ -294,7 +325,7 @@ def main() -> None:
     props_present = raw_path("props").exists()
     if not props_present:
         print(f"skip props: {raw_path('props')} not found")
-    extras = {name: raw_path(name).exists() for name in ("fx", "blackboard")}
+    extras = {name: raw_path(name).exists() for name in ("fx", "thrust_fx", "blackboard")}
     for name, found in extras.items():
         if not found:
             print(f"skip {name}: {raw_path(name)} not found")
@@ -318,6 +349,9 @@ def main() -> None:
     if extras["fx"]:
         manifest["fx"] = build_fx(args.preview)
         print("  fx: done")
+    if extras["thrust_fx"]:
+        manifest["thrust_fx"] = build_thrust_fx(args.preview)
+        print("  thrust_fx: done")
     if extras["blackboard"]:
         manifest["blackboard"] = build_blackboard(args.preview)
     pipeline.write_manifest(OUT_DIR / "animation_manifest.json", manifest)
