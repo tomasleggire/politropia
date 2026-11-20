@@ -1,14 +1,13 @@
-
 [gd_scene format=3 uid="uid://dfi8n3n7j5qnj"]
 
 [ext_resource type="Script" uid="uid://rs4chv5qhjlo" path="res://scripts/ui/ability_unlock_popup.gd" id="1_nb7u6"]
 
-[node name="AbilityUnlockPopup" type="CanvasLayer"]
+[node name="AbilityUnlockPopup" type="CanvasLayer" unique_id=247938561]
 process_mode = 3
 layer = 95
 script = ExtResource("1_nb7u6")
 
-[node name="Overlay" type="Control" parent="."]
+[node name="Overlay" type="Control" parent="." unique_id=1203713435]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -16,8 +15,16 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Backdrop" type="ColorRect" parent="Overlay"]
+[node name="Backdrop" type="ColorRect" parent="Overlay" unique_id=227294568]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 color = Color(0, 0, 0, 0.65)
+
+[node name="CenterContainer" type="CenterContainer" parent="Overlay" unique_id=317350449]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -25,55 +32,46 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="CenterContainer" type="CenterContainer" parent="Overlay"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="Panel" type="Panel" parent="Overlay/CenterContainer"]
-custom_minimum_size = Vector2(420, 460)
+[node name="Panel" type="Panel" parent="Overlay/CenterContainer" unique_id=987366101]
+custom_minimum_size = Vector2(380, 360)
 layout_mode = 2
 
-[node name="MarginContainer" type="MarginContainer" parent="Overlay/CenterContainer/Panel"]
+[node name="MarginContainer" type="MarginContainer" parent="Overlay/CenterContainer/Panel" unique_id=1285854850]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = -20.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = -16.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Overlay/CenterContainer/Panel/MarginContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="Overlay/CenterContainer/Panel/MarginContainer" unique_id=159842969]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer"]
+[node name="Title" type="Label" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=1389261603]
 layout_mode = 2
 text = "¡HABILIDAD APRENDIDA!"
 horizontal_alignment = 1
 
-[node name="AbilityIcon" type="TextureRect" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(160, 160)
+[node name="AbilityIcon" type="TextureRect" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=478369538]
+custom_minimum_size = Vector2(112, 112)
 layout_mode = 2
 expand_mode = 3
 stretch_mode = 5
 
-[node name="AbilityName" type="Label" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer"]
+[node name="AbilityName" type="Label" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=1679755693]
 layout_mode = 2
 horizontal_alignment = 1
 
-[node name="Description" type="Label" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(320, 0)
+[node name="Description" type="Label" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=1115748288]
 layout_mode = 2
+horizontal_alignment = 1
 autowrap_mode = 3
-horizontal_alignment = 1
 
-[node name="ContinueButton" type="Button" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer"]
+[node name="ContinueButton" type="Button" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=1854489868]
 layout_mode = 2
 text = "CONTINUAR"

@@ -25,7 +25,7 @@ var final_dialogue: Array[String] = []
 
 @onready var interaction_area: Area2D = $InteractionArea
 @onready var speech_bubble: SpeechBubble = $SpeechBubble
-@onready var prompt_icon: Control = get_node_or_null("PromptIcon")
+@onready var prompt: InteractionPrompt = $InteractionPrompt
 @onready var sprite: AnimatedSprite2D = $AnimatedSprite2D
 
 var _player_in_range := false
@@ -41,8 +41,8 @@ func _ready() -> void:
 	_sync_quest_progress()
 	_setup_dialogues()
 	
-	if prompt_icon:
-		prompt_icon.hide()
+	if prompt:
+		prompt.hide()
 		
 	if interaction_area:
 		interaction_area.body_entered.connect(_on_body_entered)
@@ -52,13 +52,13 @@ func _ready() -> void:
 		speech_bubble.finished.connect(_on_dialogue_finished)
 
 	var touch := get_node_or_null("/root/TouchControls")
-	if touch != null and touch.has_method(&"set_hyperfocus_available"):
-		hyperfocus_unlocked.connect(touch.set_hyperfocus_available.bind(true))
-		if quest_accepted or quest_completed:
-			touch.set_hyperfocus_available(true)
+	
+	if touch != null:
+		if touch.has_method("set_hyperfocus_available"):
+			hyperfocus_unlocked.connect(
+			touch.set_hyperfocus_available.bind(true)
+		)
 
-	# A previous visit may have handed over the coin without Luz touching it.
-	# Recover it once the level is fully in the tree.
 	_restore_pending_reward.call_deferred()
 
 
@@ -163,16 +163,28 @@ func request_interact() -> bool:
 
 
 func _refresh_touch_interact() -> void:
+	var available := _player_in_range and not _is_talking
+
+	# Indicador de interacción para desktop.
 	var touch := get_node_or_null("/root/TouchControls")
+
+	if touch != null and touch.visible:
+		prompt.hide_prompt()
+	elif available:
+		prompt.show_prompt()
+	else:
+		prompt.hide_prompt()
+
+	# Botón de interacción para mobile.
 	if touch != null and touch.has_method(&"set_interact_available"):
-		touch.set_interact_available(self, _player_in_range and not _is_talking)
+		touch.set_interact_available(self, available)
 
 
 func _start_dialogue() -> void:
 	_is_talking = true
 	_refresh_touch_interact()
-	if prompt_icon:
-		prompt_icon.hide()
+	if prompt:
+		prompt.hide()
 		
 	if speech_bubble:
 		if not quest_accepted:
@@ -196,21 +208,39 @@ func _start_dialogue() -> void:
 
 func _on_dialogue_finished() -> void:
 	_is_talking = false
-	_refresh_touch_interact()
-	
+
+	# Primera conversación: acepta la misión y aprende Open Eyes.
 	if not quest_accepted:
 		quest_accepted = true
+
 		var progress := _quest_progress()
 		if progress != null:
 			progress.call("accept")
+
+		var learned := AbilityProgress.record(&"open_eyes")
+
+		if learned:
+			print("¡Habilidad aprendida: Open Eyes!")
+
+			hyperfocus_unlocked.emit()
+
+			$AbilityUnlockPopup.show_ability(
+				"Open Eyes",
+				"Luz aprendió a revelar secretos y descubrir elementos ocultos.",
+				load("res://assets/ui/open_eyes_learned.png")
+			)
+
 		print("Misión aceptada: Buscar libro en sala de curación")
+
+	# Conversaciones posteriores: entrega el libro si ya lo encontró.
 	elif has_required_book() and not quest_completed:
 		quest_completed = _give_reward()
 
-	hyperfocus_unlocked.emit()
+	call_deferred("_refresh_touch_interact")
 
 func has_required_book() -> bool:
-	return true
+	var progress := _quest_progress()
+	return progress != null and bool(progress.call("has_required_book"))
 
 func _quest_progress() -> Node:
 	return get_node_or_null("/root/BlindQuestProgress")
@@ -343,14 +373,16 @@ func _floor_global_y() -> float:
 	return global_position.y + 120.0 * absf(global_scale.y)
 
 func _on_body_entered(body: Node2D) -> void:
-	if body.is_in_group("player") or body is Player or "Luz" in body.name or "Player" in body.name:
-		_player_in_range = true
-		_refresh_touch_interact()
-		if not _is_talking:
-			_start_dialogue()
+	if not (body.is_in_group("player") or body is Player or "Luz" in body.name or "Player" in body.name):
+		return
+
+	_player_in_range = true
+	_refresh_touch_interact()
+
 
 func _on_body_exited(body: Node2D) -> void:
-	if body.is_in_group("player") or body is Player or "Luz" in body.name or "Player" in body.name:
-		_player_in_range = false
-		_is_talking = false
-		_refresh_touch_interact()
+	if not (body.is_in_group("player") or body is Player or "Luz" in body.name or "Player" in body.name):
+		return
+
+	_player_in_range = false
+	_refresh_touch_interact()

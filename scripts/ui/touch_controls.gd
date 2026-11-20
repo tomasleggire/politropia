@@ -69,16 +69,38 @@ func _ready() -> void:
 	add_to_group(&"touch_controls")
 	visible = _platform_wants_controls()
 	_position_pad_at_rest()
-	set_hyperfocus_available(_hyperfocus_available)
+	
+	set_hyperfocus_available(false)
+	
+	var ability_progress := get_node_or_null("/root/AbilityProgress")
+	if ability_progress != null:
+		if ability_progress.has_signal(&"ability_recorded"):
+			if not ability_progress.is_connected(
+				&"ability_recorded",
+				_on_ability_recorded
+			):
+				ability_progress.connect(
+					&"ability_recorded",
+					_on_ability_recorded
+				)
+	
 	_bind_found_player.call_deferred()
 	_check_saved_hyperfocus.call_deferred()
 
 
 func _check_saved_hyperfocus() -> void:
-	var blind_progress := get_node_or_null("/root/BlindQuestProgress")
-	if blind_progress != null and (bool(blind_progress.call("is_accepted")) or bool(blind_progress.call("is_completed"))):
-		set_hyperfocus_available(true)
+	var ability_progress := get_node_or_null("/root/AbilityProgress")
 
+	var available :bool = (
+		ability_progress != null
+		and ability_progress.call("is_unlocked", &"open_eyes")
+	)
+
+	set_hyperfocus_available(available)
+
+func _on_ability_recorded(ability: StringName) -> void:
+	if ability == &"open_eyes":
+		set_hyperfocus_available(true)
 
 func _platform_wants_controls() -> bool:
 	return force_visible or OS.has_feature("mobile") or DisplayServer.is_touchscreen_available()
@@ -328,6 +350,7 @@ func set_interact_available(source: Object, available: bool) -> void:
 		_interact_sources.erase(source)
 	if is_instance_valid(_interact_button):
 		_interact_button.visible = not _interact_sources.is_empty()
+
 	if _interact_sources.is_empty() and _interact_touch_id >= 0:
 		_end_interact()
 
