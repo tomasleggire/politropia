@@ -33,10 +33,18 @@ const HEAD_POLYGON := [
 ]
 const JAW_POLYGON := [Vector2(-30.0, 5.0), Vector2(-20.0, 14.0), Vector2(6.0, 20.0), Vector2(0.0, 9.0)]
 const ROAR_GAPE := 9.0
-## Art: the neck sags a little between its ends (never in a sweep) and the stump is this wide.
-const NECK_SAG := 0.08
-const NECK_MAX_SAG := 12.0
-const NECK_SEGMENTS := 8
+## Art: the neck is a curve from the body stump to the head. It leaves the stump and reaches the
+## head horizontally, with handles of `NECK_ROOT_HANDLE` / `NECK_HEAD_HANDLE` of its length (at
+## most `NECK_MAX_*_HANDLE` px). A flat sweep neck bends to the head's height within `NECK_BEND` px.
+const NECK_ROOT_HANDLE := 0.45
+const NECK_HEAD_HANDLE := 0.3
+const NECK_MAX_ROOT_HANDLE := 90.0
+const NECK_MAX_HEAD_HANDLE := 50.0
+const NECK_BEND := 70.0
+const NECK_SEGMENTS := 12
+## The neck and the stump are drawn behind the body (z 0) so the stump of the art covers their
+## root, and in front of the platforms (z -2).
+const NECK_Z := -1
 const STUMP_ART_WIDTH := 38.0
 const STUMP_ROOT_INSET := 8.0
 const IDLE := &"idle"
@@ -334,7 +342,7 @@ func _build_sprite() -> void:
 	add_child(_stuck_mark)
 
 
-## A tiled line from the shoulder to the head: behind the head, never over it.
+## A tiled line from the body stump to the head: behind the head and the body.
 func _build_neck() -> void:
 	var texture := _art.neck_texture()
 	if texture == null or _art.neck_thickness() <= 0.0:
@@ -346,7 +354,8 @@ func _build_neck() -> void:
 	_neck.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	_neck.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	_neck.width = _art.neck_thickness()
-	_neck.show_behind_parent = true
+	_neck.z_as_relative = false
+	_neck.z_index = NECK_Z
 	add_child(_neck)
 
 
@@ -356,6 +365,8 @@ func _build_stump() -> void:
 		return
 	_stump_sprite.name = "Stump"
 	_stump_sprite.visible = false
+	_stump_sprite.z_as_relative = false
+	_stump_sprite.z_index = NECK_Z
 	add_child(_stump_sprite)
 
 
@@ -376,20 +387,33 @@ func _sync_neck() -> void:
 		_neck.points = _neck_points(to_local(_shoulder_global()))
 
 
-## From the shoulder to the head origin, flat in a sweep and with a slight sag otherwise.
-## Both ends are exact.
-func _neck_points(shoulder_local: Vector2) -> PackedVector2Array:
-	var from := shoulder_local
-	var sag := 0.0
+## From the neck root to the head origin. Both ends are exact. At rest it is a curve that
+## leaves the stump and enters the head horizontally; in a sweep it bends to the head's height
+## within `NECK_BEND` px and runs flat to the head, as the damage does.
+func _neck_points(root_local: Vector2) -> PackedVector2Array:
 	if _horizontal_neck:
-		from.y = 0.0
-	else:
-		sag = minf(from.length() * NECK_SAG, NECK_MAX_SAG)
-	var points := PackedVector2Array([from])
-	for i: int in range(1, NECK_SEGMENTS):
+		var bend_x := maxf(root_local.x - NECK_BEND, 0.0)
+		var bend_end := Vector2(bend_x, 0.0)
+		var points := _curve(root_local, bend_end, minf(NECK_BEND * 0.5, root_local.x - bend_x))
+		if bend_end != Vector2.ZERO:
+			points.append(Vector2.ZERO)
+		return points
+	var length := root_local.length()
+	return _curve(root_local, Vector2.ZERO, minf(length * NECK_ROOT_HANDLE, NECK_MAX_ROOT_HANDLE), minf(length * NECK_HEAD_HANDLE, NECK_MAX_HEAD_HANDLE))
+
+
+## A cubic curve from `from` to `to`, leaving `from` toward the left and arriving at `to` from the
+## right, with its handles `from_handle` and `to_handle` px long (the same when omitted).
+func _curve(from: Vector2, to: Vector2, from_handle: float, to_handle := -1.0) -> PackedVector2Array:
+	var handle := Vector2(to_handle if to_handle >= 0.0 else from_handle, 0.0)
+	var p1 := from + Vector2(-from_handle, 0.0)
+	var p2 := to + handle
+	var points := PackedVector2Array()
+	for i: int in range(NECK_SEGMENTS + 1):
 		var u := float(i) / float(NECK_SEGMENTS)
-		points.append(from.lerp(Vector2.ZERO, u) + Vector2(0.0, sag * sin(PI * u)))
-	points.append(Vector2.ZERO)
+		points.append(from.bezier_interpolate(p1, p2, to, u))
+	points[0] = from
+	points[points.size() - 1] = to
 	return points
 
 
@@ -446,12 +470,17 @@ func _play(clip: StringName) -> void:
 	_sprite.play(resolved, fit)
 
 
+## Where the neck starts: the stump of the body art when the boss has it (it follows the body's
+## frame), else the `shoulder` export. Visual only: attacks use `shoulder`.
 func _shoulder_global() -> Vector2:
 	var host := get_parent()
 	var anchor := host.get_parent() as Node2D if host != null else null
 	if anchor == null:
 		return global_position + shoulder
-	return anchor.to_global(shoulder)
+	var root := Vector2.INF
+	if _art != null and anchor.has_method(&"get_neck_root"):
+		root = anchor.call(&"get_neck_root", int(tier)) as Vector2
+	return anchor.to_global(root if root.is_finite() else shoulder)
 
 
 func _build_hurtbox() -> void:

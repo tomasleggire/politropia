@@ -29,7 +29,8 @@ const FLIGHT_PULSE_RATE := 18.0
 ## The puddle blinks during its last seconds.
 const DRY_WARNING_TIME := 0.7
 const ELLIPSE_POINTS := 20
-## Art: the glob fits this box (px) and the puddle sprite blinks like the drawn one.
+## Art: the glob sprite is contained in a box this many px wide (the puddle sprite is as wide as
+## the puddle that hurts, and blinks like the drawn one through `_pool_fade`).
 const GLOB_ART_SIZE := 19.0
 
 var damage := 1
@@ -189,9 +190,16 @@ func _land() -> void:
 	_fit_pool_sprite()
 	_sync_art()
 	if _art != null:
-		_art.puff(self, HydraArt.PROPS, HydraArt.VENOM_SPLASH, global_position + Vector2(0.0, -POOL_HEIGHT), _width)
+		_art.puff(self, HydraArt.PROPS, HydraArt.VENOM_SPLASH, global_position - Vector2(0.0, _splash_half_height()), _width)
 	landed.emit(global_position)
 	queue_redraw()
+
+
+## Half the height of the splash at the puddle's width: the puff is centred on its point, so the
+## point sits this far above the surface and the splash stands on it instead of sinking in.
+func _splash_half_height() -> float:
+	var content := _art.art_size(HydraArt.PROPS, HydraArt.VENOM_SPLASH)
+	return content.y * (_width / maxf(content.x, 1.0)) * 0.5
 
 
 func _update_pool(delta: float) -> void:

@@ -25,6 +25,12 @@ const ART_COLUMNS := 4
 const ART_BODY_OFFSET := Vector2(0.0, -288.0)
 const ART_SCALE := 0.2896
 const ART_NECK := 18.0
+## Neck roots (low, mid, high; on-screen px of the right-facing art, from the feet centre) of the
+## fixture body: one entry per frame of `idle` and `roar`.
+const FIXTURE_NECK_ROOTS := {
+	"idle": [[[36.0, -55.0], [27.0, -95.0], [24.0, -139.0]], [[38.0, -61.0], [29.0, -105.0], [20.0, -144.0]]],
+	"roar": [[[40.0, -76.0], [21.0, -118.0], [15.0, -155.0]], [[26.0, -60.0], [28.0, -94.0], [46.0, -128.0]]],
+}
 ## Frames of every clip of the fixture sheets (a clip of a head sheet is written once per head).
 const FIXTURE_BODY_CLIPS := {"idle": 2, "roar": 2, "defeat": 3}
 const FIXTURE_HEAD_CLIPS := {"idle": 2, "telegraph": 1, "attack": 2, "roar": 1, "dazed": 1}
@@ -70,8 +76,9 @@ const CHECKS := {
 	"case_art_defeat_and_corpse": 10,
 	"case_art_heads_play_their_clips": 19,
 	"case_art_neck_and_stump": 9,
+	"case_art_neck_roots_follow_the_body": 6,
 	"case_art_venom_wears_sprites": 11,
-	"case_art_platforms_are_dressed": 8,
+	"case_art_platforms_are_dressed": 9,
 	"case_art_pieces_are_independent": 9,
 }
 
@@ -1247,7 +1254,10 @@ func _write_art_fixture(parts: Array[String] = ART_ALL, without: Array[String] =
 	var manifest := {"cell": 640, "feet_row": 608, "sprite_scale": ART_SCALE}
 	if parts.has("body"):
 		var entry := _write_clip_sheet("fixture_body.png", FIXTURE_BODY_CLIPS, without)
-		manifest["sheets"] = {"fixture_body.png": {"grid": entry["grid"], "clips": entry["clips"], "events": {}}}
+		var sheet := {"grid": entry["grid"], "clips": entry["clips"], "events": {}}
+		if not without.has("neck_roots"):
+			sheet["neck_roots"] = FIXTURE_NECK_ROOTS
+		manifest["sheets"] = {"fixture_body.png": sheet}
 	if parts.has("heads"):
 		for key: String in HydraArt.HEAD_ENTRIES:
 			var entry := _write_clip_sheet("fixture_%s.png" % key, FIXTURE_HEAD_CLIPS, without)
@@ -1511,20 +1521,22 @@ func case_art_neck_and_stump() -> void:
 	var mid := _head(HydraHead.Kind.SWEEPER)
 	var neck := mid.get_neck()
 	check(neck != null and neck.texture != null and neck.texture_mode == Line2D.LINE_TEXTURE_TILE and neck.texture_repeat == CanvasItem.TEXTURE_REPEAT_ENABLED, "the neck is a tiled, repeating textured line")
-	check(is_equal_approx(neck.width, ART_NECK) and neck.show_behind_parent, "its width is the manifest's thickness and it draws behind the head")
+	check(is_equal_approx(neck.width, ART_NECK) and not neck.z_as_relative and neck.z_index == HydraHead.NECK_Z, "its width is the manifest's thickness and it draws behind the body")
 	var points := neck.points
-	var shoulder := mid.to_local(mid.get_shoulder_global())
-	check(points.size() == HydraHead.NECK_SEGMENTS + 1 and points[0].is_equal_approx(shoulder) and points[points.size() - 1] == Vector2.ZERO, "both ends of the neck are exact: the shoulder and the head")
-	var sag := 0.0
-	for i: int in points.size():
-		sag = maxf(sag, absf(points[i].y - shoulder.lerp(Vector2.ZERO, float(i) / float(HydraHead.NECK_SEGMENTS)).y))
-	check(sag > 0.0 and sag <= HydraHead.NECK_MAX_SAG + 0.01, "the resting neck sags a little, never past the limit (%.1f px)" % sag)
+	var root := mid.to_local(mid.get_shoulder_global())
+	check(points.size() == HydraHead.NECK_SEGMENTS + 1 and points[0].is_equal_approx(root) and points[points.size() - 1] == Vector2.ZERO, "both ends of the neck are exact: the body stump and the head")
+	var leaves_flat: bool = absf(points[1].y - points[0].y) <= 0.35 * absf(points[1].x - points[0].x) and absf(points[points.size() - 2].y) <= 0.35 * absf(points[points.size() - 2].x)
+	var inside := true
+	for point: Vector2 in points:
+		inside = inside and point.y >= minf(root.y, 0.0) - 0.5 and point.y <= maxf(root.y, 0.0) + 0.5
+	check(leaves_flat and inside, "the resting neck leaves the stump and enters the head horizontally, never past either end")
 	_boss.start_attack(HydraBoss.Attack.NECK_SWEEP)
 	await _frames(3)
+	root = mid.to_local(mid.get_shoulder_global())
 	var flat := true
 	for point: Vector2 in mid.get_neck().points:
-		flat = flat and point.y == 0.0
-	check(flat, "in a sweep the neck is laid flat at the head's height")
+		flat = flat and (point.x > root.x - HydraHead.NECK_BEND or absf(point.y) < 0.001)
+	check(flat and mid.get_neck().points[0].is_equal_approx(root), "in a sweep the neck bends to the head's height near the stump and runs flat to the head")
 	await _wait_for(_attack_is_over, 4.0)
 	await _secs(1.0)
 	_slash(mid, 12)
@@ -1534,9 +1546,43 @@ func case_art_neck_and_stump() -> void:
 	check(stump != null and stump.visible and stump.scale.x < 0.0, "the stump shows, facing left")
 	var width := float(FIXTURE_PROPS["stump"][0]) * absf(stump.scale.x)
 	check(is_equal_approx(width, HydraHead.STUMP_ART_WIDTH), "the stump is %.0f px wide" % HydraHead.STUMP_ART_WIDTH)
-	shoulder = mid.to_local(mid.get_shoulder_global())
+	root = mid.to_local(mid.get_shoulder_global())
 	var right_edge := stump.position.x + width * 0.5
-	check(is_equal_approx(right_edge, shoulder.x + HydraHead.STUMP_ROOT_INSET) and is_equal_approx(stump.position.y, shoulder.y + HydraHead.STUMP_DROOP * 0.5), "its root sits on the shoulder, drooping like the placeholder")
+	check(is_equal_approx(right_edge, root.x + HydraHead.STUMP_ROOT_INSET) and is_equal_approx(stump.position.y, root.y + HydraHead.STUMP_DROOP * 0.5) and stump.z_index == HydraHead.NECK_Z, "its root sits on the body stump, drooping like the placeholder, behind the body")
+	_remove_art_fixture()
+
+
+func case_art_neck_roots_follow_the_body() -> void:
+	_write_art_fixture()
+	await _awake_art()
+	var sprite := _body_sprite()
+	var heads := [_head(HydraHead.Kind.BITER), _head(HydraHead.Kind.SWEEPER), _head(HydraHead.Kind.SPITTER)]
+	var expected: Array = FIXTURE_NECK_ROOTS[String(sprite.animation)][sprite.frame]
+	var facing := signf(_boss.get_node("Visual").scale.x)
+	var matched := true
+	for head: HydraHead in heads:
+		var point: Array = expected[head.tier]
+		matched = matched and head.get_shoulder_global().is_equal_approx(_boss.to_global(Vector2(float(point[0]) * facing, float(point[1]))))
+	check(matched, "every neck starts on the stump of the body's current frame, mirrored with the body")
+	check(heads[0].get_shoulder_global().y > heads[1].get_shoulder_global().y and heads[1].get_shoulder_global().y > heads[2].get_shoulder_global().y, "the low head's root is the lowest stump, the high head's the top one")
+	sprite.pause()
+	sprite.animation = &"idle"
+	sprite.frame = 1
+	await _frames(2)
+	var second: Array = FIXTURE_NECK_ROOTS["idle"][1]
+	check(heads[0].get_shoulder_global().is_equal_approx(_boss.to_global(Vector2(float(second[0][0]) * facing, float(second[0][1])))), "the root follows the body to its next frame")
+	check(heads[0].shoulder == Vector2(-46.0, -30.0) and _boss.get_node("Heads/LowHead").shoulder == heads[0].shoulder, "the shoulder export that the attacks read is untouched")
+	_tough_luz()
+	await _put_luz(Vector2(-350.0, 0.0))
+	for head: HydraHead in heads:
+		_slash(head, 12)
+		await _frames(2)
+	await _frames(2)
+	check(not _boss.get_neck_root(0).is_finite(), "no root while the defeat clip hides the heads")
+	_write_art_fixture(ART_ALL, ["neck_roots"])
+	await _awake_art()
+	var bare := _head(HydraHead.Kind.SWEEPER)
+	check(bare.get_shoulder_global().is_equal_approx(_boss.to_global(bare.shoulder)), "art without recorded roots keeps the shoulder export")
 	_remove_art_fixture()
 
 
@@ -1561,7 +1607,9 @@ func case_art_venom_wears_sprites() -> void:
 	var height := float(FIXTURE_PROPS["venom_pool"][1]) * pool.scale.y
 	check(is_equal_approx(width, _boss.venom_pool_width) and is_equal_approx(pool.position.y, -height * 0.5), "it is as wide as the puddle and stands on its surface")
 	check(pool.sprite_frames.get_animation_loop(&"venom_pool") and pool.sprite_frames.get_frame_count(&"venom_pool") == 2, "the puddle is a two-frame loop")
-	check(_sprites_of(venom, &"venom_splash").size() == 1, "the landing throws one splash")
+	var splashes := _sprites_of(venom, &"venom_splash")
+	var splash_bottom := splashes[0].global_position.y + float(FIXTURE_PROPS["venom_splash"][1]) * (_boss.venom_pool_width / float(FIXTURE_PROPS["venom_splash"][0])) * 0.5 if splashes.size() == 1 else INF
+	check(splashes.size() == 1 and splash_bottom <= venom.get_spot().y + 0.5, "the landing throws one splash that stands on the surface instead of sinking into it")
 	await _secs(0.5)
 	check(_sprites_of(venom, &"venom_splash").is_empty(), "the splash frees itself")
 	await _secs(_boss.venom_pool_time - 1.0)
@@ -1604,6 +1652,7 @@ func case_art_platforms_are_dressed() -> void:
 	var top := first.position.y - float(FIXTURE_PROPS["platform"][1]) * first.scale.y * 0.5
 	var top_alt := second.position.y - float(FIXTURE_PROPS["platform_alt"][1]) * second.scale.y * 0.5
 	check(is_equal_approx(top, -8.0) and is_equal_approx(top_alt, -8.0), "the art's top edge sits on the collision top and the rest hangs below")
+	check(first.z_index == HydraArt.PLATFORM_Z and HydraArt.PLATFORM_Z < HydraHead.NECK_Z, "the slabs sit behind the necks, which a sweep must show in front of them")
 	# A platform added later and one that moved are dressed on the next rescan, nothing is doubled.
 	var added := StaticBody2D.new()
 	added.name = "PlatformAdded"
@@ -1628,7 +1677,8 @@ func case_art_platforms_are_dressed() -> void:
 		for child: Node in _platform(platform_name).get_children():
 			sprites += 1 if child is AnimatedSprite2D else 0
 	check(sprites == names.size(), "a rescan never doubles a sprite")
-	check(third.get_parent() == _platform("PlatformMid") and third.position.is_equal_approx(first.position), "a moved platform keeps its sprite fitted to its collision")
+	var moved_top := third.global_position.y - float(FIXTURE_PROPS["platform"][1]) * third.scale.y * 0.5
+	check(third.get_parent() == _platform("PlatformMid") and is_equal_approx(moved_top, _platform("PlatformMid").global_position.y - 8.0), "a moved platform keeps its sprite fitted to its new collision top")
 	_remove_art_fixture()
 
 

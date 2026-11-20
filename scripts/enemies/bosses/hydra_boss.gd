@@ -171,6 +171,8 @@ func _ready() -> void:
 	_setup_art()
 	_collect_heads()
 	_begin_layout()
+	# Once now (the platforms of this scene are all in the tree) and once deferred (the ones a
+	# teammate adds or moves while the scene finishes loading); a dressed platform is refitted.
 	_dress_platforms.call_deferred()
 	if _dead:
 		_sever_all_heads()
@@ -237,6 +239,18 @@ func get_clip() -> StringName:
 
 func get_art() -> HydraArt:
 	return _art
+
+
+## Where the neck of the head at `tier` leaves the body, in boss space: the stump of the art in
+## the frame the body shows now (it follows the idle bob and the roar). `Vector2.INF` without
+## body art or manifest roots, and while the defeat clip hides the heads. Visual only.
+func get_neck_root(tier: int) -> Vector2:
+	if not _art_on or _sprite.animation == &"defeat":
+		return Vector2.INF
+	var root := _art.neck_root(_sprite.animation, _sprite.frame, tier)
+	if not root.is_finite():
+		return root
+	return Vector2(root.x * signf(_visual.scale.x), root.y)
 
 
 ## The heads that are carrying out an attack right now (the lead and the echo).

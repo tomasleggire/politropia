@@ -32,6 +32,9 @@ const CLIP_FALLBACKS := {
 	"dazed": ["idle"], "roar": ["attack", "idle"], "telegraph": ["idle"],
 }
 const POOL_FPS := 6.0
+## Platform sprites sit behind the necks (z -1) and the body (z 0): a neck is never hidden by the
+## ledge it sweeps along.
+const PLATFORM_Z := -2
 ## HydraHead.Kind -> manifest entry (BITER, SPITTER, SWEEPER).
 const HEAD_ENTRIES := [BITER_HEAD, SPITTER_HEAD, SWEEPER_HEAD]
 
@@ -55,6 +58,29 @@ func catalog() -> BossAnimationCatalog:
 
 func has_body() -> bool:
 	return _catalog.has_art()
+
+
+## The neck root of the head at `tier` (0 low, 1 mid, 2 high) in the frame `frame` of the body
+## clip `clip`: on-screen px of the right-facing art, relative to the feet centre (x right, y
+## down). `Vector2.INF` when the manifest records none (older art), then the head keeps its own
+## shoulder point.
+func neck_root(clip: StringName, frame: int, tier: int) -> Vector2:
+	var roots := _body_neck_roots().get(String(clip), []) as Array
+	if frame < 0 or frame >= roots.size():
+		return Vector2.INF
+	var tiers := roots[frame] as Array
+	if tier < 0 or tier >= tiers.size():
+		return Vector2.INF
+	var point := tiers[tier] as Array
+	return Vector2(float(point[0]), float(point[1]))
+
+
+func _body_neck_roots() -> Dictionary:
+	var sheets: Variant = _catalog.manifest_entry("sheets")
+	for sheet: Variant in (sheets as Dictionary).values():
+		if sheet is Dictionary and (sheet as Dictionary).get("neck_roots") is Dictionary:
+			return (sheet as Dictionary)["neck_roots"] as Dictionary
+	return {}
 
 
 ## -- Heads ---------------------------------------------------------------------------------
@@ -132,6 +158,7 @@ func dress_platform(platform: Node, alt: bool) -> bool:
 	if sprite == null:
 		sprite = width_sprite(clip, size.x)
 		sprite.name = PLATFORM_SPRITE
+		sprite.z_index = PLATFORM_Z
 		platform.add_child(sprite)
 	var fit := BoomboxHazard.art_scale(art_size(PROPS, clip), Vector2(size.x, size.x), BoomboxHazard.ArtFit.WIDTH)
 	sprite.scale = fit
