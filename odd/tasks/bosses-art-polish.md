@@ -44,15 +44,15 @@ Out: gameplay (timings, hitboxes, damage, patterns), boss design changes, Luz an
 
 - Strategy: ask-on-risk. Forecast: about 400 authored lines plus binary art. Chain strategy: pending, asked before any pull request together with the rest of `feat/new-bosses`.
 - TDD: off (source: project convention, `odd/tasks/artemis-polish.md:27`). Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/<name>_test.gd` (one Godot process at a time).
-- Receipt-driven development: on by default; consent `granted` by standing user instruction. Last reviewed boundary when this document was created: `b35bfb4`.
+- Receipt-driven development: on by default; consent `granted` by standing user instruction. Last reviewed boundary: `36caaad` (was `b35bfb4` when this document was created).
 
 ## Tasks
 
-- [ ] P1 El Topo: harmonise the colours of every sheet to `exposed`; clean the `fx` pink patch and the warm puff (route: delegated writer; trigger: pipeline, script, docs and tests).
-- [ ] P2 Artemis: full stag frames (no 256 px clamp on the 384 px cell), drop the detached specks that are residue (route: delegated writer, same run as P1).
-- [ ] P3 Edge despill for the three bosses, reusing what La Hidra's T4 adds to the shared pipeline as opt-in (route: delegated writer, same run).
-- [ ] P4 Fight review of the four bosses at 1920x1080 (hazards, draw order, flips, glow and flash) and fixes for what it shows (route: delegated).
-- [ ] P5 Codex regeneration, only if P1-P4 leave a flaw that processing or code cannot fix (route: inline).
+- [x] P1 El Topo: harmonise the colours of every sheet to `exposed`; clean the `fx` pink patch and the warm puff (route: delegated writer; trigger: pipeline, script, docs and tests). Commit `f352b18`.
+- [x] P2 Artemis: full stag frames, drop the detached specks that are residue (route: delegated writer, same run as P1). Commit `f352b18`: the clamp was not the only cause, the stretched poses are wider than the cell, so the stag cell is now 512 x 384.
+- [x] P3 Edge despill, reusing what La Hidra's T4 added, moved to the shared pipeline as opt-in (route: delegated writer, same run). Commit `f352b18`: applied to the character sheets of El Topo and El Profesor; La Hidra's output is byte-identical; Artemis is left out (her outline is light, so the measured outline colour is wrong and the pink-edge count went up).
+- [x] P4 Fight review at 1920x1080 (hazards, draw order, flips, glow and flash) and fixes for what it shows (route: delegated). Commits `508e253` (Artemis hit flash and telegraph glow drawn on her sprite instead of the placeholder polygon box) and `36caaad` (no dirt mound under El Topo while the intro clip shows).
+- [ ] P5 Codex art for the two attacks that still draw placeholder shapes, found in P4: the pointer thrust of El Profesor (flat red polygon arrow) and the claw of El Topo (red striped rectangle). One new effect sheet per boss, processed and wired like the existing effect clips, placeholder kept as the fallback (route: Codex runs inline, integration by a delegated writer; trigger: scripts, processing, tests and docs). The same writer takes the review follow-ups below.
 - [ ] P6 Final captures for the user (route: inline).
 
 ## Acceptance criteria
@@ -70,6 +70,15 @@ The suites above; `--import`; each processing script run twice gives identical o
 - 2026-11-20: Codex has credits again. Audit of Artemis, El Profesor and El Topo done (read-only agent, numeric checks plus contact sheets plus one gallery capture per boss). Findings above. Measured as fine: standing scale per clip, feet row (416/417 for Topo and Profesor, 224/225 for Artemis), no clipped limbs on Artemis beyond the bow tip, at least 27 px of margin around Topo and Profesor content (the 7-texel glow sampling does not reach a neighbouring cell).
 - 2026-11-20: Topo colour prototype run outside the repository; the before/after strip confirms the processing route.
 
+- 2026-11-20: P1-P4 done by one writer (commits `f352b18`, `508e253`, `36caaad`; P1-P3 share `tools/boss_sheet_pipeline.py`, so they close in one commit).
+  - Looked at by the parent: the Topo colour strip (same jacket and fur in every clip, on light and dark), the stag cells before and after (whole, with margin), the eruption patch zoom, the despill zoom, and stills of the three fights at 1920x1080.
+  - Checks (writer, before -> after): `--import` clean; `blind_beast_boss_test` 349 -> 349; `boombox_teacher_boss_test` 412 -> 412; `hydra_boss_test` 321 -> 321; `boss_animation_catalog_test` 41 -> 41; `boss_enemy_test` 178 -> 178; `boss_test_hub_test` 213 -> 213; `tools/test_process_hydra_sheets.py` 10 OK; new `tools/test_process_boss_sheets.py` 13 OK; every processing script run twice gives identical output equal to the committed files.
+  - Parent spot check: both Python suites OK, `blind_beast_boss_test` PASS, `boombox_teacher_boss_test` PASS 412/412, ritual runner with the same 13 failing cases as the base.
+  - Added by the parent: `case_flash_and_glow_on_the_sprite` in `tests/artemis_boss_test.gd` (7 checks, pass), one mound check in `tests/blind_beast_boss_test.gd` (PASS 350/350), and the flash and glow rows of `docs/bosses/ARTEMIS_ANIMATIONS.md`.
+  - Known base failures, unchanged: the Artemis suite runs through `tests/stillness_desk_ritual_test.gd`, which reports `FAIL incomplete run` (now 476 of 726 checks, 469 of 719 before the new case) with 13 failing cases, the same list as on the base; `tests/artemis_room_test.gd` does not parse (removed `DoorID` names).
+- 2026-11-20: native review of `9ca45d3..36caaad`: assessed high (`tools/process_artemis_sheets.py` starts other processes), consent `granted`, four lenses, approved and acknowledged (lineage `review-d512c44ce38eb476`). 13 advisory findings, none blocking. Taken as follow-ups in P5: a check that the mound is back once the fight starts (`blind_beast_boss.gd:1370`), a despill test that can fail (`tools/test_process_boss_sheets.py:107`), the docstring test renamed or dropped (`tools/test_process_boss_sheets.py:161`), a guard for a sheet with no solid pixels in `estimate_outline` (`tools/boss_sheet_pipeline.py:88`). Left as they are: the suggestions about duplicated constants and names.
+- P4 findings left for the user, not changed: the shared stun tint (`STUN_TINT`, a multiply) turns El Topo lion-gold and El Profesor yellow while dazed; El Topo's intro clip lasts about 0.8 s, so the old man shows for about 0.15 s; the test arena shows grey beyond the room after a defeat (test backdrop, not a boss defect).
+
 ## Next step
 
-Wait for La Hidra's T4 writer, then run P1-P3 with one writer, then P4.
+P5: generate the two effect sheets with Codex, then one writer integrates them and takes the review follow-ups; then P6.
