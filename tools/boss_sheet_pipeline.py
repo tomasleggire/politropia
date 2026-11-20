@@ -85,6 +85,8 @@ def estimate_outline(rgba: np.ndarray, band_px: int = 2) -> np.ndarray:
     the outline colour of a figure drawn with a dark contour."""
     solid = rgba[..., 3] > 250
     inner = solid & ~ndimage.binary_erosion(solid, structure=np.ones((3, 3)), iterations=band_px)
+    if not inner.any():
+        raise ValueError("estimate_outline: the sheet has no solid pixel (alpha above 250), so its outline colour cannot be measured; check the keying of the raw sheet")
     return np.median(rgba[..., :3][inner], axis=0).astype(np.float32)
 
 

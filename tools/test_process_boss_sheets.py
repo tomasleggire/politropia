@@ -11,6 +11,7 @@ import unittest
 
 import numpy as np
 from PIL import Image
+from scipy import ndimage
 
 import boss_sheet_pipeline as pipeline
 import process_blind_beast_sheets as topo
@@ -95,23 +96,53 @@ class UnmixFringeTest(unittest.TestCase):
         _, _, unmixed = pipeline.unmix_fringe(rgb, background, self.outline)
         self.assertFalse(unmixed.any())
 
+    def test_dark_purple_brown_edge_pixel_is_read_as_a_blend_today(self):
+        # Pins today's behaviour, not a wish: a dark purple-brown art pixel on the silhouette edge
+        # (here 64, 40, 56) lies within UNMIX_RESIDUAL of the outline-magenta line, so it is taken
+        # for about 15 percent magenta: it becomes the outline colour and loses about 15 percent of
+        # its alpha. Real art that dark, right at the edge, is therefore darkened.
+        rgb = np.zeros((9, 9, 3), dtype=np.float32)
+        rgb[:] = pipeline.MAGENTA
+        rgb[:, 4:] = self.outline
+        rgb[4, 3] = (64, 40, 56)
+        background = np.zeros((9, 9), dtype=bool)
+        background[:, :3] = True
+        alpha, colour, unmixed = pipeline.unmix_fringe(rgb, background, self.outline)
+        self.assertTrue(unmixed[4, 3])
+        self.assertAlmostEqual(float(alpha[4, 3]), 0.85, delta=0.03)
+        self.assertTrue(np.array_equal(colour[4, 3], self.outline))
+
     def test_despill_edges_changes_only_the_fringe(self):
+        outline = np.array([27.0, 15.0, 21.0], dtype=np.float32)
         raw = np.zeros((20, 20, 3), dtype=np.uint8)
         raw[:] = (255, 0, 255)
         raw[5:15, 5:15] = (27, 15, 21)
         raw[6:14, 6:14] = (150, 110, 60)
-        raw[10, 4] = (141, 7, 138)  # half outline, half magenta
+        raw[10, 4] = (50, 13, 44)  # 10 percent magenta over the outline: keyed almost opaque, tinted
         image = Image.fromarray(raw)
         keyed = pipeline.key_magenta(image)
-        out = pipeline.despill_edges(image, keyed, np.array([27.0, 15.0, 21.0], dtype=np.float32))
-        self.assertTrue(np.array_equal(out[8:12, 8:12], keyed[8:12, 8:12]))
-        self.assertLess(out[10, 4, 3], keyed[10, 4, 3] + 1e-3)
+        out = pipeline.despill_edges(image, keyed, outline)
+        self.assertGreater(keyed[10, 4, 3], 200.0)
+        self.assertLess(out[10, 4, 3], keyed[10, 4, 3] - 10.0)  # strictly more transparent
+        self.assertTrue(np.array_equal(out[10, 4, :3], outline))  # and the outline colour again
+        background = keyed[..., 3] <= 0.0
+        band = ndimage.binary_dilation(background, structure=np.ones((3, 3)), iterations=pipeline.FRINGE_PX) & ~background
+        self.assertTrue(np.array_equal(out[~band], keyed[~band]))
 
     def test_estimate_outline_reads_the_contour(self):
         frame = solid(30, 30, (150, 110, 60))
         frame[:3] = frame[-3:] = (30, 20, 25, 255)
         frame[:, :3] = frame[:, -3:] = (30, 20, 25, 255)
         self.assertTrue(np.allclose(pipeline.estimate_outline(frame), (30, 20, 25), atol=1.0))
+
+    def test_estimate_outline_without_a_solid_pixel_names_the_problem(self):
+        frame = solid(30, 30, (150, 110, 60))
+        frame[..., 3] = 200.0  # nothing above the solid threshold
+        with self.assertRaisesRegex(ValueError, "no solid pixel"):
+            pipeline.estimate_outline(frame)
+        raw = Image.fromarray(np.full((8, 8, 3), (255, 0, 255), dtype=np.uint8))
+        with self.assertRaisesRegex(ValueError, "no solid pixel"):
+            pipeline.despill_edges(raw, pipeline.key_magenta(raw))
 
 
 class StagHelpersTest(unittest.TestCase):
@@ -158,7 +189,7 @@ class PinkLeakTest(unittest.TestCase):
         self.assertGreaterEqual(g - b, topo.LEAK_BEIGE_GAP - 1)  # beige: green well above blue
         self.assertLessEqual(r - g, topo.LEAK_PUFF_RED_OVER_GREEN)
 
-    def test_docstring_matches_the_pink_predicate(self):
+    def test_docstring_names_the_cases_it_handles(self):
         for word in ("magenta", "bled", "beige"):
             self.assertIn(word, topo.clear_pink_leaks.__doc__)
 

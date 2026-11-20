@@ -70,7 +70,7 @@ const CHECKS := {
 	"case_corpse_made_before_entering_the_tree": 10,
 	"case_art_absent_keeps_the_placeholders": 12,
 	"case_art_shows_the_sprite_and_hides_when_burrowed": 20,
-	"case_art_clip_per_state": 20,
+	"case_art_clip_per_state": 21,
 	"case_art_glow_and_flash_on_the_sprite": 8,
 	"case_art_defeat_and_corpse_frame": 10,
 	"case_art_hazards_wear_the_sprites": 24,
@@ -1277,6 +1277,7 @@ func case_art_clip_per_state() -> void:
 	_boss.engage()
 	await _frames(3)
 	check(not _boss._visual.visible and _boss.get_clip() == &"exposed_idle", "the fight starts with him underground")
+	check(_boss._mound_visible(), "the dirt mound is back once he is engaged and burrowed")
 	await _build_rig(_with_manifest(ART_MANIFEST))
 	await _frames(5)
 	_boss._sprite.sprite_frames.remove_animation(&"intro")
