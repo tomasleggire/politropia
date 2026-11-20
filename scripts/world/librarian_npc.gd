@@ -92,16 +92,16 @@ func _start_dialogue() -> void:
 	
 	speech_bubble.show_text(frase)
 
+var icono 
+
 func _on_dialogue_finished() -> void:
 	_is_talking = false
 	var learned := AbilityProgress.record(&"focus")
 	if learned:
-		print("¡Habilidad aprendida: Focus!")
-
 		$AbilityUnlockPopup.show_ability(
 			"Focus",
 			"Luz aprendió a concentrar su energía para recuperar salud.",
-			null
+			load("res://assets/ui/open_eyes_learned.png")
 		)
 
 	call_deferred("_refresh_interaction")

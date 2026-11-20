@@ -40,4 +40,3 @@ position = Vector2(187, 205)
 prompt_text = "Hablar"
 
 [node name="AbilityUnlockPopup" parent="." unique_id=1976063548 instance=ExtResource("5_umqrt")]
-position = Vector2(251, 294)

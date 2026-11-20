@@ -13,7 +13,7 @@ signal changed
 var _accepted := false
 var _completed := false
 var _reward_granted := false
-
+var _required_book_collected := false
 
 ## Marks the first dialogue as finished. Returns false when it already was.
 func accept() -> bool:
@@ -63,6 +63,7 @@ func clear() -> void:
 	_accepted = false
 	_completed = false
 	_reward_granted = false
+	_required_book_collected = false
 	changed.emit()
 
 
@@ -88,3 +89,13 @@ func from_dict(data: Dictionary) -> void:
 	_completed = bool(completed) or bool(reward_granted)
 	_reward_granted = bool(reward_granted)
 	changed.emit()
+
+func collect_required_book() -> void:
+	if _required_book_collected:
+		return
+		_required_book_collected = true
+		changed.emit()
+
+
+func has_required_book() -> bool:
+	return _required_book_collected

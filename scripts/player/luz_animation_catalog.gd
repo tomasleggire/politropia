@@ -42,7 +42,7 @@ const CLIP_SPEEDS := {
 	"heal_start": 14.3,
 	"heal_loop": 4.44,
 	"heal_end": 20.0,
-	"open_eyes": 5.0,
+	"open_eyes": 25.0,
 }
 
 ## PLACEHOLDER MAPPING (no art yet): "turn" and "skid" have no clip in the
@@ -76,6 +76,7 @@ const CLIP_SOURCE_NAMES := {
 	"heal_start": "heal_start",
 	"heal_loop": "heal_loop",
 	"heal_end": "heal_end",
+	"open_eyes": "open_eyes"
 }
 
 ## Animations whose manifest "contact_frames" entry (if any) should be
