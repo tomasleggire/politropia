@@ -84,7 +84,7 @@ Missing raw sheets are skipped with a message (exit 0); sheets already processed
 | `burrow` | `emerge` 0-3, `dig_in` 4-7 |
 | `claw` (3 x 2) | `claw_windup` 0-1, `claw_strike` 2-3, `claw_recover` 4-5 |
 | `slam` | `slam_windup` 0-1, `slam_strike` 2-3, `phase_change` 4-7 |
-| `intro` | `intro` 0-7 (the old man turning into the beast) |
+| `intro` | `intro` 0-7 (the old man turning into the beast); the clip table lists 12 entries, `0, 0, 0, 0, 1, 1, 2, 3, 4, 5, 6, 7`, so the old man holds a third of the reveal, his hunch a sixth and the change into the mole the other half. The sheet keeps its 8 cells; the manifest clip repeats the indices and the catalog adds one frame per entry. |
 | `defeat` | `defeat` 0-7 (6-7 are the corpse) |
 | `props` (no figure) | `mound` 0-3 (loop), `rock` 4, `rock_alt` 5, `crack` 6, `spike` 7 |
 | `claw_fx` (2 x 2, one effect) | `claw_swipe` 0-3: three bone-coloured claw slashes sweeping from the upper left to the lower right and raking the ground (thin scratch lines, strike, follow-through with earth, remnants and dust) |

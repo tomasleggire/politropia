@@ -227,5 +227,25 @@ class PinkLeakTest(unittest.TestCase):
             self.assertIn(word, topo.clear_pink_leaks.__doc__)
 
 
+class HeldFramesTest(unittest.TestCase):
+    def test_a_clip_that_repeats_a_cell_keeps_one_cell_on_the_sheet(self):
+        used, clips = pipeline.compact_clips({"intro": [0, 0, 1, 1, 2]})
+        self.assertEqual(used, [0, 1, 2])
+        self.assertEqual(clips["intro"], [0, 0, 1, 1, 2])
+
+    def test_clip_contents_ignores_the_repeats(self):
+        image = Image.new("RGBA", (40, 20), (0, 0, 0, 0))
+        image.paste((255, 255, 255, 255), (2, 4, 8, 12))
+        image.paste((255, 255, 255, 255), (22, 2, 30, 10))
+        self.assertEqual(pipeline.clip_contents(image, 20, {"c": [0, 0, 0, 1]}), pipeline.clip_contents(image, 20, {"c": [0, 1]}))
+
+    def test_the_topo_intro_holds_the_old_man(self):
+        clip = topo.SHEETS["intro"]["clips"]["intro"]
+        self.assertEqual(sorted(set(clip)), list(range(8)))
+        self.assertAlmostEqual(clip.count(0) / len(clip), 1 / 3, delta=0.01)
+        self.assertAlmostEqual(clip.count(1) / len(clip), 1 / 6, delta=0.01)
+        self.assertEqual(clip[6:], [2, 3, 4, 5, 6, 7])
+
+
 if __name__ == "__main__":
     unittest.main()

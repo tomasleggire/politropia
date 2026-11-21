@@ -128,7 +128,9 @@ SHEETS = {
         "body_feet": True,
         # The first frames show the old man, before the nose exists.
         "size_cells": [4, 5, 6, 7],
-        "clips": {"intro": list(range(8))},
+        # Frames 0 and 1 are held: the old man reads for a third and a sixth of the reveal, and the
+        # change into the beast (frames 2-7) shares the other half. 12 entries over 8 cells.
+        "clips": {"intro": [0, 0, 0, 0, 1, 1, 2, 3, 4, 5, 6, 7]},
     },
     "defeat": {
         "grid": (4, 2),
