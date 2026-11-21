@@ -10,4 +10,4 @@
 
 [resource]
 script = ExtResource("1_catalog")
-items = Array[ExtResource("2_ruby_owl")]([ExtResource("2_ruby_owl"), ExtResource("3_emerald_bull"), ExtResource("4_sapphire_horse"), ExtResource("5_turquoise_dolphin"), ExtResource("6_jade_hound"), ExtResource("7_garnet_goat")])
+items = Array[ExtResource("7_garnet_goat")]([ExtResource("7_garnet_goat"), ExtResource("3_emerald_bull"), ExtResource("2_ruby_owl"), ExtResource("4_sapphire_horse"), ExtResource("5_turquoise_dolphin"), ExtResource("6_jade_hound")])

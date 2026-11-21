@@ -3,9 +3,11 @@ extends SceneTree
 ## touch layer from leaking input, the Mapa hook and the main menu button.
 ## Run: godot --headless --path . --script res://tests/pause_menu_test.gd
 
-const PLAYER_SCENE := preload("res://scenes/player/player.tscn")
 const WATCHDOG_SECONDS := 60.0
 const MENU_SCENE := "res://scenes/ui/main_menu.tscn"
+# Loaded at runtime: in --script mode Godot 4.7 compiles preloads before the
+# project autoloads, and player.gd references the AbilityProgress singleton.
+var PLAYER_SCENE: PackedScene
 
 var checks := 0
 var failed: Array[String] = []
@@ -13,6 +15,7 @@ var _rig: Node2D
 
 
 func _initialize() -> void:
+	PLAYER_SCENE = load("res://scenes/player/player.tscn") as PackedScene
 	var watchdog := create_timer(WATCHDOG_SECONDS)
 	watchdog.timeout.connect(func() -> void:
 		print("FAIL: watchdog")
@@ -47,7 +50,7 @@ func _run() -> void:
 
 	_rig = Node2D.new()
 	root.add_child(_rig)
-	var player := PLAYER_SCENE.instantiate() as Player
+	var player := PLAYER_SCENE.instantiate()
 	_rig.add_child(player)
 	await _frames(3)
 	check(pause.can_pause(), "can pause with Luz in the scene")

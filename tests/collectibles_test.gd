@@ -7,8 +7,11 @@ extends SceneTree
 
 const PICKUP_SCENE := preload("res://scenes/world/collectible_pickup.tscn")
 const GALLERY_SCENE := preload("res://scenes/ui/collectibles_gallery.tscn")
-const PLAYER_SCENE := preload("res://scenes/player/player.tscn")
-const BLIND_NPC_SCENE := preload("res://scenes/world/blind_npc.tscn")
+# Loaded at runtime: in --script mode Godot 4.7 compiles preloads before the
+# project autoloads, and player.gd references the AbilityProgress singleton.
+# blind_npc.gd depends on player.gd, so its scene needs the same treatment.
+var PLAYER_SCENE: PackedScene
+var BLIND_NPC_SCENE: PackedScene
 
 const GALLERY_PATH := "res://scenes/ui/collectibles_gallery.tscn"
 const MENU_PATH := "res://scenes/ui/main_menu.tscn"
@@ -31,10 +34,12 @@ const EXPECTED_REGIONS := {
 var checks := 0
 var failed: Array[String] = []
 var _rig: Node2D
-var _player: Player
+var _player
 
 
 func _initialize() -> void:
+	PLAYER_SCENE = load("res://scenes/player/player.tscn") as PackedScene
+	BLIND_NPC_SCENE = load("res://scenes/world/blind_npc.tscn") as PackedScene
 	var watchdog := create_timer(WATCHDOG_SECONDS)
 	watchdog.timeout.connect(func() -> void:
 		print("FAIL: watchdog")
@@ -57,6 +62,13 @@ func _manager() -> Node:
 
 func _definitions() -> Array:
 	return _manager().call("get_all_definitions")
+
+
+func _definition_by_id(id: String) -> CollectibleDefinition:
+	for definition: CollectibleDefinition in _definitions():
+		if definition.id == id:
+			return definition
+	return null
 
 
 func _frames(count: int) -> void:
@@ -91,6 +103,15 @@ func _case_service() -> void:
 	for definition: CollectibleDefinition in _definitions():
 		ids.append(definition.id)
 	check(ids.size() == 6 and ids.count(FIRST_ID) == 1 and ids.count(SECOND_ID) == 1, "catalog ids are unique and stable")
+	var expected_order := [
+		"garnet_goat_other_ways",
+		"emerald_bull_clear_text",
+		"ruby_owl_read_aloud",
+		"sapphire_horse_extra_time",
+		"turquoise_dolphin_learn_by_listening",
+		"jade_hound_quiet_space",
+	]
+	check(ids == expected_order, "catalog order follows in-game appearance")
 	check(not bool(manager.call("has_collected", FIRST_ID)), "has_collected is false before collecting")
 
 	var events: Array = []
@@ -201,7 +222,7 @@ func _build_rig() -> void:
 	body.position = FLOOR_RECT.get_center()
 	body.add_child(shape)
 	_rig.add_child(body)
-	_player = PLAYER_SCENE.instantiate() as Player
+	_player = PLAYER_SCENE.instantiate()
 	_player.position = Vector2(-400.0, 0.0)
 	_rig.add_child(_player)
 	await _frames(20)
@@ -228,7 +249,8 @@ func _case_pickup() -> void:
 	print("CASE pickup")
 	var manager := _manager()
 	manager.call("clear")
-	var definition := _definitions()[0] as CollectibleDefinition
+	var definition := _definition_by_id(FIRST_ID)
+	check(definition != null, "the ruby owl definition is in the catalog")
 	await _build_rig()
 
 	var pickup := _make_pickup(definition, Vector2(0.0, -30.0))
@@ -243,7 +265,8 @@ func _case_pickup() -> void:
 	check(pickup_icon.modulate == Color.WHITE, "pickup does not tint the original coin colors")
 	check(is_equal_approx(pickup_icon.scale.x, 26.0 / 512.0), "pickup scales the 512x512 coin cell without distortion")
 
-	var second_definition := _definitions()[1] as CollectibleDefinition
+	var second_definition := _definition_by_id(SECOND_ID)
+	check(second_definition != null, "the emerald bull definition is in the catalog")
 	var second_pickup := _make_pickup(second_definition, Vector2(300.0, -30.0))
 	_rig.add_child(second_pickup)
 	await _frames(3)
@@ -330,8 +353,8 @@ func _reward_pickups() -> Array:
 	return result
 
 
-func _spawn_blind_npc(at: Vector2) -> BlindNPC:
-	var npc := BLIND_NPC_SCENE.instantiate() as BlindNPC
+func _spawn_blind_npc(at: Vector2):
+	var npc := BLIND_NPC_SCENE.instantiate()
 	npc.position = at
 	_rig.add_child(npc)
 	return npc
@@ -348,7 +371,7 @@ func _case_blind_reward() -> void:
 	progress.call("clear")
 	await _build_rig()
 
-	var npc := _spawn_blind_npc(Vector2(0.0, -128.625))
+	var npc = _spawn_blind_npc(Vector2(0.0, -128.625))
 	await _frames(4)
 
 	# The first dialogue accepts the mission but must not create the reward.
@@ -389,8 +412,8 @@ func _case_blind_reward() -> void:
 	check(not reward.monitoring, "the reward cannot be collected while it is being delivered")
 
 	# The hand-over starts near the NPC, moves, and lands above the floor.
-	var origin := npc._delivery_origin()
-	var landing := npc._delivery_landing()
+	var origin: Vector2 = npc._delivery_origin()
+	var landing: Vector2 = npc._delivery_landing()
 	check(reward.global_position.distance_to(origin) < 20.0, "the coin appears near the NPC's hands")
 	check(origin.distance_to(npc.global_position) < 150.0, "the delivery starts close to the NPC")
 	check(landing.y < npc._floor_global_y(), "the landing point stays above the floor")
@@ -420,7 +443,7 @@ func _case_blind_reward() -> void:
 	reward.queue_free()
 	await _frames(4)
 	check(_reward_pickups().is_empty(), "the old room loses its pickup")
-	var returning_npc := _spawn_blind_npc(Vector2(0.0, -128.625))
+	var returning_npc = _spawn_blind_npc(Vector2(0.0, -128.625))
 	await _frames(4)
 	check(returning_npc.quest_accepted and returning_npc.quest_completed, "the returning NPC restores the completed quest")
 	var recovered := _reward_pickups()
@@ -446,7 +469,7 @@ func _case_blind_reward() -> void:
 		for node in _reward_pickups():
 			node.queue_free()
 		await _frames(4)
-		var after_collect_npc := _spawn_blind_npc(Vector2(0.0, -128.625))
+		var after_collect_npc = _spawn_blind_npc(Vector2(0.0, -128.625))
 		await _frames(4)
 		check(after_collect_npc.quest_completed, "the returning NPC still knows the mission is complete")
 		check(_reward_pickups().is_empty(), "a collected reward does not appear again")
@@ -457,9 +480,9 @@ func _case_blind_reward() -> void:
 		await _frames(4)
 		manager.call("clear")
 		progress.call("clear")
-		var removal_npc := _spawn_blind_npc(Vector2(0.0, -128.625))
+		var removal_npc = _spawn_blind_npc(Vector2(0.0, -128.625))
 		await _frames(4)
-		var removal_landing := removal_npc._delivery_landing()
+		var removal_landing: Vector2 = removal_npc._delivery_landing()
 		removal_npc._start_dialogue()
 		await process_frame
 		removal_npc.speech_bubble.finished.emit()
@@ -573,7 +596,7 @@ func _case_gallery_logic() -> void:
 	check(detail_icon != null and detail_icon.definition.image == first.image, "the detail and the first slot use the same coin texture")
 	check(detail_icon != null and detail_icon.uses_coin_silhouette(), "the locked detail silhouettes the selected coin")
 
-	check(bool(manager.call("try_collect", FIRST_ID)), "gallery test collects the first item")
+	check(bool(manager.call("try_collect", first.id)), "gallery test collects the first item in catalog order")
 	gallery.call("refresh")
 	await process_frame
 	check(gallery.call("get_progress_text") == "1 / 6", "gallery updates the progress counter")
