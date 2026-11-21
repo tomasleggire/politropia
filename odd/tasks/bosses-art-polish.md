@@ -44,7 +44,7 @@ Out: gameplay (timings, hitboxes, damage, patterns), boss design changes, Luz an
 
 - Strategy: ask-on-risk. Forecast: about 400 authored lines plus binary art. Chain strategy: pending, asked before any pull request together with the rest of `feat/new-bosses`.
 - TDD: off (source: project convention, `odd/tasks/artemis-polish.md:27`). Runner: `/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script res://tests/<name>_test.gd` (one Godot process at a time).
-- Receipt-driven development: on by default; consent `granted` by standing user instruction. Last reviewed boundary: `89adeed` (was `b35bfb4` when this document was created). Pending in the slice: `60022a9` (medium, under budget).
+- Receipt-driven development: on by default; consent `granted` by standing user instruction. Last reviewed boundary: `4db8341` (was `b35bfb4` when this document was created). Pending in the slice: `69d40fa` (medium, under budget).
 
 ## Tasks
 
@@ -57,11 +57,11 @@ Out: gameplay (timings, hitboxes, damage, patterns), boss design changes, Luz an
 
 Second round, asked by the user on 2026-11-20 ("fijate si quedan toques ... y seguí con eso"), from stills of the 1920x1080 captures (route for P7-P10: one delegated writer; trigger: shared boss script, three boss scripts, processing, tests and docs):
 
-- [ ] P7 Dazed look: with drawn art the stun no longer multiplies the body by `STUN_TINT` at full strength (El Topo turns lion-gold, El Profesor gets a yellow shirt and a gold boombox); the boss keeps his own colours with a light warm tint. Placeholders keep the full tint.
-- [ ] P8 Corpse: with drawn art the corpse is dimmed less than `CORPSE_TINT` (0.32), so the drawn corpse of El Topo, El Profesor and La Hidra reads. Regular enemies and placeholders are unchanged. Artemis is left as she is (her corpse is replaced by the ending screen and her test pins the tint).
-- [ ] P9 El Topo intro: the old man is visible for one frame (about 0.1 s of the 0.8 s reveal). Hold the human frames longer inside the same duration; the arena's `engage_delay` does not change.
-- [ ] P10 Claw remnant frame: remove the faint pink dots the raw art left near the dust (processing only).
-- [ ] P11 Captures of the changed states and updated videos (route: inline).
+- [x] P7 Dazed look: with drawn art the stun no longer multiplies the body by `STUN_TINT` at full strength (El Topo turns lion-gold, El Profesor gets a yellow shirt and a gold boombox); the boss keeps his own colours with a light warm tint. Placeholders keep the full tint. Commit `ea1a0f7`.
+- [x] P8 Corpse: with drawn art the corpse is dimmed less than `CORPSE_TINT` (0.32), so the drawn corpse of El Topo, El Profesor and La Hidra reads. Regular enemies and placeholders are unchanged. Artemis is left as she is (her corpse is replaced by the ending screen and her test pins the tint). Commit `ea1a0f7` (same unit as P7: both tints live in the boss base and its tests).
+- [x] P9 El Topo intro: the old man is visible for one frame (about 0.1 s of the 0.8 s reveal). Hold the human frames longer inside the same duration; the arena's `engage_delay` does not change. Commit `0fad118`: the clip lists cells 0 and 1 more than once (12 entries over the same 8 cells).
+- [x] P10 Claw remnant frame: remove the faint pink dots the raw art left near the dust (processing only). Commit `78b8ec0`.
+- [x] P11 Captures of the changed states and updated videos (route: inline). Files listed under Progress; recorded by the commit of this document.
 
 ## Acceptance criteria
 
@@ -99,7 +99,18 @@ The suites above; `--import`; each processing script run twice gives identical o
   - Checks for `60022a9` (writer, three runs each): `blind_beast_boss_test` PASS 390/390, `boombox_teacher_boss_test` PASS 428/428; once: `boss_animation_catalog_test` PASS 48/48, `boss_enemy_test` PASS 178/178. Parent spot check: the first three, same results.
   - Assessment of `60022a9`: medium, `under_budget` (100 lines), so it stays pending in the slice.
 - 2026-11-20: P6 done. Captures at 1920x1080 in `~/Downloads`: `hidra_pelea.mp4`, `artemis_pelea.mp4`, `profesor_pelea.mp4`, `topo_pelea.mp4`, plus slow-motion close-ups of the two new effects, `profesor_estocada.mp4` and `topo_zarpazo.mp4`. The fight captures of El Profesor and El Topo predate `60022a9`, which changes nothing on screen.
+- 2026-11-20: second round (P7-P10) done by one writer; task list committed first in `4db8341`.
+  - P7: `STUN_ART_STRENGTH` 0.25 through a `has_art()` hook in the boss base; El Topo and El Profesor keep their colours while dazed. La Hidra shares the code path but nothing stuns her in the game.
+  - P8: `ART_CORPSE_TINT` (0.62, 0.62, 0.68, 1.0) for bosses with art, also on La Hidra's `Heads` root; squash, tilt and z-index unchanged.
+  - P9: intro clip `0,0,0,0,1,1,2,3,4,5,6,7`; the catalog adds one frame per entry and the boss stretches the clip to the reveal from its frame count, so the total stays 0.8 s. The intro sheet is byte-identical.
+  - P10: `clear_claw_pink_specks` removes small separate pieces that are mostly pink (the floating pebble of frame 3, 101 px); attached pinkish rims stay on purpose.
+  - Looked at by the parent, before and after at 1920x1080: El Topo and El Profesor dazed, the three corpses, the intro strip (one still every 0.1 s: the old man now shows for about 0.3 s and the mole is formed at the same time as before), the zoom of claw frame 3. The parent recorded La Hidra's fight for her corpse, which the writer could not capture.
+  - Checks (writer, before -> after): `--import` clean; `blind_beast_boss_test` 390 -> 395; `boombox_teacher_boss_test` 428 -> 433; `boss_enemy_test` 178 -> 182; `hydra_boss_test` 321 -> 323; `boss_animation_catalog_test` 48 -> 48; `boss_test_hub_test` 213 -> 213; `tools/test_process_boss_sheets.py` 18 -> 26 OK; `tools/test_process_hydra_sheets.py` 10 OK; El Topo processing run twice identical, every sheet but the claw one byte-identical.
+  - Parent spot check: `boss_enemy_test` PASS 182/182, `blind_beast_boss_test` PASS 395/395, `boombox_teacher_boss_test` PASS 433/433, `hydra_boss_test` PASS 323/323, `boss_animation_catalog_test` PASS 48/48, both Python suites OK. Not rerun by the parent: `boss_test_hub_test`. Not run: the Artemis suite (no Artemis file changed).
+- 2026-11-20: native review of `89adeed..4db8341` (it also covers `60022a9`): assessed high (`tools/process_blind_beast_sheets.py` starts other processes), consent `granted`, four lenses, approved and acknowledged (lineage `review-3a14a264bc69753f`). 10 advisory findings, none blocking. Taken in `69d40fa` (inline, two mechanical test edits): the catalog proves the shipped intro builds twelve entries over eight cells, and the corpse test restores `art_on`. Left as they are: no live observation of the claw strike frames during ACTIVE (the mapping is checked at controlled values instead), the boundaries of the speck rule, a literal for the halo width, a frame-count literal in one test.
+  - Checks for `69d40fa`: `boss_animation_catalog_test` PASS 51/51, `boss_enemy_test` PASS 182/182. Assessment: medium, `under_budget` (22 lines), pending in the slice.
+- 2026-11-20: P11 done. Updated in `~/Downloads`: `profesor_pelea.mp4`, `topo_pelea.mp4`, `hidra_pelea.mp4` (1920x1080, recorded after the second round), and the before/after stills in `jefes_antes_despues/`. `topo_zarpazo.mp4` predates P10 (it still shows the pebble).
 
 ## Next step
 
-P7-P10 with one writer, then P11. Earlier text of this section, kept for the record: all tasks of the first round are done. Open for the user: the P4 findings listed above (stun tint, El Topo intro length) and the push and pull request of `feat/new-bosses` (chain strategy to be asked first).
+All tasks of both rounds are done. Earlier text of this section, kept for the record: all tasks of the first round are done. Open for the user: the P4 findings listed above (stun tint, El Topo intro length) and the push and pull request of `feat/new-bosses` (chain strategy to be asked first).
