@@ -55,6 +55,14 @@ Out: gameplay (timings, hitboxes, damage, patterns), boss design changes, Luz an
 - [x] P5 Codex art for the two attacks that still draw placeholder shapes, found in P4: the pointer thrust of El Profesor (flat red polygon arrow) and the claw of El Topo (red striped rectangle). One new effect sheet per boss, processed and wired like the existing effect clips, placeholder kept as the fallback (route: Codex runs inline, integration by a delegated writer; trigger: scripts, processing, tests and docs). The same writer takes the review follow-ups below. Commits `5380012` (raw sheets and prompts), `96e4583` (follow-ups of the first review), `db97b15` (El Profesor thrust streak), `89adeed` (El Topo claw swipe) and `60022a9` (follow-ups of the second review, by a second delegated writer).
 - [x] P6 Final captures for the user (route: inline). Files listed under Progress; recorded by the commit of this document.
 
+Second round, asked by the user on 2026-11-20 ("fijate si quedan toques ... y seguí con eso"), from stills of the 1920x1080 captures (route for P7-P10: one delegated writer; trigger: shared boss script, three boss scripts, processing, tests and docs):
+
+- [ ] P7 Dazed look: with drawn art the stun no longer multiplies the body by `STUN_TINT` at full strength (El Topo turns lion-gold, El Profesor gets a yellow shirt and a gold boombox); the boss keeps his own colours with a light warm tint. Placeholders keep the full tint.
+- [ ] P8 Corpse: with drawn art the corpse is dimmed less than `CORPSE_TINT` (0.32), so the drawn corpse of El Topo, El Profesor and La Hidra reads. Regular enemies and placeholders are unchanged. Artemis is left as she is (her corpse is replaced by the ending screen and her test pins the tint).
+- [ ] P9 El Topo intro: the old man is visible for one frame (about 0.1 s of the 0.8 s reveal). Hold the human frames longer inside the same duration; the arena's `engage_delay` does not change.
+- [ ] P10 Claw remnant frame: remove the faint pink dots the raw art left near the dust (processing only).
+- [ ] P11 Captures of the changed states and updated videos (route: inline).
+
 ## Acceptance criteria
 
 - El Topo keeps the same jacket and fur colours in every clip, judged side by side and in a fight capture.
@@ -94,4 +102,4 @@ The suites above; `--import`; each processing script run twice gives identical o
 
 ## Next step
 
-All tasks are done. Open for the user: the P4 findings listed above (stun tint, El Topo intro length) and the push and pull request of `feat/new-bosses` (chain strategy to be asked first).
+P7-P10 with one writer, then P11. Earlier text of this section, kept for the record: all tasks of the first round are done. Open for the user: the P4 findings listed above (stun tint, El Topo intro length) and the push and pull request of `feat/new-bosses` (chain strategy to be asked first).
