@@ -16,6 +16,7 @@ const SPEEDS := {"idle": 8.0, "run": 12.0}
 const LOOPING := ["idle"]
 const FALLBACKS := {"jump": ["run", "idle"], "glide": ["nothing"]}
 const WIDE_CELL := Vector2i(6, 3)
+const TOPO_MANIFEST := "res://assets/enemies/blind_beast/animation_manifest.json"
 const SHIPPED_WIDE := {
 	"res://assets/enemies/boombox_teacher/animation_manifest.json": ["thrust_fx", &"thrust_streak", Vector2(400.0, 80.0)],
 	"res://assets/enemies/blind_beast/animation_manifest.json": ["claw_fx", &"claw_swipe", Vector2(400.0, 208.0)],
@@ -41,6 +42,7 @@ func run() -> void:
 	case_effect_entries()
 	case_non_square_grid()
 	case_shipped_non_square_grids()
+	case_shipped_held_frames()
 	case_duplicate_clip()
 	case_missing_manifest()
 	case_missing_texture()
@@ -214,6 +216,24 @@ func case_shipped_non_square_grids() -> void:
 			sizes_ok = sizes_ok and cell != null and cell.region.size == spec[2]
 		check(count == 4, "%s has four frames" % spec[0])
 		check(sizes_ok, "%s frames are %s cells" % [spec[0], spec[2]])
+
+
+## A clip that lists a cell more than once holds that frame: El Topo's intro keeps the old
+## man for four of its twelve entries and his hunch for two.
+func case_shipped_held_frames() -> void:
+	var frames := BossAnimationCatalog.new(TOPO_MANIFEST, {}, {}, []).build_sprite_frames()
+	var count := frames.get_frame_count(&"intro") if frames.has_animation(&"intro") else 0
+	check(count == 12, "the shipped intro of El Topo has twelve entries")
+	var origins: Array[Vector2] = []
+	for i: int in count:
+		var cell := frames.get_frame_texture(&"intro", i) as AtlasTexture
+		origins.append(cell.region.position if cell != null else Vector2(-1.0, float(i)))
+	var held := count == 12 and origins.slice(0, 4).all(func(origin: Vector2) -> bool: return origin == origins[0])
+	check(held and origins[4] == origins[5] and origins[4] != origins[0], "the old man holds four entries and his hunch two")
+	var distinct := {}
+	for origin: Vector2 in origins:
+		distinct[origin] = true
+	check(distinct.size() == 8, "the twelve entries still show the eight cells of the sheet")
 
 
 ## A clip two sheets both draw keeps the first sheet's frames; it is never stacked.

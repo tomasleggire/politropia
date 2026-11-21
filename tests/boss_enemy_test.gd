@@ -589,6 +589,8 @@ func case_final_blow_and_corpse() -> void:
 	_boss.art_on = true
 	_boss._apply_visual()
 	check(_boss._visual.modulate.is_equal_approx(BossEnemy.ART_CORPSE_TINT), "a drawn corpse settles on the lighter art dim")
+	_boss.art_on = false
+	_boss._apply_visual()
 	check(not _boss.receive_hit(1, HIT_FROM, &"attack_1"), "a corpse takes no hits")
 	check(_boss.is_on_floor() and absf(_boss.global_position.y) <= 1.0, "the corpse rests on the floor")
 
