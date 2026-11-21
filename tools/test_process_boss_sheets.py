@@ -227,6 +227,47 @@ class PinkLeakTest(unittest.TestCase):
             self.assertIn(word, topo.clear_pink_leaks.__doc__)
 
 
+class ClawSpeckTest(unittest.TestCase):
+    def sheet(self) -> np.ndarray:
+        rgba = np.zeros((90, 160, 4), dtype=np.float32)
+        rgba[50:80, 10:120, :3] = (185, 172, 156)  # dust
+        rgba[50:80, 10:120, 3] = 255.0
+        rgba[40:50, 50:70, :3] = (154, 127, 99)  # earth pebble on the dust
+        rgba[40:50, 50:70, 3] = 255.0
+        rgba[10:20, 130:140, :3] = (26, 20, 16)  # a floating pebble: outline ...
+        rgba[10:20, 130:140, 3] = 255.0
+        rgba[12:18, 132:138, :3] = (195, 109, 109)  # ... around a pink core
+        rgba[22:30, 20:28, :3] = (201, 166, 120)  # a floating bone chip
+        rgba[22:30, 20:28, 3] = 255.0
+        rgba[44, 52, :3] = (195, 109, 109)  # one pink pixel on the earth pebble
+        return rgba
+
+    def test_floating_pink_speck_is_removed_with_its_outline(self):
+        out = topo.clear_claw_pink_specks(self.sheet())
+        self.assertEqual(float(out[15, 135, 3]), 0.0)
+        self.assertEqual(float(out[10, 130, 3]), 0.0)
+
+    def test_palette_pieces_are_untouched(self):
+        sheet = self.sheet()
+        out = topo.clear_claw_pink_specks(sheet)
+        for y, x in ((60, 60), (45, 60), (25, 24)):
+            self.assertEqual(tuple(out[y, x]), tuple(sheet[y, x]))
+
+    def test_pink_on_an_attached_piece_stays(self):
+        out = topo.clear_claw_pink_specks(self.sheet())
+        self.assertEqual(float(out[44, 52, 3]), 255.0)
+
+    def test_only_alpha_changes(self):
+        sheet = self.sheet()
+        out = topo.clear_claw_pink_specks(sheet)
+        self.assertTrue(np.array_equal(out[..., :3], sheet[..., :3]))
+
+    def test_palette_colours_are_not_pink(self):
+        for rgb in ((242, 226, 192), (255, 246, 224), (201, 166, 120), (74, 58, 48), (110, 86, 68), (154, 127, 99), (185, 172, 156), (26, 20, 16)):
+            sheet = solid(8, 8, rgb)
+            self.assertTrue(np.array_equal(topo.clear_claw_pink_specks(sheet), sheet), rgb)
+
+
 class HeldFramesTest(unittest.TestCase):
     def test_a_clip_that_repeats_a_cell_keeps_one_cell_on_the_sheet(self):
         used, clips = pipeline.compact_clips({"intro": [0, 0, 1, 1, 2]})

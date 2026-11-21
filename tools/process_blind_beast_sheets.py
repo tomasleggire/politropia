@@ -88,6 +88,16 @@ LEAK_PUFF_RED_OVER_GREEN = 26
 # The claw swipe is drawn 120 px wide in the game and the game runs at 3x on a device: 0.52 makes
 # its ~708 raw px about 368 texels, a 400 x 208 cell keeps at least 8 px around it.
 CLAW_FX_SCALE = 0.52
+# The claw effect is bone, earth, dust and a near black outline: none of them has red above green
+# by CLAW_PINK_RED_OVER_GREEN together with blue within CLAW_PINK_BLUE_MARGIN under green (earth
+# #9A7F63 and bone #C9A678 have blue 28 and 46 under green, dust #B9AC9C has red 13 over green).
+CLAW_PINK_MIN_RED = 110  # keeps the dark outline's antialiasing out of the rule
+CLAW_PINK_RED_OVER_GREEN = 25
+CLAW_PINK_BLUE_MARGIN = 8
+CLAW_PINK_MIN_ALPHA = 128.0  # drawn pixels only: the faint edge of a streak is never judged
+CLAW_SPECK_MIN_ALPHA = 32.0  # raw alpha from which a pixel belongs to a drawn piece (outline included)
+CLAW_SPECK_MAX_PX = 300  # raw px; a piece of the effect (claw, rock, dust) is far bigger than a speck
+CLAW_SPECK_PINK_SHARE = 0.2  # a speck is mostly pink; a piece with a pink pixel or two is left alone
 CLAW_FX_CELL = (400, 208)
 EFFECT_MIN_COMPONENT_PX = 40  # raw px; drops stray specks around the effects
 
@@ -329,13 +339,38 @@ def build_effects(sheet: str, spec: dict, preview: Path | None) -> dict:
     }
 
 
+def clear_claw_pink_specks(rgba: np.ndarray) -> np.ndarray:
+    """Remove the pink specks the raw claw art left floating around its dust, leaving bone,
+    earth and dust exactly as they are (unlike `clear_pink_leaks`, nothing is recoloured). A
+    pixel is pink when it is drawn (alpha from CLAW_PINK_MIN_ALPHA), its red is above
+    CLAW_PINK_MIN_RED and above its green by CLAW_PINK_RED_OVER_GREEN, and its blue is no more
+    than CLAW_PINK_BLUE_MARGIN under its green. A speck is a separate drawn piece (its outline
+    included) of at most CLAW_SPECK_MAX_PX pixels whose pink share is at least
+    CLAW_SPECK_PINK_SHARE: it is removed whole with its faint halo. Pieces attached to the dust
+    or the claws, or with only a few pink pixels, stay: cutting them would leave a hole in the
+    drawing."""
+    r, g, b, alpha = rgba[..., 0], rgba[..., 1], rgba[..., 2], rgba[..., 3]
+    pink = (alpha >= CLAW_PINK_MIN_ALPHA) & (r >= CLAW_PINK_MIN_RED) & (r - g >= CLAW_PINK_RED_OVER_GREEN) & (b - g >= -CLAW_PINK_BLUE_MARGIN)
+    pieces, count = ndimage.label(alpha >= CLAW_SPECK_MIN_ALPHA, structure=np.ones((3, 3)))
+    index = np.arange(1, count + 1)
+    size = np.asarray(ndimage.sum(np.ones_like(alpha), pieces, index))
+    share = np.asarray(ndimage.sum(pink, pieces, index)) / np.maximum(size, 1.0)
+    specks = index[(size <= CLAW_SPECK_MAX_PX) & (share >= CLAW_SPECK_PINK_SHARE)]
+    speck = np.isin(pieces, specks)
+    halo = ndimage.binary_dilation(speck, structure=np.ones((3, 3)), iterations=2) & (alpha < CLAW_SPECK_MIN_ALPHA)
+    out = rgba.copy()
+    out[..., 3] = np.where(speck | halo, 0.0, alpha)
+    return out
+
+
 def build_claw_fx(preview: Path | None) -> dict:
     """The claw swipe: 2 x 2 raw cells of one effect (four frames of the clip), kept in place
     relative to each other (so the flat ground edge stays common) and saved as one row of
-    non-square cells (`CLAW_FX_CELL`). Despilled only: its bone and earth colours are not
-    recoloured, unlike `props` and `fx`."""
+    non-square cells (`CLAW_FX_CELL`). Despilled and cleared of pink specks only: its bone and
+    earth colours are not recoloured, unlike `props` and `fx`."""
     raw = Image.open(raw_path("claw_fx"))
-    cells = pipeline.split_cells(pipeline.despill_edges(raw, pipeline.key_magenta(raw)), *CLAW_FX["grid"], "claw_fx", EFFECT_MIN_COMPONENT_PX)
+    despilled = clear_claw_pink_specks(pipeline.despill_edges(raw, pipeline.key_magenta(raw)))
+    cells = pipeline.split_cells(despilled, *CLAW_FX["grid"], "claw_fx", EFFECT_MIN_COMPONENT_PX)
     cell_width, cell_height = CLAW_FX_CELL
     image, clips = pipeline.effect_clip_sheet(cells, CLAW_FX["clips"], CLAW_FX_SCALE, cell_width, cell_height, "claw_fx")
     image.save(OUT_DIR / sheet_file("claw_fx"), optimize=True)
