@@ -34,12 +34,12 @@ const CHECKS := {
 	"case_phase_beat_waits_for_stun": 6,
 	"case_phase_beat_during_telegraph": 4,
 	"case_stagger": 8,
-	"case_stun": 11,
+	"case_stun": 13,
 	"case_interrupt_and_super_armor": 6,
 	"case_hittable_states_and_root_layer": 9,
 	"case_no_recoil": 3,
 	"case_projectile_pool": 6,
-	"case_final_blow_and_corpse": 11,
+	"case_final_blow_and_corpse": 13,
 	"case_reset_to_fresh": 12,
 	"case_arena_integration": 20,
 	"case_corpse_restored_on_reload": 17,
@@ -469,6 +469,12 @@ func case_stun() -> void:
 	await _secs(0.1)
 	check(_boss.stun(0.4), "stun applies mid-attack")
 	check(_boss.get_state() == BossEnemy.State.STUN and _boss.is_stunned(), "the boss is stunned")
+	check(_boss._visual.modulate == BossEnemy.STUN_TINT, "a placeholder body wears the full stun tint")
+	_boss.art_on = true
+	_boss._apply_visual()
+	check(_boss._visual.modulate.is_equal_approx(Color.WHITE.lerp(BossEnemy.STUN_TINT, BossEnemy.STUN_ART_STRENGTH)), "drawn art wears the stun tint at low strength")
+	_boss.art_on = false
+	_boss._apply_visual()
 	check(_boss.events.has("end:1:0"), "the cut attack phase was closed")
 	check(_boss.stun_count == 1, "_on_stunned ran once")
 	check(_hit(), "a stunned boss takes hits")
@@ -579,6 +585,10 @@ func case_final_blow_and_corpse() -> void:
 	await _secs(1.0)
 	check(_signals.has("settled"), "corpse_settled fires once the corpse rests")
 	check(not _boss.is_physics_processing(), "a settled corpse stops processing")
+	check(_boss._visual.modulate.is_equal_approx(Enemy.CORPSE_TINT), "a placeholder corpse is dimmed with the enemy corpse tint")
+	_boss.art_on = true
+	_boss._apply_visual()
+	check(_boss._visual.modulate.is_equal_approx(BossEnemy.ART_CORPSE_TINT), "a drawn corpse settles on the lighter art dim")
 	check(not _boss.receive_hit(1, HIT_FROM, &"attack_1"), "a corpse takes no hits")
 	check(_boss.is_on_floor() and absf(_boss.global_position.y) <= 1.0, "the corpse rests on the floor")
 

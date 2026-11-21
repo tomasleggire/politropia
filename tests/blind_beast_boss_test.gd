@@ -69,11 +69,11 @@ const CHECKS := {
 	"case_ridge_fits_narrow_arena": 5,
 	"case_corpse_restored_on_reload": 12,
 	"case_corpse_made_before_entering_the_tree": 10,
-	"case_art_absent_keeps_the_placeholders": 12,
-	"case_art_shows_the_sprite_and_hides_when_burrowed": 20,
+	"case_art_absent_keeps_the_placeholders": 14,
+	"case_art_shows_the_sprite_and_hides_when_burrowed": 21,
 	"case_art_clip_per_state": 21,
 	"case_art_glow_and_flash_on_the_sprite": 8,
-	"case_art_defeat_and_corpse_frame": 10,
+	"case_art_defeat_and_corpse_frame": 12,
 	"case_art_hazards_wear_the_sprites": 24,
 	"case_art_missing_effect_sheets_keep_placeholders": 6,
 	"case_art_claw_swipe": 35,
@@ -1177,6 +1177,8 @@ func case_art_absent_keeps_the_placeholders() -> void:
 	_boss.stun(1.0)
 	await _frames(3)
 	check(_boss.get_clip() == &"", "no clip is requested without art")
+	check(_boss._visual.modulate == BossEnemy.STUN_TINT, "the placeholder body wears the full stun tint")
+	check(_boss._corpse_tint() == Enemy.CORPSE_TINT, "a placeholder corpse keeps the enemy corpse tint")
 	check(_boss._hazard_art != null and _boss._hazard_art.sprite_count() == 0, "no hazard wears a sprite without art")
 	_boss.receive_hit(1, HIT_FROM, &"attack_1")
 	check(_boss.is_flash_visible() and _boss._flash.visible, "a hit flashes the white polygon as before")
@@ -1205,6 +1207,7 @@ func case_art_shows_the_sprite_and_hides_when_burrowed() -> void:
 	check(_boss.is_burrowed() and not _boss._visual.visible and not sprite.is_visible_in_tree(), "burrowed, the sprite is hidden: he is never drawn underground")
 	check(_boss._mound_visible(), "the mound is what shows instead")
 	check(_boss.stun(1.0) and sprite.is_visible_in_tree() and _boss.get_clip() == &"dazed", "a stun brings him up dazed")
+	check(_boss._visual.modulate.is_equal_approx(Color.WHITE.lerp(BossEnemy.STUN_TINT, BossEnemy.STUN_ART_STRENGTH)), "the drawn dazed clip wears the stun tint at low strength")
 	await _secs(1.15)
 	check(_boss.get_clip() == &"dig_in" and _lasts(&"dig_in", _boss.dig_in_time), "he digs in with the drawn clip, as long as the dig")
 	check(_boss._visual.position.y == 0.0 and sprite.is_visible_in_tree(), "the drawn dig-in is cut at the floor: the node does not sink as well")
@@ -1327,6 +1330,7 @@ func case_art_defeat_and_corpse_frame() -> void:
 	var last: int = _sprite().sprite_frames.get_frame_count(&"defeat") - 1
 	check(_sprite().animation == &"defeat" and _sprite().frame == last and not _sprite().is_playing(), "the corpse is the last frame of the defeat clip")
 	check(is_equal_approx(_sprite().get_global_transform().y.length(), 0.2896) and absf(_sprite().get_global_transform().x.y) < 0.001, "the drawn slump replaces the placeholder's tilt and squash")
+	check(_boss._visual.modulate.is_equal_approx(BossEnemy.ART_CORPSE_TINT), "the drawn corpse settles on the lighter art dim")
 	# A corpse restored from an earlier run shows the last frame at once, before it enters the tree.
 	_boss.get_parent().remove_child(_boss)
 	_boss.free()
@@ -1340,6 +1344,7 @@ func case_art_defeat_and_corpse_frame() -> void:
 	check(_boss._visual.visible and _sprite().is_visible_in_tree(), "lying above ground, visible")
 	check(is_equal_approx(_sprite().get_global_transform().y.length(), 0.2896) and _sprite().get_global_transform().x.x < 0.0, "undone squash, facing kept")
 	check(_boss.hazard_count() == 0 and _boss._hazard_art.sprite_count() == 0, "no hazard sprite is left")
+	check(_boss._visual.modulate.is_equal_approx(BossEnemy.ART_CORPSE_TINT), "a restored drawn corpse has the same dim")
 	_remove_art_fixture()
 
 

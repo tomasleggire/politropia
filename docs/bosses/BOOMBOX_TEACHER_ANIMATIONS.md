@@ -25,7 +25,7 @@ Same style as Luz and Artemis: thick dark outline `#1A1410`, cel shading in 2-3 
 
 | Path (under `BoomboxTeacher`, a `CharacterBody2D`) | Contract |
 |---|---|
-| `Visual` (`Node2D`) | Code owns it: `scale.x = facing`, `position.x` (flinch shake), `modulate` (stun and corpse tints), tilt and squash of the placeholder corpse. Art never animates these. |
+| `Visual` (`Node2D`) | Code owns it: `scale.x = facing`, `position.x` (flinch shake), `modulate` (stun and corpse tints; with drawn art the stun tint is `STUN_ART_STRENGTH` 0.25 of the placeholder tint, because the `overheat` clip already shows the state, and the corpse dims to the lighter `ART_CORPSE_TINT`, both in `BossEnemy`; placeholders keep the full tints), tilt and squash of the placeholder corpse. Art never animates these. |
 | `Visual/AnimatedSprite2D` | The final art, first child of `Visual` (so the flash and glow clones draw above it). `texture_filter = 4`, `scale = 0.2896`, `offset = (0, -192)`. |
 | `Visual/Body`, `Tie`, `Pointer`, `Head/*` | Placeholders. Visible only when no art exists. With art they are hidden. The telegraph glow and the white hit flash are drawn on the sprite itself by `shaders/sprite_glow.gdshader` (see 3, "Glow and flash"), so they follow the exact silhouette; without art the old polygon clones are used. |
 | `CollisionShape2D` | 28 x 84 at `(0, -42)` on this scene only (the base boss is 26 x 56) so Luz's hits connect with the drawn torso and head. It applies with or without art (decision: the art ships with the boss, so the placeholder fight uses the same body). |

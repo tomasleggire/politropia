@@ -77,12 +77,12 @@ const CHECKS := {
 	"case_reset_clears_every_hazard": 12,
 	"case_arena_reset_after_luz_dies": 5,
 	"case_defeat_through_the_arena": 16,
-	"case_art_absent_keeps_the_placeholders": 12,
+	"case_art_absent_keeps_the_placeholders": 14,
 	"case_art_shows_the_sprite": 12,
 	"case_art_glow_and_flash_on_the_sprite": 10,
 	"case_art_thrust_and_briefcase_clips": 18,
 	"case_art_other_attack_clips": 5,
-	"case_art_state_clips": 15,
+	"case_art_state_clips": 18,
 	"case_art_scale_relation": 6,
 	"case_art_hazards_wear_the_sprites": 17,
 	"case_art_thrust_streak": 16,
@@ -1377,6 +1377,10 @@ func case_art_absent_keeps_the_placeholders() -> void:
 	_boss.start_attack(BoomboxTeacherBoss.Attack.THRUST)
 	await _frames(3)
 	check(_boss.get_clip() == &"", "no clip is requested without art")
+	_boss.stun(1.0)
+	await _frames(2)
+	check(_boss._visual.modulate == BossEnemy.STUN_TINT, "the placeholder body wears the full stun tint")
+	check(_boss._corpse_tint() == Enemy.CORPSE_TINT, "a placeholder corpse keeps the enemy corpse tint")
 	var shape := _boss.get_node("CollisionShape2D") as CollisionShape2D
 	check((shape.shape as RectangleShape2D).size == Vector2(28.0, 84.0), "the body collision covers the drawn height")
 	check(shape.position == Vector2(0.0, -42.0), "the body collision is centred on the torso")
@@ -1535,6 +1539,7 @@ func case_art_state_clips() -> void:
 	_boss.stun(1.0)
 	await _frames(2)
 	check(_boss.get_clip() == &"overheat", "the overheat stun plays the overheat clip")
+	check(_boss._visual.modulate.is_equal_approx(Color.WHITE.lerp(BossEnemy.STUN_TINT, BossEnemy.STUN_ART_STRENGTH)), "the drawn overheat wears the stun tint at low strength")
 	check(_sprite().sprite_frames.get_animation_loop(&"overheat"), "the overheat loops while the stun lasts")
 	_boss.walk_speed = 0.0
 	await _wait(1.2)
@@ -1563,6 +1568,7 @@ func case_art_state_clips() -> void:
 	check(absf(_sprite().global_transform.y.x) < 0.01, "the sprite undoes the tilt: the clip carries the slump")
 	check(absf(_sprite().global_transform.y.length() - 0.2896) < 0.005, "the sprite undoes the squash")
 	check(_sprite().frame == _sprite().sprite_frames.get_frame_count(&"defeat") - 1, "the corpse shows the last defeat frame")
+	check(_boss._visual.modulate.is_equal_approx(BossEnemy.ART_CORPSE_TINT), "the drawn corpse settles on the lighter art dim")
 	# A corpse restored by a checkpoint shows the last frame at once.
 	_build_world()
 	var corpse := (load(BOSS_SCENE) as PackedScene).instantiate() as BoomboxTeacherBoss
@@ -1572,6 +1578,7 @@ func case_art_state_clips() -> void:
 	await _frames(3)
 	var corpse_sprite := corpse.get_node("Visual/AnimatedSprite2D") as AnimatedSprite2D
 	check(corpse_sprite.frame == corpse_sprite.sprite_frames.get_frame_count(&"defeat") - 1 and not corpse_sprite.is_playing(), "a restored corpse lies on the last frame")
+	check(corpse._visual.modulate.is_equal_approx(BossEnemy.ART_CORPSE_TINT), "a restored drawn corpse has the same dim")
 	_remove_art_fixture()
 
 

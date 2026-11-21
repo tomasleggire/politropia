@@ -516,7 +516,7 @@ func _apply_visual() -> void:
 	_sync_sprite()
 	if _heads_root != null:
 		var corpse := _dead or _state == State.DEFEATED
-		_heads_root.modulate = CORPSE_TINT if corpse else Color.WHITE
+		_heads_root.modulate = _corpse_tint() if corpse else Color.WHITE
 		# The drawn defeat shows the severed necks itself.
 		_heads_root.visible = not (corpse and _has_clip(&"defeat"))
 

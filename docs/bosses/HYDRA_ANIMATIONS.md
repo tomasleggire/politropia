@@ -110,7 +110,7 @@ The code asks for clips by these names. A clip that is not drawn resolves throug
 | `roar` | `TRANSITION` (a head died: `phase_transition_time`, 1.2 s) and the arena intro (`play_intro`, while `IDLE`) | the transition time or the intro duration | hold | `attack`, then `idle` |
 | `defeat` | `DEFEATED`; a restored corpse shows the last frame at once | `defeat_time` (1.2 s) | hold | `idle` |
 
-With the `defeat` clip drawn, the `Heads` node is **hidden from the start of the defeat** (the frames show the severed necks) and the sprite undoes `Visual`'s corpse tilt and squash, as El Topo's does. Without it the stumps and the placeholder corpse show as today.
+With the `defeat` clip drawn, the `Heads` node is **hidden from the start of the defeat** (the frames show the severed necks) and the sprite undoes `Visual`'s corpse tilt and squash, as El Topo's does. Without it the stumps and the placeholder corpse show as today. A corpse with body art (body and `Heads`) dims to `BossEnemy.ART_CORPSE_TINT` instead of the darker `CORPSE_TINT`. La Hidra is never stunned by her own attacks (nothing calls `stun()` on her), but if she were, drawn art would wear `STUN_ART_STRENGTH` of the stun tint like the other bosses.
 
 ### 3.2 Heads (per kind)
 

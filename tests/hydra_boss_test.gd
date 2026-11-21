@@ -73,7 +73,7 @@ const CHECKS := {
 	"case_venom_release_in_callback": 5,
 	"case_art_absent_keeps_the_placeholders": 8,
 	"case_art_body_sprite_and_clips": 12,
-	"case_art_defeat_and_corpse": 10,
+	"case_art_defeat_and_corpse": 12,
 	"case_art_heads_play_their_clips": 19,
 	"case_art_neck_and_stump": 9,
 	"case_art_neck_roots_follow_the_body": 6,
@@ -1420,6 +1420,7 @@ func case_art_defeat_and_corpse() -> void:
 	var last: int = sprite.sprite_frames.get_frame_count(&"defeat") - 1
 	check(sprite.frame == last and not sprite.is_playing(), "the corpse is the last frame of the defeat")
 	check(is_equal_approx(sprite.get_global_transform().y.length(), ART_SCALE) and absf(sprite.get_global_transform().x.y) < 0.001, "the drawn slump replaces the placeholder's tilt and squash")
+	check(_boss._visual.modulate.is_equal_approx(BossEnemy.ART_CORPSE_TINT), "the drawn corpse settles on the lighter art dim")
 	# A corpse restored from an earlier run shows the last frame at once.
 	await _build(false, true, ART_MANIFEST)
 	await _frames(10)
@@ -1431,6 +1432,7 @@ func case_art_defeat_and_corpse() -> void:
 	await _build(false, true, ART_MANIFEST)
 	await _frames(10)
 	check(_boss.is_dead() and _boss.get_node("Heads").visible, "no defeat clip keeps the heads (and their stumps) visible")
+	check(_boss.get_node("Heads").modulate.is_equal_approx(BossEnemy.ART_CORPSE_TINT), "the heads of a drawn corpse wear the same lighter dim")
 	var stumps := true
 	for head: HydraHead in _boss.get_heads():
 		stumps = stumps and head.get_stump_sprite().visible and not head.get_sprite().visible

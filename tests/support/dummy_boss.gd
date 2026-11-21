@@ -23,6 +23,12 @@ var stun_ended_count := 0
 var hazard_clears := 0
 var intro_count := 0
 var refuse_hits := false
+## What `has_art` returns: lets a test show the drawn-art tints.
+var art_on := false
+
+
+func has_art() -> bool:
+	return art_on
 
 
 func _choose_next_action() -> int:

@@ -58,7 +58,13 @@ const NEVER := -1.0e9
 const PLAYER_CENTER_OFFSET := Vector2(0.0, -29.0)
 const STAGGER_TINT := Color(0.72, 0.75, 0.95)
 const STUN_TINT := Color(1.0, 0.85, 0.45)
+## How much of `STUN_TINT` drawn art receives: the dazed clip already shows the state, so a
+## full tint would turn the drawing gold. Placeholders keep the full tint.
+const STUN_ART_STRENGTH := 0.25
 const FLINCH_TINT := Color(1.0, 0.55, 0.55)
+## Corpse dim of a boss that shows drawn art: lighter than `CORPSE_TINT`, which turns a
+## drawing into a dark blob. Placeholders keep `CORPSE_TINT`.
+const ART_CORPSE_TINT := Color(0.62, 0.62, 0.68, 1.0)
 ## Radians per second of the flinch shake.
 const FLINCH_SHAKE_RATE := 90.0
 ## Beat pulse of the transition glow, radians per second.
@@ -579,11 +585,24 @@ func _apply_visual() -> void:
 		State.STAGGER:
 			_visual.modulate = STAGGER_TINT
 		State.STUN:
-			_visual.modulate = STUN_TINT
+			_visual.modulate = _stun_tint()
 		State.FLINCH:
 			_visual.modulate = FLINCH_TINT
 		_:
 			_visual.modulate = Color.WHITE
+
+
+## True when the boss shows drawn art; the bosses that have art override it.
+func has_art() -> bool:
+	return false
+
+
+func _stun_tint() -> Color:
+	return Color.WHITE.lerp(STUN_TINT, STUN_ART_STRENGTH) if has_art() else STUN_TINT
+
+
+func _corpse_tint() -> Color:
+	return ART_CORPSE_TINT if has_art() else CORPSE_TINT
 
 
 ## Slumps while `_defeat_left` runs down, then rests once on the floor (a kill in
@@ -923,7 +942,7 @@ func _defeat_progress() -> float:
 func _pose_corpse(progress: float) -> void:
 	_visual.scale = Vector2(float(_facing), lerpf(1.0, CORPSE_SQUASH_Y, progress))
 	_visual.rotation = float(_facing) * CORPSE_TILT * progress
-	_visual.modulate = Color.WHITE.lerp(CORPSE_TINT, progress)
+	_visual.modulate = Color.WHITE.lerp(_corpse_tint(), progress)
 	_visual.z_index = -1 if progress >= 1.0 else 0
 
 
