@@ -4,6 +4,8 @@
 [ext_resource type="Shader" uid="uid://du6sx1ejcwo31" path="res://shaders/blind_npc.gdshader" id="2_1wqur"]
 [ext_resource type="Texture2D" uid="uid://c73i2bhpacxsi" path="res://assets/world/blind_npc.jpg" id="2_epejh"]
 [ext_resource type="PackedScene" uid="uid://bq2h3mekduxqo" path="res://scenes/ui/speech_bubble.tscn" id="3_6hsw5"]
+[ext_resource type="PackedScene" uid="uid://dfi8n3n7j5qnj" path="res://scenes/ui/ability_unlock_popup.tscn" id="5_6hsw5"]
+[ext_resource type="PackedScene" path="res://scenes/ui/interaction_prompt.tscn" id="6_gtda4"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_xrivr"]
 shader = ExtResource("2_1wqur")
@@ -103,3 +105,10 @@ shape = SubResource("CircleShape2D_davfq")
 [node name="SpeechBubble" parent="." unique_id=641743792 instance=ExtResource("3_6hsw5")]
 position = Vector2(296.66666, -86.66667)
 scale = Vector2(1, 1)
+
+[node name="AbilityUnlockPopup" parent="." unique_id=247938561 instance=ExtResource("5_6hsw5")]
+
+[node name="InteractionPrompt" parent="." unique_id=731686068 instance=ExtResource("6_gtda4")]
+position = Vector2(180, 76.666664)
+scale = Vector2(2.72794, 2.5179186)
+prompt_text = "Hablar"

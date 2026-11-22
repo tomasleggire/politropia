@@ -46,10 +46,14 @@ func _fade_to(alpha: float) -> void:
 	if alpha <= 0.0:
 		_fade_tween.tween_callback(func() -> void: visible = false)
 
+func is_mobile_platform() -> bool:
+	return OS.has_feature("android") or OS.has_feature("ios")
 
 func _refresh_labels() -> void:
 	if _key_label == null or _action_label == null:
 		return
+		
+	_key_label.visible = not is_mobile_platform()
 	_key_label.text = _key_hint()
 	_action_label.text = prompt_text
 
@@ -60,3 +64,7 @@ func _key_hint() -> String:
 			if event is InputEventKey:
 				return OS.get_keycode_string(event.physical_keycode)
 	return "E"
+
+func _uses_touch_controls() -> bool:
+	var touch := get_node_or_null("/root/TouchControls")
+	return touch != null and touch.is_visible_in_tree()

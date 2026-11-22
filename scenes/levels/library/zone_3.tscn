@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" path="res://scenes/world/collectible_pickup.tscn" id="10_2jtkc"]
 [ext_resource type="Resource" uid="uid://0i2o8tutuald" path="res://data/collectibles/definitions/garnet_goat_other_ways.tres" id="11_7m53a"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="11_cne4m"]
+[ext_resource type="PackedScene" uid="uid://d0fndhvvtp3yq" path="res://scenes/world/static_npc.tscn" id="12_7m53a"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="12_a30ts"]
 [ext_resource type="PackedScene" uid="uid://ds7l8yd2hcyor" path="res://scenes/world/change_scene_vertical.tscn" id="13_tmyxi"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
@@ -14322,6 +14323,13 @@ position = Vector2(70, 1404)
 [node name="CollectiblePickup" parent="." unique_id=843226684 instance=ExtResource("10_2jtkc")]
 position = Vector2(75, 494)
 definition = ExtResource("11_7m53a")
+
+[node name="NPC" parent="." unique_id=188900045 instance=ExtResource("12_7m53a")]
+position = Vector2(403, 1111)
+collision_layer = 0
+collision_mask = 0
+npc_name = "Bibliotecario"
+dialogue = Array[String](["Esta biblioteca está llena de historias", "Algunas se dejan leer fácilmente; otras parecen esconder sus palabras entre las páginas", "Hay quienes recorren esta biblioteca sin perderse jamás", "Otros necesitan detenerse, volver sobre sus pasos y mirar las cosas desde otro lugar"])
 
 [node name="BookFlyer" parent="." unique_id=898895438 instance=ExtResource("8_cne4m")]
 position = Vector2(165, 916)

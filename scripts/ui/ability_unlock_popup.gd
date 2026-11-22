@@ -5,7 +5,7 @@ signal popup_closed
 @onready var title_label: Label = $Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer/Title
 @onready var ability_icon: TextureRect = $Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer/AbilityIcon
 @onready var ability_name: Label = $Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer/AbilityName
-@onready var description: Label = $Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer/Description
+@onready var description: RichTextLabel = $Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer/Description
 @onready var continue_button: Button = $Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer/ContinueButton
 
 var _popup_open := false
@@ -22,7 +22,7 @@ func show_ability(
 	icon: Texture2D
 ) -> void:
 	ability_name.text = display_name
-	description.text = detail
+	description.text = DialogueColor.color_text(detail)
 	ability_icon.texture = icon
 
 	_popup_open = true

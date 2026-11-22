@@ -13,5 +13,5 @@ script = ExtResource("1_definition")
 id = "turquoise_dolphin_learn_by_listening"
 title = "Delfín de Turquesa"
 category = "Aprender escuchando"
-content = "Los audiolibros y las grabaciones de clases permiten acceder a la información a través del audio, sin depender únicamente de la lectura. Pueden ser útiles para estudiar temas nuevos, repasar lecciones y disfrutar de historias. Algunas personas con dislexia comprenden mejor un texto cuando lo escuchan, ya que pueden dedicar menos esfuerzo a descifrar las palabras y concentrarse más en su significado. Combinar audio y texto también puede ayudar a seguir la lectura mientras se escucha."
+content = "Los audiolibros y las grabaciones de clases permiten acceder a la información a través del audio, sin depender únicamente de la lectura. Pueden ser útiles para estudiar temas nuevos, repasar lecciones y disfrutar de historias.\n\nAlgunas personas con dislexia comprenden mejor un texto cuando lo escuchan, ya que pueden dedicar menos esfuerzo a descifrar las palabras y concentrarse más en su significado.\n\nCombinar audio y texto también puede ayudar a seguir la lectura mientras se escucha."
 image = SubResource("AtlasTexture_turquoise_dolphin")
