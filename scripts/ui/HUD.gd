@@ -41,6 +41,8 @@ func _ready() -> void:
 		ability_progress.ability_recorded.connect(_on_ability_recorded)
 		_refresh_skill_icons()
 	
+	_layout_fragment_indicator()
+	get_viewport().size_changed.connect(_layout_fragment_indicator)
 	var progress := get_node_or_null("/root/FragmentProgress")
 	if progress == null:
 		return
@@ -52,6 +54,20 @@ func _ready() -> void:
 	progress.fragment_state_changed.connect(_on_fragment_state_changed)
 	get_tree().scene_changed.connect(_on_scene_changed)
 	_refresh_fragment_indicator()
+
+
+## Keeps the fragment icons below the mobile pause button, including safe-area
+## insets for notches and rounded phone corners.
+func _layout_fragment_indicator() -> void:
+	if not is_instance_valid(_fragment_indicator):
+		return
+	var pause_button := get_node_or_null("/root/PauseMenu/PauseButton") as Control
+	if pause_button == null:
+		return
+	var pause_rect := pause_button.get_global_rect()
+	var top := pause_rect.end.y - 3.0
+	_fragment_indicator.offset_top = top
+	_fragment_indicator.offset_bottom = top + 36.0
 
 
 func _apply_scale() -> void:
