@@ -30,7 +30,7 @@ func save_checkpoint() -> bool:
 	if saved:
 		var toast := get_node_or_null("/root/PickupToast")
 		if toast != null:
-			toast.call(&"show_toast", "Partida guardada", "Progreso asegurado en este punto")
+			toast.call(&"show_toast", "Partida guardada", "Progreso asegurado en este punto", true)
 	return saved
 
 
