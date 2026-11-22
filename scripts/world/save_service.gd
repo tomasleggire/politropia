@@ -26,7 +26,12 @@ func save_checkpoint() -> bool:
 	if scene_path.is_empty() or not ResourceLoader.exists(scene_path):
 		push_error("SaveService: cannot save an invalid checkpoint scene: %s" % scene_path)
 		return false
-	return _write_payload(_build_payload(scene_path))
+	var saved := _write_payload(_build_payload(scene_path))
+	if saved:
+		var toast := get_node_or_null("/root/PickupToast")
+		if toast != null:
+			toast.call(&"show_toast", "Partida guardada", "Progreso asegurado en este punto")
+	return saved
 
 
 func continue_game() -> bool:
