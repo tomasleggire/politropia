@@ -41,8 +41,6 @@ func _ready() -> void:
 		ability_progress.ability_recorded.connect(_on_ability_recorded)
 		_refresh_skill_icons()
 	
-	_layout_fragment_indicator()
-	get_viewport().size_changed.connect(_layout_fragment_indicator)
 	var progress := get_node_or_null("/root/FragmentProgress")
 	if progress == null:
 		return

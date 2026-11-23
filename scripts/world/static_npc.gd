@@ -1,4 +1,4 @@
-class_name LibrarianNPC
+#class_name LibrarianNPC
 extends CharacterBody2D
 
 @export var npc_name := "Bibliotecario"

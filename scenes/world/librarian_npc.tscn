@@ -2,7 +2,8 @@
 
 [ext_resource type="Texture2D" uid="uid://cvjdmwt7wk0da" path="res://assets/ui/librarian.png" id="1_1oqjc"]
 [ext_resource type="Script" uid="uid://esr7sh3cwqgi" path="res://scripts/world/static_npc.gd" id="1_ts6vr"]
-[ext_resource type="PackedScene" uid="uid://do5yura3snuld" path="res://scenes/ui/npc_speech_bubble.tscn" id="3_p8m32"]
+[ext_resource type="PackedScene" uid="uid://do5yura3snuld" path="res://scenes/ui/librarian_speech_bubble.tscn" id="3_p8m32"]
+[ext_resource type="Script" uid="uid://jhe8aed15tp1" path="res://scripts/ui/librarian_speech_bubble.gd" id="4_8cbkb"]
 [ext_resource type="PackedScene" path="res://scenes/ui/interaction_prompt.tscn" id="4_prompt"]
 [ext_resource type="PackedScene" uid="uid://dfi8n3n7j5qnj" path="res://scenes/ui/ability_unlock_popup.tscn" id="5_umqrt"]
 
@@ -14,8 +15,6 @@ radius = 35.0
 
 [node name="NPC" type="CharacterBody2D" unique_id=188900045]
 script = ExtResource("1_ts6vr")
-npc_name = null
-dialogue = null
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1609965343]
 position = Vector2(183.4125, 266.5)
@@ -34,8 +33,9 @@ collision_mask = 7
 position = Vector2(187, 267)
 shape = SubResource("CircleShape2D_davfq")
 
-[node name="SpeechBubble" parent="." unique_id=1025694301 instance=ExtResource("3_p8m32")]
+[node name="LibrarianSpeechBubble" parent="." unique_id=1025694301 instance=ExtResource("3_p8m32")]
 position = Vector2(223, 158)
+script = ExtResource("4_8cbkb")
 
 [node name="InteractionPrompt" parent="." unique_id=688852151 instance=ExtResource("4_prompt")]
 position = Vector2(187, 205)

@@ -8,10 +8,10 @@
 [ext_resource type="Texture2D" uid="uid://dghb8tgyy5sjr" path="res://assets/ui/energy_progress.png" id="4_oj5la"]
 [ext_resource type="Texture2D" uid="uid://ffjbpt1rya0n" path="res://assets/ui/open_eyes_unavailable.png" id="5_0h1do"]
 [ext_resource type="Texture2D" uid="uid://dov0vpvm2cway" path="res://assets/world/fragmento_libro.png" id="5_frag1"]
-[ext_resource type="Texture2D" uid="uid://bb25xvltkkajf" path="res://assets/ui/focus-available.png" id="6_erw67"]
+[ext_resource type="Texture2D" uid="uid://cvt6p3ywysnxb" path="res://assets/ui/focus-available.png" id="6_erw67"]
 [ext_resource type="Texture2D" uid="uid://cu4qv1dol4sei" path="res://assets/world/fragmento_libro_2.png" id="6_frag2"]
 [ext_resource type="Texture2D" uid="uid://bone5etihipqp" path="res://assets/world/fragmento_libro_3.png" id="7_frag3"]
-[ext_resource type="Texture2D" uid="uid://coxych71lcrxp" path="res://assets/ui/focus-unavailable.png" id="7_gonto"]
+[ext_resource type="Texture2D" uid="uid://c6dn65qctxjmn" path="res://assets/ui/focus-unavailable.png" id="7_gonto"]
 [ext_resource type="Texture2D" uid="uid://c0im2jy5aiajx" path="res://assets/ui/open_eyes_available.png" id="7_mj13f"]
 [ext_resource type="Texture2D" uid="uid://dc6smqpf8ayt4" path="res://assets/world/fragmento_libro_4.png" id="8_frag4"]
 
