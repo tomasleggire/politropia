@@ -40,7 +40,7 @@ var _energy_food_tip_shown := false
 
 @onready var _slide: Control = $Root/Slide
 @onready var _title: Label = $Root/Slide/Panel/Margin/Box/Title
-@onready var _subtitle: Label = $Root/Slide/Panel/Margin/Box/Subtitle
+@onready var _subtitle: RichTextLabel = $Root/Slide/Panel/Margin/Box/Subtitle
 
 
 func _ready() -> void:
@@ -55,8 +55,8 @@ func _ready() -> void:
 
 
 ## Queues a toast. `subtitle` may be empty.
-func show_toast(title: String, subtitle := "") -> void:
-	_queue.append([title, subtitle])
+func show_toast(title: String, subtitle := "", highlight := false) -> void:
+	_queue.append([title, subtitle, highlight])
 	if not _playing:
 		_play_next()
 
@@ -66,7 +66,7 @@ func show_energy_food_first_use() -> void:
 	if _energy_food_tip_shown:
 		return
 	_energy_food_tip_shown = true
-	show_toast("Chegusán de Milanesa", "Restaura la mitad de la concentración")
+	show_toast("Chegusán de Milanesa", "Restaura la mitad de la concentración", true)
 
 
 func _play_next() -> void:
@@ -76,8 +76,16 @@ func _play_next() -> void:
 	_playing = true
 	var entry: Array = _queue.pop_front()
 	_title.text = entry[0]
-	_subtitle.text = entry[1]
-	_subtitle.visible = not String(entry[1]).is_empty()
+	var highlighted := bool(entry[2]) if entry.size() > 2 else false
+	var subtitle_text := String(entry[1])
+	_subtitle.text = DialogueColor.color_text(subtitle_text) if highlighted and not subtitle_text.is_empty() else subtitle_text
+	_subtitle.visible = not subtitle_text.is_empty()
+	_title.add_theme_color_override(
+		&"font_color",
+		Color(1.0, 0.78, 0.32, 1.0) if highlighted else Color(0.878, 0.725, 0.31, 1.0)
+	)
+	_title.add_theme_font_size_override(&"font_size", 16 if highlighted else 14)
+	_subtitle.add_theme_font_size_override(&"normal_font_size", 11 if highlighted else 10)
 	_slide.visible = true
 	_slide.modulate.a = 0.0
 	_slide.position.y = -slide_distance

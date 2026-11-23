@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://cvqcuhqqbuhap" path="res://assets/art/greece/foreground_plants.png" id="10_ucxks"]
 [ext_resource type="Texture2D" uid="uid://dsln3teo3w40k" path="res://assets/art/greece/Plants/Bush-1.png" id="11_aa0nv"]
 [ext_resource type="PackedScene" uid="uid://bghweuci26m8m" path="res://scenes/world/blind_npc.tscn" id="11_e3xj1"]
+[ext_resource type="PackedScene" path="res://scenes/world/energy_food.tscn" id="12_e3xj1"]
 [ext_resource type="PackedScene" uid="uid://cbkprc1u3o38a" path="res://scenes/world/change_scene_horizontal.tscn" id="12_nebux"]
 [ext_resource type="PackedScene" uid="uid://dowigi85o1a" path="res://scenes/player/player.tscn" id="20_g5kwh"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="21_l868g"]
@@ -14198,3 +14199,6 @@ scale = Vector2(0.7, 1)
 target_scene_path = "uid://bt3m0cf4sgq7r"
 door_id = 33
 target_door_id = 32
+
+[node name="ChegusanMilanesa" parent="." unique_id=2131912509 instance=ExtResource("12_e3xj1")]
+position = Vector2(-109, 313)

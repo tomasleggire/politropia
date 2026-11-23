@@ -36,9 +36,33 @@ var _original_sprite_material: Material
 @onready var death_particles: GPUParticles2D = get_node_or_null("DeathParticles") as GPUParticles2D
 
 
+func _ensure_nodes() -> void:
+	if ledge_ray == null:
+		ledge_ray = get_node_or_null("LedgeRayCast")
+	if sprite == null:
+		sprite = get_node_or_null("AnimatedSprite2D")
+	if death_particles == null:
+		death_particles = get_node_or_null("DeathParticles") as GPUParticles2D
+
+
+func _ensure_death_material() -> void:
+	_ensure_nodes()
+	if _death_material == null:
+		_death_material = ShaderMaterial.new()
+		_death_material.shader = DEATH_KEY_SHADER
+	if sprite != null and _original_sprite_material == null:
+		_original_sprite_material = sprite.material
+
+
 func _ready() -> void:
 	_facing = 1
 	start_facing = 1
+	_ensure_death_material()
+	if sprite and not sprite.animation_finished.is_connected(_on_sprite_animation_finished):
+		sprite.animation_finished.connect(_on_sprite_animation_finished)
+	if death_particles and not death_particles.finished.is_connected(_on_death_particles_finished):
+		death_particles.finished.connect(_on_death_particles_finished)
+
 	super._ready()
 	
 	if ledge_ray:
@@ -48,16 +72,10 @@ func _ready() -> void:
 	if not Engine.is_editor_hint():
 		for i: int in 2:
 			_projectiles.append(_make_projectile())
-	if sprite:
-		_original_sprite_material = sprite.material
-		_death_material = ShaderMaterial.new()
-		_death_material.shader = DEATH_KEY_SHADER
-		sprite.animation_finished.connect(_on_sprite_animation_finished)
-	if death_particles:
-		death_particles.finished.connect(_on_death_particles_finished)
 
-	_update_direction()
-	_play_walk_animation()
+	if not _dead:
+		_update_direction()
+		_play_walk_animation()
 
 # Enemy.gd llama a este método desde su propio _physics_process().
 func _think(delta: float) -> void:
@@ -178,6 +196,16 @@ func set_ai_active(active: bool) -> void:
 func make_corpse_at(at: Vector2, facing: int) -> void:
 	_clear_projectiles()
 	super.make_corpse_at(at, facing)
+	_ensure_death_material()
+
+	# If restored from registry on scene load (already dead), remain hidden and inert
+	if not is_node_ready():
+		_death_sequence_active = false
+		if sprite:
+			sprite.visible = false
+		set_physics_process(false)
+		return
+
 	_death_sequence_active = true
 	if death_particles:
 		death_particles.emitting = false
@@ -187,7 +215,8 @@ func make_corpse_at(at: Vector2, facing: int) -> void:
 		sprite.offset = Vector2(0.0, -24.0)
 		sprite.speed_scale = 1.0
 		sprite.material = _death_material
-		_death_material.set_shader_parameter(&"key_background", true)
+		if _death_material != null:
+			_death_material.set_shader_parameter(&"key_background", true)
 		sprite.play(&"death")
 	else:
 		_finish_death_animation()

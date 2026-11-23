@@ -358,7 +358,9 @@ var current_health: int:
 @export var hitbox_up := Rect2(-46, -110, 79, 77)
 @export var hitbox_air := Rect2(2, -56, 79, 38)
 
-@export var open_eyes_duration := 1.0
+@export_group("Open eyes")
+@export var open_eyes_soul_cost: int = 25
+#@export var open_eyes_duration := 1.0
 
 @onready var _sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var aseprite: AnimatedSprite2D = $AnimatedSprite2D
@@ -635,7 +637,6 @@ func _build_animation_sprite_frames() -> SpriteFrames:
 		"land": landing_squash_time,
 		"turn": turn_time,
 		"skid": _skid_brake_duration(),
-		"open_eyes": open_eyes_duration,
 		"attack_1": attack_startup_time + _phase_total(attack_hit1_phases),
 		"attack_2": attack_chain_startup_time + _phase_total(attack_hit2_phases),
 		"attack_3": attack_finisher_startup_time + _phase_total(attack_hit3_phases),
@@ -851,20 +852,25 @@ func open_eyes() -> void:
 	if _state != State.IDLE and _state != State.RUN:
 		return 
 	
-	##prueba##
-	_sprite.stop()
-	_enter_state(State.OPEN_EYES)##-->Funciona pero se tilda
-	_revelation_burst.play_burst()
-	##_enter_state(State.SKID)
-	##prueba##
-	open_eyes_activated.emit()
+	if not can_use_open_eyes():
+		return 
 	
+	_sprite.stop()
+	_enter_state(State.OPEN_EYES)
+	#_revelation_burst.play_burst()
+	#_set_soul(_soul - open_eyes_soul_cost)
+
+	open_eyes_activated.emit()
+
+func can_use_open_eyes() -> bool:
+	return (
+		AbilityProgress.is_unlocked(&"open_eyes")
+		and _soul >= open_eyes_soul_cost
+	)
 
 func _update_open_eyes(delta: float) -> void:
 	velocity.x = 0.0
-	if _state_time >= open_eyes_duration:
-		_enter_state(State.IDLE)
-		return
+
 
 func _update_shared_timers(delta: float) -> void:
 	_landing_left = maxf(_landing_left - delta, 0.0)
@@ -2558,7 +2564,13 @@ func _set_soul(value: int) -> void:
 ## True when a focus heal would be worth starting: enough soul and a missing
 ## pip. The touch Focus button follows this.
 func is_focus_available() -> bool:
-	return not _dead and _health > 0 and _health < max_health and _soul >= focus_cost
+	return (
+		not _dead
+		and _health > 0
+		and _health < max_health
+		and _soul >= focus_cost
+		and AbilityProgress.is_unlocked(&"focus")
+	)
 
 
 func is_focusing() -> bool:
@@ -2859,6 +2871,9 @@ func _poll_rest_exit_input() -> void:
 
 
 func _on_sprite_animation_finished() -> void:
+	
+
+	
 	if _state == State.FOCUS and _sprite.animation == &"heal_start":
 		_play_focus_animation(&"heal_loop")
 		return
@@ -2868,6 +2883,15 @@ func _on_sprite_animation_finished() -> void:
 		return
 	if _meditating and _rest_animation != &"":
 		rest_animation_finished.emit(_rest_animation)
+	
+	if _state == State.OPEN_EYES and _sprite.animation == &"open_eyes":
+		
+		
+		_revelation_burst.play_burst()
+		_set_soul(_soul - open_eyes_soul_cost)
+		open_eyes_activated.emit()
+		_enter_state(State.IDLE)
+		return
 
 
 func _on_sprite_frame_changed() -> void:

@@ -3,7 +3,8 @@ extends Node2D
 
 ## A world signpost that teaches something. Drag `scenes/world/tutorial_sign.tscn`
 ## into a zone, put its base on the floor, then fill in the Inspector:
-##   - Content: `title` and `text` (BBCode ok, e.g. [color=#e0b94f]word[/color]).
+##   - Content: `title` and `text` (texto plano: `DialogueColor.color_text` añade
+##     el BBCode pastel de accesibilidad al construir el panel).
 ##   - Look: `marker_style` picks what marks the spot: a small firefly swarm
 ##     (default, it does not look interactable), the old signpost, or nothing.
 ##   - Trigger: size and offset of the area that makes the panel appear.
@@ -79,7 +80,14 @@ func _ready() -> void:
 	_area.position = trigger_offset
 	_title_label.text = title
 	_title_label.visible = not title.is_empty()
-	_body.text = "[center]%s[/center]" % text if center_text else text
+	
+	var formatted_text: String = text
+	if center_text:
+		formatted_text = "[center]%s[/center]" % text
+	_body.add_theme_constant_override("text_highlight_h_padding", 1)
+	_body.add_theme_constant_override("text_highlight_v_padding", 3)
+	_body.text = DialogueColor.color_text(formatted_text)
+	
 	_panel.custom_minimum_size.x = panel_width
 	_panel.offset_left = -panel_width * 0.5
 	_panel.offset_right = panel_width * 0.5

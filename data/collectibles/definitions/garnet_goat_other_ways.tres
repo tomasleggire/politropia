@@ -13,5 +13,9 @@ script = ExtResource("1_definition")
 id = "garnet_goat_other_ways"
 title = "Cabra de Granate"
 category = "Otras formas de demostrarlo"
-content = "Tener dificultades para leer o escribir no significa tener dificultades para comprender un tema. En algunas situaciones, las evaluaciones orales, el uso de una computadora o los programas de reconocimiento de voz, que convierten el habla en texto, pueden ayudar a demostrar lo aprendido. Estas alternativas permiten expresar ideas sin que las dificultades con la escritura interfieran tanto con el resultado. La adaptación depende de lo que se esté evaluando y de las necesidades de cada persona."
+passive_effect = 4
+passive_value = 0.2
+content = "Tener dificultades para leer o escribir no significa tener dificultades para comprender un tema. En algunas situaciones, las evaluaciones orales, el uso de una computadora o los programas de reconocimiento de voz, que convierten el habla en texto, pueden ayudar a demostrar lo aprendido.
+
+Estas alternativas permiten expresar ideas sin que las dificultades con la escritura interfieran tanto con el resultado. La adaptación depende de lo que se esté evaluando y de las necesidades de cada persona."
 image = SubResource("AtlasTexture_garnet_goat")
