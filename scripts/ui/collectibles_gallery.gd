@@ -140,7 +140,7 @@ func select_item(index: int) -> void:
 		accent if unlocked else LOCKED_LABEL_COLOR
 	)
 	_detail_lock.visible = not unlocked
-	_detail_text.text = definition.content if unlocked else LOCKED_TEXT
+	_detail_text.text = DialogueColor.color_text(definition.content if unlocked else LOCKED_TEXT)
 	_detail_hint.text = "Encontralo en el mundo"
 	_detail_hint.visible = not unlocked
 	_detail_scroll.scroll_vertical = 0
@@ -163,7 +163,8 @@ func get_selected_category() -> String:
 
 
 func get_selected_body() -> String:
-	return _detail_text.text
+	## Devuelve el texto legible (sin BBCode), igual al contenido original.
+	return _detail_text.get_parsed_text()
 
 
 func is_selected_locked() -> bool:

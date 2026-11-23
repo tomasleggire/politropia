@@ -13,5 +13,5 @@ script = ExtResource("1_definition")
 id = "jade_hound_quiet_space"
 title = "Sabueso de Jade"
 category = "Un espacio tranquilo"
-content = "Los ruidos, las interrupciones y la presión de un examen pueden dificultar la concentración. Por eso, algunas personas con dislexia pueden beneficiarse de rendir en un espacio separado y tranquilo. Según las necesidades de cada estudiante, también puede permitirse leer las preguntas en voz alta o utilizar herramientas de apoyo. Estas adaptaciones ayudan a reducir las barreras durante la evaluación y permiten que el estudiante se concentre mejor en lo que necesita resolver."
+content = "Los ruidos, las interrupciones y la presión de un examen pueden dificultar la concentración. Por eso, algunas personas con dislexia pueden beneficiarse de rendir en un espacio separado y tranquilo.\n\nSegún las necesidades de cada estudiante, también puede permitirse leer las preguntas en voz alta o utilizar herramientas de apoyo. Estas adaptaciones ayudan a reducir las barreras durante la evaluación y permiten que el estudiante se concentre mejor en lo que necesita resolver."
 image = SubResource("AtlasTexture_jade_hound")

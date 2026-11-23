@@ -13,5 +13,11 @@ script = ExtResource("1_definition")
 id = "emerald_bull_clear_text"
 title = "Toro de Esmeralda"
 category = "Lectura más clara"
-content = "Algunas fuentes, como Arial y Verdana, tienen formas de letras sencillas que pueden resultar más cómodas para ciertas personas con dislexia. También existen fuentes diseñadas específicamente para facilitar la lectura, como OpenDyslexic, aunque no funcionan mejor para todo el mundo. Aumentar el tamaño de las letras y el espacio entre palabras y líneas puede ayudar a distinguirlas con mayor facilidad. El color de fondo también importa: algunas personas leen más cómodamente con fondos crema o de otros tonos suaves que con un fondo blanco muy brillante. ¡Cada persona puede probar distintas combinaciones hasta encontrar la que mejor le funcione!"
+passive_effect = 3
+passive_value = 25.0
+content = "Algunas fuentes, como Arial y Verdana, tienen formas de letras sencillas que pueden resultar más cómodas para ciertas personas con dislexia. También existen fuentes diseñadas específicamente para facilitar la lectura, como OpenDyslexic, aunque no funcionan mejor para todo el mundo.
+
+Aumentar el tamaño de las letras y el espacio entre palabras y líneas puede ayudar a distinguirlas con mayor facilidad. El color de fondo también importa: algunas personas leen más cómodamente con fondos crema o de otros tonos suaves que con un fondo blanco muy brillante.
+
+¡Cada persona puede probar distintas combinaciones hasta encontrar la que mejor le funcione!"
 image = SubResource("AtlasTexture_emerald_bull")

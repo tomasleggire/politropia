@@ -3,7 +3,8 @@ extends Node2D
 
 ## A world signpost that teaches something. Drag `scenes/world/tutorial_sign.tscn`
 ## into a zone, put its base on the floor, then fill in the Inspector:
-##   - Content: `title` and `text` (BBCode ok, e.g. [color=#e0b94f]word[/color]).
+##   - Content: `title` and `text` (texto plano: `DialogueColor.color_text` añade
+##     el BBCode pastel de accesibilidad al construir el panel).
 ##   - Look: `marker_style` picks what marks the spot: a small firefly swarm
 ##     (default, it does not look interactable), the old signpost, or nothing.
 ##   - Trigger: size and offset of the area that makes the panel appear.

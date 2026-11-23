@@ -14229,5 +14229,5 @@ text = "Tocá el botón de dash para lanzarte hacia adelante. Mientras dura, nad
 [node name="SignHeal" parent="." unique_id=1363102432 instance=ExtResource("20_tutsign")]
 position = Vector2(1324, 700)
 title = "Curación"
-text = "Golpeá enemigos para llenar la [color=#e0b94f]energía[/color]. Tocá el botón de [color=#e0b94f]curar[/color] para recuperar vida."
+text = "Golpeá enemigos para llenar la energía. Tocá el botón de curar para recuperar vida."
 show_once = true
