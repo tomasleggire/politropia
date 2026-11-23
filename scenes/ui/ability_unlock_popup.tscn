@@ -67,10 +67,17 @@ stretch_mode = 5
 layout_mode = 2
 horizontal_alignment = 1
 
-[node name="Description" type="Label" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=1115748288]
+[node name="Description" type="RichTextLabel" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=1115748288]
+custom_minimum_size = Vector2(320, 0)
 layout_mode = 2
-horizontal_alignment = 1
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+theme_override_colors/default_color = Color(0.94902, 0.921569, 0.85098, 1)
+theme_override_constants/text_highlight_h_padding = 4
+theme_override_constants/text_highlight_v_padding = 4
 autowrap_mode = 3
+horizontal_alignment = 1
 
 [node name="ContinueButton" type="Button" parent="Overlay/CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=1854489868]
 layout_mode = 2

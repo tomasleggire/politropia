@@ -85,3 +85,5 @@ layout_mode = 2
 mouse_filter = 2
 bbcode_enabled = true
 fit_content = true
+theme_override_constants/text_highlight_h_padding = 1
+theme_override_constants/text_highlight_v_padding = 3

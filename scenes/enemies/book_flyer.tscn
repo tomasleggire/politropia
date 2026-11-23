@@ -15,6 +15,9 @@ enemy_id = &"book_flyer"
 max_health = 2
 recoil_speed = 340.0
 recoil_time = 0.18
+fade_corpse_after_landing = true
+corpse_linger_time = 0.6
+corpse_fade_time = 0.5
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -16)

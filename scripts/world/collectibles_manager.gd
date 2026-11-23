@@ -129,3 +129,15 @@ func from_dict(data: Dictionary) -> void:
 			if (id is String or id is StringName) and _definitions_by_id.has(String(id)):
 				_collected[String(id)] = true
 	collectibles_changed.emit()
+
+
+## Merges external collected IDs with current ones without losing any.
+func merge_collected_ids(ids: Array) -> void:
+	var changed := false
+	for item: Variant in ids:
+		var id := String(item)
+		if _definitions_by_id.has(id) and not _collected.has(id):
+			_collected[id] = true
+			changed = true
+	if changed:
+		collectibles_changed.emit()

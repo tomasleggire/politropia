@@ -5,8 +5,10 @@ extends SceneTree
 ## Exits 0 when every check passes, 1 otherwise.
 
 const PICKUP_SCENE := preload("res://scenes/world/collectible_pickup.tscn")
-const PLAYER_SCENE := preload("res://scenes/player/player.tscn")
 const MANAGER_SCRIPT := preload("res://scripts/world/collectibles_manager.gd")
+# Loaded at runtime: in --script mode Godot 4.7 compiles preloads before the
+# project autoloads, and player.gd references the AbilityProgress singleton.
+var PLAYER_SCENE: PackedScene
 const WATCHDOG_SECONDS := 120.0
 const FLOOR_RECT := Rect2(-600.0, 0.0, 1200.0, 100.0)
 
@@ -37,12 +39,13 @@ class HitRecorder:
 var checks := 0
 var failed: Array[String] = []
 var _rig: Node2D
-var _player: Player
+var _player
 var _saved_definitions: Array
 var _saved_by_id: Dictionary
 
 
 func _initialize() -> void:
+	PLAYER_SCENE = load("res://scenes/player/player.tscn") as PackedScene
 	var watchdog := create_timer(WATCHDOG_SECONDS)
 	watchdog.timeout.connect(func() -> void:
 		print("FAIL: watchdog")
@@ -152,7 +155,7 @@ func _build_rig() -> void:
 	_rig = Node2D.new()
 	root.add_child(_rig)
 	LevelGeometry.add_solid(_rig, FLOOR_RECT, Color.DIM_GRAY)
-	_player = PLAYER_SCENE.instantiate() as Player
+	_player = PLAYER_SCENE.instantiate()
 	_player.position = Vector2(0.0, -10.0)
 	_rig.add_child(_player)
 	await _frames(20)
@@ -187,12 +190,24 @@ func _case_definition_defaults() -> void:
 	check(is_equal_approx(infinite.passive_bonus(), 0.0), "infinite values are ignored")
 
 	var definitions := _manager().call("get_all_definitions") as Array
-	var all_none := definitions.size() == 6
+	var expected: Dictionary = {
+		"garnet_goat_other_ways": [CollectibleDefinition.PassiveEffect.DASH_DURATION, 0.1],
+		"emerald_bull_clear_text": [CollectibleDefinition.PassiveEffect.MAX_ENERGY, 25.0],
+		"ruby_owl_read_aloud": [CollectibleDefinition.PassiveEffect.MAX_HEALTH, 1.0],
+	}
+	var seen: Dictionary = {}
 	for definition: CollectibleDefinition in definitions:
-		all_none = all_none and definition.passive_effect == CollectibleDefinition.PassiveEffect.NONE
-		all_none = all_none and is_equal_approx(definition.passive_value, 0.0)
+		var effect: int = CollectibleDefinition.PassiveEffect.NONE
+		var value: float = 0.0
+		if expected.has(definition.id):
+			var entry: Array = expected[definition.id]
+			effect = int(entry[0])
+			value = float(entry[1])
+		check(definition.passive_effect == effect, "%s has its configured passive effect" % definition.id)
+		check(is_equal_approx(definition.passive_value, value), "%s has its configured passive value" % definition.id)
+		seen[definition.id] = true
 	check(definitions.size() == 6, "the real catalog still has six collectibles")
-	check(all_none, "every real collectible remains NONE")
+	check(seen.size() == 6, "the real catalog ids are unique")
 
 
 func _case_manager_totals() -> void:
@@ -375,7 +390,7 @@ func _case_dash() -> void:
 	print("CASE dash")
 	_install_fixtures()
 	await _build_rig()
-	var old_frames := _player._animation_sprite_frames
+	var old_frames = _player._animation_sprite_frames
 
 	_player._start_dash()
 	check(is_equal_approx(_player._active_dash_duration, 0.43), "the first dash snapshots the base duration")
@@ -387,7 +402,7 @@ func _case_dash() -> void:
 	check(_player._dash_speed_at(0.45) < 200.0, "the current dash movement still uses its snapshotted duration")
 	check(_player._animation_sprite_frames == old_frames, "the clips are not swapped in the middle of a dash")
 
-	_player._enter_state(Player.State.IDLE)
+	_player._enter_state(0) # Player.State.IDLE; avoid a compile-time class dependency
 	_player._start_dash()
 	check(not _player._dash_animation_dirty, "the next dash flushes the deferred clip rebuild")
 	check(_player._animation_sprite_frames != old_frames, "the dash clips are rebuilt with the new duration")
@@ -397,17 +412,17 @@ func _case_dash() -> void:
 	_manager().call("clear")
 	check(is_equal_approx(_player.dash_duration, 0.43), "clearing the ids restores the ground dash duration")
 	check(is_equal_approx(_player.air_dash_duration, 0.30), "clearing the ids restores the air dash duration")
-	_player._enter_state(Player.State.IDLE)
+	_player._enter_state(0) # Player.State.IDLE; avoid a compile-time class dependency
 
 
 func _case_jump() -> void:
 	print("CASE jump")
 	_install_fixtures()
 	await _build_rig()
-	var base_rise_gravity := _player._rise_gravity
-	var base_fall_gravity := _player._fall_gravity
-	var base_jump_speed := absf(_player._jump_velocity)
-	var base_double_speed := absf(_player._double_jump_velocity)
+	var base_rise_gravity: float = _player._rise_gravity
+	var base_fall_gravity: float = _player._fall_gravity
+	var base_jump_speed: float = absf(_player._jump_velocity)
+	var base_double_speed: float = absf(_player._double_jump_velocity)
 
 	check(_collect(JUMP), "the jump passive is collected")
 	check(is_equal_approx(_player._jump_height_bonus_percent, 50.0), "the jump bonus is read as a percentage")
@@ -415,7 +430,7 @@ func _case_jump() -> void:
 	check(is_equal_approx(_player._fall_gravity, base_fall_gravity), "the fall gravity is preserved")
 	check(is_equal_approx(absf(_player._jump_velocity), base_jump_speed * sqrt(1.5)), "the ground launch speed is scaled by sqrt(1 + percent / 100)")
 	check(is_equal_approx(absf(_player._double_jump_velocity), base_double_speed * sqrt(1.5)), "the double jump gets the same height bonus")
-	var predicted_rise := (_player._jump_velocity * _player._jump_velocity) / (2.0 * _player._rise_gravity)
+	var predicted_rise: float = (_player._jump_velocity * _player._jump_velocity) / (2.0 * _player._rise_gravity)
 	check(is_equal_approx(predicted_rise, _player._base_jump_height * 1.5), "the extra percentage becomes extra apex height")
 	check(is_equal_approx(_player.jump_release_multiplier, 0.45), "the variable jump release multiplier is untouched")
 

@@ -38,6 +38,8 @@ MusicManager="*uid://5cfbl0ss3jw"
 Collectibles="*res://scripts/world/collectibles_manager.gd"
 BlindQuestProgress="*res://scripts/world/blind_quest_progress.gd"
 SaveService="*res://scripts/world/save_service.gd"
+SaveManager="*res://scripts/world/save_manager.gd"
+FirebaseService="*res://scripts/network/firebase_service.gd"
 
 [display]
 

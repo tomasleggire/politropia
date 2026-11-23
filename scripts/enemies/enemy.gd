@@ -60,6 +60,13 @@ const CORPSE_SQUASH := 0.55
 @export var gravity := 1400.0
 @export var max_fall_speed := 900.0
 
+@export_group("Death")
+## Optionally fade the corpse after it lands. The enemy node stays registered
+## so checkpoint resets can still revive it.
+@export var fade_corpse_after_landing := false
+@export_range(0.0, 5.0, 0.1) var corpse_linger_time := 0.6
+@export_range(0.1, 3.0, 0.1) var corpse_fade_time := 0.5
+
 ## Room that owns this enemy, assigned by the registry from the spawn point.
 var home_room: StringName = &""
 
@@ -76,6 +83,7 @@ var _visual: Node2D
 var _flash: Polygon2D
 var _contact: ContactDamage
 var _player_ref: Node
+var _corpse_fade_tween: Tween
 
 
 func _get_configuration_warnings() -> PackedStringArray:
@@ -194,6 +202,8 @@ func freeze(duration: float) -> void:
 
 ## Full health, spawn position and facing, AI idle. Also revives a corpse.
 func reset_to_spawn() -> void:
+	if _corpse_fade_tween != null and _corpse_fade_tween.is_valid():
+		_corpse_fade_tween.kill()
 	_revive()
 	_health = max_health
 	global_position = _spawn_position
@@ -265,12 +275,27 @@ func _update_corpse(delta: float) -> void:
 	move_and_slide()
 	if is_on_floor():
 		set_physics_process(false)
+		if fade_corpse_after_landing:
+			_fade_landed_corpse()
+
+
+func _fade_landed_corpse() -> void:
+	if _visual == null:
+		return
+	if _corpse_fade_tween != null and _corpse_fade_tween.is_valid():
+		_corpse_fade_tween.kill()
+	_corpse_fade_tween = create_tween()
+	_corpse_fade_tween.tween_interval(corpse_linger_time)
+	_corpse_fade_tween.tween_property(_visual, "modulate:a", 0.0, corpse_fade_time)
+	_corpse_fade_tween.tween_callback(func() -> void: _visual.visible = false)
 
 
 func _revive() -> void:
 	if not _dead:
 		return
 	_dead = false
+	if _visual != null:
+		_visual.visible = true
 	collision_layer = ENEMY_LAYER
 	if _contact != null:
 		_contact.monitoring = true

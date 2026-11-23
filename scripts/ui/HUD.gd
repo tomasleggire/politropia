@@ -54,6 +54,20 @@ func _ready() -> void:
 	_refresh_fragment_indicator()
 
 
+## Keeps the fragment icons below the mobile pause button, including safe-area
+## insets for notches and rounded phone corners.
+func _layout_fragment_indicator() -> void:
+	if not is_instance_valid(_fragment_indicator):
+		return
+	var pause_button := get_node_or_null("/root/PauseMenu/PauseButton") as Control
+	if pause_button == null:
+		return
+	var pause_rect := pause_button.get_global_rect()
+	var top := pause_rect.end.y - 3.0
+	_fragment_indicator.offset_top = top
+	_fragment_indicator.offset_bottom = top + 36.0
+
+
 func _apply_scale() -> void:
 	var player_ui := get_node_or_null("PlayerUI") as Control
 	if player_ui != null:
@@ -66,7 +80,7 @@ func _on_fragment_state_changed(level_key: String, id: int, state: int) -> void:
 	_set_fragment_icon(id - 1, state)
 
 
-func _on_scene_changed(_scene: Node) -> void:
+func _on_scene_changed(_scene: Variant = null) -> void:
 	_refresh_fragment_indicator()
 
 

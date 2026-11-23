@@ -927,6 +927,10 @@ class ScreenFadeOverlay extends CanvasLayer:
 			await tree.current_scene.ready
 		await tree.process_frame
 
+		var save_mgr := tree.root.get_node_or_null("/root/SaveManager")
+		if save_mgr != null and tree.current_scene != null and not tree.current_scene.scene_file_path.is_empty():
+			save_mgr.set_saved_scene_path(tree.current_scene.scene_file_path)
+
 		# Bloquear al nuevo jugador durante el fade in si corresponde
 		var new_player := SceneTransitionArea._find_player(tree)
 		if new_player != null and should_lock_player:
