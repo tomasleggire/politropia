@@ -142,7 +142,8 @@ func _case_marker_style() -> void:
 			for j in state.get_node_property_count(i):
 				overridden = overridden or state.get_node_property_name(i, j) == &"marker_style"
 			check(not overridden, "library sign %s keeps the default fireflies" % state.get_node_name(i))
-	check(signs == 5, "library zone_1 has five signs (%d)" % signs)
+	# Five tutorial signs plus the demo sign that points at the boss test hub.
+	check(signs == 6, "library zone_1 has six signs (%d)" % signs)
 
 
 func _case_toast() -> void:
