@@ -21,18 +21,30 @@ var _deposit_marks: Array[Label] = []
 		_apply_scale()
 
 @onready var open_eyes_icon: TextureRect = $PlayerUI/SkillsContainer/OpenEyesIcon
+@onready var focus_icon: TextureRect = $PlayerUI/SkillsContainer/FocusIcon
 
 @export_group("Open Eyes")
 @export var open_eyes_available_texture: Texture2D
 @export var open_eyes_unavailable_texture: Texture2D
 
+@export_group("Focus")
+@export var focus_available_texture: Texture2D
+@export var focus_unavailable_texture: Texture2D
+
 var _player: Player
 
 func _ready() -> void:
 	_apply_scale()
+	
+	var ability_progress := get_node_or_null("/root/AbilityProgress")
+	if ability_progress != null:
+		ability_progress.ability_recorded.connect(_on_ability_recorded)
+		_refresh_skill_icons()
+	
 	var progress := get_node_or_null("/root/FragmentProgress")
 	if progress == null:
 		return
+		
 	for i in range(progress.total()):
 		var slot := _fragment_indicator.get_node("Slot%d" % (i + 1))
 		_fragment_icons.append(slot.get_node("Icon") as TextureRect)
@@ -98,19 +110,53 @@ func bind_player(player: Player) -> void:
 	_on_player_health_changed(cur_hp, max_hp)
 
 	_on_player_soul_changed(player.get_soul(), player.get_max_soul())
-	_update_open_eyes_icon()
+	_refresh_skill_icons()
 
 
-func _update_open_eyes_icon() -> void:
-	if not is_instance_valid(open_eyes_icon) or _player == null:
+func _on_ability_recorded(_ability: StringName) -> void:
+	_refresh_skill_icons()
+
+
+func _refresh_skill_icons() -> void:
+	var progress := get_node_or_null("/root/AbilityProgress")
+
+	if progress == null:
 		return
-	
-	var available :bool= _player.get_soul() >= _player.open_eyes_soul_cost
-	open_eyes_icon.texture = (
-		open_eyes_available_texture
-		if available
-		else open_eyes_unavailable_texture
-	)
+
+	var open_eyes_unlocked: bool = progress.is_unlocked(&"open_eyes")
+	var focus_unlocked: bool = progress.is_unlocked(&"focus")
+
+	open_eyes_icon.visible = open_eyes_unlocked
+	focus_icon.visible = focus_unlocked
+
+	_update_skill_icons_energy()
+
+
+func _update_skill_icons_energy() -> void:
+	if _player == null:
+		return
+
+	if open_eyes_icon.visible:
+		var open_eyes_available: bool = (
+			_player.get_soul() >= _player.open_eyes_soul_cost
+		)
+
+		open_eyes_icon.texture = (
+			open_eyes_available_texture
+			if open_eyes_available
+			else open_eyes_unavailable_texture
+		)
+
+	if focus_icon.visible:
+		var focus_available: bool = (
+			_player.get_soul() >= _player.focus_cost
+		)
+
+		focus_icon.texture = (
+			focus_available_texture
+			if focus_available
+			else focus_unavailable_texture
+		)
 
 func _on_player_health_changed(current_health: int, max_health: int) -> void:
 	if hearts_container == null:
@@ -148,4 +194,4 @@ func _on_player_soul_changed(current_soul: int, max_soul: int) -> void:
 	if is_instance_valid(energy_bar):
 		energy_bar.max_value = max_soul
 		energy_bar.value = current_soul
-	_update_open_eyes_icon()
+	_update_skill_icons_energy()
