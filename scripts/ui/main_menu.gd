@@ -30,6 +30,7 @@ var _buttons: Array[Button] = []
 @onready var btn_continue: Button = %Continue
 @onready var btn_collectables: Button = %Collectables
 @onready var btn_achievements: Button = %Achievements
+@onready var btn_account: Button = %BtnAccount
 @onready var _stage: MainMenuStage = %Stage
 @onready var _ui: Control = %Ui
 @onready var _logo: Control = %Logo
@@ -48,7 +49,8 @@ func _ready() -> void:
 		false
 	)
 
-	btn_continue.disabled = not SaveService.has_save()
+	var has_saved_data := _has_save_data()
+	btn_continue.disabled = not has_saved_data
 	_buttons = [btn_new_game, btn_continue, btn_collectables, btn_achievements]
 	for button in _buttons:
 		_setup_button(button)
@@ -59,13 +61,19 @@ func _ready() -> void:
 	btn_collectables.pressed.connect(_on_collectables_pressed)
 	btn_achievements.pressed.connect(_on_achievements_pressed)
 
-	btn_new_game.grab_focus()
+	_setup_account_button()
+
+	if has_saved_data:
+		btn_continue.grab_focus()
+	else:
+		btn_new_game.grab_focus()
+
 	_place_selector.call_deferred()
 	_play_opening()
 
 	MusicManager.play_menu_music()
-	# Start loading the game scene in the background.
-	ResourceLoader.load_threaded_request(GAME_SCENE)
+	# Scene loading will be handled when the player chooses New Game or Continue.
+	# ResourceLoader.load_threaded_request(GAME_SCENE)
 
 
 func _exit_tree() -> void:
@@ -167,8 +175,13 @@ func _play_new_game_cinematic() -> void:
 
 
 func _finish_new_game() -> void:
+	if SaveManager != null:
+		SaveManager.clear_save()
 	_reset_new_game_progress()
 	SaveService.begin_new_game(GAME_SCENE)
+	if SaveManager != null:
+		SaveManager.set_saved_scene_path(GAME_SCENE)
+		SaveManager.save_game()
 	MusicManager.stop_music()
 	if scene_changer.is_valid():
 		scene_changer.call(INTRO_SCENE)
@@ -194,8 +207,36 @@ func _on_continue_pressed() -> void:
 func _continue_from_save() -> void:
 	# Render the label before the saved PackedScene is synchronously loaded.
 	await get_tree().process_frame
-	if SaveService.continue_game():
+	if SaveManager != null and SaveManager.has_save():
+		SaveManager.load_game()
+
+	# If CheckpointService has an active checkpoint loaded, ensure SaveService is synchronized
+	if CheckpointService != null and CheckpointService.has_active_checkpoint() and SaveService != null:
+		SaveService.sync_from_state(CheckpointService.get_active_scene_path())
+
+	if SaveService != null and SaveService.continue_game():
+		MusicManager.play_gameplay_music()
 		return
+
+	# Fallback: load scene from CheckpointService, SaveManager, or default GAME_SCENE
+	var target_scene := ""
+	if CheckpointService != null and CheckpointService.has_active_checkpoint():
+		target_scene = CheckpointService.get_active_scene_path()
+	if (target_scene.is_empty() or not ResourceLoader.exists(target_scene)) and SaveManager != null:
+		target_scene = SaveManager.get_saved_scene_path()
+	if target_scene.is_empty() or not ResourceLoader.exists(target_scene):
+		target_scene = GAME_SCENE
+
+	if not target_scene.is_empty() and ResourceLoader.exists(target_scene):
+		var packed: PackedScene = SaveService.load_packed_scene(target_scene) if SaveService != null else ResourceLoader.load(target_scene) as PackedScene
+		if packed != null:
+			if CheckpointService != null and CheckpointService.has_active_checkpoint():
+				CheckpointService.queue_pending_restore()
+			MusicManager.play_gameplay_music()
+			var error := get_tree().change_scene_to_packed(packed)
+			if error == OK:
+				return
+
 	input_locked = false
 	btn_continue.disabled = true
 	_ui.modulate.a = 1.0
@@ -249,3 +290,76 @@ func _show_coming_soon_toast() -> void:
 
 	if toast != null:
 		toast.show_toast("Coming soon")
+
+
+func _setup_account_button() -> void:
+	if btn_account == null:
+		return
+
+	btn_account.pressed.connect(_on_account_pressed)
+
+	if FirebaseService != null:
+		FirebaseService.auth_state_changed.connect(func(_logged: bool) -> void:
+			_update_account_ui()
+			_refresh_continue_button_state()
+		)
+		FirebaseService.sync_started.connect(func() -> void:
+			_update_account_ui("SINCRONIZANDO...")
+		)
+		FirebaseService.sync_completed.connect(func(_ok: bool) -> void:
+			_update_account_ui()
+			_refresh_continue_button_state()
+		)
+		FirebaseService.auth_error.connect(func(msg: String) -> void:
+			var toast := get_node_or_null("/root/PickupToast")
+			if toast != null:
+				toast.show_toast(msg)
+			_update_account_ui()
+		)
+
+	_update_account_ui()
+
+
+func _has_save_data() -> bool:
+	return (SaveManager != null and SaveManager.has_save()) or (SaveService != null and SaveService.has_save())
+
+
+func _refresh_continue_button_state() -> void:
+	btn_continue.disabled = not _has_save_data()
+	_rebuild_focus_chain()
+
+
+func _update_account_ui(override_text: String = "") -> void:
+	if btn_account == null:
+		return
+
+	if not override_text.is_empty():
+		btn_account.text = override_text
+		return
+
+	if FirebaseService != null and FirebaseService.is_logged_in:
+		var display: String = FirebaseService.user_name
+		if display.is_empty():
+			display = FirebaseService.user_email
+		if display.is_empty():
+			display = "CONECTADO"
+		btn_account.text = "%s ☁" % display.to_upper()
+	else:
+		btn_account.text = "CONECTAR GOOGLE"
+
+
+func _on_account_pressed() -> void:
+	if input_locked:
+		return
+
+	if FirebaseService == null:
+		return
+
+	if FirebaseService.is_logged_in:
+		# Already logged in: trigger manual sync
+		FirebaseService.sync_with_cloud()
+		var toast := get_node_or_null("/root/PickupToast")
+		if toast != null:
+			toast.show_toast("Sincronizando con la nube...")
+	else:
+		FirebaseService.prompt_google_sign_in()

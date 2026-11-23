@@ -100,8 +100,12 @@ func restore_pending_player(player: Player) -> bool:
 
 
 func restore_pending_player_for_scene(player: Player, scene_path: String) -> bool:
-	if not _pending_restore or player == null or scene_path != _pending_scene_path:
+	if player == null:
 		return false
+	var matches_pending := _pending_restore and (scene_path == _pending_scene_path or _pending_scene_path.is_empty())
+	if not matches_pending and not has_checkpoint_for_scene(scene_path):
+		return false
+
 	_pending_restore = false
 	_pending_scene_path = ""
 	player.apply_checkpoint(_active_spawn_position)
@@ -159,7 +163,7 @@ func from_dict(data: Dictionary) -> void:
 			if checkpoint_id is String and not (checkpoint_id as String).is_empty():
 				_activated_ids[StringName(checkpoint_id)] = true
 	var active_id: Variant = data.get("active_id", "")
-	var scene_path: Variant = data.get("scene_path", "")
+	var scene_path: Variant = data.get("scene_path", data.get("active_scene_path", ""))
 	var spawn_x: Variant = data.get("spawn_x", 0.0)
 	var spawn_y: Variant = data.get("spawn_y", 0.0)
 	if active_id is String and not active_id.is_empty() and scene_path is String and not scene_path.is_empty() and _is_number(spawn_x) and _is_number(spawn_y):
