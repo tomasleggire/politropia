@@ -864,7 +864,7 @@ func open_eyes() -> void:
 
 func can_use_open_eyes() -> bool:
 	return (
-		AbilityProgress.is_unlocked(&"open_eyes")
+		_ability_unlocked(&"open_eyes")
 		and _soul >= open_eyes_soul_cost
 	)
 
@@ -1739,6 +1739,14 @@ func has_double_jump() -> bool:
 	return can_double_jump
 
 
+## True when the run has earned `ability`. The autoload is looked up at run time
+## because a test run with --script compiles this file before the project autoloads
+## exist, so naming the singleton here would stop every such test from compiling.
+func _ability_unlocked(ability: StringName) -> bool:
+	var progress := get_node_or_null("/root/AbilityProgress")
+	return progress != null and bool(progress.call(&"is_unlocked", ability))
+
+
 ## Abilities earned earlier in the run (AbilityProgress) come back with each new
 ## Player, so a change of zone never takes them away. No signal: nothing new unlocks.
 func _restore_saved_abilities() -> void:
@@ -2569,7 +2577,7 @@ func is_focus_available() -> bool:
 		and _health > 0
 		and _health < max_health
 		and _soul >= focus_cost
-		and AbilityProgress.is_unlocked(&"focus")
+		and _ability_unlocked(&"focus")
 	)
 
 
