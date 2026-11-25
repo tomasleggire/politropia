@@ -39,6 +39,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	_check_options(menu)
+	_check_account_ui(menu)
 	_check_navigation(menu)
 	_check_luz(menu)
 	await _check_new_game(menu)
@@ -61,6 +62,57 @@ func _check_options(menu: Node) -> void:
 	check(menu.btn_continue.disabled, "Continue disabled")
 	check(menu.btn_continue.focus_mode == Control.FOCUS_NONE, "Continue not focusable")
 	check(menu.btn_new_game.has_focus(), "NewGame focused on open")
+
+
+func _check_account_ui(menu: Node) -> void:
+	check(menu.account_avatar != null, "account_avatar exists")
+	check(not menu.account_avatar.visible, "account_avatar hidden when disconnected")
+	check(menu.btn_account.text == "CONECTAR GOOGLE", "account button shows CONECTAR GOOGLE when disconnected")
+	check(menu.btn_switch_account != null, "btn_switch_account exists")
+	check(not menu.btn_switch_account.visible, "btn_switch_account hidden when disconnected")
+
+	var firebase: Node = root.get_node_or_null("/root/FirebaseService")
+	if firebase == null:
+		return
+
+	var prev_logged: bool = firebase.is_logged_in
+	var prev_name: String = firebase.user_name
+	var prev_email: String = firebase.user_email
+	var prev_photo: String = firebase.user_photo_url
+
+	# Simulate connected Google user with full name (first name + surname)
+	firebase.is_logged_in = true
+	firebase.user_name = "Juan Zurita"
+	firebase.user_email = "juan.zurita@example.com"
+	menu._update_account_ui()
+
+	check(menu.account_avatar.visible, "account_avatar visible when connected")
+	check(menu.account_avatar.texture != null, "account_avatar has texture when connected")
+	check(menu.btn_account.text == "JUAN", "account button shows only first name (excluding surname)")
+	check(menu.btn_switch_account.visible, "btn_switch_account visible when connected")
+	check(menu.btn_switch_account.text == "CAMBIAR USUARIO", "btn_switch_account text is CAMBIAR USUARIO")
+
+	# Simulate connected Google user with single name
+	firebase.user_name = "Lucas"
+	firebase.user_email = "lucas@example.com"
+	menu._update_account_ui()
+	check(menu.btn_account.text == "LUCAS", "account button shows single name correctly")
+
+	# Simulate connected Google user with only email (no display name)
+	firebase.user_name = ""
+	firebase.user_email = "maria@example.com"
+	menu._update_account_ui()
+	check(menu.btn_account.text == "MARIA", "account button shows username from email without domain or cloud icon")
+
+	# Restore disconnected state
+	firebase.is_logged_in = prev_logged
+	firebase.user_name = prev_name
+	firebase.user_email = prev_email
+	firebase.user_photo_url = prev_photo
+	menu._update_account_ui()
+	check(not menu.account_avatar.visible, "account_avatar hidden after restore")
+	check(not menu.btn_switch_account.visible, "btn_switch_account hidden after restore")
+	check(menu.btn_account.text == "CONECTAR GOOGLE", "account button restored to CONECTAR GOOGLE")
 
 
 func _check_navigation(menu: Node) -> void:

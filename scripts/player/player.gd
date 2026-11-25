@@ -863,8 +863,10 @@ func open_eyes() -> void:
 	open_eyes_activated.emit()
 
 func can_use_open_eyes() -> bool:
+	var progress := get_node_or_null("/root/AbilityProgress")
 	return (
-		AbilityProgress.is_unlocked(&"open_eyes")
+		progress != null
+		and progress.is_unlocked(&"open_eyes")
 		and _soul >= open_eyes_soul_cost
 	)
 
@@ -2564,12 +2566,14 @@ func _set_soul(value: int) -> void:
 ## True when a focus heal would be worth starting: enough soul and a missing
 ## pip. The touch Focus button follows this.
 func is_focus_available() -> bool:
+	var progress := get_node_or_null("/root/AbilityProgress")
 	return (
 		not _dead
 		and _health > 0
 		and _health < max_health
 		and _soul >= focus_cost
-		and AbilityProgress.is_unlocked(&"focus")
+		and progress != null
+		and progress.is_unlocked(&"focus")
 	)
 
 
