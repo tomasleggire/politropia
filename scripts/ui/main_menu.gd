@@ -3,6 +3,7 @@ extends Control
 const GAME_SCENE := "res://scenes/levels/library/zone_1.tscn"
 const INTRO_SCENE := "res://scenes/ui/new_game_intro.tscn"
 const GALLERY_SCENE := "res://scenes/ui/collectibles_gallery.tscn"
+const AVATAR_CACHE_PATH := "user://profile_avatar.png"
 
 @export_group("Opening")
 @export var fade_in_time := 0.8
@@ -25,12 +26,16 @@ var scene_changer := Callable()
 var input_locked := false
 
 var _buttons: Array[Button] = []
+var _avatar_http: HTTPRequest = null
+var _last_avatar_url: String = ""
 
 @onready var btn_new_game: Button = %NewGame
 @onready var btn_continue: Button = %Continue
 @onready var btn_collectables: Button = %Collectables
 @onready var btn_achievements: Button = %Achievements
 @onready var btn_account: Button = %BtnAccount
+@onready var btn_switch_account: Button = %BtnSwitchAccount
+@onready var account_avatar: TextureRect = %AccountAvatar
 @onready var _stage: MainMenuStage = %Stage
 @onready var _ui: Control = %Ui
 @onready var _logo: Control = %Logo
@@ -297,6 +302,10 @@ func _setup_account_button() -> void:
 		return
 
 	btn_account.pressed.connect(_on_account_pressed)
+	if btn_switch_account != null and not btn_switch_account.pressed.is_connected(_on_switch_account_pressed):
+		btn_switch_account.pressed.connect(_on_switch_account_pressed)
+	if account_avatar != null and not account_avatar.gui_input.is_connected(_on_avatar_gui_input):
+		account_avatar.gui_input.connect(_on_avatar_gui_input)
 
 	if FirebaseService != null:
 		FirebaseService.auth_state_changed.connect(func(_logged: bool) -> void:
@@ -320,6 +329,11 @@ func _setup_account_button() -> void:
 	_update_account_ui()
 
 
+func _on_avatar_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_on_account_pressed()
+
+
 func _has_save_data() -> bool:
 	return (SaveManager != null and SaveManager.has_save()) or (SaveService != null and SaveService.has_save())
 
@@ -335,17 +349,158 @@ func _update_account_ui(override_text: String = "") -> void:
 
 	if not override_text.is_empty():
 		btn_account.text = override_text
+		if account_avatar != null and FirebaseService != null and FirebaseService.is_logged_in:
+			account_avatar.visible = true
+		if btn_switch_account != null:
+			btn_switch_account.visible = false
 		return
 
 	if FirebaseService != null and FirebaseService.is_logged_in:
-		var display: String = FirebaseService.user_name
+		if account_avatar != null:
+			account_avatar.visible = true
+			_update_avatar_display()
+		if btn_switch_account != null:
+			btn_switch_account.visible = true
+
+		var display: String = ""
+		var full_name: String = FirebaseService.user_name.strip_edges()
+		if not full_name.is_empty():
+			var parts := full_name.split(" ", false)
+			if not parts.is_empty():
+				display = parts[0]
+		elif not FirebaseService.user_email.is_empty():
+			var local_part := FirebaseService.user_email.split("@")[0].strip_edges()
+			var parts := local_part.split(".", false)
+			display = parts[0] if not parts.is_empty() else local_part
+
 		if display.is_empty():
-			display = FirebaseService.user_email
-		if display.is_empty():
-			display = "CONECTADO"
-		btn_account.text = "%s ☁" % display.to_upper()
+			display = "USUARIO"
+		btn_account.text = display.to_upper()
 	else:
+		if account_avatar != null:
+			account_avatar.visible = false
+			account_avatar.texture = null
+		_last_avatar_url = ""
+		if btn_switch_account != null:
+			btn_switch_account.visible = false
 		btn_account.text = "CONECTAR GOOGLE"
+
+
+func _update_avatar_display() -> void:
+	if account_avatar == null:
+		return
+
+	if account_avatar.texture == null:
+		if FileAccess.file_exists(AVATAR_CACHE_PATH):
+			var cached_img := Image.load_from_file(AVATAR_CACHE_PATH)
+			if cached_img != null and not cached_img.is_empty():
+				account_avatar.texture = ImageTexture.create_from_image(cached_img)
+		if account_avatar.texture == null:
+			account_avatar.texture = _create_default_avatar()
+
+	var photo_url: String = FirebaseService.user_photo_url if FirebaseService != null else ""
+	if not photo_url.is_empty() and photo_url != _last_avatar_url:
+		_last_avatar_url = photo_url
+		_fetch_avatar(photo_url)
+
+
+func _fetch_avatar(url: String) -> void:
+	if _avatar_http == null:
+		_avatar_http = HTTPRequest.new()
+		add_child(_avatar_http)
+		_avatar_http.request_completed.connect(_on_avatar_request_completed)
+	else:
+		_avatar_http.cancel_request()
+
+	_avatar_http.request(url)
+
+
+func _on_avatar_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200 or body.is_empty():
+		return
+
+	var img := Image.new()
+	var err := FAILED
+	if body.size() >= 4 and body[0] == 0x89 and body[1] == 0x50 and body[2] == 0x4E and body[3] == 0x47:
+		err = img.load_png_from_buffer(body)
+	elif body.size() >= 3 and body[0] == 0xFF and body[1] == 0xD8 and body[2] == 0xFF:
+		err = img.load_jpg_from_buffer(body)
+	elif body.size() >= 4 and body[0] == 0x52 and body[1] == 0x49 and body[2] == 0x46 and body[3] == 0x46:
+		err = img.load_webp_from_buffer(body)
+	else:
+		err = img.load_png_from_buffer(body)
+		if err != OK:
+			err = img.load_jpg_from_buffer(body)
+		if err != OK:
+			err = img.load_webp_from_buffer(body)
+
+	if err == OK:
+		var circular := _make_circular_avatar(img, 48)
+		circular.save_png(AVATAR_CACHE_PATH)
+		if account_avatar != null and is_instance_valid(account_avatar):
+			account_avatar.texture = ImageTexture.create_from_image(circular)
+
+
+static func _make_circular_avatar(source: Image, target_size: int = 48) -> Image:
+	var img := Image.create(target_size, target_size, false, Image.FORMAT_RGBA8)
+	var sw := source.get_width()
+	var sh := source.get_height()
+	var side := mini(sw, sh)
+	var src_x := (sw - side) / 2
+	var src_y := (sh - side) / 2
+
+	var cropped := source.get_region(Rect2i(src_x, src_y, side, side))
+	cropped.resize(target_size, target_size, Image.INTERPOLATE_BILINEAR)
+
+	var center := (float(target_size) - 1.0) * 0.5
+	var radius := float(target_size) * 0.48
+	var border_width := 1.5
+	var border_col := Color(0.85, 0.75, 0.5, 0.9)
+
+	for y in target_size:
+		for x in target_size:
+			var dist := Vector2(x, y).distance_to(Vector2(center, center))
+			if dist <= radius:
+				var c := cropped.get_pixel(x, y)
+				if dist > radius - border_width:
+					var blend := (dist - (radius - border_width)) / border_width
+					img.set_pixel(x, y, c.lerp(border_col, blend * 0.75))
+				else:
+					img.set_pixel(x, y, c)
+			else:
+				img.set_pixel(x, y, Color(0, 0, 0, 0))
+	return img
+
+
+static func _create_default_avatar(target_size: int = 48) -> ImageTexture:
+	var img := Image.create(target_size, target_size, false, Image.FORMAT_RGBA8)
+	var center := (float(target_size) - 1.0) * 0.5
+	var radius := float(target_size) * 0.48
+	var head_center := Vector2(center, float(target_size) * 0.38)
+	var head_radius := float(target_size) * 0.17
+	var body_center := Vector2(center, float(target_size) * 0.82)
+	var body_radius := float(target_size) * 0.32
+
+	var col_bg := Color(0.13, 0.12, 0.17, 0.95)
+	var col_border := Color(0.85, 0.75, 0.5, 0.9)
+	var col_figure := Color(0.85, 0.8, 0.7, 0.9)
+
+	for y in target_size:
+		for x in target_size:
+			var p := Vector2(x, y)
+			var dist := p.distance_to(Vector2(center, center))
+			if dist > radius:
+				img.set_pixel(x, y, Color(0, 0, 0, 0))
+			elif dist > radius - 1.5:
+				img.set_pixel(x, y, col_border)
+			else:
+				var in_head := p.distance_to(head_center) <= head_radius
+				var in_body := p.distance_to(body_center) <= body_radius and p.y >= head_center.y + head_radius * 0.6
+				if in_head or in_body:
+					img.set_pixel(x, y, col_figure)
+				else:
+					img.set_pixel(x, y, col_bg)
+	return ImageTexture.create_from_image(img)
 
 
 func _on_account_pressed() -> void:
@@ -363,3 +518,12 @@ func _on_account_pressed() -> void:
 			toast.show_toast("Sincronizando con la nube...")
 	else:
 		FirebaseService.prompt_google_sign_in()
+
+
+func _on_switch_account_pressed() -> void:
+	if input_locked:
+		return
+	if FirebaseService == null:
+		return
+	_update_account_ui("CAMBIANDO...")
+	FirebaseService.switch_google_account()
