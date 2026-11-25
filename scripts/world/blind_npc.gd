@@ -156,10 +156,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func request_interact() -> bool:
-	if _player_in_range and not _is_talking:
-		_start_dialogue()
-		return true
-	return false
+	if not _player_in_range:
+		return false
+		
+	if _is_talking:
+		if speech_bubble and speech_bubble.visible:
+			speech_bubble.advance_dialogue()
+			return true
+	_start_dialogue()
+	return true
 
 
 func _refresh_touch_interact() -> void:
@@ -177,7 +182,7 @@ func _refresh_touch_interact() -> void:
 
 	# Botón de interacción para mobile.
 	if touch != null and touch.has_method(&"set_interact_available"):
-		touch.set_interact_available(self, available)
+		touch.set_interact_available(self, _player_in_range)
 
 
 func _start_dialogue() -> void:

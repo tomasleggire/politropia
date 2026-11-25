@@ -58,7 +58,7 @@ func is_reward_granted() -> bool:
 
 ## Forgets everything (tests, new game).
 func clear() -> void:
-	if not _accepted and not _completed and not _reward_granted:
+	if not _accepted and not _completed and not _reward_granted and not _required_book_collected:
 		return
 	_accepted = false
 	_completed = false
@@ -93,8 +93,8 @@ func from_dict(data: Dictionary) -> void:
 func collect_required_book() -> void:
 	if _required_book_collected:
 		return
-		_required_book_collected = true
-		changed.emit()
+	_required_book_collected = true
+	changed.emit()
 
 
 func has_required_book() -> bool:

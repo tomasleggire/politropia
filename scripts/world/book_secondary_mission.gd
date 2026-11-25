@@ -13,5 +13,6 @@ func _on_body_entered(body: Node2D) -> void:
 	if progress == null:
 		push_warning("No se encontró BlindQuestProgress")
 		return
-		progress.call("collect_required_book")
-		queue_free()
+		
+	progress.call("collect_required_book")
+	queue_free()

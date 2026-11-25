@@ -19,7 +19,7 @@ func _ready() -> void:
 	interaction_area.body_entered.connect(_on_body_entered)
 	interaction_area.body_exited.connect(_on_body_exited)
 
-	speech_bubble.finished.connect(_on_dialogue_finished)
+#	speech_bubble.finished.connect(_on_dialogue_finished)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"interact") and request_interact():

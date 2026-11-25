@@ -60,6 +60,9 @@ func _advance_dialogue() -> void:
 		else:
 			_finish()
 
+func advance_dialogue() -> void:
+	_advance_dialogue()
+
 func _show_line() -> void:
 	_is_typing = true
 	label.text = _lines[_current_line]
