@@ -237,12 +237,12 @@ func case_contact_damages_once() -> void:
 	_player.health_changed.connect(func(_current: int, _maximum: int) -> void: _health_events += 1)
 	await _spawn_walker(&"w1", Vector2.ZERO, 1, 0.0)
 	await _secs(0.8)
-	check(_player.get_health() == 2, "touching the walker costs one pip (%d)" % _player.get_health())
+	check(_player.get_health() == _player.max_health - 1, "touching the walker costs one pip (%d)" % _player.get_health())
 	check(_health_events == 1, "and fires health_changed once (%d)" % _health_events)
 	_player.global_position = Vector2.ZERO
 	_player.velocity = Vector2.ZERO
 	await _secs(IFRAMES_OVER)
-	check(_player.get_health() <= 1, "contact hurts again after the i-frames (%d)" % _player.get_health())
+	check(_player.get_health() <= _player.max_health - 2, "contact hurts again after the i-frames (%d)" % _player.get_health())
 
 
 func case_two_hits_kill() -> void:
@@ -261,7 +261,7 @@ func case_two_hits_kill() -> void:
 	check(is_instance_valid(_walker) and _walker.is_inside_tree(), "the corpse stays in the world")
 	_player.global_position = _walker.global_position
 	await _secs(0.4)
-	check(_player.get_health() == 3, "Luz walks through the corpse unharmed (%d)" % _player.get_health())
+	check(_player.get_health() == _player.max_health, "Luz walks through the corpse unharmed (%d)" % _player.get_health())
 	check(_walker.global_position.distance_to(died_at) < 3.0, "it lies where it died (%s)" % _walker.global_position)
 	check(not _walker.receive_hit(1, Vector2.ZERO), "a corpse cannot be hit again")
 
@@ -369,9 +369,9 @@ func case_rule_3_death_revives() -> void:
 	await _build_rig()
 	await _spawn_walker(&"w1", Vector2(300.0, 0.0))
 	_walker.receive_hit(2, Vector2.ZERO)
-	for i: int in 3:
+	for i: int in _player.max_health:
 		_player.take_damage(1, Vector2(-100.0, -30.0))
-		if i < 2:
+		if i < _player.max_health - 1:
 			await _secs(IFRAMES_OVER)
 	await _frames(3)
 	check(_walker.is_dead(), "the corpse stays during the death fade, so nothing visibly resets early")

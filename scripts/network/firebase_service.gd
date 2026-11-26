@@ -25,6 +25,7 @@ var is_logged_in := false
 var user_id := ""
 var user_email := ""
 var user_name := ""
+var user_photo_url := ""
 var _id_token := ""
 var _refresh_token := ""
 var _token_expires_at := 0
@@ -63,6 +64,19 @@ func _on_google_plugin_failed(error_message: String) -> void:
 func prompt_google_sign_in() -> void:
 	if _google_plugin != null:
 		_google_plugin.call("signIn", web_client_id)
+	else:
+		push_warning("FirebaseService: GoogleSignIn native plugin not found (Android only). Conectando con cuenta Firebase en modo invitado...")
+		sign_in_anonymously()
+
+
+## Clears cached credentials and prompts the Google account selector.
+func switch_google_account() -> void:
+	_clear_cached_session()
+	const AVATAR_CACHE := "user://avatar_cache.png"
+	if FileAccess.file_exists(AVATAR_CACHE):
+		DirAccess.remove_absolute(AVATAR_CACHE)
+	if _google_plugin != null:
+		_google_plugin.call("switchAccount", web_client_id)
 	else:
 		push_warning("FirebaseService: GoogleSignIn native plugin not found (Android only). Conectando con cuenta Firebase en modo invitado...")
 		sign_in_anonymously()
@@ -122,6 +136,7 @@ func _restore_cached_session() -> void:
 	user_id = str(data.get("user_id", ""))
 	user_email = str(data.get("user_email", ""))
 	user_name = str(data.get("user_name", ""))
+	user_photo_url = str(data.get("user_photo_url", ""))
 	_id_token = str(data.get("id_token", ""))
 	_token_expires_at = int(data.get("expires_at", 0))
 
@@ -145,6 +160,7 @@ func _save_cached_session() -> void:
 		"user_id": user_id,
 		"user_email": user_email,
 		"user_name": user_name,
+		"user_photo_url": user_photo_url,
 		"id_token": _id_token,
 		"refresh_token": _refresh_token,
 		"expires_at": _token_expires_at
@@ -160,6 +176,7 @@ func _clear_cached_session() -> void:
 	user_id = ""
 	user_email = ""
 	user_name = ""
+	user_photo_url = ""
 	_id_token = ""
 	_refresh_token = ""
 	_token_expires_at = 0
@@ -428,6 +445,7 @@ func _process_auth_response_body(body: PackedByteArray, default_email: String = 
 	user_id = str(data.get("localId", ""))
 	user_email = str(data.get("email", default_email))
 	user_name = str(data.get("displayName", default_name))
+	user_photo_url = str(data.get("photoUrl", ""))
 	var expires_in: int = int(data.get("expiresIn", "3600"))
 	_token_expires_at = int(Time.get_unix_time_from_system()) + expires_in
 
