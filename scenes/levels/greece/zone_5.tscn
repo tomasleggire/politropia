@@ -27,7 +27,7 @@
 [ext_resource type="Resource" path="res://data/ambience/greece.tres" id="amb_style"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
 [ext_resource type="PackedScene" path="res://scenes/world/parallax_backdrop.tscn" id="par_back"]
-[ext_resource type="Resource" uid="uid://cnyabltaqgayo" path="res://data/parallax/greece.tres" id="par_style"]
+[ext_resource type="Resource" path="res://data/parallax/greece.tres" id="par_style"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_kgimf"]
 texture = ExtResource("6_w5tkt")
@@ -15201,7 +15201,7 @@ target_door_id = 26
 
 [node name="SceneTransitionArea3" parent="." unique_id=2095772123 instance=ExtResource("3_njreu")]
 position = Vector2(1721, 640)
-target_scene_path = "uid://d0frrlyw800j7"
+target_scene_path = "res://scenes/levels/greece/zone_artemis.tscn"
 door_id = 29
 target_door_id = 30
 
