@@ -14195,12 +14195,18 @@ target_door_id = 2
 
 [node name="DemoShortcutToArtemis" parent="." unique_id=1348843079 instance=ExtResource("10_n3h83")]
 position = Vector2(-22, 620)
-target_scene_path = "res://scenes/levels/greece/zone_artemis.tscn"
+target_scene_path = "res://scenes/levels/test/boss_test_hub.tscn"
 door_id = 31
-target_door_id = 30
+target_door_id = 35
 
 [node name="DemoShortcutCandle" parent="." unique_id=244982327 instance=ExtResource("amb_candle")]
 position = Vector2(-12, 697)
+
+[node name="DemoShortcutBossHubSign" parent="." instance=ExtResource("20_tutsign")]
+position = Vector2(30, 697)
+title = "Sala de jefes"
+text = "Demo: la puerta de la izquierda lleva a la sala de pruebas de los jefes."
+trigger_size = Vector2(40, 90)
 
 [node name="SignMove" parent="." unique_id=1447290022 instance=ExtResource("20_tutsign")]
 position = Vector2(160, 697)

@@ -439,6 +439,7 @@ var _interrupt_left := 0.0
 ## The contract clip last requested through `_play` (not the fallback it resolved to).
 var _clip: StringName = &""
 var _moonlit := false
+var _sprite_fx: BossSpriteFx
 ## Pooled arrow-impact bursts (see `_setup_impact`) and the next one to reuse.
 var _impacts: Array[AnimatedSprite2D] = []
 var _impact_next := 0
@@ -811,10 +812,38 @@ func _setup_sprite() -> void:
 	if _sprite == null:
 		return
 	_sprite.sprite_frames = ArtemisAnimationCatalog.build_sprite_frames()
+	_bind_sprite_fx()
 	_setup_vfx()
 	_setup_impact()
 	_clip = &""
 	_sync_sprite()
+
+
+## With art, the hit flash and the telegraph glow are drawn by the skin shader on the sprite
+## itself, so they follow her exact silhouette; the polygon overlays stay hidden.
+func _bind_sprite_fx() -> void:
+	if _sprite.sprite_frames == null or _sprite.sprite_frames.get_animation_names().is_empty():
+		return
+	_sprite_fx = BossSpriteFx.new(_sprite, MOONLIT_SHADER)
+	_sprite_fx.set_parameter(&"moonlit", 1.0 if _moonlit else 0.0)
+	if _flash != null:
+		_flash.visible = false
+	_telegraph.bind_sprite_fx(_sprite_fx)
+
+
+## With art the flash is the sprite's own; without it, the white polygon as always.
+func _set_flash_visible(visible_now: bool) -> void:
+	if _sprite_fx != null:
+		_sprite_fx.set_flash(visible_now)
+		return
+	super._set_flash_visible(visible_now)
+
+
+## True while the hit flash shows, on the sprite or on the placeholder.
+func is_flash_visible() -> bool:
+	if _sprite_fx != null:
+		return _sprite_fx.is_flashing()
+	return _flash != null and _flash.visible
 
 
 ## The single hook between logic and art: show the contract clip `clip`, or the
@@ -920,6 +949,9 @@ func _show_vfx(art: AnimatedSprite2D, clip: StringName, on: bool, duration := 0.
 func _set_skin(phase: int) -> void:
 	_moonlit = phase == PHASE_TWO
 	if _sprite == null:
+		return
+	if _sprite_fx != null:
+		_sprite_fx.set_parameter(&"moonlit", 1.0 if _moonlit else 0.0)
 		return
 	if not _moonlit:
 		_sprite.material = null
