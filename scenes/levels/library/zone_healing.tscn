@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://xipvhi7nu2g" path="res://scenes/world/secret_chest.tscn" id="9_k66w0"]
 [ext_resource type="Script" uid="uid://bjyg8d4fea6jh" path="res://scripts/camera/camara_region.gd" id="9_vw8bd"]
 [ext_resource type="PackedScene" uid="uid://t5snr0d4egcd" path="res://scenes/world/book_secondary_mission.tscn" id="10_simqr"]
+[ext_resource type="PackedScene" path="res://scenes/world/energy_food.tscn" id="13_btdr3"]
 [ext_resource type="PackedScene" path="res://scenes/world/dust_motes.tscn" id="amb_dust"]
 [ext_resource type="PackedScene" path="res://scenes/world/ambient_light.tscn" id="amb_light"]
 [ext_resource type="PackedScene" path="res://scenes/world/zone_ambience.tscn" id="amb_zone"]
@@ -14166,6 +14167,9 @@ reward_offset = Vector2(100, 25)
 [node name="StillnessDesk" parent="." unique_id=333200608 instance=ExtResource("7_j4ml1")]
 position = Vector2(449, 739)
 checkpoint_id = &"library_desk_a"
+
+[node name="ChegusanMilanesa" parent="." unique_id=132926591 instance=ExtResource("13_btdr3")]
+position = Vector2(681, 726)
 
 [node name="Player2" parent="." unique_id=1611018514 instance=ExtResource("6_d85p6")]
 position = Vector2(1041, 733)
