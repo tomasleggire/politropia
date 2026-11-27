@@ -866,7 +866,7 @@ func can_use_open_eyes() -> bool:
 	var progress := get_node_or_null("/root/AbilityProgress")
 	return (
 		_ability_unlocked(&"open_eyes")
-		progress != null
+		and progress != null
 		and progress.is_unlocked(&"open_eyes")
 		and _soul >= open_eyes_soul_cost
 	)
