@@ -1,0 +1,595 @@
+"""Shared helpers to turn raw Codex boss sheets into game sprite sheets.
+
+Raw sheets are drawn on a magenta background in a regular grid. The helpers here
+key the magenta, split the figures (connected components assigned to the grid cell
+they mostly fall in), rescale every frame with ONE scale for the whole set, put the
+lowest sole on a shared feet row, anchor the feet on the cell centre, and write the
+sheet PNG plus the manifest entry that `BossAnimationCatalog` (and the older
+`ArtemisAnimationCatalog`) read.
+
+It is used by tools/process_artemis_sheets.py, tools/process_boombox_teacher_sheets.py and
+tools/process_blind_beast_sheets.py, and is meant for La Hidra later. Nothing in here knows a boss by name.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import numpy as np
+from PIL import Image, ImageDraw
+from scipy import ndimage
+
+# Luz is drawn so 331.5 source px become 48 px on screen: 0.1448 per source pixel at
+# a 512 px reference cell. A boss sheet with a smaller cell scales the sprite node up.
+LUZ_SPRITE_SCALE = 0.1448
+LUZ_REFERENCE_CELL = 512.0
+LUZ_HEIGHT = 48.0
+ARTEMIS_HEIGHT = 56.0
+MIN_COMPONENT_PX = 40
+COLUMNS = 4
+
+
+def sprite_scale_for(out_cell: int) -> float:
+    """Sprite node scale that gives a processed cell Luz's on-screen pixel size."""
+    return LUZ_SPRITE_SCALE * LUZ_REFERENCE_CELL / out_cell
+
+
+def key_magenta(raw: Image.Image, low: int = 30, high: int = 100) -> np.ndarray:
+    """Return float RGBA (0..255 alpha) with the magenta background keyed out.
+
+    A pixel whose magenta excess (min(r, b) - g) is at most `low` is opaque, above `high`
+    transparent, and in between partly transparent. A sheet whose art encloses pockets of
+    a pinker background tone can lower `high` (the defaults are the shipped behaviour)."""
+    arr = np.asarray(raw.convert("RGB")).astype(np.int32)
+    r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
+    m = np.minimum(r, b) - g
+    alpha = np.clip((high - m) / float(high - low), 0.0, 1.0)
+    alpha[m <= low] = 1.0
+    alpha[m > high] = 0.0
+    # remove the magenta tint from the partially transparent fringe
+    fringe = (m > low) & (m <= high)
+    out = arr.copy()
+    out[..., 0] = np.where(fringe, np.maximum(0, r - m), r)
+    out[..., 2] = np.where(fringe, np.maximum(0, b - m), b)
+    rgba = np.dstack([out, alpha * 255.0]).astype(np.float32)
+    return rgba
+
+
+MAGENTA = np.array([255.0, 0.0, 255.0], dtype=np.float32)
+FRINGE_PX = 3  # width of the antialiased silhouette edge, from the background outwards
+UNMIX_RESIDUAL = 70.0  # an edge pixel off the outline-magenta line by more than this is real art colour
+
+
+def unmix_fringe(rgb: np.ndarray, background: np.ndarray, outline: np.ndarray, fringe_px: int = FRINGE_PX, residual_limit: float = UNMIX_RESIDUAL) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Un-mix the antialiased silhouette edge from the magenta key.
+
+    A pixel within `fringe_px` of `background` (bool mask of the keyed-out pixels) is a blend of
+    the outline colour and magenta. Its share of magenta, projected on the outline-magenta line,
+    becomes transparency and its colour becomes the outline's again, so no pink halo is left.
+    A pixel farther than `residual_limit` (RGB distance) from that line is real art colour and is
+    left alone. Returns (alpha 0..1 of the un-mixed pixels, rgb with their colour replaced, the
+    mask of un-mixed pixels); the caller decides what alpha the other pixels keep."""
+    fringe = ndimage.binary_dilation(background, structure=np.ones((3, 3)), iterations=fringe_px) & ~background
+    axis = MAGENTA - outline
+    share = np.clip(((rgb - outline) @ axis) / float(axis @ axis), 0.0, 1.0)  # 1 = pure magenta
+    residual = np.linalg.norm(rgb - (outline + share[..., None] * axis), axis=-1)
+    unmixed = fringe & (residual < residual_limit)
+    out = rgb.copy()
+    out[unmixed & (share > 0.02)] = outline
+    return 1.0 - share, out, unmixed
+
+
+def estimate_outline(rgba: np.ndarray, band_px: int = 2) -> np.ndarray:
+    """Median RGB of the solid pixels in the `band_px` px band just inside the silhouette:
+    the outline colour of a figure drawn with a dark contour."""
+    solid = rgba[..., 3] > 250
+    inner = solid & ~ndimage.binary_erosion(solid, structure=np.ones((3, 3)), iterations=band_px)
+    if not inner.any():
+        raise ValueError("estimate_outline: the sheet has no solid pixel (alpha above 250), so its outline colour cannot be measured; check the keying of the raw sheet")
+    return np.median(rgba[..., :3][inner], axis=0).astype(np.float32)
+
+
+def despill_edges(raw: Image.Image, keyed: np.ndarray, outline: np.ndarray | None = None) -> np.ndarray:
+    """`keyed` (the output of `key_magenta` for `raw`) with the silhouette edge un-mixed from
+    the magenta (`unmix_fringe`), against `outline` (default: measured with `estimate_outline`).
+    Only the pixels within FRINGE_PX of the keyed-out background change. Opt-in."""
+    rgb = np.asarray(raw.convert("RGB")).astype(np.float32)
+    outline = estimate_outline(keyed) if outline is None else outline
+    alpha, colour, unmixed = unmix_fringe(rgb, keyed[..., 3] <= 0.0, outline)
+    out = keyed.copy()
+    out[..., :3] = np.where(unmixed[..., None], colour, out[..., :3])
+    out[..., 3] = np.where(unmixed, np.minimum(out[..., 3], alpha * 255.0), out[..., 3])
+    return out
+
+
+def split_frames(rgba: np.ndarray, cols: int, rows: int, name: str, needed: set[int] | None = None) -> list[np.ndarray | None]:
+    """One cropped RGBA frame per grid cell (None for a cell outside `needed`)."""
+    height, width = rgba.shape[:2]
+    cell_w, cell_h = width / cols, height / rows
+    mask = rgba[..., 3] > 20
+    labels, count = ndimage.label(mask, structure=np.ones((3, 3)))
+    owner: dict[int, int] = {}
+    sizes = ndimage.sum(mask, labels, range(1, count + 1))
+    centers = ndimage.center_of_mass(mask, labels, range(1, count + 1))
+    for index in range(count):
+        if sizes[index] < MIN_COMPONENT_PX:
+            continue
+        cy, cx = centers[index]
+        owner[index + 1] = int(min(cy // cell_h, rows - 1)) * cols + int(min(cx // cell_w, cols - 1))
+    frames = []
+    for cell in range(cols * rows):
+        keep = [label for label, c in owner.items() if c == cell]
+        if not keep:
+            if needed is not None and cell not in needed:
+                frames.append(None)
+                continue
+            raise ValueError(f"{name}: cell {cell} has no art")
+        sel = np.isin(labels, keep)
+        ys, xs = np.where(sel)
+        crop = rgba[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1].copy()
+        crop[..., 3] = np.where(sel[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1], crop[..., 3], 0)
+        frames.append(crop)
+    return frames
+
+
+def split_cells(rgba: np.ndarray, cols: int, rows: int, name: str, min_px: int) -> list[np.ndarray]:
+    """Full raw cells (not cropped to the art) with stray specks removed, so frames
+    keep their position relative to each other (effects, dissolves, props)."""
+    height, width = rgba.shape[:2]
+    cell_w, cell_h = width // cols, height // rows
+    labels, count = ndimage.label(rgba[..., 3] > 20, structure=np.ones((3, 3)))
+    sizes = ndimage.sum(np.ones_like(labels), labels, range(1, count + 1))
+    centers = ndimage.center_of_mass(np.ones_like(labels), labels, range(1, count + 1))
+    owner: dict[int, int] = {}
+    for index in range(count):
+        if sizes[index] >= min_px:
+            cy, cx = centers[index]
+            owner[index + 1] = int(min(cy // cell_h, rows - 1)) * cols + int(min(cx // cell_w, cols - 1))
+    cells = []
+    for cell in range(cols * rows):
+        keep = [label for label, c in owner.items() if c == cell]
+        if not keep:
+            raise ValueError(f"{name}: cell {cell} has no art")
+        r, c = divmod(cell, cols)
+        block = rgba[r * cell_h : (r + 1) * cell_h, c * cell_w : (c + 1) * cell_w].copy()
+        sel = np.isin(labels, keep)[r * cell_h : (r + 1) * cell_h, c * cell_w : (c + 1) * cell_w]
+        block[..., 3] = np.where(sel, block[..., 3], 0)
+        cells.append(block)
+    return cells
+
+
+def alpha_box(frame: np.ndarray, threshold: float = 20.0) -> tuple[int, int, int, int] | None:
+    """(left, top, right, bottom) of the pixels above `threshold` alpha (right and bottom
+    exclusive), or None when the frame is empty."""
+    ys, xs = np.where(frame[..., 3] > threshold)
+    if len(xs) == 0:
+        return None
+    return int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
+
+
+def union_box(frames: list[np.ndarray]) -> tuple[int, int, int, int] | None:
+    """Smallest box that holds the art of every frame (None when all are empty)."""
+    boxes = [box for box in (alpha_box(f) for f in frames) if box is not None]
+    if not boxes:
+        return None
+    return min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes)
+
+
+def require_box(frames: list[np.ndarray], label: str) -> tuple[int, int, int, int]:
+    """`union_box`, but an error naming `label` (sheet and cells) when nothing is drawn."""
+    box = union_box(frames)
+    if box is None:
+        raise ValueError(f"{label}: no drawn pixels (the cells are empty after keying); check the raw sheet")
+    return box
+
+
+def standing_height(frame: np.ndarray) -> float:
+    """Height of the whole cropped frame (every pixel of art counts)."""
+    return float(frame.shape[0])
+
+
+def sole_bottom(frame: np.ndarray) -> int:
+    """Lowest row holding a solid run of art (ignores stray fringe pixels)."""
+    solid = (frame[..., 3] > 128).sum(axis=1)
+    rows = np.where(solid >= 6)[0]
+    return int(rows.max()) if len(rows) else frame.shape[0] - 1
+
+
+def solid_top(frame: np.ndarray, min_width_fraction: float) -> int:
+    """First row whose solid run is at least `min_width_fraction` of the widest row.
+
+    A thin antenna, hair wisp or spark above the head is narrower than that and is
+    skipped, so the result is the top of the massive part of the figure."""
+    solid = (frame[..., 3] > 128).sum(axis=1)
+    rows = np.where(solid >= max(6.0, solid.max() * min_width_fraction))[0]
+    return int(rows.min()) if len(rows) else 0
+
+
+def body_height(frame: np.ndarray, min_width_fraction: float) -> float:
+    """Sole row minus `solid_top` plus one: the standing height without thin extras."""
+    return float(sole_bottom(frame) - solid_top(frame, min_width_fraction) + 1)
+
+
+def feet_center_x(frame: np.ndarray, bottom: int) -> float:
+    band = max(6, int(frame.shape[0] * 0.12))
+    sub = frame[max(0, bottom - band) : bottom + 1, :, 3] > 128
+    xs = np.where(sub.any(axis=0))[0]
+    weights = sub.sum(axis=0).astype(np.float64)
+    return float((np.arange(len(weights)) * weights).sum() / max(weights.sum(), 1.0)) if len(xs) else frame.shape[1] / 2
+
+
+def body_mask_bottom(arr: np.ndarray) -> tuple[int, float]:
+    """Sole row and feet centre of the largest component (the body, not the sparkles)."""
+    labels, count = ndimage.label(arr[..., 3] > 128, structure=np.ones((3, 3)))
+    sizes = ndimage.sum(np.ones_like(labels), labels, range(1, count + 1))
+    body = labels == (int(np.argmax(sizes)) + 1)
+    solo = np.zeros_like(arr)
+    solo[..., 3] = np.where(body, 255.0, 0.0)
+    bottom = sole_bottom(solo)
+    return bottom, feet_center_x(solo, bottom)
+
+
+def scale_rgba(frame: np.ndarray, scale: float) -> np.ndarray:
+    """Lanczos resize in premultiplied alpha (no dark or magenta fringes)."""
+    premult = frame.copy()
+    premult[..., :3] *= premult[..., 3:4] / 255.0
+    img = Image.fromarray(premult.astype(np.uint8), "RGBA")
+    img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
+    arr = np.asarray(img).astype(np.float32)
+    a = arr[..., 3:4]
+    arr[..., :3] = np.where(a > 0, np.minimum(arr[..., :3] * 255.0 / np.maximum(a, 1.0), 255.0), 0)
+    return arr.astype(np.uint8)
+
+
+def to_cell(
+    frame: np.ndarray,
+    scale: float,
+    label: str,
+    out_cell: int,
+    feet_row: int,
+    body_feet: bool = False,
+    cell_height: int | None = None,
+) -> Image.Image:
+    """Scale `frame`, put its lowest sole on `feet_row` and its feet centre on the
+    cell centre. `body_feet` measures the feet on the largest component only.
+
+    The cell is `out_cell` wide and `cell_height` tall (default square). A frame that does
+    not fit is nudged inside the cell, which moves its feet off the centre: give the cell
+    room instead (the log names the frame)."""
+    arr = scale_rgba(frame, scale)
+    h, w = arr.shape[:2]
+    if body_feet:
+        bottom, cx = body_mask_bottom(arr.astype(np.float32))
+    else:
+        bottom = sole_bottom(arr.astype(np.float32))
+        cx = feet_center_x(arr.astype(np.float32), bottom)
+    left = round(out_cell / 2 - cx)
+    top = feet_row - bottom
+    cell = Image.new("RGBA", (out_cell, cell_height or out_cell), (0, 0, 0, 0))
+    if left < 0 or top < 0 or left + w > out_cell:
+        # nudge to keep inside the cell rather than crop
+        left = min(max(left, 0), out_cell - w)
+        top = max(top, 0)
+        print(f"  note: {label} nudged to fit the cell ({w}x{h})")
+    cell.alpha_composite(Image.fromarray(arr, "RGBA"), (left, top))
+    return cell
+
+
+def place_fixed(frames: list[np.ndarray], scale: float, out_cell: int, anchor_of, anchor_dst: tuple[float, float], label: str, anchor_idx: int = 0, cell_height: int | None = None) -> list[Image.Image]:
+    """Scale full raw cells and paste them with ONE offset, chosen so the anchor of
+    frame `anchor_idx` lands on `anchor_dst`. Reports art that falls outside the cell
+    (`out_cell` wide, `cell_height` tall, default square)."""
+    ch = cell_height or out_cell
+    scaled = [scale_rgba(f, scale) for f in frames]
+    ax, ay = anchor_of(scaled[anchor_idx])
+    left, top = round(anchor_dst[0] - ax), round(anchor_dst[1] - ay)
+    out = []
+    for index, arr in enumerate(scaled):
+        full = Image.new("RGBA", (max(out_cell, arr.shape[1] + abs(left)) + out_cell, max(ch, arr.shape[0] + abs(top)) + ch), (0, 0, 0, 0))
+        full.alpha_composite(Image.fromarray(arr, "RGBA"), (left + out_cell, top + ch))
+        cell = full.crop((out_cell, ch, 2 * out_cell, 2 * ch))
+        lost = int((arr[..., 3] > 20).sum()) - int((np.asarray(cell)[..., 3] > 20).sum())
+        if lost > 30:
+            print(f"  note: {label}[{index}] loses {lost} px outside the cell")
+        out.append(cell)
+    return out
+
+
+def centered_cell(frame: np.ndarray, scale: float, out_cell: int, label: str, cell_height: int | None = None) -> Image.Image:
+    """A prop frame (not a figure): scaled and centred in the cell, no feet row. The cell
+    is `out_cell` wide and `cell_height` tall (default square)."""
+    arr = scale_rgba(frame, scale)
+    h, w = arr.shape[:2]
+    ch = cell_height or out_cell
+    if w > out_cell or h > ch:
+        raise ValueError(f"{label} is {w}x{h}, larger than its {out_cell}x{ch} px cell")
+    cell = Image.new("RGBA", (out_cell, ch), (0, 0, 0, 0))
+    cell.alpha_composite(Image.fromarray(arr, "RGBA"), ((out_cell - w) // 2, (ch - h) // 2))
+    return cell
+
+
+EFFECT_MARGIN_PX = 8  # empty border an effect keeps inside its cell, so filtering never clips it
+
+
+def effect_clip_sheet(cells: list[np.ndarray], clips: dict[str, list[int]], scale: float, cell_width: int, cell_height: int, label: str) -> tuple[Image.Image, dict[str, list[int]]]:
+    """A sheet of one-row effect clips from full raw `cells` (`split_cells`): every clip is
+    cropped with ONE box (its frames keep their place relative to each other, so a shared
+    ground line stays shared), scaled by `scale` and centred in a `cell_width` x `cell_height`
+    cell. Returns the sheet (one row, unused raw cells dropped) and the clips re-indexed to
+    it. An effect that leaves less than EFFECT_MARGIN_PX of empty border stops with an error."""
+    placed: dict[int, Image.Image] = {}
+    for clip, indices in clips.items():
+        left, top, right, bottom = require_box([cells[i] for i in indices], f"{label} clip '{clip}' (cells {indices})")
+        for i in indices:
+            cell = centered_cell(cells[i][top:bottom, left:right], scale, cell_width, f"{label}[{i}]", cell_height)
+            box = cell.getchannel("A").point(lambda a: 255 if a > 20 else 0).getbbox()
+            if box is not None and min(box[0], box[1], cell_width - box[2], cell_height - box[3]) < EFFECT_MARGIN_PX:
+                raise ValueError(f"{label}[{i}] leaves under {EFFECT_MARGIN_PX} px of margin in its {cell_width}x{cell_height} cell; lower the scale or enlarge the cell")
+            placed[i] = cell
+    used, compact = compact_clips(clips)
+    return assemble_sheet([placed[i] for i in used], cell_width, columns=len(used), cell_height=cell_height), compact
+
+
+def assemble_sheet(cells: list[Image.Image], out_cell: int, columns: int = COLUMNS, cell_height: int | None = None) -> Image.Image:
+    """Lay the cells out left to right, top to bottom on one transparent sheet
+    (`out_cell` wide, `cell_height` tall, default square)."""
+    ch = cell_height or out_cell
+    rows = (len(cells) + columns - 1) // columns
+    sheet = Image.new("RGBA", (columns * out_cell, rows * ch), (0, 0, 0, 0))
+    for index, cell in enumerate(cells):
+        sheet.alpha_composite(cell, ((index % columns) * out_cell, (index // columns) * ch))
+    return sheet
+
+
+def compact_clips(clips: dict[str, list[int]]) -> tuple[list[int], dict[str, list[int]]]:
+    """Raw cell indices actually used (sorted) and the clips re-indexed to the
+    compacted sheet, so unused raw cells never take space in the game sheet."""
+    used = sorted({i for idx in clips.values() for i in idx})
+    remap = {src: dst for dst, src in enumerate(used)}
+    return used, {clip: [remap[i] for i in idx] for clip, idx in clips.items()}
+
+
+def clip_contents(image: Image.Image, cell: int, clips: dict[str, list[int]], cell_height: int | None = None) -> dict[str, list[int]]:
+    """Per clip, the [width, height] in sheet px of the box that holds its art in every frame
+    of a sheet laid out by `assemble_sheet` (clips with no drawn pixel are left out)."""
+    sheet = np.asarray(image).astype(np.float32)
+    columns = image.width // cell
+    ch = cell_height or cell
+    contents = {}
+    for clip, indices in clips.items():
+        frames = []
+        for i in indices:
+            row, col = divmod(i, columns)
+            frames.append(sheet[row * ch : (row + 1) * ch, col * cell : (col + 1) * cell])
+        box = union_box(frames)
+        if box is not None:
+            contents[clip] = [box[2] - box[0], box[3] - box[1]]
+    return contents
+
+
+def manifest_entry(sheet: Image.Image, out_cell: int, clips: dict[str, list[int]], events: dict[str, int], cell_height: int | None = None) -> dict:
+    """The manifest block of one sheet: grid, clips (compacted indices) and events."""
+    ch = cell_height or out_cell
+    columns = sheet.width // out_cell
+    rows = sheet.height // ch
+    return {
+        "grid": {"columns": columns, "rows": rows, "cell_width": out_cell, "cell_height": ch},
+        "clips": clips,
+        "events": events,
+    }
+
+
+def write_manifest(path: Path, manifest: dict) -> None:
+    path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+
+def write_preview(sheet: Image.Image, path: Path, out_cell: int, feet_row: int, sprite_scale: float, reference_heights: dict[str, float], label: str = "") -> None:
+    """Sheet on a dark background with each cell's feet row and one reference line per
+    entry of `reference_heights` (label -> on-screen px: Luz 48, Artemis 56...), drawn
+    above the feet at that height divided by `sprite_scale`, so the scale can be judged."""
+    bg = Image.new("RGBA", sheet.size, (24, 32, 56, 255))
+    bg.alpha_composite(sheet)
+    draw = ImageDraw.Draw(bg)
+    colors = [(80, 220, 120, 255), (240, 200, 60, 255), (240, 90, 90, 255)]
+    for row in range(sheet.height // out_cell):
+        for col in range(sheet.width // out_cell):
+            x0, y0 = col * out_cell, row * out_cell
+            draw.rectangle([x0, y0, x0 + out_cell - 1, y0 + out_cell - 1], outline=(70, 80, 110, 255))
+            y_feet = y0 + feet_row
+            draw.line([x0, y_feet, x0 + out_cell, y_feet], fill=(255, 255, 255, 255))
+            for color, (label, px) in zip(colors, reference_heights.items()):
+                y_ref = y_feet - round(px / sprite_scale)
+                draw.line([x0, y_ref, x0 + out_cell // 4, y_ref], fill=color, width=2)
+                if col == 0 and row == 0:
+                    draw.text((x0 + out_cell // 4 + 4, y_ref - 5), f"{label} {px:.0f}px", fill=color)
+    if label:
+        draw.text((6, sheet.height - 14), label, fill=(255, 255, 255, 255))
+    bg.save(path)
+
+
+def block_size(frame: np.ndarray, max_saturation: float = 0.15, min_value: int = 50, max_value: int = 225, closing: int = 15, min_fraction: float = 0.25) -> float:
+    """sqrt(area) of the highest large grey block of a frame: a size reference that
+    exists in every pose (standing, crouched, lying), unlike the standing height.
+
+    Grey = low saturation and mid brightness (the boombox of El Profesor; shirt, trousers
+    and shoes are warm or near black). The mask is closed (bridges the dark outlines
+    between buttons and speakers), holes are filled, thin links (gloves, antenna) are
+    cut by an opening, and among the components of at least `min_fraction` of the
+    largest one the topmost is the block. sqrt(area) barely changes when it tilts."""
+    rgb = frame[..., :3]
+    solid = frame[..., 3] > 128
+    top, low = rgb.max(-1), rgb.min(-1)
+    saturation = (top - low) / np.maximum(top, 1)
+    grey = solid & (saturation < max_saturation) & (top >= min_value) & (top <= max_value)
+    mask = ndimage.binary_closing(grey, structure=np.ones((closing, closing)))
+    mask = ndimage.binary_fill_holes(mask)
+    mask = ndimage.binary_opening(mask, structure=np.ones((9, 9)))
+    labels, count = ndimage.label(mask)
+    if count == 0:
+        return 0.0
+    sizes = ndimage.sum(mask, labels, range(1, count + 1))
+    boxes = ndimage.find_objects(labels)
+    candidates = [i for i in range(count) if sizes[i] >= min_fraction * sizes.max()]
+    best = min(candidates, key=lambda i: boxes[i][0].start)
+    return float(np.sqrt(sizes[best]))
+
+
+def color_block_size(
+    frame: np.ndarray,
+    targets: list[tuple[int, int, int]],
+    tolerance: float = 55.0,
+    opening: int = 5,
+    min_fraction: float = 0.25,
+) -> float:
+    """sqrt(area) of the highest large block of a frame painted in one of `targets` (RGB):
+    a size reference for a distinctive colour (El Topo's pink nose), as `block_size` is
+    for a grey one. A pixel belongs to the block when it is solid and within `tolerance`
+    (euclidean RGB distance) of a target; an opening drops specks and thin links; among
+    the components of at least `min_fraction` of the largest one the topmost wins. 0.0
+    when the colour is absent (the nose is hidden or not drawn yet)."""
+    rgb = frame[..., :3].astype(np.float32)
+    near = np.zeros(frame.shape[:2], dtype=bool)
+    for target in targets:
+        near |= np.sqrt(((rgb - np.array(target, dtype=np.float32)) ** 2).sum(-1)) <= tolerance
+    mask = ndimage.binary_opening(near & (frame[..., 3] > 128), structure=np.ones((opening, opening)))
+    labels, count = ndimage.label(mask)
+    if count == 0:
+        return 0.0
+    sizes = ndimage.sum(mask, labels, range(1, count + 1))
+    boxes = ndimage.find_objects(labels)
+    candidates = [i for i in range(count) if sizes[i] >= min_fraction * sizes.max()]
+    best = min(candidates, key=lambda i: boxes[i][0].start)
+    return float(np.sqrt(sizes[best]))
+
+
+def drop_distant_specks(frame: np.ndarray, min_distance: float, max_px: int) -> np.ndarray:
+    """Frame without the components of at most `max_px` pixels that lie more than
+    `min_distance` px from the largest component (a speck floating away from the figure).
+    Small pieces close to the figure (a wisp of tail, a spark) stay."""
+    solid = frame[..., 3] > 20
+    labels, count = ndimage.label(solid, structure=np.ones((3, 3)))
+    if count < 2:
+        return frame
+    sizes = np.asarray(ndimage.sum(solid, labels, range(1, count + 1)))
+    far = ndimage.distance_transform_edt(labels != int(np.argmax(sizes)) + 1)
+    drop = [i + 1 for i in range(count) if sizes[i] <= max_px and far[labels == i + 1].min() > min_distance]
+    out = frame.copy()
+    out[..., 3] = np.where(np.isin(labels, drop), 0, out[..., 3])
+    return out
+
+
+def drop_specks(frame: np.ndarray, min_px: int) -> np.ndarray:
+    """Frame with every connected component smaller than `min_px` made transparent
+    (stray sparkle marks the art agent left near a figure)."""
+    labels, count = ndimage.label(frame[..., 3] > 20, structure=np.ones((3, 3)))
+    if count == 0:
+        return frame
+    sizes = ndimage.sum(np.ones_like(labels), labels, range(1, count + 1))
+    keep = np.isin(labels, [i + 1 for i in range(count) if sizes[i] >= min_px])
+    out = frame.copy()
+    out[..., 3] = np.where(keep, out[..., 3], 0)
+    return out
+
+
+# -- Colour matching between the sheets of one character (opt-in) ----------------------------------
+
+_XYZ_FROM_RGB = np.array([[0.4124564, 0.3575761, 0.1804375], [0.2126729, 0.7151522, 0.0721750], [0.0193339, 0.1191920, 0.9503041]])
+_WHITE = np.array([0.95047, 1.0, 1.08883])
+
+
+def rgb_to_lab(rgb: np.ndarray) -> np.ndarray:
+    """sRGB (0..255, any leading shape) to CIE Lab (D65)."""
+    linear = rgb / 255.0
+    linear = np.where(linear > 0.04045, ((linear + 0.055) / 1.055) ** 2.4, linear / 12.92)
+    xyz = linear @ _XYZ_FROM_RGB.T / _WHITE
+    f = np.where(xyz > 0.008856, np.cbrt(xyz), 7.787 * xyz + 16 / 116)
+    return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], axis=-1)
+
+
+def lab_to_rgb(lab: np.ndarray) -> np.ndarray:
+    """Inverse of `rgb_to_lab`, rounded and clipped to 0..255."""
+    fy = (lab[..., 0] + 16) / 116
+    f = np.stack([fy + lab[..., 1] / 500, fy, fy - lab[..., 2] / 200], axis=-1)
+    xyz = np.where(f**3 > 0.008856, f**3, (f - 16 / 116) / 7.787) * _WHITE
+    linear = np.clip(xyz @ np.linalg.inv(_XYZ_FROM_RGB).T, 0, 1)
+    srgb = np.where(linear > 0.0031308, 1.055 * linear ** (1 / 2.4) - 0.055, 12.92 * linear)
+    return np.clip(np.round(srgb * 255), 0, 255)
+
+
+def hue_class_weight(lab: np.ndarray, hue_start: float, hue_end: float, soft: float) -> np.ndarray:
+    """Soft membership (0..1) of Lab pixels in the hue arc [hue_start, hue_end] (degrees, may
+    wrap through 0): 1 inside, 0 outside, a linear ramp of `soft` degrees centred on each end.
+    The arc and its complement (ends swapped) sum to exactly 1."""
+    hue = np.degrees(np.arctan2(lab[..., 2], lab[..., 1])) % 360.0
+    half = ((hue_end - hue_start) % 360.0) / 2.0
+    centre = (hue_start + half) % 360.0
+    distance = np.abs((hue - centre + 180.0) % 360.0 - 180.0)
+    return np.clip((half + soft / 2.0 - distance) / soft, 0.0, 1.0)
+
+
+def tone_weights(lab: np.ndarray, tone: dict) -> np.ndarray:
+    """Weight of each pixel in the tone class `tone`: hue arc (optional) times a chroma fade
+    that is 1 up to `fade_start` and 0 from `fade_start + fade_width`."""
+    chroma = np.hypot(lab[..., 1], lab[..., 2])
+    weight = np.clip((tone["fade_start"] + tone["fade_width"] - chroma) / tone["fade_width"], 0.0, 1.0)
+    if "hue" in tone:
+        weight = weight * hue_class_weight(lab, *tone["hue"], tone.get("hue_soft", 15.0))
+    return weight
+
+
+def tone_band_means(frames: list[np.ndarray | None], tone: dict, centres: np.ndarray, half_width: float, min_weight: float) -> np.ndarray:
+    """Weighted mean Lab (a, b) per lightness band (centre +- half_width) of the solid pixels
+    of `frames` that belong to the tone class `tone`; NaN where the class weighs less than
+    `min_weight` pixels. Selecting by tone class keeps saturated accents (a tie, a nose) out."""
+    labs = [rgb_to_lab(f[..., :3][f[..., 3] > 250]) for f in frames if f is not None]
+    lab = np.concatenate(labs) if labs else np.zeros((0, 3))
+    weight = tone_weights(lab, tone)
+    stats = np.full((len(centres), 2), np.nan)
+    for i, centre in enumerate(centres):
+        w = weight * (np.abs(lab[:, 0] - centre) < half_width)
+        if w.sum() >= min_weight:
+            stats[i] = (lab[:, 1:] * w[:, None]).sum(axis=0) / w.sum()
+    return stats
+
+
+def match_tones(
+    frames: list[np.ndarray | None],
+    references: list[np.ndarray],
+    tones: list[dict],
+    centres: np.ndarray,
+    half_width: float,
+    min_weight: float,
+    passes: int = 2,
+) -> list[np.ndarray | None]:
+    """Shift the muted tones of `frames` (one sheet) so that, per tone class and lightness band,
+    their mean (a, b) equals the matching `references` entry (`tone_band_means` of the reference
+    sheet). Each pixel moves by the offsets of every class, interpolated over lightness and
+    scaled by its class weight, so saturated accents keep their colour. Alpha is untouched.
+    Further passes remove the bias the soft weights leave. Deterministic; returns new frames."""
+    current = list(frames)
+    for _ in range(passes):
+        offsets = []
+        for tone, reference in zip(tones, references):
+            stats = tone_band_means(current, tone, centres, half_width, min_weight)
+            valid = ~np.isnan(stats[:, 0]) & ~np.isnan(reference[:, 0])
+            offsets.append((valid, reference[valid] - stats[valid]) if valid.any() else None)
+        shifted = []
+        for frame in current:
+            if frame is None:
+                shifted.append(None)
+                continue
+            lab = rgb_to_lab(frame[..., :3])
+            moved = lab.copy()
+            for tone, offset in zip(tones, offsets):
+                if offset is None:
+                    continue
+                valid, delta = offset
+                weight = tone_weights(lab, tone)
+                moved[..., 1] += np.interp(lab[..., 0], centres[valid], delta[:, 0]) * weight
+                moved[..., 2] += np.interp(lab[..., 0], centres[valid], delta[:, 1]) * weight
+            out = frame.copy()
+            out[..., :3] = np.where(frame[..., 3:4] > 0, lab_to_rgb(moved), frame[..., :3])
+            shifted.append(out)
+        current = shifted
+    return current

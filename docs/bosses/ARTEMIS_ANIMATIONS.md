@@ -39,7 +39,7 @@ The silhouette must stay readable against dark navy backgrounds: keep a light va
 | Path (under `Artemis`, a `CharacterBody2D`) | Contract |
 |---|---|
 | `Visual` (`Node2D`) | Code owns it: `scale = (facing, crouch)`, `position.y` (dive), `rotation`, `scale` and `modulate` (stagger tint, corpse pose), `visible` (off-screen dive). **Never animate these properties from art.** |
-| `Visual/Body` (`Polygon2D`) | **Keep.** `Enemy._setup_flash` clones its polygon into a white hurt flash, and `BossTelegraph.bind_body` clones it into the colour glow. Set `visible = false` (as `shadow_owl.tscn`) and make the polygon trace the **final art silhouette** so flash and glow match the sprite. The clones have their own visibility, so a hidden `Body` still flashes. |
+| `Visual/Body` (`Polygon2D`) | **Keep.** `Enemy._setup_flash` clones its polygon into a white hurt flash, and `BossTelegraph.bind_body` clones it into the colour glow. Set `visible = false` (as `shadow_owl.tscn`) and make the polygon trace the **final art silhouette** so flash and glow match the sprite. The clones have their own visibility, so a hidden `Body` still flashes. **With the sheet loaded the clones stay hidden:** the hit flash and the telegraph glow are drawn on the sprite by `shaders/artemis_moonlit.gdshader` through `BossSpriteFx` (bound in `ArtemisBoss._bind_sprite_fx`), so they follow the drawn silhouette in both skins. The polygon clones are the fallback for a missing sheet. |
 | `Visual/AnimatedSprite2D` (new) | The final art. Add it as the **first child of `Visual`** (index 0) so the glow and flash clones, inserted after `Body`, draw above it. `texture_filter = 1`. |
 | `Visual/Bow/Muzzle` (`Marker2D`) | **Keep the path.** Arrows spawn here (`@onready _muzzle`) and aim lines start here. Local position now `(17, -34)` (Bow `(13,-34)` + Muzzle `(4,0)`). Match the bow hand to it, or move the node in the scene (position only) and keep draw/release poses within about 6 px of it. |
 | Old polygons `Cloak`, `Quiver`, `Belt`, `Head`, `Hair`, `Arm`, `Bow/Limbs`, `Bow/String` | Delete or `visible = false` once the sprite carries them. Logic does not read them. Keep `Bow` (the node) because it parents `Muzzle`. |
@@ -70,7 +70,7 @@ The silhouette must stay readable against dark navy backgrounds: keep a light va
 - One PNG sheet per skin (`artemis_p1.png`, `artemis_p2.png`) under `assets/art/greece/bosses/artemis/`, transparent background, one uniform grid, **one cell size for the whole sheet** (suggest 256 x 256, boss on the same pixel grid as Luz after scaling; Codex may choose another size but must keep it uniform and state it in the manifest).
 - Same pipeline as Luz: a JSON manifest (`animation_manifest.json`: `grid {columns, rows, cell_width, cell_height}`, `clips {name: [frame indices]}`, `events {name: frame index}`) and a repack script so feet land on the same row in every cell.
 - `p2` sheet has an identical layout and clip list (silver accents only).
-- Stag: separate small sheet `spectral_stag.png`, same rules.
+- Stag: separate sheet `spectral_stag_sheet.png`, same rules, with its own cell: 512 wide x 384 tall (the stretched gallop poses reach 239 px left of the feet, which sit on the cell centre), feet row 340, sprite scale 0.245. `stag_run` frames lose detached specks more than 24 px from the body; wisps close to the tail stay.
 
 ### 2.5 Registration: `artemis_animation_catalog.gd` (proposed)
 
@@ -134,7 +134,7 @@ Defaults: fps 12 unless stated. "Suggested frames" = `round(duration x fps)` as 
 | `stagger_in` | `STAGGER` entry (`_enter_stagger`) | 0.15 s | one-shot | 20 / 3 | Recoil frame 0 | Knocked off balance. |
 | `stagger_loop` | `STAGGER`, rest of `stagger_time` 1.5 s | 1.35 s (the clip repeats until the state ends) | loop | 8 / 6 | Code already applies `STAGGER_TINT` to `Visual.modulate`; do not bake that tint | Dazed: bow arm low, head down, swaying. A clear "free hits" read. |
 | `phase_transition` | `TRANSITION` (`_update_transition`) | `phase_two_transition_time` 1.0 s | one-shot | 12 / 12 | Skin swap to phase 2 at about 0.5 s (frame 6). She stays hittable throughout. Code pulses a silver glow at `TRANSITION_PULSE_RATE` 10 rad/s | Raises the bow to the moon, silver light rising through the body, ends in a ready stance with the halo. Reads as "she got serious", not as an attack: bow aimed up but **no aim line, no amber**. |
-| `hurt` | Hit | `flash_time` 0.08 s | **no clip** | n/a | Code-driven white flash from the `Body` polygon clone | Nothing to draw. Keep `Body` accurate so the flash matches. |
+| `hurt` | Hit | `flash_time` 0.08 s | **no clip** | n/a | Code-driven white flash on the sprite itself (`BossSpriteFx.set_flash`); the `Body` polygon clone only without the sheet | Nothing to draw. |
 
 ### 3.2 Phase 1 attacks
 
@@ -195,7 +195,7 @@ Orientation: the stag is drawn facing right; `scale.x = dir` flips it.
 | Aim line | `Line2D`, 3 px (`LINE_WIDTH`), amber; alpha 0.45 while tracking (`LINE_TRACKING_ALPHA`), 1.0 when locked | Keep both states: **dim and moving = still tracking, solid = locked**. Length 520 (shot), 300 (fan, one per arrow), 140 (rain, upward). May become a dotted pixel line; it must keep the dim/solid contrast. |
 | Floor markers | `Polygon2D` unit rectangles, 8 px tall (`RAIN_MARKER_HEIGHT`), bright edges (`MARKER_EDGE_SHARE` 0.07), pulse faster as the hit nears. Rain markers sit on the surface the arrows will hit: on a one-way platform top when one covers the zone, split in two over a platform edge. The dive adds a vertical silver column (slot 1, about half the marker alpha) | Replace with a pixel-art ground glyph per zone; zone width 56 (rain), 56 (dive, `dive_marker_width`), 60 x 48 at the wall (stag). Keep the **edges brighter than the fill** and the **pulse that accelerates**. |
 | Colour language (`BossTelegraph`) | amber `#FFB840`-ish (`RANGED_COLOR`), red (`MELEE_COLOR`), silver `(0.8,0.9,1.0)` (`MOON_COLOR`), white (`VAULT_COLOR`) | **Non-negotiable**: amber = ranged, red = melee, silver = moon (phase 2: dive, stag, transition), white = vault. Colour is the second cue; the pose silhouette is the first (section 5). |
-| Body glow | Tinted clone of `Body` polygon, alpha up to 0.65 (`GLOW_MAX_ALPHA`) | Needs an accurate `Body` silhouette. Rises over the telegraph; at ACTIVE it clears. May be replaced by an outline or rim shader if the call API (`set_glow`) stays. |
+| Body glow | Tinted clone of `Body` polygon, alpha up to 0.65 (`GLOW_MAX_ALPHA`) | Needs an accurate `Body` silhouette. Rises over the telegraph; at ACTIVE it clears. With the sheet loaded it is the outline and tint of the skin shader on the sprite (`BossTelegraph.bind_sprite_fx`, same `set_glow` API); the polygon clone is the fallback. |
 | Dagger slash | `DaggerHitbox/Slash` polygon, red, shown only while the hitbox is armed | A crescent sweep covering x 12 to 68, y -8 to -48, visible exactly during `dagger_active_time` 0.12 s. |
 | Dive impact | `DiveHitbox/Impact` polygon (silver), shown while armed | A vertical silver shaft/crater that follows `Visual` down for 0.4 s, then a flash at impact for 0.1 s. |
 | Dust on landings | None | Small puff at: `backstep`/`dodge`/`dagger_flip` landing, `vault_land` frame 0, dive impact (larger). Pure VFX; must not extend past 0.3 s. |
@@ -245,7 +245,7 @@ Orientation: the stag is drawn facing right; `scale.x = dir` flips it.
 
 - `tests/artemis_boss_test.gd` still passes unchanged (it reads `Visual/Body`, `Visual/Bow/Muzzle`, `Visual` visibility and the exported timings).
 - The full headless suite and the headless boot (`--headless --path . --quit-after 120`) show no new script errors.
-- The hit flash still works (white copy of `Body`, `flash_time` 0.08 s) and matches the art silhouette.
+- The hit flash still works (`flash_time` 0.08 s) and matches the art silhouette: white on the sprite with the sheet, the white copy of `Body` without it.
 - Collision, `DaggerHitbox`, `DiveHitbox`, `SpectralStag` and arrow shapes are byte-for-byte unchanged.
 - Every attack keeps its exported telegraph; no telegraph is under 0.35 s; telegraph colours match the colour language.
 - Placeholders still work if the sprite is absent (`_play` is a no-op when there is no sprite).

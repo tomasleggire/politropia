@@ -1,0 +1,358 @@
+{
+  "cell": 640,
+  "feet_row": 608,
+  "sprite_scale": 0.2896,
+  "sheets": {
+    "hydra_body_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 640,
+        "cell_height": 640
+      },
+      "clips": {
+        "idle": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "roar": [
+          4,
+          5
+        ]
+      },
+      "events": {},
+      "neck_roots": {
+        "idle": [
+          [
+            [
+              34.75,
+              -55.6
+            ],
+            [
+              26.06,
+              -95.86
+            ],
+            [
+              22.88,
+              -139.59
+            ]
+          ],
+          [
+            [
+              37.36,
+              -61.11
+            ],
+            [
+              28.67,
+              -105.99
+            ],
+            [
+              18.82,
+              -146.54
+            ]
+          ],
+          [
+            [
+              34.17,
+              -56.18
+            ],
+            [
+              26.06,
+              -95.86
+            ],
+            [
+              22.59,
+              -139.3
+            ]
+          ],
+          [
+            [
+              34.75,
+              -56.18
+            ],
+            [
+              27.51,
+              -94.7
+            ],
+            [
+              28.96,
+              -135.82
+            ]
+          ]
+        ],
+        "roar": [
+          [
+            [
+              39.1,
+              -76.16
+            ],
+            [
+              19.98,
+              -118.16
+            ],
+            [
+              13.61,
+              -157.54
+            ]
+          ],
+          [
+            [
+              25.2,
+              -60.24
+            ],
+            [
+              26.64,
+              -95.86
+            ],
+            [
+              45.47,
+              -130.03
+            ]
+          ]
+        ]
+      }
+    },
+    "hydra_defeat_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 640,
+        "cell_height": 640
+      },
+      "clips": {
+        "defeat": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "events": {}
+    }
+  },
+  "head_biter": {
+    "sheet": "hydra_head_biter_sheet.png",
+    "sprite_scale": 0.2896,
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 288,
+      "cell_height": 288
+    },
+    "clips": {
+      "idle": [
+        0,
+        1,
+        2
+      ],
+      "telegraph": [
+        3
+      ],
+      "attack": [
+        4,
+        5
+      ],
+      "roar": [
+        6
+      ],
+      "dazed": [
+        7
+      ]
+    },
+    "content": {
+      "idle": [
+        193,
+        160
+      ],
+      "telegraph": [
+        192,
+        166
+      ],
+      "attack": [
+        198,
+        180
+      ],
+      "roar": [
+        192,
+        175
+      ],
+      "dazed": [
+        190,
+        132
+      ]
+    }
+  },
+  "head_sweeper": {
+    "sheet": "hydra_head_sweeper_sheet.png",
+    "sprite_scale": 0.2896,
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 288,
+      "cell_height": 288
+    },
+    "clips": {
+      "idle": [
+        0,
+        1,
+        2
+      ],
+      "telegraph": [
+        3
+      ],
+      "attack": [
+        4,
+        5
+      ],
+      "roar": [
+        6
+      ],
+      "dazed": [
+        7
+      ]
+    },
+    "content": {
+      "idle": [
+        199,
+        110
+      ],
+      "telegraph": [
+        198,
+        127
+      ],
+      "attack": [
+        213,
+        101
+      ],
+      "roar": [
+        197,
+        155
+      ],
+      "dazed": [
+        200,
+        123
+      ]
+    }
+  },
+  "head_spitter": {
+    "sheet": "hydra_head_spitter_sheet.png",
+    "sprite_scale": 0.2896,
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 288,
+      "cell_height": 288
+    },
+    "clips": {
+      "idle": [
+        0,
+        1,
+        2
+      ],
+      "telegraph": [
+        3
+      ],
+      "attack": [
+        4,
+        5
+      ],
+      "roar": [
+        6
+      ],
+      "dazed": [
+        7
+      ]
+    },
+    "content": {
+      "idle": [
+        197,
+        152
+      ],
+      "telegraph": [
+        196,
+        165
+      ],
+      "attack": [
+        195,
+        146
+      ],
+      "roar": [
+        202,
+        172
+      ],
+      "dazed": [
+        193,
+        139
+      ]
+    }
+  },
+  "props": {
+    "sheet": "hydra_props_sheet.png",
+    "sprite_scale": 0.2896,
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 256,
+      "cell_height": 256
+    },
+    "clips": {
+      "stump": [
+        0
+      ],
+      "venom_glob": [
+        1
+      ],
+      "venom_pool": [
+        2,
+        3
+      ],
+      "venom_splash": [
+        4
+      ],
+      "platform": [
+        5
+      ],
+      "platform_alt": [
+        6
+      ]
+    },
+    "content": {
+      "stump": [
+        88,
+        60
+      ],
+      "venom_glob": [
+        92,
+        56
+      ],
+      "venom_pool": [
+        160,
+        40
+      ],
+      "venom_splash": [
+        132,
+        70
+      ],
+      "platform": [
+        161,
+        49
+      ],
+      "platform_alt": [
+        160,
+        42
+      ]
+    }
+  },
+  "neck": {
+    "texture": "hydra_neck.png",
+    "thickness": 18.0,
+    "tile": [
+      98,
+      36
+    ]
+  }
+}

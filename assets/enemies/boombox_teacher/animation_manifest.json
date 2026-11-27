@@ -1,0 +1,327 @@
+{
+  "cell": 448,
+  "feet_row": 416,
+  "sprite_scale": 0.2896,
+  "sheets": {
+    "boombox_teacher_loco_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "idle": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "walk": [
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {}
+    },
+    "boombox_teacher_thrust_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "thrust_high_windup": [
+          0
+        ],
+        "thrust_high_strike": [
+          1
+        ],
+        "thrust_high_recover": [
+          2
+        ],
+        "thrust_low_windup": [
+          3
+        ],
+        "thrust_low_strike": [
+          4
+        ],
+        "thrust_low_recover": [
+          5
+        ]
+      },
+      "events": {
+        "thrust_high_strike": 0,
+        "thrust_low_strike": 0
+      }
+    },
+    "boombox_teacher_throw_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "throw_windup": [
+          0,
+          1
+        ],
+        "throw_release": [
+          2
+        ],
+        "throw_wait": [
+          3
+        ],
+        "throw_catch": [
+          4
+        ],
+        "kick_windup": [
+          5
+        ],
+        "kick_strike": [
+          6
+        ],
+        "kick_recover": [
+          7
+        ]
+      },
+      "events": {
+        "throw_release": 0,
+        "kick_strike": 0
+      }
+    },
+    "boombox_teacher_conduct_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "conduct": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "lecture": [
+          4,
+          5
+        ],
+        "notes": [
+          6,
+          7
+        ]
+      },
+      "events": {}
+    },
+    "boombox_teacher_bass_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "bass_lift": [
+          0,
+          1
+        ],
+        "bass_slam": [
+          2,
+          3
+        ],
+        "overheat": [
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {
+        "bass_slam": 0
+      }
+    },
+    "boombox_teacher_trans_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "phase_change": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "intro": [
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {}
+    },
+    "boombox_teacher_defeat_sheet.png": {
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 448,
+        "cell_height": 448
+      },
+      "clips": {
+        "defeat": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "events": {}
+    }
+  },
+  "props": {
+    "sheet": "boombox_teacher_props_sheet.png",
+    "sprite_scale": 0.2896,
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 256,
+      "cell_height": 256
+    },
+    "clips": {
+      "briefcase_spin": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "note": [
+        4
+      ],
+      "note_pair": [
+        5
+      ],
+      "steam": [
+        6
+      ],
+      "spark": [
+        7
+      ]
+    },
+    "content": {
+      "briefcase_spin": [
+        106,
+        120
+      ],
+      "note": [
+        71,
+        93
+      ],
+      "note_pair": [
+        95,
+        95
+      ],
+      "steam": [
+        108,
+        91
+      ],
+      "spark": [
+        85,
+        98
+      ]
+    }
+  },
+  "fx": {
+    "sheet": "boombox_teacher_fx_sheet.png",
+    "grid": {
+      "columns": 4,
+      "rows": 2,
+      "cell_width": 256,
+      "cell_height": 256
+    },
+    "clips": {
+      "wave_low": [
+        0
+      ],
+      "wave_high": [
+        1
+      ],
+      "bass_shock": [
+        2
+      ],
+      "chalk_dust": [
+        3
+      ],
+      "steam": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    "content": {
+      "wave_low": [
+        109,
+        129
+      ],
+      "wave_high": [
+        109,
+        129
+      ],
+      "bass_shock": [
+        241,
+        74
+      ],
+      "chalk_dust": [
+        104,
+        83
+      ],
+      "steam": [
+        151,
+        153
+      ]
+    }
+  },
+  "blackboard": {
+    "texture": "boombox_teacher_blackboard.png",
+    "size": [
+      601,
+      224
+    ]
+  },
+  "thrust_fx": {
+    "sheet": "boombox_teacher_thrust_fx_sheet.png",
+    "grid": {
+      "columns": 4,
+      "rows": 1,
+      "cell_width": 400,
+      "cell_height": 80
+    },
+    "clips": {
+      "thrust_streak": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "content": {
+      "thrust_streak": [
+        377,
+        57
+      ]
+    }
+  }
+}

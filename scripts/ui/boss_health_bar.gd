@@ -47,6 +47,8 @@ var _max_health := 1
 var _health_ratio := 1.0
 var _chunk_ratio := 1.0
 var _notch_ratio := NO_NOTCH
+var _extra_notch_ratios := PackedFloat32Array()
+var _extra_notches: Array[ColorRect] = []
 var _shown := false
 var _title_shown := false
 var _safe_override := Rect2()
@@ -92,10 +94,13 @@ func _ready() -> void:
 
 ## Names the boss and starts from full health. `notch_ratio` marks the phase-two
 ## threshold (0 to 1 of the bar); leave it out for a boss with one phase.
-func setup(boss_name: String, max_health: int, notch_ratio := NO_NOTCH) -> void:
+## `extra_notch_ratios` marks the later phase thresholds of a boss with more than
+## two phases (one thin notch each); the tint still follows the first notch.
+func setup(boss_name: String, max_health: int, notch_ratio := NO_NOTCH, extra_notch_ratios := PackedFloat32Array()) -> void:
 	_name.text = boss_name
 	_max_health = maxi(max_health, 1)
 	_notch_ratio = notch_ratio
+	_extra_notch_ratios = extra_notch_ratios
 	_kill(_chunk_tween)
 	_health_ratio = 1.0
 	_chunk_ratio = 1.0
@@ -187,6 +192,11 @@ func get_notch_ratio() -> float:
 	return _notch_ratio
 
 
+## Ratios of the notches after the first one (empty for one or two phases).
+func get_extra_notch_ratios() -> PackedFloat32Array:
+	return _extra_notch_ratios
+
+
 func is_phase_two_tint() -> bool:
 	return _notch_ratio >= 0.0 and _health_ratio <= _notch_ratio
 
@@ -248,6 +258,24 @@ func _apply() -> void:
 	_notch.visible = _notch_ratio >= 0.0
 	_notch.size = Vector2(notch_width, inner.y + 4.0)
 	_notch.position = Vector2(inner_pos.x + inner.x * _notch_ratio - notch_width * 0.5, inner_pos.y - 2.0)
+	_apply_extra_notches(inner_pos, inner)
+
+
+## One reused ColorRect per extra threshold, built on demand and hidden when unused
+## or when its ratio is not strictly between 0 and 1 (it would sit off the bar).
+func _apply_extra_notches(inner_pos: Vector2, inner: Vector2) -> void:
+	while _extra_notches.size() < _extra_notch_ratios.size():
+		var notch := ColorRect.new()
+		notch.color = notch_color
+		notch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_bar.add_child(notch)
+		_extra_notches.append(notch)
+	for i: int in _extra_notches.size():
+		var notch := _extra_notches[i]
+		notch.visible = i < _extra_notch_ratios.size() and _extra_notch_ratios[i] > 0.0 and _extra_notch_ratios[i] < 1.0
+		if notch.visible:
+			notch.size = Vector2(notch_width, inner.y + 4.0)
+			notch.position = Vector2(inner_pos.x + inner.x * _extra_notch_ratios[i] - notch_width * 0.5, inner_pos.y - 2.0)
 
 
 func _set_chunk_ratio(value: float) -> void:

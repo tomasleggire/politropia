@@ -418,7 +418,7 @@
     "grid": {
       "columns": 4,
       "rows": 5,
-      "cell_width": 384,
+      "cell_width": 512,
       "cell_height": 384
     },
     "clips": {

@@ -38,6 +38,7 @@ const CHECKS := {
 	"case_dash_through_body_and_after": 4,
 	"case_arrow_impact": 5,
 	"case_telegraph_glyphs": 6,
+	"case_flash_and_glow_on_the_sprite": 7,
 	"case_slash_does_not_break_arrows": 4,
 	"case_backstep_when_close": 3,
 	"case_backstep_refused_at_walls_and_ledges": 4,
@@ -281,6 +282,27 @@ func case_telegraph_glyphs() -> void:
 	telegraph.show_floor_marker(0, strip, BossTelegraph.RANGED_COLOR, 0.4, &"rain")
 	telegraph.clear()
 	h.check(not telegraph.is_floor_marker_visible(0) and not telegraph._glyph_sprites[0].visible, "clearing hides the glyphs too")
+	_end_case()
+
+
+func case_flash_and_glow_on_the_sprite() -> void:
+	await _build_rig(LUZ_START, false)
+	await _add_boss(Vector2(-300.0, 0.0), QUIET)
+	var sprite := _boss.get_node("Visual/AnimatedSprite2D") as AnimatedSprite2D
+	var material := sprite.material as ShaderMaterial
+	var telegraph := _boss.get_telegraph()
+	h.check(material != null and material.shader == ArtemisBoss.MOONLIT_SHADER and is_zero_approx(float(material.get_shader_parameter(&"moonlit"))), "the sprite carries the skin shader with the phase-one look")
+	telegraph.set_glow(BossTelegraph.RANGED_COLOR, 0.6)
+	h.check(telegraph.is_glowing() and is_equal_approx(float(material.get_shader_parameter(&"glow_amount")), 0.6) and not telegraph._glow.visible, "a telegraph glows on the sprite, not on the polygon")
+	telegraph.clear()
+	h.check(not telegraph.is_glowing() and is_zero_approx(float(material.get_shader_parameter(&"glow_amount"))), "clearing the telegraph clears the glow")
+	h.check(not _boss.is_flash_visible(), "no flash before a hit")
+	_boss.receive_hit(1, HIT_FROM, &"attack_1")
+	h.check(_boss.is_flash_visible() and is_equal_approx(float(material.get_shader_parameter(&"flash_amount")), 1.0) and not _boss._flash.visible, "a hit flashes the sprite white, not the polygon")
+	await h.secs(_boss.flash_time + 0.1)
+	h.check(not _boss.is_flash_visible() and is_zero_approx(float(material.get_shader_parameter(&"flash_amount"))), "the flash ends after flash_time")
+	_boss._set_skin(ArtemisBoss.PHASE_TWO)
+	h.check(sprite.material == material and is_equal_approx(float(material.get_shader_parameter(&"moonlit")), 1.0), "phase two switches the skin on the same material")
 	_end_case()
 
 

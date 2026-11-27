@@ -50,6 +50,7 @@ const TRIGGER_MASK := 1
 ## Reward height above the floor (the centre of Luz's body).
 const REWARD_HEIGHT := 28.0
 const PHASE_THRESHOLD_PROPERTY := &"phase_two_threshold"
+const PHASE_THRESHOLDS_PROPERTY := &"phase_thresholds"
 const CUE_DOORS_CLOSE := &"DoorsClose"
 const CUE_DOORS_OPEN := &"DoorsOpen"
 const CUE_BOSS_INTRO := &"BossIntro"
@@ -418,6 +419,16 @@ func _notch_ratio() -> float:
 	return float(threshold) if threshold != null else BossHealthBar.NO_NOTCH
 
 
+## Notches for the thresholds after the first, when the boss exposes more than one
+## (`phase_thresholds`). Empty for a boss with one or no extra phase (Artemis).
+func _extra_notch_ratios() -> PackedFloat32Array:
+	var extra := PackedFloat32Array()
+	var thresholds: Variant = _boss.get(PHASE_THRESHOLDS_PROPERTY)
+	if thresholds is PackedFloat32Array and (thresholds as PackedFloat32Array).size() > 1:
+		extra = (thresholds as PackedFloat32Array).slice(1)
+	return extra
+
+
 func _on_boss_hit(_amount: int, remaining: int) -> void:
 	_bar.set_health(remaining)
 
@@ -446,7 +457,7 @@ func _start_fight(player: Player) -> void:
 	var music := get_node_or_null("/root/MusicManager")
 	if music != null and music.has_method(&"play_boss_music"):
 		music.call(&"play_boss_music")
-	_bar.setup(boss_name, _boss.max_health, _notch_ratio())
+	_bar.setup(boss_name, _boss.max_health, _notch_ratio(), _extra_notch_ratios())
 	_bar.set_health(_boss.get_health())
 	_bar.show_bar()
 	_bar.show_title(boss_name, title_time)
@@ -475,6 +486,11 @@ func _on_player_died() -> void:
 	_kill(_intro_tween)
 	if is_instance_valid(_boss):
 		_boss.set_ai_active(false)
+	_restore_gameplay_music()
+
+
+## Back to the level track after the boss one (Luz died, or the boss fell).
+func _restore_gameplay_music() -> void:
 	var music := get_node_or_null("/root/MusicManager")
 	if music != null and music.has_method(&"play_gameplay_music"):
 		music.call(&"play_gameplay_music")
@@ -568,6 +584,7 @@ func _trigger_game_completion() -> void:
 
 
 func _open_arena() -> void:
+	_restore_gameplay_music()
 	_bar.hide_title()
 	_bar.hide_bar()
 	_set_doors(false)

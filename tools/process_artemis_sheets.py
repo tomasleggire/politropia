@@ -27,6 +27,20 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
+import boss_sheet_pipeline as pipeline
+from boss_sheet_pipeline import (
+    MIN_COMPONENT_PX,
+    body_mask_bottom,
+    feet_center_x,
+    key_magenta,
+    place_fixed,
+    scale_rgba,
+    sole_bottom,
+    split_cells,
+    split_frames,
+    standing_height,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 RAW_DIR = ROOT / "tools" / "art_sources" / "artemis" / "raw"
 OUT_DIR = ROOT / "assets" / "enemies" / "artemis"
@@ -34,11 +48,10 @@ OUT_DIR = ROOT / "assets" / "enemies" / "artemis"
 OUT_CELL = 256
 FEET_ROW = 224
 COLUMNS = 4
-LUZ_SPRITE_SCALE = 0.1448
+LUZ_SPRITE_SCALE = pipeline.LUZ_SPRITE_SCALE
 SPRITE_SCALE = LUZ_SPRITE_SCALE * 512.0 / OUT_CELL
 BODY_HEIGHT = 56.0
 STAND_HEIGHT = BODY_HEIGHT / SPRITE_SCALE  # output px from hair top to sole
-MIN_COMPONENT_PX = 40
 
 # sheet -> raw file, raw grid (cols, rows), reference frame (only used to log the
 # resulting height) and clips (names from the contract).
@@ -188,107 +201,9 @@ SHEETS = {
 }
 
 
-def key_magenta(raw: Image.Image) -> np.ndarray:
-    """Return float RGBA (0..1 alpha) with the magenta background keyed out."""
-    arr = np.asarray(raw.convert("RGB")).astype(np.int32)
-    r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
-    m = np.minimum(r, b) - g
-    alpha = np.clip((100 - m) / 70.0, 0.0, 1.0)
-    alpha[m <= 30] = 1.0
-    alpha[m > 100] = 0.0
-    # remove the magenta tint from the partially transparent fringe
-    fringe = (m > 30) & (m <= 100)
-    out = arr.copy()
-    out[..., 0] = np.where(fringe, np.maximum(0, r - m), r)
-    out[..., 2] = np.where(fringe, np.maximum(0, b - m), b)
-    rgba = np.dstack([out, alpha * 255.0]).astype(np.float32)
-    return rgba
+def to_cell(frame: np.ndarray, scale: float, label: str, body_feet: bool = False, out_cell: int = OUT_CELL, feet_row: int = FEET_ROW, cell_height: int | None = None) -> Image.Image:
+    return pipeline.to_cell(frame, scale, label, out_cell, feet_row, body_feet, cell_height)
 
-
-def split_frames(rgba: np.ndarray, cols: int, rows: int, name: str, needed: set[int] | None = None) -> list[np.ndarray | None]:
-    height, width = rgba.shape[:2]
-    cell_w, cell_h = width / cols, height / rows
-    mask = rgba[..., 3] > 20
-    labels, count = ndimage.label(mask, structure=np.ones((3, 3)))
-    owner: dict[int, int] = {}
-    sizes = ndimage.sum(mask, labels, range(1, count + 1))
-    centers = ndimage.center_of_mass(mask, labels, range(1, count + 1))
-    for index in range(count):
-        if sizes[index] < MIN_COMPONENT_PX:
-            continue
-        cy, cx = centers[index]
-        owner[index + 1] = int(min(cy // cell_h, rows - 1)) * cols + int(min(cx // cell_w, cols - 1))
-    frames = []
-    for cell in range(cols * rows):
-        keep = [label for label, c in owner.items() if c == cell]
-        if not keep:
-            if needed is not None and cell not in needed:
-                frames.append(None)
-                continue
-            raise ValueError(f"{name}: cell {cell} has no art")
-        sel = np.isin(labels, keep)
-        ys, xs = np.where(sel)
-        crop = rgba[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1].copy()
-        crop[..., 3] = np.where(sel[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1], crop[..., 3], 0)
-        frames.append(crop)
-    return frames
-
-
-def standing_height(frame: np.ndarray) -> float:
-    return float(frame.shape[0])
-
-
-def sole_bottom(frame: np.ndarray) -> int:
-    """Lowest row holding a solid run of art (ignores stray fringe pixels)."""
-    solid = (frame[..., 3] > 128).sum(axis=1)
-    rows = np.where(solid >= 6)[0]
-    return int(rows.max()) if len(rows) else frame.shape[0] - 1
-
-
-def feet_center_x(frame: np.ndarray, bottom: int) -> float:
-    band = max(6, int(frame.shape[0] * 0.12))
-    sub = frame[max(0, bottom - band) : bottom + 1, :, 3] > 128
-    xs = np.where(sub.any(axis=0))[0]
-    weights = sub.sum(axis=0).astype(np.float64)
-    return float((np.arange(len(weights)) * weights).sum() / max(weights.sum(), 1.0)) if len(xs) else frame.shape[1] / 2
-
-
-def body_mask_bottom(arr: np.ndarray) -> tuple[int, float]:
-    """Sole row and feet centre of the largest component (the body, not the sparkles)."""
-    labels, count = ndimage.label(arr[..., 3] > 128, structure=np.ones((3, 3)))
-    sizes = ndimage.sum(np.ones_like(labels), labels, range(1, count + 1))
-    body = labels == (int(np.argmax(sizes)) + 1)
-    solo = np.zeros_like(arr)
-    solo[..., 3] = np.where(body, 255.0, 0.0)
-    bottom = sole_bottom(solo)
-    return bottom, feet_center_x(solo, bottom)
-
-
-def to_cell(frame: np.ndarray, scale: float, label: str, body_feet: bool = False, out_cell: int = OUT_CELL, feet_row: int = FEET_ROW) -> Image.Image:
-    premult = frame.copy()
-    premult[..., :3] *= premult[..., 3:4] / 255.0
-    img = Image.fromarray(premult.astype(np.uint8), "RGBA")
-    w, h = max(1, round(img.width * scale)), max(1, round(img.height * scale))
-    img = img.resize((w, h), Image.LANCZOS)
-    arr = np.asarray(img).astype(np.float32)
-    a = arr[..., 3:4]
-    arr[..., :3] = np.where(a > 0, np.minimum(arr[..., :3] * 255.0 / np.maximum(a, 1.0), 255.0), 0)
-    arr = arr.astype(np.uint8)
-    if body_feet:
-        bottom, cx = body_mask_bottom(arr.astype(np.float32))
-    else:
-        bottom = sole_bottom(arr.astype(np.float32))
-        cx = feet_center_x(arr.astype(np.float32), bottom)
-    left = round(out_cell / 2 - cx)
-    top = feet_row - bottom
-    cell = Image.new("RGBA", (out_cell, out_cell), (0, 0, 0, 0))
-    if left < 0 or top < 0 or left + w > out_cell:
-        # nudge to keep inside the cell rather than crop
-        left = min(max(left, 0), OUT_CELL - w)
-        top = max(top, 0)
-        print(f"  note: {label} nudged to fit the cell ({w}x{h})")
-    cell.alpha_composite(Image.fromarray(arr, "RGBA"), (left, top))
-    return cell
 
 
 ARROW_RAW = "artemis_arrow_raw.png"
@@ -324,62 +239,6 @@ def build_arrows() -> None:
         print(f"  {file_name}: {out.size}")
 
 
-def split_cells(rgba: np.ndarray, cols: int, rows: int, name: str, min_px: int) -> list[np.ndarray]:
-    """Full raw cells (not cropped to the art) with stray specks removed, so frames
-    keep their position relative to each other (effects and the stag dissolve)."""
-    height, width = rgba.shape[:2]
-    cell_w, cell_h = width // cols, height // rows
-    labels, count = ndimage.label(rgba[..., 3] > 20, structure=np.ones((3, 3)))
-    sizes = ndimage.sum(np.ones_like(labels), labels, range(1, count + 1))
-    centers = ndimage.center_of_mass(np.ones_like(labels), labels, range(1, count + 1))
-    owner: dict[int, int] = {}
-    for index in range(count):
-        if sizes[index] >= min_px:
-            cy, cx = centers[index]
-            owner[index + 1] = int(min(cy // cell_h, rows - 1)) * cols + int(min(cx // cell_w, cols - 1))
-    cells = []
-    for cell in range(cols * rows):
-        keep = [label for label, c in owner.items() if c == cell]
-        if not keep:
-            raise ValueError(f"{name}: cell {cell} has no art")
-        r, c = divmod(cell, cols)
-        block = rgba[r * cell_h : (r + 1) * cell_h, c * cell_w : (c + 1) * cell_w].copy()
-        sel = np.isin(labels, keep)[r * cell_h : (r + 1) * cell_h, c * cell_w : (c + 1) * cell_w]
-        block[..., 3] = np.where(sel, block[..., 3], 0)
-        cells.append(block)
-    return cells
-
-
-def scale_rgba(frame: np.ndarray, scale: float) -> np.ndarray:
-    premult = frame.copy()
-    premult[..., :3] *= premult[..., 3:4] / 255.0
-    img = Image.fromarray(premult.astype(np.uint8), "RGBA")
-    img = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
-    arr = np.asarray(img).astype(np.float32)
-    a = arr[..., 3:4]
-    arr[..., :3] = np.where(a > 0, np.minimum(arr[..., :3] * 255.0 / np.maximum(a, 1.0), 255.0), 0)
-    return arr.astype(np.uint8)
-
-
-def place_fixed(frames: list[np.ndarray], scale: float, out_cell: int, anchor_of, anchor_dst: tuple[float, float], label: str, anchor_idx: int = 0) -> list[Image.Image]:
-    """Scale full raw cells and paste them with ONE offset, chosen so the anchor of
-    frame `anchor_idx` lands on `anchor_dst`. Reports art that falls outside the cell."""
-    scaled = [scale_rgba(f, scale) for f in frames]
-    ax, ay = anchor_of(scaled[anchor_idx])
-    left, top = round(anchor_dst[0] - ax), round(anchor_dst[1] - ay)
-    out = []
-    for index, arr in enumerate(scaled):
-        cell = Image.new("RGBA", (out_cell, out_cell), (0, 0, 0, 0))
-        full = Image.new("RGBA", (max(out_cell, arr.shape[1] + abs(left)) + out_cell, max(out_cell, arr.shape[0] + abs(top)) + out_cell), (0, 0, 0, 0))
-        full.alpha_composite(Image.fromarray(arr, "RGBA"), (left + out_cell, top + out_cell))
-        cell = full.crop((out_cell, out_cell, 2 * out_cell, 2 * out_cell))
-        lost = int((arr[..., 3] > 20).sum()) - int((np.asarray(cell)[..., 3] > 20).sum())
-        if lost > 30:
-            print(f"  note: {label}[{index}] loses {lost} px outside the cell")
-        out.append(cell)
-    return out
-
-
 def stag_body_anchor(arr: np.ndarray) -> tuple[float, float]:
     bottom, cx = body_mask_bottom(arr.astype(np.float32))
     return cx, float(bottom)
@@ -387,7 +246,8 @@ def stag_body_anchor(arr: np.ndarray) -> tuple[float, float]:
 
 # Spectral stag: its own sheet and sprite scale (the sprite node uses STAG_SPRITE_SCALE).
 STAG_RAW = "artemis_stag_raw.png"
-STAG_CELL = 384
+STAG_CELL = 512  # cell width: the stretched gallop poses reach 239 px left of the feet, which sit on the cell centre
+STAG_CELL_HEIGHT = 384
 STAG_FEET_ROW = 340
 STAG_SPRITE_SCALE = 0.245  # sprite node scale in artemis.tscn (commit 0aa2d61); the sheet is NOT rescaled by it
 STAG_RENDER_SCALE = 0.2  # sizing basis of the sheet pixels (STAG_BODY_WIDTH is relative to this)
@@ -402,17 +262,22 @@ STAG_CLIPS = {
     "stag_run": list(range(3, 11)),
 }
 STAG_REF = 6
+STAG_RUN_CELLS = range(3, 11)
+STAG_SPECK_DISTANCE = 24.0  # raw px from the body; the tail wisps of the gallop are within 10
+STAG_SPECK_MAX_PX = 150
 
 
 def build_stag() -> dict:
     cols, rows = STAG_GRID
     needed = {i for clip in STAG_CLIPS.values() for i in clip}
     frames = split_frames(key_magenta(Image.open(RAW_DIR / STAG_RAW)), cols, rows, "stag", needed)
+    for src in STAG_RUN_CELLS:
+        frames[src] = pipeline.drop_distant_specks(frames[src], STAG_SPECK_DISTANCE, STAG_SPECK_MAX_PX)
     ref = frames[STAG_REF]
     scale = (STAG_BODY_WIDTH / STAG_RENDER_SCALE) / ref.shape[1]
     used = sorted(needed)
     remap = {src: dst for dst, src in enumerate(used)}
-    cells = [to_cell(frames[src], scale, f"stag[{src}]", True, STAG_CELL, STAG_FEET_ROW) for src in used]
+    cells = [to_cell(frames[src], scale, f"stag[{src}]", True, STAG_CELL, STAG_FEET_ROW, STAG_CELL_HEIGHT) for src in used]
     rows_out = (len(cells) + COLUMNS - 1) // COLUMNS
     clips = {clip: [remap[i] for i in idx] for clip, idx in STAG_CLIPS.items()}
     if (RAW_DIR / STAG_VANISH_RAW).exists():
@@ -420,19 +285,19 @@ def build_stag() -> dict:
         # a run frame would, the rest keep their position relative to it.
         vcols, vrows = STAG_VANISH_GRID
         full = split_cells(key_magenta(Image.open(RAW_DIR / STAG_VANISH_RAW)), vcols, vrows, "stag_vanish", 12)
-        placed = place_fixed(full, scale * STAG_VANISH_SCALE_MULT, STAG_CELL, stag_body_anchor, (STAG_CELL / 2, STAG_FEET_ROW), "stag_vanish")
+        placed = place_fixed(full, scale * STAG_VANISH_SCALE_MULT, STAG_CELL, stag_body_anchor, (STAG_CELL / 2, STAG_FEET_ROW), "stag_vanish", cell_height=STAG_CELL_HEIGHT)
         clips["stag_vanish"] = list(range(len(cells), len(cells) + len(placed)))
         cells.extend(placed)
     rows_out = (len(cells) + COLUMNS - 1) // COLUMNS
-    sheet = Image.new("RGBA", (COLUMNS * STAG_CELL, rows_out * STAG_CELL), (0, 0, 0, 0))
+    sheet = Image.new("RGBA", (COLUMNS * STAG_CELL, rows_out * STAG_CELL_HEIGHT), (0, 0, 0, 0))
     for index, cell in enumerate(cells):
-        sheet.alpha_composite(cell, ((index % COLUMNS) * STAG_CELL, (index // COLUMNS) * STAG_CELL))
+        sheet.alpha_composite(cell, ((index % COLUMNS) * STAG_CELL, (index // COLUMNS) * STAG_CELL_HEIGHT))
     sheet.save(OUT_DIR / "spectral_stag_sheet.png", optimize=True)
     return {
         "sheet": "spectral_stag_sheet.png",
         "sprite_scale": STAG_SPRITE_SCALE,
         "feet_row": STAG_FEET_ROW,
-        "grid": {"columns": COLUMNS, "rows": rows_out, "cell_width": STAG_CELL, "cell_height": STAG_CELL},
+        "grid": {"columns": COLUMNS, "rows": rows_out, "cell_width": STAG_CELL, "cell_height": STAG_CELL_HEIGHT},
         "clips": clips,
     }
 
@@ -621,20 +486,12 @@ def main() -> None:
     }
     for name, spec in SHEETS.items():
         frames = prepared[name]
-        used = sorted({i for clip in spec["clips"].values() for i in clip})
-        remap = {src: dst for dst, src in enumerate(used)}
+        used, clips = pipeline.compact_clips(spec["clips"])
         cells = [to_cell(frames[src], scales[name], f"{name}[{src}]", spec.get("body_feet", False)) for src in used]
-        rows = (len(cells) + COLUMNS - 1) // COLUMNS
-        sheet = Image.new("RGBA", (COLUMNS * OUT_CELL, rows * OUT_CELL), (0, 0, 0, 0))
-        for index, cell in enumerate(cells):
-            sheet.alpha_composite(cell, ((index % COLUMNS) * OUT_CELL, (index // COLUMNS) * OUT_CELL))
+        sheet = pipeline.assemble_sheet(cells, OUT_CELL)
         file_name = f"artemis_{name}_sheet.png"
         sheet.save(OUT_DIR / file_name, optimize=True)
-        manifest["sheets"][file_name] = {
-            "grid": {"columns": COLUMNS, "rows": rows, "cell_width": OUT_CELL, "cell_height": OUT_CELL},
-            "clips": {clip: [remap[i] for i in idx] for clip, idx in spec["clips"].items()},
-            "events": spec.get("events", {}),
-        }
+        manifest["sheets"][file_name] = pipeline.manifest_entry(sheet, OUT_CELL, clips, spec.get("events", {}))
         if args.preview:
             args.preview.mkdir(parents=True, exist_ok=True)
             bg = Image.new("RGBA", sheet.size, (24, 32, 56, 255))
