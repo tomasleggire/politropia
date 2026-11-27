@@ -1,9 +1,10 @@
 class_name LibrarianNPC
 extends CharacterBody2D
 
-@export var npc_name := "Filósofo"
+@export var npc_name := "Bibliotecario"
 
-@onready var speech_bubble: LibrarianSpeechBubble = $LibrarianSpeechBubble
+@export_multiline var dialogue: Array[String] = []
+@onready var speech_bubble: NpcSpeechBubble = $SpeechBubble
 @onready var interaction_area: Area2D = $InteractionArea
 #01@onready var prompt_icon: Control = $PromptIcon
 @onready var prompt: InteractionPrompt = $InteractionPrompt
@@ -26,8 +27,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func request_interact() -> bool:
-	if not _player_in_range or _is_talking:
+	if not _player_in_range:
 		return false
+
+	if _is_talking:
+		speech_bubble.advance_dialogue()
+		return true
 
 	_start_dialogue()
 	return true
@@ -76,21 +81,9 @@ func _start_dialogue() -> void:
 	_refresh_interaction()
 
 
-	var frase = (
-		DialogueColor.tag("No", DialogueColor.CREMA) + " " +
-		DialogueColor.tag("todos", DialogueColor.NARANJA) + " " +
-		DialogueColor.tag("los", DialogueColor.CREMA) + " " +
-		DialogueColor.tag("secretos", DialogueColor.AZUL) + " " +
-		DialogueColor.tag("están", DialogueColor.AMARILLO) + " " +
-		DialogueColor.tag("ocultos.", DialogueColor.NARANJA) + "\n" +
-		DialogueColor.tag("Algunos", DialogueColor.CREMA) + " " +
-		DialogueColor.tag("solo", DialogueColor.NARANJA) + " " +
-		DialogueColor.tag("esperan", DialogueColor.AZUL) + " " +
-		DialogueColor.tag("ser", DialogueColor.AMARILLO) + " " +
-		DialogueColor.tag("revelados.", DialogueColor.NARANJA)
-	)
+	var colored_dialogue: Array[String] = DialogueColor.color_dialogue(dialogue)
 	
-	speech_bubble.show_text(frase)
+	speech_bubble.start_dialogue(colored_dialogue)
 
 var icono 
 

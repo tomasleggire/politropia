@@ -14330,6 +14330,7 @@ position = Vector2(403, 1111)
 collision_layer = 0
 collision_mask = 0
 script = ExtResource("13_bm5rn")
+dialogue = Array[String](["Esta biblioteca está llena de historias. Algunas se dejan leer fácilmente", "otras parecen esconder sus palabras entre las páginas", "Hay quienes recorren esta biblioteca sin perderse jamás", "Otros necesitan detenerse, descansar un momento", "y recuperar fuerzas para mirar las cosas desde otro lugar"])
 
 [node name="BookFlyer" parent="." unique_id=898895438 instance=ExtResource("8_cne4m")]
 position = Vector2(165, 916)

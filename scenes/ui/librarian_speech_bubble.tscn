@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://do5yura3snuld"]
 
-[ext_resource type="Script" uid="uid://bpc1dbdk1ognf" path="res://scripts/ui/librarian_speech_bubble.gd" id="1_5tf0o"]
+[ext_resource type="Script" uid="uid://bpc1dbdk1ognf" path="res://scripts/ui/npc_speech_bubble.gd" id="1_5tf0o"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ts6vr"]
 content_margin_left = 6.0
@@ -13,7 +13,7 @@ corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
-[node name="LibrarianSpeechBubble" type="Node2D" unique_id=1025694301]
+[node name="NpcSpeechBubble" type="Node2D" unique_id=1025694301]
 z_index = 10
 position = Vector2(1, 1)
 scale = Vector2(0.5, 0.5)
