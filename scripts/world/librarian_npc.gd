@@ -54,24 +54,24 @@ func _on_body_exited(body: Node2D) -> void:
 func _is_player(body: Node2D) -> bool:
 	return body.is_in_group(&"player") or body is Player
 
+
 func _refresh_interaction() -> void:
-	var available := _player_in_range and not _is_talking
 	var touch := get_node_or_null("/root/TouchControls")
 
+	# El botón táctil permanece visible mientras Luz esté cerca,
 	if touch != null:
-		touch.set_interact_available(self, available)
-		
-		if touch.visible:
-			prompt.hide_prompt()
-		elif available:
-			prompt.show_prompt()
-		else:
-			prompt.hide_prompt()
+		touch.set_interact_available(self, _player_in_range)
+
+	# El indicador de teclado solamente aparece cuando no hay diálogo.
+	var can_interact := _player_in_range and not _is_talking
+
+	if touch != null and touch.visible:
+		prompt.hide_prompt()
+	elif can_interact:
+		prompt.show_prompt()
 	else:
-		if available:
-			prompt.show_prompt()
-		else:
-			prompt.hide_prompt()
+		prompt.hide_prompt()
+
 
 
 func _start_dialogue() -> void:
@@ -94,7 +94,7 @@ func _on_dialogue_finished() -> void:
 		$AbilityUnlockPopup.show_ability(
 			"Focus",
 			"Luz aprendió a concentrar su energía para recuperar salud.",
-			load("res://assets/ui/open_eyes_learned.png")
+			load("res://assets/ui/focus_learned.png")
 		)
 
 	call_deferred("_refresh_interaction")
