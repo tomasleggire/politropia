@@ -13,6 +13,7 @@ extends Node
 ## `BossProgress.to_dict()` and restore both together with `from_dict()`.
 
 signal ability_recorded(ability: StringName)
+signal progress_changed
 
 const SAVE_VERSION := 1
 
@@ -23,8 +24,10 @@ var _abilities: Dictionary = {}
 func record(ability: StringName) -> bool:
 	if ability.is_empty() or _abilities.has(ability):
 		return false
+		
 	_abilities[ability] = true
 	ability_recorded.emit(ability)
+	progress_changed.emit()
 	return true
 
 
@@ -35,6 +38,7 @@ func is_unlocked(ability: StringName) -> bool:
 ## Forgets everything (tests, new game).
 func clear() -> void:
 	_abilities.clear()
+	progress_changed.emit()
 
 
 func to_dict() -> Dictionary:
@@ -49,3 +53,4 @@ func from_dict(data: Dictionary) -> void:
 	for ability: Variant in data["abilities"]:
 		if ability is String and not (ability as String).is_empty():
 			_abilities[StringName(ability)] = true
+	progress_changed.emit()

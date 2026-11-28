@@ -74,19 +74,14 @@ func _ready() -> void:
 	
 	var ability_progress := get_node_or_null("/root/AbilityProgress")
 	if ability_progress != null:
-		if ability_progress.has_signal(&"ability_recorded"):
-			if not ability_progress.is_connected(
-				&"ability_recorded",
-				_on_ability_recorded
-			):
-				ability_progress.connect(
-					&"ability_recorded",
-					_on_ability_recorded
-				)
-	
-	_bind_found_player.call_deferred()
+			if ability_progress.has_signal(&"progress_changed"):
+				ability_progress.progress_changed.connect(
+					_on_ability_progress_changed)
+					
 	_check_saved_hyperfocus.call_deferred()
 
+func _on_ability_progress_changed() -> void:
+	_check_saved_hyperfocus()
 
 func _check_saved_hyperfocus() -> void:
 	var ability_progress := get_node_or_null("/root/AbilityProgress")
